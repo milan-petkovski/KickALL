@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const fs        = require('fs');
 const path      = require('path');
+const http      = require('http');
 
 // ─── KONFIGURACIJA (ne menjaj) ────────────────────────────────────────────────
 const CHATROOM_ID      = "93361227";
@@ -1099,6 +1100,15 @@ async function proveriDaLiJeLive() {
         log('ERR', `Greška pri proveri statusa strima: ${err.message}`);
     }
 }
+
+// ─── HTTP SERVER (Trik za besplatni Render Web Service) ────────────────────────
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('🤖 Tutzot Kick Bot je aktivan i zdrav!\n');
+}).listen(PORT, () => {
+    log('INFO', `Lokalni HTTP server pokrenut na portu: ${PORT}`);
+});
 
 // ─── START ────────────────────────────────────────────────────────────────────
 log('INFO', '🤖 Kickot bot se pokreće...');
