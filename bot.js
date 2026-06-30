@@ -10,15 +10,14 @@ const BEARER_TOKEN  = "Bearer 389179658|D3szQX9nsKYknEjj5Umt2AWMcuJcqQjuUWBRkqiv
 const BOT_COOKIE    = `cf_clearance=ezbrEx33FpRWS0tXJTf4NHrcd7Dg850icIOBQH5C9Dc-1782816941-1.2.1.1-apAXO0.n3N6aZ6oE0uSrin1WWmyHnInLsd1TYp08yA.BbvrQ8rE85oZoKop4sHEkgxWsszvObA2TdH3z6erB7l2osQfeFu44rwDayyrc352h3aqLnfWlbC_QeI26s55aDJgM9DtTdK6fzUXh0qpekAp_3JT_bv5EFpsXw2H52_MYa6x6R1mr8JKUYRWwuEzKKIckUxipUI2ivSndTJvzLOC8yv.7jf5YmxDAHp5KM39kQKnuwVqE_lemipl37QhweYACCgaMk7o7AXsgyL5CjEZYmyIfqvkKlkWWNgVcPxwbmATJR17OjL47GS5ePQBXbRngLKwysx0wshofNYjwFQ; KP_UIDz-ssn=0PWTbXafST42PKO5aojj4Q2nFGuqAUPdfktw2jVETfJv3i087Patg1BeqF40lnsNqio3APUGc6ZUybXaiqtmuA8AGR2dU26dV40WZ8A5fbgm4oYFbdmgJPaMObeMjwloi3GNv5dn3Ai8nK8mL2q6S5g3YBnWzD2gASuDIktlMpge; KP_UIDz=0PWTbXafST42PKO5aojj4Q2nFGuqAUPdfktw2jVETfJv3i087Patg1BeqF40lnsNqio3APUGc6ZUybXaiqtmuA8AGR2dU26dV40WZ8A5fbgm4oYFbdmgJPaMObeMjwloi3GNv5dn3Ai8nK8mL2q6S5g3YBnWzD2gASuDIktlMpge; __stripe_mid=6ff5cc8a-fd2d-4319-9221-652c9959bd5dec5dfd; __stripe_sid=44778426-ba6b-48ad-a6c9-4752e04beaec1012e7; session_token=389179658%7CD3szQX9nsKYknEjj5Umt2AWMcuJcqQjuUWBRkqiv; XSRF-TOKEN=eyJpdiI6IkE5SUVrYmJaN3QyRHc1QTRLNEw2OEE9PSIsInZhbHVlIjoiM2wvWFI5cE90TmtvWGdmRFdZTGJGNWF4TEFmcTJocnJRWFRkTTcxM25GZGwvYVpVRy9NbVNYdW1SUmhDNWV0Q2R2YnB3bThqbkxFRHd5RzY1emM2L2JHTEMwcU1VRE4yWFdIT1F5dCtUWHlsbENEWGJFU1hIbFFDV2NOdndRRXQiLCJtYWMiOiI5ZjZiYTFmYmY1MDIwZGFkODZmMjE2OTUyN2Y3YTM5MzExZjg0MTYyNWJhNzdjYzgxNDYyOGVhZDdmNmQzYzJkIiwidGFnIjoiIn0%3D; kick_session=eyJpdiI6ImpDUlBReTJUNncvTEFKanEzN1hORnc9PSIsInZhbHVlIjoiQ2FzaHNUejM1RmlBQWlTSWZzLzZldWJYdzUxanQzc0NLV1dkaGt5a1QxYnpRWm04TVc5NytQd0VjZTh4elNPeE80NUtrdUwxL1pPSHIybGF4ckk1VUc0NW10T0kwcWN3WlBLcEhNR3BidndXd3JlUkdXV1hRWDRHbXNlRHhUbkoiLCJtYWMiOiIzMmU5YTJhMTEyNTMwMzJhMTIyOGRmYmFkM2YwNTU3MzM3NTk2NzE3NTExYzBiZTZlMjQ2OGQwODNkMGNmOTczIiwidGFnIjoiIn0%3D; _iidt=ARhmkhcMA/7pVwxa4hpmWR6TeSs68+EP0mZNZORG3O1uH/QSFtcSNd32H+HsHausQULAWflhB/suMtq3PDny1KXv4zR2+hSaSpOFLWE=; volume=0.5; __cf_bm=cwx_GzqCaSQdnTHURVV6HoFv8uu3uZE_bI3VAgHiDT4-1782816964.9727213-1.0.1.1-7NaKjNHGm9HN1GADKN2_E2jO9pfEujB3yed9x6n1rAreLu4zmV4soil_7HcZQrTXDqHezTpf9qnAES_esLIiD79.6BJrgY_m.ymOVJrVw02xT6f4mukdVALkWp_sYp2i; _cfuvid=I_EG_6TGtC32.Mmi9xxcXqd_SqxL2KYrFSq4RGiIPS0-1782816969.2289946-1.0.1.1-Lnw2FICduTVx3p7lkBKMsJte_T6VJ4JzSQKQxzSen2M; kick:anon-id:v1=33b237ef-4d16-4366-9c6b-65af1508a709; _dd_s=aid=8ce60aab-a6e6-4340-8a99-494bbb7fadc5&logs=1&id=90d08dc4-d7e8-4c15-92bd-5b761f6a5c99&created=1782816960352&expire=1782817932657`;
 
 // ─── BOT PODEŠAVANJA ──────────────────────────────────────────────────────────
-const COOLDOWN_MS           = 5000;   // Minimalno vreme između iste komande (ms)
+const COOLDOWN_MS           = 3000;   // Minimalno vreme između iste komande (ms)
 const RECONNECT_BASE_MS     = 3000;   // Početno vreme za reconnect (ms)
 const RECONNECT_MAX_MS      = 60000;  // Maksimalno vreme čekanja reconnecta (ms)
 const HEARTBEAT_MS          = 25000;  // Koliko često šaljemo ping (ms)
 const SPAM_THRESHOLD        = 3;      // Broj identičnih poruka pre upozorenja
 const SPAM_WINDOW_MS        = 30000;  // Vremenski prozor za spam detekciju (ms)
-const ANNOUNCE_AFTER_MSGS   = 20;     // Broj poruka u chatu pre auto-poruke
-const ANNOUNCE_MIN_GAP_MS   = 30 * 60 * 1000; // Min. vreme između dve auto-poruke (30min)
-const LURKER_COOLDOWN_MS    = 60 * 60 * 1000; // 1h - koliko dugo user ostaje "poznat" (ms)
+const ANNOUNCE_AFTER_MSGS   = 30;     // Broj poruka u chatu pre auto-poruke
+const ANNOUNCE_MIN_GAP_MS   = 15 * 60 * 1000; // Min. vreme između dve auto-poruke (15min)
 
 // ─── PORUKE ZA GRUPISANE KOMANDE ──────────────────────────────────────────────
 const specPoruka      = '🖥️ Tutz PC Setup: Ryzen 9 5900X | RTX 4080 16GB | 32GB RAM | Asus ROG B550-F | 2.5TB SSD | ROG 750W Gold | Corsair H150i LCD | Ekran: 2x Asus 144Hz | Miš: G502 Hero | Tastatura: Scope RX';
@@ -109,9 +108,6 @@ const cooldowns = {};
 
 // Spam tracker: { username: [timestamp, timestamp, ...] }
 const spamTracker = {};
-
-// Lurker tracker: { username: lastSeenTimestamp }
-const lurkerTracker = {};
 
 // Love modifiers: { 'user1::user2': offset_value }
 const loveModifiers = {};
@@ -317,19 +313,43 @@ function povezi() {
             const username = chatData.sender.username;
             const isBotMsg = chatData.sender.is_bot || false;
 
-            log('CHAT', `${username}: ${poruka}`);
+            // Logujemo samo poruke drugih korisnika (da ne bismo duplirali poruke bota u konzoli)
+            if (username.toLowerCase() !== 'tutzonja') {
+                log('CHAT', `${username}: ${poruka}`);
+            }
 
-            // Preskačemo sopstvene poruke
-            if (isBotMsg) return;
+            // Preskačemo sopstvene poruke, strimera i poznate botove
+            const userKey = username.toLowerCase();
+            if (isBotMsg || userKey === 'tutzonja' || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs' || userKey === CHANNEL_USERNAME.toLowerCase()) {
+                return;
+            }
 
             // Evidentiraj poruku u leaderboardu aktivnosti
             evidentirajPoruku(username);
 
+            const porukaLower = poruka.toLowerCase();
+
             // ── Anti-spam filter ───────────────────────────────────────────────
             if (spamFilter(username, poruka)) return;
 
-            // ── Lurker welcome ─────────────────────────────────────────────────
-            lurkerWelcome(username);
+            // ── Pozdrav na tag bota ─────────────────────────────────────────────
+            if (porukaLower.includes('@tutzonja')) {
+                const pozdravi = ['cao', 'ćao', 'pozdrav', 'zdravo', 'hej', 'hi', 'hello', 'desi', 'de si', 'jesi tu', 'gde si'];
+                const imaPozdrav = pozdravi.some(rec => porukaLower.includes(rec));
+                if (imaPozdrav) {
+                    if (!proveraKulauna('bot_tag_welcome', username)) {
+                        const odgovori = [
+                            `Ćao @${username}! Kako si danas? 😊`,
+                            `Hej @${username}! Tu sam, pratim strim i družim se sa vama! 🔥`,
+                            `Pozdrav @${username}! Uživaj u lajvu! 👑`,
+                            `Zdravo @${username}! Šta ima kod tebe? 👋`
+                        ];
+                        const tekst = odgovori[Math.floor(Math.random() * odgovori.length)];
+                        posaljiPoruku(tekst);
+                        return; // Prekidamo dalju obradu jer je na pozdrav odgovoreno
+                    }
+                }
+            }
 
             // ── Auto-announce brojač ────────────────────────────────────────────
             if (isStreamLive) {
@@ -343,7 +363,6 @@ function povezi() {
             }
 
             // ── Dinamičke komande ────────────────────────────────────────────
-            const porukaLower = poruka.toLowerCase();
 
             if (porukaLower.startsWith('!vreme ')) {
                 const grad = poruka.slice(7).trim();
@@ -555,30 +574,6 @@ function spamFilter(username, poruka) {
     }
 
     return false;
-}
-
-// ─── LURKER WELCOME ────────────────────────────────────────────────────────────
-function lurkerWelcome(username) {
-    const sada   = Date.now();
-    const zadnji = lurkerTracker[username] || 0;
-
-    if (sada - zadnji > LURKER_COOLDOWN_MS) {
-        const poruke = [
-            `Pozdrav @${username}! Dobrodošao na strim! 👋`,
-            `Hej @${username}! Lepo je što si tu, uživaj u strimu! 🔥`,
-            `@${username} se pojavio/la! Dobro došao! 🎉`,
-            `Dobrodošao nazad @${username}! Kako si danas? 😊`,
-            `Ooo vidi ko je to nama došao! Pozdrav za @${username}! 👑`,
-            `Upada @${username} direktno na strim! Smeštaj se i uživaj! 🛋️`,
-            `Nova faca u chatu! Dobrodošao @${username}! 🚀`,
-            `Pozdrav @${username}! Nadamo se da će ti biti zabavno sa nama! 🌟`
-        ];
-        const tekst = poruke[Math.floor(Math.random() * poruke.length)];
-        posaljiPoruku(tekst);
-        log('INFO', `Lurker welcome: ${username}`);
-    }
-
-    lurkerTracker[username] = sada;
 }
 
 // ─── AUTO ANNOUNCE ────────────────────────────────────────────────────────────
