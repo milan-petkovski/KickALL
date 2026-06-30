@@ -1,0 +1,4 @@
+node_modules/
+leaderboard.json
+leaderboard_backup_*.json
+.env

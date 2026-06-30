@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "axios": "^1.18.1",
+    "pusher-js": "^8.5.0",
+    "ws": "^8.21.0"
+  }
+}
