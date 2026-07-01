@@ -16,6 +16,8 @@ const RECONNECT_MAX_MS      = 60000;  // Maksimalno vreme čekanja reconnecta (m
 const HEARTBEAT_MS          = 25000;  // Koliko često šaljemo ping (ms)
 const SPAM_THRESHOLD        = 3;      // Broj identičnih poruka pre upozorenja
 const SPAM_WINDOW_MS        = 15000;  // Vremenski prozor za spam detekciju (ms)
+const RAPID_MSG_THRESHOLD   = 5;      // Broj bilo kojih poruka za detekciju brzog kucanja
+const RAPID_MSG_WINDOW_MS   = 8000;   // Vremenski prozor za brzo kucanje (ms)
 const ANNOUNCE_AFTER_MSGS   = 30;     // Broj poruka u chatu pre auto-poruke
 const ANNOUNCE_MIN_GAP_MS   = 15 * 60 * 1000; // Min. vreme između dve auto-poruke (15min)
 
@@ -106,8 +108,11 @@ let isConnected      = false;
 // Cooldown tracker: { komanda: lastUsedTimestamp }
 const cooldowns = {};
 
-// Spam tracker: { username: [timestamp, timestamp, ...] }
+// Spam tracker: { username::message: [timestamp, timestamp, ...] }
 const spamTracker = {};
+
+// Rapid messaging tracker: { username: [timestamp, timestamp, ...] }
+const rapidTracker = {};
 
 // Last warning tracker: { username: timestamp }
 const lastWarned = {};
@@ -159,6 +164,7 @@ async function fetchKickAPI(url) {
     return fetch(url, {
         headers: {
             'accept':        'application/json',
+            'authorization': BEARER_TOKEN,
             'cookie':        BOT_COOKIE,
             'user-agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36'
         }
@@ -694,37 +700,61 @@ function handleDuel(challenger, meta) {
 // Vraća true ako je spam (treba zaustaviti dalju obradu poruke)
 function spamFilter(username, poruka) {
     const sada  = Date.now();
-    const kljuc = `${username}::${poruka.toLowerCase()}`;
+    const userKey = username.toLowerCase();
+    
+    // ── 1. Provera identičnih poruka ──────────────────────────────────────────
+    const kljucIdenticna = `${username}::${poruka.toLowerCase()}`;
+    if (!spamTracker[kljucIdenticna]) spamTracker[kljucIdenticna] = [];
+    spamTracker[kljucIdenticna] = spamTracker[kljucIdenticna].filter(t => sada - t < SPAM_WINDOW_MS);
+    spamTracker[kljucIdenticna].push(sada);
+    const countIdenticna = spamTracker[kljucIdenticna].length;
 
-    if (!spamTracker[kljuc]) spamTracker[kljuc] = [];
+    // ── 2. Provera brzog kucanja (bilo kojih poruka) ──────────────────────────
+    if (!rapidTracker[userKey]) rapidTracker[userKey] = [];
+    rapidTracker[userKey] = rapidTracker[userKey].filter(t => sada - t < RAPID_MSG_WINDOW_MS);
+    rapidTracker[userKey].push(sada);
+    const countRapid = rapidTracker[userKey].length;
 
-    // Uklanjamo stare zapise van prozora
-    spamTracker[kljuc] = spamTracker[kljuc].filter(t => sada - t < SPAM_WINDOW_MS);
-    spamTracker[kljuc].push(sada);
+    const zadnjeUpozorenje = lastWarned[userKey] || 0;
 
-    const count = spamTracker[kljuc].length;
-
-    if (count === SPAM_THRESHOLD) {
-        const userKey = username.toLowerCase();
-        const zadnjeUpozorenje = lastWarned[userKey] || 0;
-        
-        // Smanjujemo broj poruka u leaderboardu i auto-announce brojaču za preostale koje su prebrojane u ovoj spam sekvenci
+    // Ako je dostignut limit za identične poruke
+    if (countIdenticna === SPAM_THRESHOLD) {
         smanjiPoruku(username, SPAM_THRESHOLD - 1);
         porukePosleAnnounce = Math.max(0, porukePosleAnnounce - (SPAM_THRESHOLD - 1));
 
         if (sada - zadnjeUpozorenje > SPAM_WINDOW_MS) {
             posaljiPoruku(`@${username} molim te ne spam-uj u chatu! 🙏`);
             lastWarned[userKey] = sada;
-            log('WARN', `Anti-spam: upozoren ${username} (${count}x ista poruka)`);
+            log('WARN', `Anti-spam: upozoren ${username} (${countIdenticna}x ista poruka)`);
         } else {
             log('WARN', `Anti-spam: preskočeno duplirano upozorenje za ${username}`);
         }
         return true;
     }
 
-    if (count > SPAM_THRESHOLD) {
-        log('WARN', `Anti-spam: blokirano od ${username} (${count}x)`);
-        return true; // tihо blokujemo, bez ponavljanja upozorenja
+    if (countIdenticna > SPAM_THRESHOLD) {
+        log('WARN', `Anti-spam: blokirano od ${username} (${countIdenticna}x ista poruka)`);
+        return true;
+    }
+
+    // Ako je dostignut limit za brzo kucanje (bilo koje poruke)
+    if (countRapid === RAPID_MSG_THRESHOLD) {
+        smanjiPoruku(username, RAPID_MSG_THRESHOLD - 1);
+        porukePosleAnnounce = Math.max(0, porukePosleAnnounce - (RAPID_MSG_THRESHOLD - 1));
+
+        if (sada - zadnjeUpozorenje > SPAM_WINDOW_MS) {
+            posaljiPoruku(`@${username} molim te ne spam-uj u chatu! 🙏`);
+            lastWarned[userKey] = sada;
+            log('WARN', `Anti-spam: upozoren ${username} (${countRapid}x brze poruke)`);
+        } else {
+            log('WARN', `Anti-spam: preskočeno duplirano upozorenje za ${username}`);
+        }
+        return true;
+    }
+
+    if (countRapid > RAPID_MSG_THRESHOLD) {
+        log('WARN', `Anti-spam: blokirano od ${username} (${countRapid}x brze poruke)`);
+        return true;
     }
 
     return false;
