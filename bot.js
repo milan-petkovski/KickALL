@@ -20,6 +20,7 @@ const RAPID_MSG_THRESHOLD   = 5;      // Broj bilo kojih poruka za detekciju brz
 const RAPID_MSG_WINDOW_MS   = 8000;   // Vremenski prozor za brzo kucanje (ms)
 const ANNOUNCE_AFTER_MSGS   = 30;     // Broj poruka u chatu pre auto-poruke
 const ANNOUNCE_MIN_GAP_MS   = 15 * 60 * 1000; // Min. vreme između dve auto-poruke (15min)
+const LEADERBOARD_SAVE_INTERVAL_MS = 1 * 60 * 1000; // Vreme između dva automatska čuvanja leaderboarda (1 minut)
 
 // ─── PORUKE ZA GRUPISANE KOMANDE ──────────────────────────────────────────────
 const specPoruka      = '🖥️ Tutz PC Setup: Ryzen 9 5900X | RTX 4080 16GB | 32GB RAM | Asus ROG B550-F | 2.5TB SSD | ROG 750W Gold | Corsair H150i LCD | Ekran: 2x Asus 144Hz | Miš: G502 Hero | Tastatura: Scope RX';
@@ -39,12 +40,12 @@ const komande = {
     '!kick':        'Dobrodošli na strim! Lupite taj Follow ako uživate!',
 
     // ─── KANAL / EKIPA (GANG) ────────────────────────────────────────────────────
-    /*'!tutz':        'Deda matori neradnik',
-    '!treshonja':   'Ko je taj lik',
+    '!tutz':        'Najbolji strimer',
+    '!sofia':       'Milanova najveća i jedina ljubav :D',
+    /*'!treshonja':   'Ko je taj lik',
     '!milance':     'Najbolji menadzer Tutz Ganga',
     '!lambana':     'Lamba i Ana Kid se vole najvise na svetu',
     '!lamba':       'Tutzov brat',
-    '!sofia':       'Milanova najveća ljubav',
     '!block':       'Sofia unblock plssss',
     '!inaa':        'INAABANK',
     '!anakid':      'Samo ime kaze kid...',
@@ -82,19 +83,20 @@ const komande = {
     '!gw':          giveawayPoruka,
 
     // ─── LISTA SVIH KOMANDI ───────────────────────────────────────────────────────
-    '!komande':     '🤖 Komande: !socials, !pc, !gw, !merch, !sponzori, !viber, !igra, !uptime, !vreme <grad>, !love, !duel, !brakovi, !top, !stats, !info',
+    '!komande':     '🤖 Komande: !pc, !gw, !merch, !sponzori, !viber, !igra, !uptime, !vreme <grad>, !love, !duel, !brakovi, !top, !stats, !info',
 };
 
 // Automatske poruke koje bot rotira (neće iste dve izaći jedna za drugom)
 const AUTO_PORUKE = [
+    'Dobrodošli na strim! Lupite taj Follow ako uživate!',
     'Zaprati Tutza na Kicku da ne propustiš ni jedan stream! 📲',
-    'Koristi kod tutz na sajtovima ako imaš više od 18 godina! 💰',
     '🎁 Učestvuj u Tutz Giveaway-u za Brawl Stars nagrade: https://tutzz.netlify.app/giveaway',
     '🛍️ Kupi oficijalni Tutz Merch i podrži kanal: https://tutzshop.com',
     '💬 Pridruži se našoj Discord zajednici: https://discord.gg/u3Sf9rTyDt',
     '📱 Upadni u Viber grupu i druži se sa ekipom: https://tutzz.netlify.app/viber',
     '🌳 Sve Tutzove društvene mreže i linkovi: https://tutzz.netlify.app/linktree',
-    '🥤 Podrži kanal i kupi Noro osvežavajuće napitke: https://noro.rs/?aff_id=22',
+    '💨 Prodišite uz Noro trakice: https://noro.rs/?aff_id=22',
+    '💰 Podržite kanal: https://streamlabs.com/tutz/tip',
     'Uživajte na strimu i poštujte pravila chata da ne dobijete timeout! 🚫',
     'Tip: Upotrebi !komande da vidiš šta sve bot može! 🤖'
 ];
@@ -159,6 +161,7 @@ let porukePosleAnnounce  = 0;   // brojac poruka od poslednje auto-poruke
 let zadnjaAutoPorukaTs   = 0;   // timestamp poslednje auto-poruke
 let zadnjiAutoPorukaIdx  = -1;  // index poslednje poslate auto-poruke
 let isStreamLive         = false; // da li je strim trenutno aktivan
+let isFirstLiveCheck     = true;  // Indikator za prvu proveru statusa strima pri startovanju
 
 // ─── POMOĆNE FUNKCIJE ─────────────────────────────────────────────────────────
 function log(tip, poruka) {
@@ -394,12 +397,12 @@ function evidentirajPoruku(username) {
     leaderboard[key].username = username; // Ažuriramo case u slučaju da se promenio
     leaderboardDirty = true;
 
-    // Odloženo upisivanje na disk (svakih 10 sekundi) da ne opterećujemo disk pri svakoj poruci
+    // Odloženo upisivanje (svakih 2 minuta) da ne opterećujemo API i disk pri svakoj poruci
     if (!leaderboardSaveTimer) {
         leaderboardSaveTimer = setTimeout(() => {
             sacuvajLeaderboard();
             leaderboardSaveTimer = null;
-        }, 10000);
+        }, LEADERBOARD_SAVE_INTERVAL_MS);
     }
 }
 
@@ -413,7 +416,7 @@ function smanjiPoruku(username, iznos) {
             leaderboardSaveTimer = setTimeout(() => {
                 sacuvajLeaderboard();
                 leaderboardSaveTimer = null;
-            }, 10000);
+            }, LEADERBOARD_SAVE_INTERVAL_MS);
         }
     }
 }
@@ -481,6 +484,11 @@ function povezi() {
             try {
                 chatData = JSON.parse(response.data);
             } catch {
+                return;
+            }
+
+            // Sigurnosna provera strukture podataka
+            if (!chatData || !chatData.content || !chatData.sender || !chatData.sender.username) {
                 return;
             }
 
@@ -774,11 +782,26 @@ function proveraKulauna(kljuc, username) {
 // ─── DINAMIČKE KOMANDE ────────────────────────────────────────────────────────
 
 // !duel @user — random dvoboj između dva korisnika
-function handleDuel(challenger, meta) {
-    // Meta može biti "@user" ili samo "user"
-    const opponent = meta.replace(/^@/, '').trim();
-    if (!opponent || opponent.toLowerCase() === challenger.toLowerCase()) {
-        posaljiPoruku(`${challenger}, ne možeš da se boriš sam sa sobom! 😄 Tag-uj nekog!`);
+function handleDuel(sender, meta) {
+    const args = meta.split(/\s+/).filter(Boolean);
+    if (args.length === 0) {
+        posaljiPoruku(`${sender}, moraš tag-ovati nekoga za duel! ⚔️`);
+        return;
+    }
+
+    let challenger = '';
+    let opponent = '';
+
+    if (args.length === 1) {
+        challenger = sender;
+        opponent = args[0].replace(/^@/, '').trim();
+    } else {
+        challenger = args[0].replace(/^@/, '').trim();
+        opponent = args[1].replace(/^@/, '').trim();
+    }
+
+    if (!opponent || challenger.toLowerCase() === opponent.toLowerCase()) {
+        posaljiPoruku(`${sender}, duel između iste osobe nije moguć! 😄`);
         return;
     }
 
@@ -796,7 +819,13 @@ function handleDuel(challenger, meta) {
         `🦴 ${challenger} vs ${opponent} — ${pobednik} je slomio ruku i nogu ${gubitnik}-u. Totalna dominacija! 🔥`,
         `🍌 ${challenger} vs ${opponent} — ${gubitnik} se okliznuo na bananu i sam sebe eliminisao, ${pobednik} slavi! 🍌`,
         `🎮 ${challenger} vs ${opponent} — ${pobednik} je iskoristio cheat code i pobedio u sekundi! EZ PZ za ${pobednik}-a.`,
-        `🦖 ${challenger} vs ${opponent} — ${pobednik} je prizvao T-Rexa koji je pojeo ${gubitnik}-a za doručak! 🦕`
+        `🦖 ${challenger} vs ${opponent} — ${pobednik} je prizvao T-Rexa koji je pojeo ${gubitnik}-a za doručak! 🦕`,
+        `🚌 ${challenger} vs ${opponent} — ${pobednik} je pregazio ${gubitnik}-a svadbenim busom! 🚌💨`,
+        `⌨️ ${challenger} vs ${opponent} — ${pobednik} je pogodio ${gubitnik}-a tastaturom u glavu! RAGE QUIT! ⌨️💥`,
+        `🤼 ${challenger} vs ${opponent} — ${pobednik} je bacio RKO iz vedra neba! ${gubitnik} ne zna gde se nalazi! 🤼‍♂️💥`,
+        `👟 ${challenger} vs ${opponent} — ${pobednik} je skinuo patiku i gađao ${gubitnik}-a sa 100% preciznosti! 👟🎯`,
+        `💤 ${challenger} vs ${opponent} — ${gubitnik} je zaspao usred borbe, pa je ${pobednik} lagano uzeo pobedu! 💤`,
+        `🎵 ${challenger} vs ${opponent} — ${pobednik} je počeo da peva narodnjake na mikrofonu, ${gubitnik} se predao sa suzama u očima! 🎶😭`
     ];
     const poruka = rezultati[Math.floor(Math.random() * rezultati.length)];
     posaljiPoruku(poruka);
@@ -825,8 +854,10 @@ function spamFilter(username, poruka) {
 
     // Ako je dostignut limit za identične poruke
     if (countIdenticna === SPAM_THRESHOLD) {
-        smanjiPoruku(username, SPAM_THRESHOLD - 1);
-        porukePosleAnnounce = Math.max(0, porukePosleAnnounce - (SPAM_THRESHOLD - 1));
+        if (!poruka.startsWith('!')) {
+            smanjiPoruku(username, SPAM_THRESHOLD - 1);
+            porukePosleAnnounce = Math.max(0, porukePosleAnnounce - (SPAM_THRESHOLD - 1));
+        }
 
         if (sada - zadnjeUpozorenje > SPAM_WINDOW_MS) {
             posaljiPoruku(`@${username} molim te ne spam-uj u chatu! 🙏`);
@@ -845,11 +876,13 @@ function spamFilter(username, poruka) {
 
     // Ako je dostignut limit za brzo kucanje (bilo koje poruke)
     if (countRapid === RAPID_MSG_THRESHOLD) {
-        smanjiPoruku(username, RAPID_MSG_THRESHOLD - 1);
-        porukePosleAnnounce = Math.max(0, porukePosleAnnounce - (RAPID_MSG_THRESHOLD - 1));
+        if (!poruka.startsWith('!')) {
+            smanjiPoruku(username, RAPID_MSG_THRESHOLD - 1);
+            porukePosleAnnounce = Math.max(0, porukePosleAnnounce - (RAPID_MSG_THRESHOLD - 1));
+        }
 
         if (sada - zadnjeUpozorenje > SPAM_WINDOW_MS) {
-            posaljiPoruku(`@${username} molim te ne spam-uj u chatu! 🙏`);
+            posaljiPoruku(`@${username} molim te ne spamuj u chatu! 🙏`);
             lastWarned[userKey] = sada;
             log('WARN', `Anti-spam: upozoren ${username} (${countRapid}x brze poruke)`);
         } else {
@@ -981,7 +1014,7 @@ function handleLove(sender, args) {
 
 // ─── MODIFIKACIJA LJUBAVI ─────────────────────────────────────────────────────
 function handleModifyLove(sender, targetRaw, amount) {
-    const target = targetRaw.replace(/^@/, '').trim();
+    const target = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
     if (!target) {
         posaljiPoruku('Upotreba: !posaljiljubav @user ili !bacihejt @user');
         return false;
@@ -1017,7 +1050,7 @@ function handleModifyLove(sender, targetRaw, amount) {
 
 // ─── BRAK I RAZVOD ────────────────────────────────────────────────────────────
 function handleVencaj(sender, targetRaw) {
-    const target = targetRaw.replace(/^@/, '').trim();
+    const target = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
     if (!target) {
         posaljiPoruku('Upotreba: !vencaj @user');
         return;
@@ -1060,7 +1093,7 @@ function handleVencaj(sender, targetRaw) {
 }
 
 function handleRazvod(sender, targetRaw) {
-    const target = targetRaw.replace(/^@/, '').trim();
+    const target = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
     if (!target) {
         posaljiPoruku('Upotreba: !razvod @user');
         return;
@@ -1398,18 +1431,28 @@ async function izvrsiSlanje(tekst) {
 }
 
 // ─── GRACEFUL SHUTDOWN ────────────────────────────────────────────────────────
-process.on('SIGINT', () => {
-    log('INFO', 'Bot se gasi... (CTRL+C)');
+let isShuttingDown = false;
+async function gracefulShutdown(signal) {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    log('INFO', `Bot se gasi... (${signal})`);
     
-    // Sačuvaj preostalu aktivnost na disk pre gašenja
+    // Sačuvaj preostalu aktivnost na disk/Gist pre gašenja i sačekaj da se završi
     if (leaderboardDirty) {
-        sacuvajLeaderboard();
+        try {
+            await sacuvajLeaderboard();
+        } catch (e) {
+            log('ERR', `Greška pri čuvanju pre gašenja: ${e.message}`);
+        }
     }
     
     stopHeartbeat();
     if (ws) ws.close();
     process.exit(0);
-});
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // ─── GLOBAL CRASH PROTECTION ──────────────────────────────────────────────────
 process.on('uncaughtException', (err) => {
@@ -1431,11 +1474,13 @@ async function proveriDaLiJeLive() {
             if (liveState !== isStreamLive) {
                 isStreamLive = liveState;
                 log('INFO', `Status strima promenjen: ${isStreamLive ? '🔴 LIVE' : '⚪ OFFLINE'}`);
-                if (isStreamLive) {
+                // Pozdravna poruka se šalje samo ako strim zaista počne dok bot već radi (nije prva provera)
+                if (isStreamLive && !isFirstLiveCheck) {
                     log('INFO', 'Strim je počeo! Slanje pozdravne poruke...');
                     posaljiPoruku('🤖 Tutzot bot je aktivan! Strim je počeo, lupite follow i uživajte! 🚀');
                 }
             }
+            isFirstLiveCheck = false;
         }
     } catch (err) {
         log('ERR', `Greška pri proveri statusa strima: ${err.message}`);
@@ -1450,6 +1495,24 @@ http.createServer((req, res) => {
 }).listen(PORT, () => {
     log('INFO', `Lokalni HTTP server pokrenut na portu: ${PORT}`);
 });
+
+// ─── MEMORY CLEANUP ───────────────────────────────────────────────────────────
+// Periodično čišćenje starih spam tracking podataka iz memorije da sprečimo curenje memorije
+setInterval(() => {
+    const sada = Date.now();
+    for (const key in spamTracker) {
+        spamTracker[key] = spamTracker[key].filter(t => sada - t < SPAM_WINDOW_MS);
+        if (spamTracker[key].length === 0) {
+            delete spamTracker[key];
+        }
+    }
+    for (const key in rapidTracker) {
+        rapidTracker[key] = rapidTracker[key].filter(t => sada - t < RAPID_MSG_WINDOW_MS);
+        if (rapidTracker[key].length === 0) {
+            delete rapidTracker[key];
+        }
+    }
+}, 10 * 60 * 1000); // Svakih 10 minuta
 
 // ─── START ────────────────────────────────────────────────────────────────────
 async function start() {
