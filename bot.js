@@ -108,6 +108,10 @@ let isConnected      = false;
 // Cooldown tracker: { komanda: lastUsedTimestamp }
 const cooldowns = {};
 
+// Cooldown tracker za ljubav/hejt: { username: lastUsedTimestamp }
+const loveHateCooldowns = {};
+const LOVE_HATE_COOLDOWN_MS = 5 * 60 * 60 * 1000; // 5 sati
+
 // Spam tracker: { username::message: [timestamp, timestamp, ...] }
 const spamTracker = {};
 
@@ -146,6 +150,10 @@ const weatherCache       = {};
 const CACHE_TTL_MS       = 60 * 1000;      // 1 minut keširanja za Kick API
 const WEATHER_TTL_MS     = 5 * 60 * 1000;  // 5 minuta keširanja za vreme (wttr.in)
 
+// Ručne komande za strimera (Fallback u slučaju 403 greške od Cloudflare-a)
+let manualGameName       = '';
+let manualStreamStartTs  = 0;
+
 // Auto-announce state
 let porukePosleAnnounce  = 0;   // brojac poruka od poslednje auto-poruke
 let zadnjaAutoPorukaTs   = 0;   // timestamp poslednje auto-poruke
@@ -161,14 +169,33 @@ function log(tip, poruka) {
 }
 
 async function fetchKickAPI(url) {
-    return fetch(url, {
-        headers: {
-            'accept':        'application/json',
-            'authorization': BEARER_TOKEN,
-            'cookie':        BOT_COOKIE,
-            'user-agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36'
-        }
-    });
+    const { gotScraping } = await import('got-scraping');
+    try {
+        const response = await gotScraping({
+            url: url,
+            responseType: 'json',
+            headers: {
+                'cookie': BOT_COOKIE,
+                'authorization': BEARER_TOKEN
+            },
+            retry: { limit: 0 }
+        });
+        
+        return {
+            ok: response.statusCode >= 200 && response.statusCode < 300,
+            status: response.statusCode,
+            json: async () => response.body,
+            text: async () => JSON.stringify(response.body)
+        };
+    } catch (error) {
+        log('ERR', `gotScraping greška za ${url}: ${error.message}`);
+        return {
+            ok: false,
+            status: error.response ? error.response.statusCode : 500,
+            json: async () => { throw new Error(error.message); },
+            text: async () => error.message
+        };
+    }
 }
 
 // ─── LEADERBOARD SISTEM ──────────────────────────────────────────────────────
@@ -475,8 +502,10 @@ function povezi() {
             // ── Anti-spam filter ───────────────────────────────────────────────
             if (spamFilter(username, poruka)) return;
 
-            // Evidentiraj poruku u leaderboardu aktivnosti
-            evidentirajPoruku(username);
+            // Evidentiraj poruku u leaderboardu aktivnosti (komande sa ! se ne računaju)
+            if (!poruka.startsWith('!')) {
+                evidentirajPoruku(username);
+            }
 
             const porukaLower = poruka.toLowerCase();
 
@@ -557,15 +586,53 @@ function povezi() {
 
             if (porukaLower.startsWith('!posaljiljubav ')) {
                 const target = poruka.slice(15).trim();
-                if (proveraKulauna('!posaljiljubav', username)) return;
-                handleModifyLove(username, target, 10);
+                const userKey = username.toLowerCase();
+                const sada = Date.now();
+                const zadnji = loveHateCooldowns[userKey] || 0;
+                
+                if (sada - zadnji < LOVE_HATE_COOLDOWN_MS) {
+                    const preostaloMs = LOVE_HATE_COOLDOWN_MS - (sada - zadnji);
+                    const sati = Math.floor(preostaloMs / 3600000);
+                    const minuti = Math.floor((preostaloMs % 3600000) / 60000);
+                    
+                    let preostaloTekst = '';
+                    if (sati > 0) preostaloTekst += `${sati}h `;
+                    preostaloTekst += `${minuti}min`;
+                    
+                    posaljiPoruku(`❌ @${username}, cooldown: ${preostaloTekst}.`);
+                    return;
+                }
+                
+                const uspesno = handleModifyLove(username, target, 10);
+                if (uspesno) {
+                    loveHateCooldowns[userKey] = sada;
+                }
                 return;
             }
 
             if (porukaLower.startsWith('!bacihejt ')) {
                 const target = poruka.slice(10).trim();
-                if (proveraKulauna('!bacihejt', username)) return;
-                handleModifyLove(username, target, -10);
+                const userKey = username.toLowerCase();
+                const sada = Date.now();
+                const zadnji = loveHateCooldowns[userKey] || 0;
+                
+                if (sada - zadnji < LOVE_HATE_COOLDOWN_MS) {
+                    const preostaloMs = LOVE_HATE_COOLDOWN_MS - (sada - zadnji);
+                    const sati = Math.floor(preostaloMs / 3600000);
+                    const minuti = Math.floor((preostaloMs % 3600000) / 60000);
+                    
+                    let preostaloTekst = '';
+                    if (sati > 0) preostaloTekst += `${sati}h `;
+                    preostaloTekst += `${minuti}min`;
+                    
+                    posaljiPoruku(`❌ @${username}, cooldown: ${preostaloTekst}.`);
+                    return;
+                }
+                
+                const uspesno = handleModifyLove(username, target, -10);
+                if (uspesno) {
+                    loveHateCooldowns[userKey] = sada;
+                }
                 return;
             }
 
@@ -608,6 +675,45 @@ function povezi() {
                                        chatData.sender.identity.badges && 
                                        chatData.sender.identity.badges.some(b => b.type === 'broadcaster'));
                 handleResetLeaderboard(username, isBroadcaster);
+                return;
+            }
+
+            if (porukaLower.startsWith('!setlive ')) {
+                const isBroadcaster = username.toLowerCase() === CHANNEL_USERNAME.toLowerCase() || 
+                                      (chatData.sender.identity && 
+                                       chatData.sender.identity.badges && 
+                                       chatData.sender.identity.badges.some(b => b.type === 'broadcaster'));
+                if (isBroadcaster) {
+                    const val = poruka.slice(9).trim().toLowerCase();
+                    if (val === 'true') {
+                        isStreamLive = true;
+                        manualStreamStartTs = Date.now();
+                        posaljiPoruku('🔴 Status strima je ručno podešen na: LIVE.');
+                    } else if (val === 'false') {
+                        isStreamLive = false;
+                        manualStreamStartTs = 0;
+                        posaljiPoruku('⚪ Status strima je ručno podešen na: OFFLINE.');
+                    } else {
+                        posaljiPoruku('Upotreba: !setlive true ili !setlive false');
+                    }
+                }
+                return;
+            }
+
+            if (porukaLower.startsWith('!setgame ')) {
+                const isBroadcaster = username.toLowerCase() === CHANNEL_USERNAME.toLowerCase() || 
+                                      (chatData.sender.identity && 
+                                       chatData.sender.identity.badges && 
+                                       chatData.sender.identity.badges.some(b => b.type === 'broadcaster'));
+                if (isBroadcaster) {
+                    const game = poruka.slice(9).trim();
+                    if (game) {
+                        manualGameName = game;
+                        posaljiPoruku(`🎮 Igra je ručno podešena na: ${game}`);
+                    } else {
+                        posaljiPoruku('Upotreba: !setgame <naziv igre>');
+                    }
+                }
                 return;
             }
 
@@ -878,7 +984,7 @@ function handleModifyLove(sender, targetRaw, amount) {
     const target = targetRaw.replace(/^@/, '').trim();
     if (!target) {
         posaljiPoruku('Upotreba: !posaljiljubav @user ili !bacihejt @user');
-        return;
+        return false;
     }
 
     const sLower = sender.toLowerCase();
@@ -886,7 +992,7 @@ function handleModifyLove(sender, targetRaw, amount) {
 
     if (sLower === tLower) {
         posaljiPoruku(`@${sender}, ne možeš modifikovati ljubav prema samom sebi! 😄`);
-        return;
+        return false;
     }
 
     const kljucMod = [sLower, tLower].sort().join('::');
@@ -906,6 +1012,7 @@ function handleModifyLove(sender, targetRaw, amount) {
     } else {
         posaljiPoruku(`💔 @${sender} baca hejt na @${target}! Ljubav je pala za ${Math.abs(amount)}%! Novi ljubavni status iznosi ${noviProcenat}%. 🌪️`);
     }
+    return true;
 }
 
 // ─── BRAK I RAZVOD ────────────────────────────────────────────────────────────
@@ -1024,7 +1131,7 @@ function handleAktivnost(user) {
 
 function handleResetLeaderboard(user, isBroadcaster) {
     if (!isBroadcaster) {
-        posaljiPoruku(`❌ @${user}, nemaš dozvolu za resetovanje leaderboarda.`);
+        posaljiPoruku(`❌ @${user}, nemaš dozvolu.`);
         return;
     }
 
@@ -1167,13 +1274,30 @@ async function handleUptime() {
         posaljiPoruku(`⏱️ Stream je live već ${trajanje.trim()}`);
     } catch (err) {
         log('ERR', `handleUptime greška: ${err.message}`);
-        posaljiPoruku('❌ Nije moguće dobiti uptime informacije.');
+        // Fallback na ručne podatke strimera
+        if (isStreamLive && manualStreamStartTs) {
+            const diffMs = Date.now() - manualStreamStartTs;
+            const sati = Math.floor(diffMs / 3_600_000);
+            const minuti = Math.floor((diffMs % 3_600_000) / 60_000);
+            const sekunde = Math.floor((diffMs % 60_000) / 1000);
+
+            let trajanje = '';
+            if (sati > 0)   trajanje += `${sati}h `;
+            trajanje += `${minuti}min`;
+            if (sati === 0) trajanje += ` ${sekunde}s`;
+
+            posaljiPoruku(`⏱️ Stream je live već ${trajanje.trim()} (ručno podešeno)`);
+        } else {
+            posaljiPoruku('❌ Uptime nedostupan.');
+        }
     }
 }
 
 // !igra — trenutna kategorija/igra na streamu sa keširanjem od 1 min
 async function handleIgra() {
     const sada = Date.now();
+    
+    // Ako imamo ručno podešenu igru i API ne radi, koristićemo nju, ali prvo proveravamo keš
     if (cachedIgra && (sada - cachedIgraTs < CACHE_TTL_MS)) {
         posaljiPoruku(`🎮 Tutz trenutno igra: ${cachedIgra}`);
         log('INFO', 'Korišćena keširana igra/kategorija.');
@@ -1186,7 +1310,12 @@ async function handleIgra() {
         const podaci = await res.json();
 
         if (!podaci.livestream) {
-            posaljiPoruku('📴 Stream trenutno nije live, ne mogu pronaći igru.');
+            // Ako je API vratio 200 ali nema livestreama, proveravamo ručnu igru
+            if (manualGameName) {
+                posaljiPoruku(`🎮 Tutz trenutno igra: ${manualGameName} (ručno podešeno)`);
+            } else {
+                posaljiPoruku('📴 Stream trenutno nije live, ne mogu pronaći igru.');
+            }
             return;
         }
 
@@ -1198,7 +1327,11 @@ async function handleIgra() {
         }
 
         if (!igra) {
-            posaljiPoruku('🎮 Igra/kategorija nije postavljena na streamu.');
+            if (manualGameName) {
+                posaljiPoruku(`🎮 Tutz trenutno igra: ${manualGameName} (ručno podešeno)`);
+            } else {
+                posaljiPoruku('🎮 Igra/kategorija nije postavljena na streamu.');
+            }
             return;
         }
 
@@ -1208,7 +1341,12 @@ async function handleIgra() {
         posaljiPoruku(`🎮 Tutz trenutno igra: ${igra}`);
     } catch (err) {
         log('ERR', `handleIgra greška: ${err.message}`);
-        posaljiPoruku('❌ Nije moguće dobiti informacije o igri.');
+        // Fallback na ručne podatke strimera
+        if (manualGameName) {
+            posaljiPoruku(`🎮 Tutz trenutno igra: ${manualGameName} (ručno podešeno)`);
+        } else {
+            posaljiPoruku('❌ Igra nedostupna.');
+        }
     }
 }
 
