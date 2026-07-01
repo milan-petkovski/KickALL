@@ -15,7 +15,7 @@ const RECONNECT_BASE_MS     = 3000;   // Početno vreme za reconnect (ms)
 const RECONNECT_MAX_MS      = 60000;  // Maksimalno vreme čekanja reconnecta (ms)
 const HEARTBEAT_MS          = 25000;  // Koliko često šaljemo ping (ms)
 const SPAM_THRESHOLD        = 3;      // Broj identičnih poruka pre upozorenja
-const SPAM_WINDOW_MS        = 30000;  // Vremenski prozor za spam detekciju (ms)
+const SPAM_WINDOW_MS        = 15000;  // Vremenski prozor za spam detekciju (ms)
 const ANNOUNCE_AFTER_MSGS   = 30;     // Broj poruka u chatu pre auto-poruke
 const ANNOUNCE_MIN_GAP_MS   = 15 * 60 * 1000; // Min. vreme između dve auto-poruke (15min)
 
@@ -37,7 +37,7 @@ const komande = {
     '!kick':        'Dobrodošli na strim! Lupite taj Follow ako uživate!',
 
     // ─── KANAL / EKIPA (GANG) ────────────────────────────────────────────────────
-    '!tutz':        'Deda matori neradnik',
+    /*'!tutz':        'Deda matori neradnik',
     '!treshonja':   'Ko je taj lik',
     '!milance':     'Najbolji menadzer Tutz Ganga',
     '!lambana':     'Lamba i Ana Kid se vole najvise na svetu',
@@ -46,7 +46,7 @@ const komande = {
     '!block':       'Sofia unblock plssss',
     '!inaa':        'INAABANK',
     '!anakid':      'Samo ime kaze kid...',
-    '!itachi':      'Juri zene al one njega ne',
+    '!itachi':      'Juri zene al one njega ne',*/
     '!67':          '[emote:5163606:tutz_livesedam][emote:5163606:tutz_livesedam][emote:5163606:tutz_livesedam]',
 
     // ─── DRUŠTVENE MREŽE & PROMO (SA SAJTA) ───────────────────────────────────────
@@ -109,6 +109,9 @@ const cooldowns = {};
 // Spam tracker: { username: [timestamp, timestamp, ...] }
 const spamTracker = {};
 
+// Last warning tracker: { username: timestamp }
+const lastWarned = {};
+
 // Love modifiers: { 'user1::user2': offset_value }
 const loveModifiers = {};
 
@@ -119,7 +122,13 @@ const marriedCouples = {};
 let leaderboard          = {};
 let leaderboardDirty     = false;
 let leaderboardSaveTimer = null;
+let tekuciMesecLeaderboarda = '';
 const LEADERBOARD_FILE   = path.join(__dirname, 'leaderboard.json');
+
+// GitHub Gist konfiguracija za čuvanje podataka na Renderu
+const GITHUB_TOKEN       = process.env.GITHUB_TOKEN;
+const GIST_ID            = process.env.GIST_ID;
+const KORISTI_GIST       = !!(GITHUB_TOKEN && GIST_ID);
 
 // Message Queue state
 const messageQueue       = [];
@@ -146,6 +155,16 @@ function log(tip, poruka) {
     console.log(`\x1b[90m[${vreme}]\x1b[0m ${boja}[${tip}]\x1b[0m ${poruka}`);
 }
 
+async function fetchKickAPI(url) {
+    return fetch(url, {
+        headers: {
+            'accept':        'application/json',
+            'cookie':        BOT_COOKIE,
+            'user-agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36'
+        }
+    });
+}
+
 // ─── LEADERBOARD SISTEM ──────────────────────────────────────────────────────
 function dobijTrenutniMesec() {
     const d = new Date();
@@ -154,37 +173,105 @@ function dobijTrenutniMesec() {
     return `${godina}-${mesec}`;
 }
 
-function ucitajLeaderboard() {
+async function ucitajLeaderboard() {
     try {
-        if (fs.existsSync(LEADERBOARD_FILE)) {
-            const data = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
-            const json = JSON.parse(data);
-            const trenutniMesec = dobijTrenutniMesec();
-            
+        let json = null;
+
+        if (KORISTI_GIST) {
+            log('INFO', `Učitavam leaderboard sa GitHub Gist-a (${GIST_ID})...`);
+            const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                headers: {
+                    'Accept': 'application/vnd.github+json',
+                    'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                    'X-GitHub-Api-Version': '2022-11-28',
+                    'User-Agent': 'Kickot-Bot'
+                }
+            });
+
+            if (res.ok) {
+                const gistData = await res.json();
+                const file = gistData.files['leaderboard.json'];
+                if (file && file.content) {
+                    json = JSON.parse(file.content);
+                } else {
+                    log('WARN', 'Fajl leaderboard.json nije pronađen u Gist-u, kreiram novi...');
+                }
+            } else {
+                throw new Error(`GitHub API status: ${res.status}`);
+            }
+        } else {
+            // Lokalni fajl sistem fallback
+            if (fs.existsSync(LEADERBOARD_FILE)) {
+                const data = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
+                json = JSON.parse(data);
+            }
+        }
+
+        const trenutniMesec = dobijTrenutniMesec();
+        
+        if (json) {
             if (json.mesec && json.mesec !== trenutniMesec) {
-                // Novi mesec je počeo -> pravimo backup i resetujemo
-                const backupFile = path.join(__dirname, `leaderboard_backup_${json.mesec}.json`);
-                fs.writeFileSync(backupFile, JSON.stringify(json, null, 2), 'utf8');
-                log('INFO', `Detektovan novi mesec (${json.mesec} -> ${trenutniMesec}). Napravljen backup, resetujem leaderboard.`);
+                log('INFO', `Detektovan novi mesec (${json.mesec} -> ${trenutniMesec}). Resetujem leaderboard.`);
+                
+                const stariMesec = json.mesec;
+                if (!KORISTI_GIST) {
+                    const backupFile = path.join(__dirname, `leaderboard_backup_${stariMesec}.json`);
+                    fs.writeFileSync(backupFile, JSON.stringify(json, null, 2), 'utf8');
+                } else {
+                    await sacuvajBackupUGist(stariMesec, json);
+                }
+
                 leaderboard = {};
+                tekuciMesecLeaderboarda = trenutniMesec;
                 leaderboardDirty = true;
-                sacuvajLeaderboard();
+                await sacuvajLeaderboard();
             } else {
                 leaderboard = json.podaci || {};
-                log('INFO', `Učitan leaderboard za mesec: ${json.mesec || trenutniMesec} (${Object.keys(leaderboard).length} aktivnih korisnika)`);
+                tekuciMesecLeaderboarda = json.mesec || trenutniMesec;
+                log('INFO', `Učitan leaderboard za mesec: ${tekuciMesecLeaderboarda} (${Object.keys(leaderboard).length} aktivnih korisnika)`);
             }
         } else {
             leaderboard = {};
+            tekuciMesecLeaderboarda = trenutniMesec;
             leaderboardDirty = true;
-            sacuvajLeaderboard();
+            await sacuvajLeaderboard();
         }
     } catch (err) {
         log('ERR', `Greška pri učitavanju leaderboarda: ${err.message}`);
         leaderboard = {};
+        tekuciMesecLeaderboarda = dobijTrenutniMesec();
     }
 }
 
-function sacuvajLeaderboard() {
+async function sacuvajBackupUGist(mesec, stariPodaci) {
+    try {
+        log('INFO', `Čuvam backup za mesec ${mesec} na GitHub Gist...`);
+        const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+            method: 'PATCH',
+            headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                'X-GitHub-Api-Version': '2022-11-28',
+                'User-Agent': 'Kickot-Bot',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                files: {
+                    [`leaderboard_backup_${mesec}.json`]: {
+                        content: JSON.stringify(stariPodaci, null, 2)
+                    }
+                }
+            })
+        });
+        if (!res.ok) {
+            log('ERR', `Neuspešan backup na Gist (status ${res.status})`);
+        }
+    } catch (err) {
+        log('ERR', `Greška pri čuvanju backupa na Gist: ${err.message}`);
+    }
+}
+
+async function sacuvajLeaderboard() {
     if (!leaderboardDirty) return;
     try {
         const trenutniMesec = dobijTrenutniMesec();
@@ -192,9 +279,37 @@ function sacuvajLeaderboard() {
             mesec: trenutniMesec,
             podaci: leaderboard
         };
-        fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(json, null, 2), 'utf8');
-        leaderboardDirty = false;
-        log('INFO', 'Leaderboard uspešno sačuvan na disk.');
+
+        if (KORISTI_GIST) {
+            const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/vnd.github+json',
+                    'Authorization': `Bearer ${GITHUB_TOKEN}`,
+                    'X-GitHub-Api-Version': '2022-11-28',
+                    'User-Agent': 'Kickot-Bot',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    files: {
+                        'leaderboard.json': {
+                            content: JSON.stringify(json, null, 2)
+                        }
+                    }
+                })
+            });
+
+            if (res.ok) {
+                leaderboardDirty = false;
+                log('INFO', 'Leaderboard uspešno sačuvan na GitHub Gist.');
+            } else {
+                throw new Error(`GitHub API status: ${res.status}`);
+            }
+        } else {
+            fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(json, null, 2), 'utf8');
+            leaderboardDirty = false;
+            log('INFO', 'Leaderboard uspešno sačuvan na disk.');
+        }
     } catch (err) {
         log('ERR', `Greška pri čuvanju leaderboarda: ${err.message}`);
     }
@@ -202,21 +317,33 @@ function sacuvajLeaderboard() {
 
 function proveriIResetujMesec() {
     const trenutniMesec = dobijTrenutniMesec();
-    try {
-        if (fs.existsSync(LEADERBOARD_FILE)) {
-            const data = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
-            const json = JSON.parse(data);
-            if (json.mesec && json.mesec !== trenutniMesec) {
-                const backupFile = path.join(__dirname, `leaderboard_backup_${json.mesec}.json`);
-                fs.writeFileSync(backupFile, JSON.stringify(json, null, 2), 'utf8');
-                log('INFO', `Novi mesec detektovan tokom rada bota (${json.mesec} -> ${trenutniMesec}). Resetujem leaderboard.`);
-                leaderboard = {};
-                leaderboardDirty = true;
-                sacuvajLeaderboard();
+    if (tekuciMesecLeaderboarda && tekuciMesecLeaderboarda !== trenutniMesec) {
+        const stariMesec = tekuciMesecLeaderboarda;
+        log('INFO', `Novi mesec detektovan tokom rada bota (${stariMesec} -> ${trenutniMesec}). Resetujem leaderboard.`);
+        
+        const stariPodaci = {
+            mesec: stariMesec,
+            podaci: { ...leaderboard }
+        };
+
+        leaderboard = {};
+        tekuciMesecLeaderboarda = trenutniMesec;
+        leaderboardDirty = true;
+
+        // Pozadinski async proces za backup i čuvanje da ne blokira chat nit
+        (async () => {
+            if (KORISTI_GIST) {
+                await sacuvajBackupUGist(stariMesec, stariPodaci);
+            } else {
+                try {
+                    const backupFile = path.join(__dirname, `leaderboard_backup_${stariMesec}.json`);
+                    fs.writeFileSync(backupFile, JSON.stringify(stariPodaci, null, 2), 'utf8');
+                } catch (e) {
+                    log('ERR', `Greška pri čuvanju lokalnog backupa: ${e.message}`);
+                }
             }
-        }
-    } catch (err) {
-        log('ERR', `Greška pri proveri/resetovanju meseca: ${err.message}`);
+            await sacuvajLeaderboard();
+        })();
     }
 }
 
@@ -240,6 +367,21 @@ function evidentirajPoruku(username) {
             sacuvajLeaderboard();
             leaderboardSaveTimer = null;
         }, 10000);
+    }
+}
+
+function smanjiPoruku(username, iznos) {
+    const key = username.toLowerCase();
+    if (leaderboard[key]) {
+        leaderboard[key].count = Math.max(0, leaderboard[key].count - iznos);
+        leaderboardDirty = true;
+
+        if (!leaderboardSaveTimer) {
+            leaderboardSaveTimer = setTimeout(() => {
+                sacuvajLeaderboard();
+                leaderboardSaveTimer = null;
+            }, 10000);
+        }
     }
 }
 
@@ -324,13 +466,13 @@ function povezi() {
                 return;
             }
 
+            // ── Anti-spam filter ───────────────────────────────────────────────
+            if (spamFilter(username, poruka)) return;
+
             // Evidentiraj poruku u leaderboardu aktivnosti
             evidentirajPoruku(username);
 
             const porukaLower = poruka.toLowerCase();
-
-            // ── Anti-spam filter ───────────────────────────────────────────────
-            if (spamFilter(username, poruka)) return;
 
             // ── Pozdrav na tag bota ─────────────────────────────────────────────
             if (porukaLower.includes('@tutzonja')) {
@@ -455,11 +597,11 @@ function povezi() {
             }
 
             if (porukaLower === '!resetleaderboard') {
-                const isMod = username.toLowerCase() === CHANNEL_USERNAME.toLowerCase() || 
-                              (chatData.sender.identity && 
-                               chatData.sender.identity.badges && 
-                               chatData.sender.identity.badges.some(b => b.type === 'moderator' || b.type === 'broadcaster'));
-                handleResetLeaderboard(username, isMod);
+                const isBroadcaster = username.toLowerCase() === CHANNEL_USERNAME.toLowerCase() || 
+                                      (chatData.sender.identity && 
+                                       chatData.sender.identity.badges && 
+                                       chatData.sender.identity.badges.some(b => b.type === 'broadcaster'));
+                handleResetLeaderboard(username, isBroadcaster);
                 return;
             }
 
@@ -563,8 +705,20 @@ function spamFilter(username, poruka) {
     const count = spamTracker[kljuc].length;
 
     if (count === SPAM_THRESHOLD) {
-        posaljiPoruku(`@${username} molim te ne spam-uj u chatu! 🙏`);
-        log('WARN', `Anti-spam: upozoren ${username} (${count}x ista poruka)`);
+        const userKey = username.toLowerCase();
+        const zadnjeUpozorenje = lastWarned[userKey] || 0;
+        
+        // Smanjujemo broj poruka u leaderboardu i auto-announce brojaču za preostale koje su prebrojane u ovoj spam sekvenci
+        smanjiPoruku(username, SPAM_THRESHOLD - 1);
+        porukePosleAnnounce = Math.max(0, porukePosleAnnounce - (SPAM_THRESHOLD - 1));
+
+        if (sada - zadnjeUpozorenje > SPAM_WINDOW_MS) {
+            posaljiPoruku(`@${username} molim te ne spam-uj u chatu! 🙏`);
+            lastWarned[userKey] = sada;
+            log('WARN', `Anti-spam: upozoren ${username} (${count}x ista poruka)`);
+        } else {
+            log('WARN', `Anti-spam: preskočeno duplirano upozorenje za ${username}`);
+        }
         return true;
     }
 
@@ -838,8 +992,8 @@ function handleAktivnost(user) {
     posaljiPoruku(`📊 @${user}, tvoja aktivnost (${trenutniMesec}): ${podaci.count} poruka (Rank #${rank})`);
 }
 
-function handleResetLeaderboard(user, isMod) {
-    if (!isMod) {
+function handleResetLeaderboard(user, isBroadcaster) {
+    if (!isBroadcaster) {
         posaljiPoruku(`❌ @${user}, nemaš dozvolu za resetovanje leaderboarda.`);
         return;
     }
@@ -898,39 +1052,68 @@ async function handleVreme(grad) {
 
 function prevediVreme(opis) {
     const mapa = {
-        'Sunny':                   '☀️ Sunčano',
-        'Clear':                   '🌙 Vedro',
-        'Partly cloudy':           '⛅ Delimično oblačno',
-        'Cloudy':                  '☁️ Oblačno',
-        'Overcast':                '☁️ Potpuno oblačno',
-        'Mist':                    '🌫️ Magla',
-        'Fog':                     '🌫️ Gusta magla',
-        'Light rain':              '🌦️ Lagana kiša',
-        'Moderate rain':           '🌧️ Umerena kiša',
-        'Heavy rain':              '🌧️ Jaka kiša',
-        'Light snow':              '🌨️ Lagani sneg',
-        'Moderate snow':           '❄️ Umereni sneg',
-        'Heavy snow':              '❄️ Jak sneg',
-        'Thunderstorm':            '⛈️ Oluja sa grmljavinom',
-        'Blizzard':                '🌨️ Mećava',
-        'Patchy rain possible':    '🌦️ Moguća kiša',
-        'Patchy snow possible':    '🌨️ Moguć sneg',
-        'Light drizzle':           '🌦️ Rosulja',
-        'Freezing drizzle':        '🌧️ Ledena rosulja',
-        'Light sleet':             '🌨️ Lagana susnežica',
+        'sunny':                            '☀️ Sunčano',
+        'clear':                            '🌙 Vedro',
+        'partly cloudy':                    '⛅ Delimično oblačno',
+        'cloudy':                           '☁️ Oblačno',
+        'overcast':                         '☁️ Potpuno oblačno',
+        'mist':                             '🌫️ Sumaglica',
+        'fog':                              '🌫️ Magla',
+        'freezing fog':                     '🌫️ Ledena magla',
+        'patchy rain nearby':               '🌦️ Mestimična kiša u blizini',
+        'patchy rain possible':             '🌦️ Moguća kiša',
+        'patchy snow nearby':               '🌨️ Mestimičan sneg u blizini',
+        'patchy snow possible':             '🌨️ Moguć sneg',
+        'patchy sleet nearby':              '🌨️ Mestimična susnežica u blizini',
+        'patchy sleet possible':            '🌨️ Moguća susnežica',
+        'patchy freezing drizzle nearby':   '🌧️ Mestimična ledena rosulja u blizini',
+        'patchy freezing drizzle possible': '🌧️ Moguća ledena rosulja',
+        'thundery outbreaks nearby':        '⛈️ Grmljavina u blizini',
+        'thundery outbreaks possible':      '⛈️ Moguća grmljavina',
+        'blowing snow':                     '🌨️ Vejavica',
+        'blizzard':                         '🌨️ Mećava',
+        'light drizzle':                    '🌦️ Rosulja',
+        'freezing drizzle':                 '🌧️ Ledena rosulja',
+        'heavy freezing drizzle':           '🌧️ Jaka ledena rosulja',
+        'patchy light drizzle':             '🌦️ Mestimična blaga rosulja',
+        'patchy light rain':                '🌦️ Mestimična blaga kiša',
+        'light rain':                       '🌦️ Lagana kiša',
+        'moderate rain at times':           '🌧️ Povremeno umerena kiša',
+        'moderate rain':                    '🌧️ Umerena kiša',
+        'heavy rain at times':              '🌧️ Povremeno jaka kiša',
+        'heavy rain':                       '🌧️ Jaka kiša',
+        'light freezing rain':              '🌧️ Blaga ledena kiša',
+        'moderate or heavy freezing rain':  '🌧️ Umerena ili jaka ledena kiša',
+        'light sleet':                      '🌨️ Lagana susnežica',
+        'moderate or heavy sleet':          '🌨️ Umerena ili jaka susnežica',
+        'patchy light snow':                '🌨️ Mestimičan blag sneg',
+        'light snow':                       '🌨️ Lagani sneg',
+        'patchy moderate snow':             '❄️ Mestimičan umeren sneg',
+        'moderate snow':                    '❄️ Umereni sneg',
+        'patchy heavy snow':                '❄️ Mestimičan jak sneg',
+        'heavy snow':                       '❄️ Jak sneg',
+        'ice pellets':                      '🌨️ Krupa / Grad',
+        'light rain shower':                '🌦️ Kratkotrajna kiša',
+        'moderate or heavy rain shower':    '🌧️ Pljusak',
+        'torrential rain shower':           '🌧️ Jak pljusak',
+        'light sleet showers':              '🌨️ Kratkotrajna susnežica',
+        'moderate or heavy sleet showers':  '🌨️ Jaka susnežica',
+        'light snow showers':               '🌨️ Kratkotrajni sneg',
+        'moderate or heavy snow showers':   '🌨️ Jak sneg',
+        'light showers of ice pellets':     '🌨️ Kratkotrajna krupa / grad',
+        'moderate or heavy showers of ice pellets': '🌨️ Jaka krupa / grad',
+        'patchy light rain with thunder':   '⛈️ Blaga kiša sa grmljavinom',
+        'moderate or heavy rain with thunder': '⛈️ Jaka kiša sa grmljavinom',
+        'patchy light snow with thunder':   '⛈️ Blag sneg sa grmljavinom',
+        'moderate or heavy snow with thunder': '⛈️ Jak sneg sa grmljavinom',
     };
-    return mapa[opis] || opis;
+    return mapa[opis.toLowerCase().trim()] || opis;
 }
 
 // !uptime — koliko je stream live (bez keširanja, po želji)
 async function handleUptime() {
     try {
-        const res  = await fetch(`https://kick.com/api/v2/channels/${CHANNEL_USERNAME}`, {
-            headers: {
-                'Accept':     'application/json',
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+        const res  = await fetchKickAPI(`https://kick.com/api/v2/channels/${CHANNEL_USERNAME}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const podaci = await res.json();
 
@@ -968,12 +1151,7 @@ async function handleIgra() {
     }
 
     try {
-        const res  = await fetch(`https://kick.com/api/v2/channels/${CHANNEL_USERNAME}`, {
-            headers: {
-                'Accept':     'application/json',
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+        const res  = await fetchKickAPI(`https://kick.com/api/v2/channels/${CHANNEL_USERNAME}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const podaci = await res.json();
 
@@ -982,13 +1160,18 @@ async function handleIgra() {
             return;
         }
 
-        const kategorije = podaci.livestream.categories;
-        if (!kategorije || kategorije.length === 0) {
+        let igra = null;
+        if (podaci.livestream.category && podaci.livestream.category.name) {
+            igra = podaci.livestream.category.name;
+        } else if (podaci.livestream.categories && podaci.livestream.categories.length > 0) {
+            igra = podaci.livestream.categories[0].name;
+        }
+
+        if (!igra) {
             posaljiPoruku('🎮 Igra/kategorija nije postavljena na streamu.');
             return;
         }
 
-        const igra = kategorije[0].name;
         cachedIgra = igra;
         cachedIgraTs = sada;
 
@@ -1073,15 +1256,10 @@ process.on('unhandledRejection', (reason, promise) => {
 // Provera statusa strima (svetski nivo - pametna detekcija)
 async function proveriDaLiJeLive() {
     try {
-        const res = await fetch(`https://kick.com/api/v2/channels/${CHANNEL_USERNAME}`, {
-            headers: {
-                'Accept': 'application/json',
-                'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+        const res = await fetchKickAPI(`https://kick.com/api/v2/channels/${CHANNEL_USERNAME}`);
         if (res.ok) {
             const data = await res.json();
-            const liveState = !!(data.livestream && data.livestream.is_live);
+            const liveState = !!data.livestream;
             if (liveState !== isStreamLive) {
                 isStreamLive = liveState;
                 log('INFO', `Status strima promenjen: ${isStreamLive ? '🔴 LIVE' : '⚪ OFFLINE'}`);
@@ -1106,10 +1284,13 @@ http.createServer((req, res) => {
 });
 
 // ─── START ────────────────────────────────────────────────────────────────────
-log('INFO', '🤖 Kickot bot se pokreće...');
-ucitajLeaderboard();
-povezi();
+async function start() {
+    log('INFO', '🤖 Kickot bot se pokreće...');
+    await ucitajLeaderboard();
+    povezi();
 
-// Pokrećemo periodičnu proveru live statusa strima (na svaka 2 minuta)
-proveriDaLiJeLive();
-setInterval(proveriDaLiJeLive, 2 * 60 * 1000);
+    // Pokrećemo periodičnu proveru live statusa strima (na svaka 2 minuta)
+    proveriDaLiJeLive();
+    setInterval(proveriDaLiJeLive, 2 * 60 * 1000);
+}
+start();
