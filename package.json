@@ -3,7 +3,9 @@
     "start": "node bot.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.1",
     "axios": "^1.18.1",
+    "dotenv": "^17.4.2",
     "got-scraping": "^4.2.1",
     "pusher-js": "^8.5.0",
     "ws": "^8.21.0"
