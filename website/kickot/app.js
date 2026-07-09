@@ -10,6 +10,8 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const { createClient } = window.supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
+let currentUser = null;
+
 // ── Translations ───────────────────────────────────────────
 const translations = {
   sr: {
@@ -113,12 +115,12 @@ const translations = {
     'form.login.link':    'Prijavi se',
     'form.have.account':  'Već imaš nalog?',
     'form.terms.note':    'Registracijom prihvataš naše Uslove korišćenja i Politiku privatnosti.',
-    'forgot.desc':        'Uneси svoju email adresu i poslaćemo ti link za reset lozinke.',
+    'forgot.desc':        'Unesi svoju email adresu i poslaćemo ti link za reset lozinke.',
     'forgot.submit':      'Pošalji reset link',
     'forgot.back':        '← Nazad na prijavu',
     // Validation
     'err.email.required': 'Email adresa je obavezna',
-    'err.email.invalid':  'Uneси validnu email adresu',
+    'err.email.invalid':  'Unesi validnu email adresu',
     'err.pw.required':    'Lozinka je obavezna',
     'err.pw.short':       'Lozinka mora imati minimum 8 karaktera',
     'err.name.required':  'Ime je obavezno',
@@ -270,6 +272,10 @@ function setLang(lang) {
   localStorage.setItem('kickall-lang', lang);
   document.documentElement.lang = lang === 'sr' ? 'sr' : 'en';
 
+  // Dodaj/ukloni klase na body elementu
+  document.body.classList.toggle('lang-sr', lang === 'sr');
+  document.body.classList.toggle('lang-en', lang === 'en');
+
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     const text = translations[lang][key];
@@ -362,16 +368,45 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   animate();
 })();
 
+// ── Web Audio API Synth Sound Helper ───────────────────────
+let audioCtx = null;
+function playSynthSound(frequency = 440, type = 'sine', duration = 0.1, volume = 0.1) {
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        osc.type = type;
+        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+        gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    } catch (e) {
+        console.warn('Audio is blocked or not supported:', e);
+    }
+}
+
 // ── Commands Showcase ─────────────────────────────────────
 const commandPreviews = {
-  rank:   () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!rank</span></div><div class="cp-line"><span class="cp-bot">Kickot:</span> <span class="cp-msg" style="color:var(--kick-green)">🏆 tutz_fan je na #3 mestu! Watchtime: 24h 35min | Bodovi: 1.204</span></div>`,
-  top:    () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!top</span></div><div class="cp-line"><span class="cp-bot">Kickot:</span> <span class="cp-msg" style="color:#FBBF24">👑 Top 3: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. tutz_fan (24h)</span></div>`,
-  love:   () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!love novak99 tutz_fan</span></div><div class="cp-line"><span class="cp-bot">Kickot:</span> <span class="cp-msg" style="color:#F472B6">💕 novak99 i tutz_fan imaju 87% kompatibilnost! ❤️</span></div>`,
-  brak:   () => `<div class="cp-line"><span class="cp-user">stefan_v:</span> <span class="cp-msg">!brak @chat_queen</span></div><div class="cp-line"><span class="cp-bot">Kickot:</span> <span class="cp-msg" style="color:#F472B6">💍 stefan_v je zaprosio chat_queen! Čestitamo mladencima! 🎊</span></div>`,
-  duel:   () => `<div class="cp-line"><span class="cp-user">gamer_marko:</span> <span class="cp-msg">!duel @novak99</span></div><div class="cp-line"><span class="cp-bot">Kickot:</span> <span class="cp-msg" style="color:#F87171">⚔️ Duel između gamer_marko i novak99! Pobednik: gamer_marko! 🏆</span></div>`,
-  '8ball':() => `<div class="cp-line"><span class="cp-user">user_aleksa:</span> <span class="cp-msg">!8ball pobedicu danas?</span></div><div class="cp-line"><span class="cp-bot">Kickot:</span> <span class="cp-msg" style="color:#A78BFA">🎱 Znakovi ukazuju na DA! Verujem u tebe! 🔮</span></div>`,
-  roll:   () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!roll 100</span></div><div class="cp-line"><span class="cp-bot">Kickot:</span> <span class="cp-msg" style="color:var(--kick-green)">🎲 chat_fan je bacio kockicu i dobio: 73!</span></div>`,
-  uptime: () => `<div class="cp-line"><span class="cp-user">new_viewer:</span> <span class="cp-msg">!uptime</span></div><div class="cp-line"><span class="cp-bot">Kickot:</span> <span class="cp-msg" style="color:#60A5FA">⏱️ Stream traje: 2 sata 47 minuta i 32 sekunde!</span></div>`,
+  rank:   () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!rank</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">🏆 tutz_fan je na #3 mestu! Watchtime: 24h 35min | Bodovi: 1.204</span></div>`,
+  top:    () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!top</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">👑 Top 3: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. tutz_fan (24h)</span></div>`,
+  love:   () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!love novak99 tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F472B6">💕 novak99 i tutz_fan imaju 87% kompatibilnost! ❤️</span></div>`,
+  brak:   () => `<div class="cp-line"><span class="cp-user">stefan_v:</span> <span class="cp-msg">!brak @chat_queen</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F472B6">💍 stefan_v je zaprosio chat_queen! Čestitamo mladencima! 🎊</span></div>`,
+  duel:   () => `<div class="cp-line"><span class="cp-user">gamer_marko:</span> <span class="cp-msg">!duel @novak99</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">⚔️ Duel između gamer_marko i novak99! Pobednik: gamer_marko! 🏆</span></div>`,
+  '8ball':() => `<div class="cp-line"><span class="cp-user">user_aleksa:</span> <span class="cp-msg">!8ball pobedicu danas?</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">🎱 Znakovi ukazuju na DA! Verujem u tebe! 🔮</span></div>`,
+  roll:   () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!roll 100</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">🎲 chat_fan je bacio kockicu i dobio: 73!</span></div>`,
+  uptime: () => `<div class="cp-line"><span class="cp-user">new_viewer:</span> <span class="cp-msg">!uptime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ Stream traje: 2 sata 47 minuta i 32 sekunde!</span></div>`,
 };
 
 document.querySelectorAll('.cmd-item').forEach(item => {
@@ -382,6 +417,17 @@ document.querySelectorAll('.cmd-item').forEach(item => {
     const preview = document.getElementById('cmdPreviewContent');
     if (preview && commandPreviews[cmd]) {
       preview.innerHTML = commandPreviews[cmd]();
+      
+      // Zvučni efekat na klik
+      playSynthSound(600, 'sine', 0.15);
+      
+      // Beli bljesak okvira za preview log tablu
+      const playground = document.getElementById('mainPlayground');
+      if (playground) {
+        playground.classList.remove('flash-active');
+        void playground.offsetWidth; // Trigger reflow
+        playground.classList.add('flash-active');
+      }
     }
   });
 });
@@ -460,7 +506,9 @@ function togglePw(inputId, btn) {
   if (!input) return;
   const show = input.type === 'password';
   input.type = show ? 'text' : 'password';
-  btn.textContent = show ? '🙈' : '👁';
+  btn.innerHTML = show 
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>` 
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 }
 
 // ── Auth Error Mapper ─────────────────────────────────────
@@ -590,6 +638,7 @@ async function handleSignOut() {
 
 // ── Auth State ─────────────────────────────────────────────
 function onUserChange(user) {
+  currentUser = user;
   const guestNav = document.getElementById('guestNav');
   const userMenu = document.getElementById('userMenu');
   const userAvatar = document.getElementById('userAvatar');
@@ -600,7 +649,17 @@ function onUserChange(user) {
     userMenu.classList.add('visible');
     const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
     userName.textContent = name;
-    userAvatar.textContent = name.charAt(0).toUpperCase();
+    
+    const avatarVal = user.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
+    if (avatarVal.startsWith('data:image') || avatarVal.startsWith('http')) {
+      userAvatar.style.backgroundImage = `url("${avatarVal}")`;
+      userAvatar.style.backgroundSize = 'cover';
+      userAvatar.style.backgroundPosition = 'center';
+      userAvatar.textContent = '';
+    } else {
+      userAvatar.style.backgroundImage = 'none';
+      userAvatar.textContent = avatarVal;
+    }
   } else {
     guestNav.style.display = 'flex';
     userMenu.classList.remove('visible');
@@ -630,8 +689,167 @@ document.addEventListener('click', (e) => {
   }
 });
 
+let settingsUploadedAvatarBase64 = null;
+
+function openSettingsModal() {
+  closeUserDropdown();
+  const modal = document.getElementById('settingsModal');
+  if (!modal) return;
+
+  if (!currentUser) {
+    showToast('error', currentLang === 'sr' ? 'Moraš biti prijavljen' : 'You must be logged in', '⚠️');
+    return;
+  }
+  
+  // Fill in fields
+  const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || 'User';
+  const avatarVal = currentUser.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
+
+  document.getElementById('settingsEmail').value = currentUser.email;
+  document.getElementById('settingsName').value = name;
+  document.getElementById('settingsPassword').value = '';
+  document.getElementById('settingsConfirmPassword').value = '';
+
+  setSettingsAvatarPreview(avatarVal);
+  settingsUploadedAvatarBase64 = null;
+
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  if (modal) {
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+}
+
+function handleSettingsModalBackdropClick(e) {
+  if (e.target.id === 'settingsModal') {
+    closeSettingsModal();
+  }
+}
+
+function setSettingsAvatarPreview(urlOrEmoji) {
+  const imgEl = document.getElementById('settingsAvatarPreviewImg');
+  if (!imgEl) return;
+  if (urlOrEmoji.startsWith('data:image') || urlOrEmoji.startsWith('http')) {
+    imgEl.style.backgroundImage = `url("${urlOrEmoji}")`;
+    imgEl.style.backgroundSize = 'cover';
+    imgEl.style.backgroundPosition = 'center';
+    imgEl.textContent = '';
+  } else {
+    imgEl.style.backgroundImage = 'none';
+    imgEl.textContent = urlOrEmoji;
+  }
+}
+
+function triggerSettingsAvatarUpload() {
+  document.getElementById('settingsAvatarFileInput').click();
+}
+
+function handleSettingsAvatarFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const maxDim = 128;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxDim) {
+          height *= maxDim / width;
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width *= maxDim / height;
+          height = maxDim;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+      setSettingsAvatarPreview(compressedBase64);
+      settingsUploadedAvatarBase64 = compressedBase64;
+    };
+    img.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function selectSettingsPresetAvatar(key) {
+  const emojis = { robot: '🤖', ninja: '🥷', gamepad: '🎮', star: '⭐' };
+  const emoji = emojis[key];
+  setSettingsAvatarPreview(emoji);
+  settingsUploadedAvatarBase64 = emoji;
+}
+
+async function handleSaveSettings() {
+  const name = document.getElementById('settingsName').value.trim();
+  const password = document.getElementById('settingsPassword').value;
+  const confirmPassword = document.getElementById('settingsConfirmPassword').value;
+
+  if (!name) {
+    showToast('error', currentLang === 'sr' ? 'Ime ne može biti prazno.' : 'Name cannot be empty.', '⚠️');
+    return;
+  }
+
+  if (password) {
+    if (password.length < 8) {
+      showToast('error', currentLang === 'sr' ? 'Lozinka mora imati barem 8 karaktera.' : 'Password must be at least 8 characters.', '⚠️');
+      return;
+    }
+    if (password !== confirmPassword) {
+      showToast('error', currentLang === 'sr' ? 'Lozinke se ne podudaraju.' : 'Passwords do not match.', '⚠️');
+      return;
+    }
+  }
+
+  const btn = document.getElementById('settingsSaveBtn');
+  const spinner = document.getElementById('settingsSpinner');
+  btn.disabled = true;
+  spinner.classList.add('visible');
+
+  try {
+    const updateData = { display_name: name };
+    if (settingsUploadedAvatarBase64 !== null) {
+      updateData.avatar_url = settingsUploadedAvatarBase64;
+    }
+
+    const { error: profileError } = await sb.auth.updateUser({ data: updateData });
+    if (profileError) throw profileError;
+
+    if (password) {
+      const { error: passwordError } = await sb.auth.updateUser({ password: password });
+      if (passwordError) throw passwordError;
+    }
+
+    showToast('success', currentLang === 'sr' ? 'Podešavanja uspešno sačuvana!' : 'Settings saved successfully!', '✅');
+    closeSettingsModal();
+    
+    const { data: { user } } = await sb.auth.getUser();
+    if (user) onUserChange(user);
+
+  } catch (err) {
+    showToast('error', err.message || 'Greška pri čuvanju podešavanja.', '❌');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.remove('visible');
+  }
+}
+
 function goToDashboard() { closeUserDropdown(); window.location.href = 'dashboard.html'; }
-function goToSettings()  { closeUserDropdown(); window.location.href = 'settings.html'; }
 
 // ── Toast Notifications ────────────────────────────────────
 let toastIdCounter = 0;
@@ -665,6 +883,19 @@ function removeToast(id) {
 // ── Auth Listener ──────────────────────────────────────────
 sb.auth.onAuthStateChange((event, session) => {
   onUserChange(session?.user || null);
+});
+
+// ── Spotlight Effect ────────────────────────────────────────
+const cards = document.querySelectorAll('.feature-card, .pricing-card');
+cards.forEach(card => {
+    card.addEventListener('mousemove', e => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        card.style.setProperty('--mouse-x', `${x}px`);
+        card.style.setProperty('--mouse-y', `${y}px`);
+    });
 });
 
 // ── Init ──────────────────────────────────────────────────

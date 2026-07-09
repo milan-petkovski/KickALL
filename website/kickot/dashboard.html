@@ -21,8 +21,13 @@
   <div id="authGate" class="auth-gate">
     <div class="auth-gate-card">
       <div class="auth-gate-logo">
-        <div class="logo-icon">🤖</div>
-        <span>Kickot <span class="text-muted">Dashboard</span></span>
+        <svg class="kick-logo-svg" viewBox="0 0 136 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="height: 24px; width: auto;">
+          <path d="M 0 0 H 12 V 16 H 18 V 8 H 30 V 20 H 18 V 24 H 30 V 40 H 18 V 32 H 12 V 40 H 0 Z" fill="#53FC18"/>
+          <path d="M 38 0 H 62 V 10 H 55 V 30 H 62 V 40 H 38 V 30 H 45 V 10 H 38 Z" fill="#53FC18"/>
+          <path d="M 70 0 H 98 V 10 H 81 V 30 H 98 V 40 H 70 Z" fill="#53FC18"/>
+          <path d="M 106 0 H 118 V 16 H 124 V 8 H 136 V 20 H 124 V 24 H 136 V 40 H 124 V 32 H 118 V 40 H 106 Z" fill="#53FC18"/>
+        </svg>
+        <span class="logo-all" style="font-size: 1.4rem; font-weight: 800; color: #fff; margin-left: 2px;">ot</span>
       </div>
       <div class="auth-gate-spinner"></div>
       <p class="auth-gate-msg" id="authGateMsg">Proveravamo sesiju...</p>
@@ -36,11 +41,13 @@
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <a href="index.html" class="sidebar-logo">
-          <div class="logo-icon">🤖</div>
-          <div>
-            <div class="logo-name">Kickot</div>
-            <div class="logo-sub">Dashboard</div>
-          </div>
+          <svg class="kick-logo-svg" viewBox="0 0 136 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="height: 20px; width: auto;">
+            <path d="M 0 0 H 12 V 16 H 18 V 8 H 30 V 20 H 18 V 24 H 30 V 40 H 18 V 32 H 12 V 40 H 0 Z" fill="#53FC18"/>
+            <path d="M 38 0 H 62 V 10 H 55 V 30 H 62 V 40 H 38 V 30 H 45 V 10 H 38 Z" fill="#53FC18"/>
+            <path d="M 70 0 H 98 V 10 H 81 V 30 H 98 V 40 H 70 Z" fill="#53FC18"/>
+            <path d="M 106 0 H 118 V 16 H 124 V 8 H 136 V 20 H 124 V 24 H 136 V 40 H 124 V 32 H 118 V 40 H 106 Z" fill="#53FC18"/>
+          </svg>
+          <span class="logo-all" style="font-size: 1.25rem; font-weight: 800; color: #fff; margin-left: 2px;">ot</span>
         </a>
       </div>
 
@@ -145,8 +152,15 @@
             <div class="user-plan" id="sidebarPlan">Free</div>
           </div>
           <div class="user-menu-sm" id="userMenuSm">
-            <button onclick="goToSettings()">⚙️ Podešavanja</button>
-            <button onclick="handleSignOut()">→ Odjavi se</button>
+            <button onclick="openSettingsModal()" class="dropdown-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <span>Podešavanja</span>
+            </button>
+            <div class="dropdown-divider"></div>
+            <button onclick="handleSignOut()" class="dropdown-item danger">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              <span>Odjavi se</span>
+            </button>
           </div>
         </div>
       </div>
@@ -183,10 +197,6 @@
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
             </svg>
           </button>
-          <div class="topbar-channel-badge">
-            <span class="kick-dot"></span>
-            <span id="topbarChannel">—</span>
-          </div>
         </div>
       </header>
 
@@ -202,28 +212,36 @@
 
           <div class="stats-grid">
             <div class="stat-card">
-              <div class="stat-icon stat-purple">🏆</div>
+              <div class="stat-icon stat-purple" style="color: var(--app-primary);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
               <div class="stat-info">
                 <div class="stat-value" id="statTopPoints">—</div>
-                <div class="stat-label">Najviše poena (mesec)</div>
+                <div class="stat-label">Najaktivniji korisnik</div>
               </div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon stat-green">⏱️</div>
+              <div class="stat-icon stat-green" style="color: var(--kick-green);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
               <div class="stat-info">
                 <div class="stat-value" id="statTotalWatchtime">—</div>
                 <div class="stat-label">Ukupno watchtime</div>
               </div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon stat-blue">⚡</div>
+              <div class="stat-icon stat-blue" style="color: #6366F1;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              </div>
               <div class="stat-info">
                 <div class="stat-value" id="statCmdCount">—</div>
                 <div class="stat-label">Prilagođene komande</div>
               </div>
             </div>
             <div class="stat-card">
-              <div class="stat-icon stat-pink">💍</div>
+              <div class="stat-icon stat-pink" style="color: #F472B6;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+              </div>
               <div class="stat-info">
                 <div class="stat-value" id="statMarriages">—</div>
                 <div class="stat-label">Aktivnih brakova</div>
@@ -236,9 +254,11 @@
             <!-- Mini Leaderboard -->
             <div class="ov-card">
               <div class="ov-card-head">
-                <h3>🏆 Top 5 — Chatters</h3>
-                <button class="btn-text" onclick="switchPanel('leaderboard'); setLeaderboardType('chatters')">Sve
-                  →</button>
+                <h3 style="display: flex; align-items: center; gap: 6px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--app-primary);"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"/><path d="M12 2a8 8 0 0 0-8 8h16a8 8 0 0 0-8-8z"/></svg>
+                  Top 5 — Chatters
+                </h3>
+                <button class="btn-text" onclick="switchPanel('leaderboard'); setLeaderboardType('chatters')">Sve →</button>
               </div>
               <div id="miniLeaderboard" class="mini-list"></div>
             </div>
@@ -246,9 +266,11 @@
             <!-- Mini Watchtime -->
             <div class="ov-card">
               <div class="ov-card-head">
-                <h3>⏱️ Top 5 — Watchtime</h3>
-                <button class="btn-text" onclick="switchPanel('leaderboard'); setLeaderboardType('watchtime')">Sve
-                  →</button>
+                <h3 style="display: flex; align-items: center; gap: 6px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kick-green);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Top 5 — Watchtime
+                </h3>
+                <button class="btn-text" onclick="switchPanel('leaderboard'); setLeaderboardType('watchtime')">Sve →</button>
               </div>
               <div id="miniWatchtime" class="mini-list"></div>
             </div>
@@ -256,9 +278,11 @@
             <!-- Quick Commands -->
             <div class="ov-card ov-card-full">
               <div class="ov-card-head">
-                <h3>⚡ Prilagođene komande</h3>
-                <button class="btn btn-primary btn-sm" onclick="switchPanel('commands'); openNewCmdModal()">+ Nova
-                  komanda</button>
+                <h3 style="display: flex; align-items: center; gap: 6px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #6366F1;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  Prilagođene komande
+                </h3>
+                <button class="btn btn-primary btn-sm" onclick="switchPanel('commands'); openNewCmdModal()">+ Nova komanda</button>
               </div>
               <div id="miniCommands" class="mini-list"></div>
             </div>
@@ -285,19 +309,23 @@
             style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-surface); padding: 0.375rem; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); max-width: fit-content;">
             <button class="btn btn-sm btn-primary" id="cmdTabAll" onclick="setCommandsTab('all')"
               style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              🌐 Sve komande
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              Sve komande
             </button>
             <button class="btn btn-sm btn-outline" id="cmdTabSystem" onclick="setCommandsTab('system')"
               style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              ⭐ Specijalne (Kanal)
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              Specijalne (Kanal)
             </button>
             <button class="btn btn-sm btn-outline" id="cmdTabCustom" onclick="setCommandsTab('custom')"
               style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              👤 Korisničke
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Korisničke
             </button>
             <button class="btn btn-sm btn-outline" id="cmdTabBuiltin" onclick="setCommandsTab('builtin')"
               style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              🤖 Ugrađene (Bot)
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg>
+              Ugrađene (Bot)
             </button>
           </div>
 
@@ -361,13 +389,20 @@
           <!-- Rang liste selektor tabova -->
           <div class="leaderboard-tabs"
             style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-surface); padding: 0.375rem; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); max-width: fit-content;">
-            <button class="btn btn-sm btn-primary" id="lbTabChatters" onclick="setLeaderboardType('chatters')"
+            <button class="btn btn-sm btn-outline" id="lbTabCombined" onclick="setLeaderboardType('combined')"
               style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              💬 Chatters
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              Zajedno
             </button>
             <button class="btn btn-sm btn-outline" id="lbTabWatchtime" onclick="setLeaderboardType('watchtime')"
               style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              ⏱️ Watchtime
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Watchtime
+            </button>
+            <button class="btn btn-sm btn-primary" id="lbTabChatters" onclick="setLeaderboardType('chatters')"
+              style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Chatters
             </button>
           </div>
 
@@ -394,7 +429,7 @@
                 <tr id="leaderboardTableHeader">
                   <th style="width:60px">#</th>
                   <th>Korisnik</th>
-                  <th>Poeni</th>
+                  <th>Poruke</th>
                   <th>Mesec</th>
                   <th>Ažurirano</th>
                 </tr>
@@ -413,7 +448,10 @@
         <section id="panel-marriages" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title">Ljubav i brakovi 💍</h1>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 10px;">
+                Ljubav i brakovi
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #F472B6;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+              </h1>
               <p class="panel-desc">Kako rade !love, !vencaj, !razvod i prikaz aktivnih brakova</p>
             </div>
             <div class="table-meta" id="marriageTableMeta"></div>
@@ -535,7 +573,10 @@
         <section id="panel-games" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title">Mini igre 🎮</h1>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 10px;">
+                Mini igre
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--app-primary);"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
+              </h1>
               <p class="panel-desc">Sve zabavne komande za duel, roll, šamar, IQ i info</p>
             </div>
           </div>
@@ -584,7 +625,10 @@
         <section id="panel-autoresponse" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title">Auto odgovori 🤖</h1>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 10px;">
+                Auto odgovori
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #6366F1;"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg>
+              </h1>
               <p class="panel-desc">Bot odgovara na pitanja, uvrede, dosadu i druge ključne fraze</p>
             </div>
           </div>
@@ -656,7 +700,10 @@
           <div class="config-grid">
             <!-- Basic Settings -->
             <div class="config-section">
-              <h3 class="config-section-title">⚙️ Osnovna podešavanja</h3>
+              <h3 class="config-section-title" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--app-primary);"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Osnovna podešavanja
+              </h3>
               <div class="config-fields">
                 <div class="config-field">
                   <label class="config-label">Prefix komandi</label>
@@ -666,8 +713,8 @@
                 <div class="config-field">
                   <label class="config-label">Jezik bota</label>
                   <select class="form-input" id="cfgLanguage">
-                    <option value="sr">Srpski 🇷🇸</option>
-                    <option value="en">English 🇺🇸</option>
+                    <option value="sr">Srpski (SR)</option>
+                    <option value="en">English (EN)</option>
                   </select>
                 </div>
                 <div class="config-field">
@@ -680,11 +727,17 @@
 
             <!-- Feature Toggles -->
             <div class="config-section">
-              <h3 class="config-section-title">🎛️ Funkcionalnosti</h3>
+              <h3 class="config-section-title" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--app-primary);"><circle cx="12" cy="5" r="3"/><circle cx="12" cy="19" r="3"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+                Funkcionalnosti
+              </h3>
               <div class="toggle-list">
                 <div class="toggle-item">
                   <div class="toggle-info">
-                    <div class="toggle-name">🏆 Leaderboard</div>
+                    <div class="toggle-name" style="display: flex; align-items: center; gap: 6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--app-primary);"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H4v2h16v-2h-5c-.55 0-1-.45-1-1v-2.34"/><path d="M12 2a8 8 0 0 0-8 8h16a8 8 0 0 0-8-8z"/></svg>
+                      Leaderboard
+                    </div>
                     <div class="toggle-desc">Sistem bodova i rang lista</div>
                   </div>
                   <label class="toggle-switch">
@@ -694,7 +747,10 @@
                 </div>
                 <div class="toggle-item">
                   <div class="toggle-info">
-                    <div class="toggle-name">⏱️ Watchtime</div>
+                    <div class="toggle-name" style="display: flex; align-items: center; gap: 6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--kick-green);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      Watchtime
+                    </div>
                     <div class="toggle-desc">Praćenje vremena gledanja</div>
                   </div>
                   <label class="toggle-switch">
@@ -704,7 +760,10 @@
                 </div>
                 <div class="toggle-item">
                   <div class="toggle-info">
-                    <div class="toggle-name">🎮 Mini-igre</div>
+                    <div class="toggle-name" style="display: flex; align-items: center; gap: 6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #6366F1;"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
+                      Mini-igre
+                    </div>
                     <div class="toggle-desc">!duel, !roll, !8ball, !iq, !samar</div>
                   </div>
                   <label class="toggle-switch">
@@ -714,7 +773,10 @@
                 </div>
                 <div class="toggle-item">
                   <div class="toggle-info">
-                    <div class="toggle-name">💕 Ljubav & Brak</div>
+                    <div class="toggle-name" style="display: flex; align-items: center; gap: 6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #F472B6;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                      Ljubav & Brak
+                    </div>
                     <div class="toggle-desc">!love, !brak, !razvod komande</div>
                   </div>
                   <label class="toggle-switch">
@@ -724,7 +786,10 @@
                 </div>
                 <div class="toggle-item">
                   <div class="toggle-info">
-                    <div class="toggle-name">🛡️ Auto-moderacija</div>
+                    <div class="toggle-name" style="display: flex; align-items: center; gap: 6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #3B82F6;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                      Auto-moderacija
+                    </div>
                     <div class="toggle-desc">Anti-spam i filter reči</div>
                   </div>
                   <label class="toggle-switch">
@@ -734,7 +799,10 @@
                 </div>
                 <div class="toggle-item">
                   <div class="toggle-info">
-                    <div class="toggle-name">🤖 Auto-odgovori</div>
+                    <div class="toggle-name" style="display: flex; align-items: center; gap: 6px;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #10B981;"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg>
+                      Auto-odgovori
+                    </div>
                     <div class="toggle-desc">Bot reaguje na ključne reči u chatu</div>
                   </div>
                   <label class="toggle-switch">
@@ -747,7 +815,10 @@
 
             <!-- Spam Control -->
             <div class="config-section">
-              <h3 class="config-section-title">🚫 Spam kontrola</h3>
+              <h3 class="config-section-title" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #EF4444;"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                Spam kontrola
+              </h3>
               <div class="config-fields">
                 <div class="config-field">
                   <label class="config-label">Spam threshold (poruka)</label>
@@ -764,7 +835,10 @@
 
             <!-- Custom Messages -->
             <div class="config-section">
-              <h3 class="config-section-title">📢 Poruke</h3>
+              <h3 class="config-section-title" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #3B82F6;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Poruke
+              </h3>
               <div class="config-fields">
                 <div class="config-field">
                   <label class="config-label">Stream pin poruka</label>
@@ -783,7 +857,10 @@
 
             <!-- Auto Announce Messages -->
             <div class="config-section">
-              <h3 class="config-section-title">⏰ Automatske najave (Auto Announce)</h3>
+              <h3 class="config-section-title" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--kick-green);"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Automatske najave (Auto Announce)
+              </h3>
               <div class="config-fields">
                 <span class="config-hint">Ove poruke će bot periodično slati u chat tokom streama.</span>
                 <div id="announceList" class="mini-list" style="margin-top:0.5rem; gap: 0.75rem;">
@@ -810,7 +887,9 @@
           </div>
 
           <div class="coming-soon-panel">
-            <div class="cs-icon">🛡️</div>
+            <div class="cs-icon" style="display: flex; align-items: center; justify-content: center; color: #3B82F6; margin: 0 auto 1.5rem; width: 64px; height: 64px; background: rgba(59, 130, 246, 0.1); border-radius: 50%;">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
             <h3>Dolazi uskoro</h3>
             <p>Napredna moderacija sa listom zabranjenih reči, auto-ban sistemom i logom kažnjenih korisnika biće
               dostupna u sledećem update-u.</p>
@@ -902,6 +981,94 @@
       <div class="modal-foot">
         <button class="btn btn-outline" onclick="closeModal('confirmModal')">Otkaži</button>
         <button class="btn btn-danger" id="confirmDeleteBtn">Obriši</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal (Account Profile & Channels Popup) -->
+  <div class="modal-backdrop" id="settingsModal" onclick="handleSettingsModalBackdropClick(event)">
+    <div class="modal-box modal-sm" style="max-width: 440px; padding: 25px;">
+      <div class="modal-head" style="margin-bottom: 15px; border-bottom: none; padding-bottom: 0;">
+        <h3 style="font-family: var(--font-heading); font-size: 1.25rem;">Podešavanja Naloga</h3>
+        <button class="modal-close" onclick="closeSettingsModal()">✕</button>
+      </div>
+
+      <!-- Tab Selectors -->
+      <div class="settings-tabs" style="display: flex; background: rgba(6, 4, 10, 0.4); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 4px; margin-bottom: 20px;">
+        <button class="settings-tab active" id="setTabProfile" onclick="switchSettingsTab('profile')" style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-family: var(--font-heading); font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Profil</button>
+        <button class="settings-tab" id="setTabChannels" onclick="switchSettingsTab('channels')" style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-family: var(--font-heading); font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Kick Kanali</button>
+      </div>
+
+      <div class="modal-body" style="padding: 0;">
+        
+        <!-- PANEL 1: PROFIL & BEZBEDNOST -->
+        <div id="settingsProfilePanel" style="display: block;">
+          <div class="settings-avatar-section">
+            <div class="avatar-preview-container" onclick="triggerSettingsAvatarUpload()">
+              <div class="avatar-preview-overlay">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </div>
+              <div class="avatar-preview-img" id="settingsAvatarPreviewImg">U</div>
+            </div>
+            <input type="file" id="settingsAvatarFileInput" accept="image/*" style="display:none;" onchange="handleSettingsAvatarFileSelect(event)" />
+            
+            <div class="settings-avatar-presets">
+              <div class="preset-title">Izaberi avatar:</div>
+              <div class="presets-grid">
+                <div class="preset-option" onclick="selectSettingsPresetAvatar('robot')">🤖</div>
+                <div class="preset-option" onclick="selectSettingsPresetAvatar('ninja')">🥷</div>
+                <div class="preset-option" onclick="selectSettingsPresetAvatar('gamepad')">🎮</div>
+                <div class="preset-option" onclick="selectSettingsPresetAvatar('star')">⭐</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase;">Email adresa</label>
+            <input type="email" id="settingsEmail" class="form-control" disabled style="opacity: 0.5; cursor: not-allowed; width: 100%;" />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase;">Ime / Nadimak</label>
+            <input type="text" id="settingsName" class="form-control" placeholder="Tvoje ime" style="width: 100%;" />
+          </div>
+
+          <div style="border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 12px; margin-top: 15px;">
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase;">Nova Lozinka</label>
+              <input type="password" id="settingsPassword" class="form-control" placeholder="Ostavi prazno ako ne menjaš" autocomplete="new-password" style="width: 100%;" />
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase;">Potvrdi Lozinku</label>
+              <input type="password" id="settingsConfirmPassword" class="form-control" placeholder="Ponovi lozinku" autocomplete="new-password" style="width: 100%;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 2: UPRAVLJANJE KANALIMA -->
+        <div id="settingsChannelsPanel" style="display: none;">
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase;">Dodaj Kick kanal</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="settingsNewChannelInput" class="form-control" placeholder="npr. tutz_live" style="flex: 1;" />
+              <button class="btn btn-primary btn-sm" onclick="addNewChannel()" id="settingsAddChannelBtn" style="white-space: nowrap;">Dodaj</button>
+            </div>
+            <div class="ch-error-msg" id="settingsAddChannelError" style="color: #f87171; font-size: 0.8rem; margin-top: 4px; display: none;"></div>
+          </div>
+
+          <div style="max-height: 240px; overflow-y: auto; margin-top: 15px;">
+            <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">Povezani kanali</label>
+            <div id="settingsChannelList" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-foot" style="border-top: none; padding-top: 15px; margin-top: 0; padding-bottom: 0; display: flex; gap: 8px; width: 100%;">
+        <button class="btn btn-outline" onclick="closeSettingsModal()" style="flex: 1; justify-content: center; text-align: center; margin: 0;">Otkaži</button>
+        <button class="btn btn-primary" id="settingsSaveBtn" onclick="handleSaveSettings()" style="flex: 1; justify-content: center; text-align: center; margin: 0;">Sačuvaj</button>
       </div>
     </div>
   </div>

@@ -23,8 +23,10 @@ let confirmCallback = null;
 let realtimeSub = null;
 let configLoaded = false;
 let localAnnounces = [];   // cached auto-announce messages
-let activeLeaderboardType = localStorage.getItem('active-leaderboard-tab') || 'chatters'; // 'chatters' or 'watchtime'
+let activeLeaderboardType = localStorage.getItem('active-leaderboard-tab') || 'chatters'; // 'chatters', 'watchtime', 'combined'
+let activeMiniLbTab = 'combined'; // 'combined', 'chatters', 'watchtime'
 let activeCommandsTab = 'all'; // 'all', 'system', 'custom', 'builtin'
+let liveStatusInterval = null; // polling interval for live status
 
 // ── Built-in commands reference ────────────────────────────
 const BUILTIN_COMMANDS = [
@@ -80,7 +82,17 @@ async function initApp() {
 
   // Sidebar avatar/name
   const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || 'User';
-  document.getElementById('sidebarAvatar').textContent = name.charAt(0).toUpperCase();
+  const avatarVal = currentUser.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
+  const sidebarAvEl = document.getElementById('sidebarAvatar');
+  if (avatarVal.startsWith('data:image') || avatarVal.startsWith('http')) {
+    sidebarAvEl.style.backgroundImage = `url("${avatarVal}")`;
+    sidebarAvEl.style.backgroundSize = 'cover';
+    sidebarAvEl.style.backgroundPosition = 'center';
+    sidebarAvEl.textContent = '';
+  } else {
+    sidebarAvEl.style.backgroundImage = 'none';
+    sidebarAvEl.textContent = avatarVal;
+  }
   document.getElementById('sidebarName').textContent = name;
 
   // Set initial leaderboard tab from state (loaded from localStorage)
@@ -112,6 +124,27 @@ async function loadUserProfile() {
       (data.plan || 'free').charAt(0).toUpperCase() + (data.plan || 'free').slice(1);
 
     currentChannels = data.kick_channels || [];
+    
+    // Fetch avatars for channels that don't have one yet
+    const needsAvatar = currentChannels.filter(c => !c.avatar);
+    if (needsAvatar.length > 0) {
+      let updated = false;
+      await Promise.all(needsAvatar.map(async (ch) => {
+        const resolved = await fetchKickAvatar(ch.username);
+        if (resolved) {
+          ch.avatar = resolved;
+          updated = true;
+        }
+      }));
+      
+      // Save updated channels with avatars back to db
+      if (updated) {
+        await sb.from('user_profiles')
+          .update({ kick_channels: currentChannels })
+          .eq('id', currentUser.id);
+      }
+    }
+    
     if (currentChannels.length > 0) {
       const primary = currentChannels.find(c => c.is_primary) || currentChannels[0];
       setActiveChannel(primary);
@@ -121,12 +154,49 @@ async function loadUserProfile() {
   renderChannelList();
 }
 
+async function fetchKickAvatar(username) {
+  const apiUrl = `https://kick.com/api/v2/channels/${username}`;
+  try {
+    const proxyUrl = `https://corsproxy.io/?` + encodeURIComponent(apiUrl);
+    const res = await fetch(proxyUrl);
+    if (res.ok) {
+      const data = await res.json();
+      return data?.user?.profile_pic || null;
+    }
+  } catch (_) {}
+  try {
+    const fallbackUrl = `https://api.allorigins.win/get?url=` + encodeURIComponent(apiUrl);
+    const res = await fetch(fallbackUrl);
+    if (res.ok) {
+      const resData = await res.json();
+      const data = resData?.contents ? JSON.parse(resData.contents) : null;
+      return data?.user?.profile_pic || null;
+    }
+  } catch (_) {}
+  return null;
+}
+
 function setActiveChannel(ch) {
   activeChannel = ch;
   document.getElementById('channelNameDisplay').textContent = ch.username;
-  document.getElementById('channelAvatar').textContent = ch.username.charAt(0).toUpperCase();
-  document.getElementById('topbarChannel').textContent = `@${ch.username}`;
-  document.getElementById('cmdPrefixBadge').textContent = '!';
+  
+  const avatarEl = document.getElementById('channelAvatar');
+  if (avatarEl) {
+    if (ch.avatar) {
+      avatarEl.style.backgroundImage = `url("${ch.avatar}")`;
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.backgroundPosition = 'center';
+      avatarEl.textContent = '';
+    } else {
+      avatarEl.style.backgroundImage = 'none';
+      avatarEl.textContent = ch.username.charAt(0).toUpperCase();
+    }
+  }
+
+  const topbarCh = document.getElementById('topbarChannel');
+  if (topbarCh) topbarCh.textContent = `@${ch.username}`;
+  const cmdBadge = document.getElementById('cmdPrefixBadge');
+  if (cmdBadge) cmdBadge.textContent = '!';
 }
 
 function renderChannelList() {
@@ -142,8 +212,13 @@ function renderChannelList() {
   currentChannels.forEach(ch => {
     const div = document.createElement('div');
     div.className = 'channel-option' + (activeChannel?.id === ch.id ? ' selected' : '');
+    
+    const avatarHtml = ch.avatar
+      ? `<div class="channel-avatar" style="width:22px;height:22px;background-image:url('${ch.avatar}');background-size:cover;background-position:center;border-radius:50%"></div>`
+      : `<div class="channel-avatar" style="width:22px;height:22px;font-size:0.65rem;border-radius:50%">${ch.username.charAt(0).toUpperCase()}</div>`;
+
     div.innerHTML = `
-      <div class="channel-avatar" style="width:22px;height:22px;font-size:0.65rem">${ch.username.charAt(0).toUpperCase()}</div>
+      ${avatarHtml}
       <span class="ch-name">${ch.username}</span>
       ${activeChannel?.id === ch.id ? '<span class="ch-check">✓</span>' : ''}
     `;
@@ -188,7 +263,8 @@ async function resolveChatroomId(username) {
       if (data && data.chatroom && data.chatroom.id) {
         return {
           id: data.chatroom.id.toString(),
-          username: data.slug || username
+          username: data.slug || username,
+          avatar: data.user?.profile_pic || null
         };
       }
     }
@@ -207,7 +283,8 @@ async function resolveChatroomId(username) {
         if (data && data.chatroom && data.chatroom.id) {
           return {
             id: data.chatroom.id.toString(),
-            username: data.slug || username
+            username: data.slug || username,
+            avatar: data.user?.profile_pic || null
           };
         }
       }
@@ -260,6 +337,7 @@ async function addChannel() {
   const newChannel = {
     id: channelId,
     username: channelName,
+    avatar: resolved.avatar || null,
     is_primary: currentChannels.length === 0
   };
 
@@ -467,12 +545,15 @@ function renderMiniCommands(cmds) {
   const el = document.getElementById('miniCommands');
   if (!el) return;
 
-  if (cmds.length === 0) {
+  // Prikaži specijalne i prilagođene komande (ne ugrađene bot komande)
+  const customOnly = cmds.filter(c => !c.is_builtin);
+
+  if (customOnly.length === 0) {
     el.innerHTML = '<div class="mini-empty">Nema prilagođenih komandi</div>';
     return;
   }
 
-  el.innerHTML = cmds.slice(0, 6).map(cmd => {
+  el.innerHTML = customOnly.map(cmd => {
     const cmdBadges = cmd.command.split(',').map(c => `<span class="td-cmd" style="font-size:0.75rem; padding: 0.1rem 0.25rem;">!${escapeHtml(c.trim())}</span>`).join(' ');
     return `
       <div class="mini-item" style="display:flex; justify-content:space-between; align-items:center;">
@@ -562,8 +643,15 @@ async function loadLeaderboard() {
   if (error) { console.error('Leaderboard:', error); return; }
   allLeaderboard = data || [];
   renderMiniLeaderboard(allLeaderboard.slice(0, 5));
-  if (allLeaderboard.length > 0) {
-    document.getElementById('statTopPoints').textContent = allLeaderboard[0]?.points ?? '—';
+  
+  // "Najaktivniji korisnik" = zbir poruka + watchtime skor, prikazujemo ime korisnika
+  if (allLeaderboard.length > 0 || allWatchtime.length > 0) {
+    const combined = buildCombinedRows();
+    if (combined.length > 0) {
+      document.getElementById('statTopPoints').textContent = combined[0].username;
+    } else if (allLeaderboard.length > 0) {
+      document.getElementById('statTopPoints').textContent = allLeaderboard[0]?.display_name || allLeaderboard[0]?.username || '—';
+    }
   }
 
   // Nakon učitavanja leaderboarda, ako je aktivni tab 'chatters', renderujemo ga
@@ -589,8 +677,8 @@ async function loadWatchtime() {
   document.getElementById('statTotalWatchtime').textContent =
     totalMins >= 60 ? `${Math.round(totalMins / 60)}h` : `${totalMins}min`;
 
-  // Nakon učitavanja watchtime-a, ako je aktivni tab 'watchtime', renderujemo ga
-  if (activeLeaderboardType === 'watchtime') {
+  // Nakon učitavanja watchtime-a, ako je aktivni tab 'watchtime' ili 'combined', renderujemo leaderboard
+  if (activeLeaderboardType === 'watchtime' || activeLeaderboardType === 'combined') {
     renderUnifiedLeaderboard();
   }
 }
@@ -601,22 +689,18 @@ function setLeaderboardType(type) {
   // Izmeni klase na tab dugmadima
   const tabChatters = document.getElementById('lbTabChatters');
   const tabWatchtime = document.getElementById('lbTabWatchtime');
+  const tabCombined = document.getElementById('lbTabCombined');
 
-  if (tabChatters && tabWatchtime) {
-    if (type === 'chatters') {
-      tabChatters.className = 'btn btn-sm btn-primary';
-      tabWatchtime.className = 'btn btn-sm btn-outline';
-    } else {
-      tabChatters.className = 'btn btn-sm btn-outline';
-      tabWatchtime.className = 'btn btn-sm btn-primary';
-    }
-  }
+  if (tabChatters) tabChatters.className = type === 'chatters' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+  if (tabWatchtime) tabWatchtime.className = type === 'watchtime' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+  if (tabCombined) tabCombined.className = type === 'combined' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
 
   // Izmeni klase u sidebar navigaciji
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const navItem = document.querySelector(`[data-panel="leaderboard"]`);
   if (navItem) navItem.classList.add('active');
-  document.getElementById('breadcrumbPage').textContent = type === 'chatters' ? 'Leaderboard' : 'Watchtime';
+  document.getElementById('breadcrumbPage').textContent =
+    type === 'chatters' ? 'Chatters' : type === 'watchtime' ? 'Watchtime' : 'Zajedno';
 
   // Izmeni zaglavlje tabele
   const header = document.getElementById('leaderboardTableHeader');
@@ -625,16 +709,25 @@ function setLeaderboardType(type) {
       header.innerHTML = `
         <th style="width:60px">#</th>
         <th>Korisnik</th>
-        <th>Poeni</th>
+        <th>Poruke</th>
         <th>Mesec</th>
+        <th>Ažurirano</th>
+      `;
+    } else if (type === 'watchtime') {
+      header.innerHTML = `
+        <th style="width:60px">#</th>
+        <th>Korisnik</th>
+        <th>Ukupno minuta</th>
+        <th>Sati gledanja</th>
         <th>Ažurirano</th>
       `;
     } else {
       header.innerHTML = `
         <th style="width:60px">#</th>
         <th>Korisnik</th>
-        <th>Ukupno minuta</th>
-        <th>Sati gledanja</th>
+        <th>Poruke (Chat)</th>
+        <th>Watchtime</th>
+        <th>Mesec</th>
         <th>Ažurirano</th>
       `;
     }
@@ -647,9 +740,49 @@ function setLeaderboardType(type) {
   renderUnifiedLeaderboard();
 }
 
+function buildCombinedRows() {
+  const map = {};
+  
+  allLeaderboard.forEach(r => {
+    const key = (r.username || '').toLowerCase();
+    if (!map[key]) map[key] = { username: r.display_name || r.username, points: 0, minutes: 0, month: r.month, updated_at: r.updated_at };
+    map[key].points += r.points || 0;
+    if (!map[key].month) map[key].month = r.month;
+  });
+  
+  allWatchtime.forEach(r => {
+    const key = (r.username || '').toLowerCase();
+    if (!map[key]) map[key] = { username: r.display_name || r.username, points: 0, minutes: 0, month: '', updated_at: r.updated_at };
+    map[key].minutes += r.minutes || 0;
+    // prefer most recent updated_at
+    if (!map[key].updated_at || (r.updated_at && r.updated_at > map[key].updated_at)) {
+      map[key].updated_at = r.updated_at;
+    }
+  });
+  
+  // score = messages + (minutes / 60 * 10) — normalize watchtime to a comparable scale
+  return Object.values(map).sort((a, b) => {
+    const scoreA = (a.points || 0) + Math.floor((a.minutes || 0) / 6);
+    const scoreB = (b.points || 0) + Math.floor((b.minutes || 0) / 6);
+    return scoreB - scoreA;
+  });
+}
+
 function renderUnifiedLeaderboard(customRows = null) {
   const isChatters = activeLeaderboardType === 'chatters';
-  const rows = customRows || (isChatters ? allLeaderboard : allWatchtime);
+  const isWatchtime = activeLeaderboardType === 'watchtime';
+  const isCombined = activeLeaderboardType === 'combined';
+
+  let rows;
+  if (customRows) {
+    rows = customRows;
+  } else if (isCombined) {
+    rows = buildCombinedRows();
+  } else if (isChatters) {
+    rows = allLeaderboard;
+  } else {
+    rows = allWatchtime;
+  }
 
   // Renderovanje podijuma (top 3)
   renderPodium(rows.slice(0, 3));
@@ -657,8 +790,10 @@ function renderUnifiedLeaderboard(customRows = null) {
   const tbody = document.getElementById('leaderboardBody');
   if (!tbody) return;
 
+  const colCount = isCombined ? 6 : 5;
+
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Nema podataka za prikaz.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${colCount}" class="table-empty">Nema podataka za prikaz.</td></tr>`;
     document.getElementById('lbTableMeta').textContent = '0 korisnika';
     return;
   }
@@ -678,12 +813,12 @@ function renderUnifiedLeaderboard(customRows = null) {
               <span style="font-weight:600">${escapeHtml(row.display_name || row.username)}</span>
             </div>
           </td>
-          <td class="td-num" style="color:${rankColor(i)}">${row.points} pt</td>
+          <td class="td-num" style="color:${rankColor(i)}">${row.points} poruke</td>
           <td style="color:var(--text-muted)">${row.month}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
-    } else {
+    } else if (isWatchtime) {
       const hours = Math.floor((row.minutes || 0) / 60);
       const mins = (row.minutes || 0) % 60;
       return `
@@ -699,6 +834,27 @@ function renderUnifiedLeaderboard(customRows = null) {
           </td>
           <td class="td-num">${row.minutes} min</td>
           <td class="td-num" style="color:var(--kick-green); font-weight: 600;">${hours}h ${mins}min</td>
+          <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
+        </tr>
+      `;
+    } else {
+      // Combined
+      const hours = Math.floor((row.minutes || 0) / 60);
+      const mins = (row.minutes || 0) % 60;
+      return `
+        <tr>
+          <td><strong style="color:${rankColor(i)}">${i + 1}.</strong></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+              <div style="width:24px;height:24px;border-radius:50%;background:var(--app-gradient);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0">
+                ${(row.username || '?').charAt(0).toUpperCase()}
+              </div>
+              <span style="font-weight:600">${escapeHtml(row.username)}</span>
+            </div>
+          </td>
+          <td class="td-num" style="color:var(--app-primary)">${row.points} poruke</td>
+          <td class="td-num" style="color:var(--kick-green); font-weight: 600;">${hours}h ${mins}min</td>
+          <td style="color:var(--text-muted)">${row.month || '—'}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
@@ -744,39 +900,54 @@ function renderPodium(top3) {
 function renderMiniLeaderboard(rows) {
   const el = document.getElementById('miniLeaderboard');
   if (!el) return;
-  if (rows.length === 0) { el.innerHTML = '<div class="mini-empty">Nema podataka</div>'; return; }
+  if (!rows || rows.length === 0) { el.innerHTML = '<div class="mini-empty">Nema podataka</div>'; return; }
   el.innerHTML = rows.map((row, i) => `
     <div class="mini-item">
       <div class="mini-rank rank-${i < 3 ? i + 1 : 'n'}">${i + 1}</div>
       <span class="mini-username">${escapeHtml(row.display_name || row.username)}</span>
-      <span class="mini-value">${row.points} pt</span>
+      <span class="mini-value">${row.points} poruke</span>
     </div>
   `).join('');
 }
 
 function filterLeaderboard(q) {
   const isChatters = activeLeaderboardType === 'chatters';
-  const source = isChatters ? allLeaderboard : allWatchtime;
+  const isCombined = activeLeaderboardType === 'combined';
+  let source;
+  if (isCombined) {
+    source = buildCombinedRows();
+  } else if (isChatters) {
+    source = allLeaderboard;
+  } else {
+    source = allWatchtime;
+  }
   const filtered = source.filter(r =>
-    (r.display_name || r.username || '').toLowerCase().includes(q.toLowerCase())
+    (r.display_name || r.username || r.username || '').toLowerCase().includes(q.toLowerCase())
   );
   renderUnifiedLeaderboard(filtered);
 }
 
 function exportLeaderboard() {
-  const isChatters = activeLeaderboardType === 'chatters';
-  if (isChatters) {
+  const type = activeLeaderboardType;
+  if (type === 'chatters') {
     if (allLeaderboard.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
-    const csv = ['Rank,Username,Points,Month,Updated']
+    const csv = ['Rank,Username,Poruke,Month,Updated']
       .concat(allLeaderboard.map((r, i) => `${i + 1},${r.display_name || r.username},${r.points},${r.month},${r.updated_at}`))
       .join('\n');
     downloadCsv(csv, `leaderboard_chatters_${activeChannel?.username}_${getCurrentMonth()}.csv`);
-  } else {
+  } else if (type === 'watchtime') {
     if (allWatchtime.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
     const csv = ['Rank,Username,Minutes,Hours,Updated']
       .concat(allWatchtime.map((r, i) => `${i + 1},${r.display_name || r.username},${r.minutes},${Math.floor(r.minutes / 60)},${r.updated_at}`))
       .join('\n');
     downloadCsv(csv, `leaderboard_watchtime_${activeChannel?.username}.csv`);
+  } else {
+    const combined = buildCombinedRows();
+    if (combined.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
+    const csv = ['Rank,Username,Poruke,Minutes,Hours,Updated']
+      .concat(combined.map((r, i) => `${i + 1},${r.username},${r.points},${r.minutes},${Math.floor((r.minutes || 0) / 60)},${r.updated_at}`))
+      .join('\n');
+    downloadCsv(csv, `leaderboard_zajedno_${activeChannel?.username}.csv`);
   }
 }
 
@@ -786,11 +957,13 @@ function renderMiniWatchtime(rows) {
   if (rows.length === 0) { el.innerHTML = '<div class="mini-empty">Nema podataka</div>'; return; }
   el.innerHTML = rows.map((row, i) => {
     const h = Math.floor((row.minutes || 0) / 60);
+    const m = (row.minutes || 0) % 60;
+    const valStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
     return `
       <div class="mini-item">
         <div class="mini-rank rank-${i < 3 ? i + 1 : 'n'}">${i + 1}</div>
         <span class="mini-username">${escapeHtml(row.display_name || row.username)}</span>
-        <span class="mini-value">${h}h</span>
+        <span class="mini-value">${valStr}</span>
       </div>
     `;
   }).join('');
@@ -1088,38 +1261,74 @@ async function toggleBotActive() {
 
 async function loadChannelLiveStatus() {
   if (!activeChannel) return;
-
-  const { data, error } = await sb.from('channels')
-    .select('is_active')
-    .eq('id', activeChannel.id)
-    .maybeSingle();
-
-  if (error) {
-    console.error('Greška pri učitavanju live statusa kanala:', error);
-    return;
+  
+  // Clear any existing polling interval
+  if (liveStatusInterval) {
+    clearInterval(liveStatusInterval);
+    liveStatusInterval = null;
   }
+  
+  // Fetch once immediately
+  await fetchKickLiveStatus();
+  
+  // Then poll every 60 seconds
+  liveStatusInterval = setInterval(fetchKickLiveStatus, 60000);
+}
 
-  const isLive = data ? data.is_active : false;
-  updateLiveStatusUI(isLive);
+async function fetchKickLiveStatus() {
+  if (!activeChannel) return;
+  
+  const apiUrl = `https://kick.com/api/v2/channels/${activeChannel.username}`;
+  const cacheBust = `&_t=${Date.now()}`;
+  
+  // Try allorigins (no caching, fresh response)
+  try {
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}${cacheBust}`;
+    const res = await fetch(proxyUrl, { cache: 'no-store' });
+    if (res.ok) {
+      const wrapper = await res.json();
+      if (wrapper?.contents) {
+        const data = JSON.parse(wrapper.contents);
+        // livestream is null when offline, object when live
+        const isLive = data?.livestream !== null && data?.livestream !== undefined;
+        updateLiveStatusUI(isLive);
+        return;
+      }
+    }
+  } catch (_) {}
+  
+  // Fallback: try corsproxy with cache-bust header
+  try {
+    const proxyUrl2 = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+    const res2 = await fetch(proxyUrl2, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+    if (res2.ok) {
+      const data = await res2.json();
+      const isLive = data?.livestream !== null && data?.livestream !== undefined;
+      updateLiveStatusUI(isLive);
+      return;
+    }
+  } catch (_) {}
+  
+  // Final fallback to DB
+  try {
+    const { data } = await sb.from('channels')
+      .select('is_active')
+      .eq('id', activeChannel.id)
+      .maybeSingle();
+    updateLiveStatusUI(data ? !!data.is_active : false);
+  } catch (_) {}
 }
 
 function updateLiveStatusUI(isLive) {
-  const kickDot = document.querySelector('.kick-dot');
-  if (kickDot) {
-    if (isLive) {
-      kickDot.style.background = '#EF4444'; // Crvena boja za LIVE
-      kickDot.style.boxShadow = '0 0 8px rgba(239, 68, 68, 0.7)';
-      kickDot.style.animation = 'pulse-red 1.5s infinite';
-    } else {
-      kickDot.style.background = 'var(--text-muted)'; // Siva boja za OFFLINE
-      kickDot.style.boxShadow = 'none';
-      kickDot.style.animation = 'none';
-    }
+  // Update the sidebar channel status indicator
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  
+  if (statusDot) {
+    statusDot.className = isLive ? 'status-dot status-on' : 'status-dot status-off';
   }
-
-  const badgeText = document.getElementById('topbarChannel');
-  if (badgeText && activeChannel) {
-    badgeText.textContent = `@${activeChannel.username}${isLive ? ' (LIVE)' : ''}`;
+  if (statusText) {
+    statusText.textContent = isLive ? 'Online' : 'Offline';
   }
 }
 
@@ -1138,7 +1347,7 @@ function setupRealtimeChannels() {
       filter: `id=eq.${activeChannel.id}`
     }, payload => {
       if (payload.new) {
-        updateLiveStatusUI(payload.new.is_active);
+        updateLiveStatusUI(!!payload.new.is_active);
       }
     })
     .subscribe();
@@ -1500,7 +1709,373 @@ const style = document.createElement('style');
 style.textContent = '@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
 document.head.appendChild(style);
 
+// ── Settings Modal Functions ──────────────────────────────
+let settingsUploadedAvatarBase64 = null;
+
+function openSettingsModal() {
+  toggleUserMenu(); // Close user menu popup
+  const modal = document.getElementById('settingsModal');
+  if (!modal) return;
+
+  sb.auth.getUser().then(({ data: { user } }) => {
+    if (!user) {
+      showToast('error', 'Moraš biti prijavljen da pristupiš podešavanjima.', '⚠️');
+      return;
+    }
+    
+    // Fill in fields
+    const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
+    const avatarVal = user.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
+
+    document.getElementById('settingsEmail').value = user.email;
+    document.getElementById('settingsName').value = name;
+    document.getElementById('settingsPassword').value = '';
+    document.getElementById('settingsConfirmPassword').value = '';
+
+    setSettingsAvatarPreview(avatarVal);
+    settingsUploadedAvatarBase64 = null;
+
+    modal.classList.add('open');
+  });
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('settingsModal');
+  if (modal) {
+    modal.classList.remove('open');
+  }
+}
+
+function handleSettingsModalBackdropClick(e) {
+  if (e.target.id === 'settingsModal') {
+    closeSettingsModal();
+  }
+}
+
+function setSettingsAvatarPreview(urlOrEmoji) {
+  const imgEl = document.getElementById('settingsAvatarPreviewImg');
+  if (!imgEl) return;
+  if (urlOrEmoji.startsWith('data:image') || urlOrEmoji.startsWith('http')) {
+    imgEl.style.backgroundImage = `url("${urlOrEmoji}")`;
+    imgEl.style.backgroundSize = 'cover';
+    imgEl.style.backgroundPosition = 'center';
+    imgEl.textContent = '';
+  } else {
+    imgEl.style.backgroundImage = 'none';
+    imgEl.textContent = urlOrEmoji;
+  }
+}
+
+function triggerSettingsAvatarUpload() {
+  document.getElementById('settingsAvatarFileInput').click();
+}
+
+function handleSettingsAvatarFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const maxDim = 128;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxDim) {
+          height *= maxDim / width;
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width *= maxDim / height;
+          height = maxDim;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressedBase64 = canvas.toDataURL('image/jpeg', 0.65);
+      setSettingsAvatarPreview(compressedBase64);
+      settingsUploadedAvatarBase64 = compressedBase64;
+    };
+    img.src = evt.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function selectSettingsPresetAvatar(key) {
+  const emojis = { robot: '🤖', ninja: '🥷', gamepad: '🎮', star: '⭐' };
+  const emoji = emojis[key];
+  setSettingsAvatarPreview(emoji);
+  settingsUploadedAvatarBase64 = emoji;
+}
+
+async function handleSaveSettings() {
+  const name = document.getElementById('settingsName').value.trim();
+  const password = document.getElementById('settingsPassword').value;
+  const confirmPassword = document.getElementById('settingsConfirmPassword').value;
+
+  if (!name) {
+    showToast('error', 'Ime ne može biti prazno.', '⚠️');
+    return;
+  }
+
+  if (password) {
+    if (password.length < 8) {
+      showToast('error', 'Lozinka mora imati barem 8 karaktera.', '⚠️');
+      return;
+    }
+    if (password !== confirmPassword) {
+      showToast('error', 'Lozinke se ne podudaraju.', '⚠️');
+      return;
+    }
+  }
+
+  const btn = document.getElementById('settingsSaveBtn');
+  btn.disabled = true;
+
+  try {
+    const updateData = { display_name: name };
+    if (settingsUploadedAvatarBase64 !== null) {
+      updateData.avatar_url = settingsUploadedAvatarBase64;
+    }
+
+    const { error: profileError } = await sb.auth.updateUser({ data: updateData });
+    if (profileError) throw profileError;
+
+    if (password) {
+      const { error: passwordError } = await sb.auth.updateUser({ password: password });
+      if (passwordError) throw passwordError;
+    }
+
+    showToast('success', 'Podešavanja uspešno sačuvana!', '✅');
+    closeSettingsModal();
+    
+    // Refresh user state
+    const { data: { user } } = await sb.auth.getUser();
+    if (user) {
+      currentUser = user;
+      // Update sidebar avatar/name immediately
+      const avatarVal = currentUser.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
+      const sidebarAvEl = document.getElementById('sidebarAvatar');
+      if (avatarVal.startsWith('data:image') || avatarVal.startsWith('http')) {
+        sidebarAvEl.style.backgroundImage = `url("${avatarVal}")`;
+        sidebarAvEl.style.backgroundSize = 'cover';
+        sidebarAvEl.style.backgroundPosition = 'center';
+        sidebarAvEl.textContent = '';
+      } else {
+        sidebarAvEl.style.backgroundImage = 'none';
+        sidebarAvEl.textContent = avatarVal;
+      }
+      document.getElementById('sidebarName').textContent = name;
+    }
+
+  } catch (err) {
+    showToast('error', err.message || 'Greška pri čuvanju podešavanja.', '❌');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════
+function switchSettingsTab(tabName) {
+  const tabProfile = document.getElementById('setTabProfile');
+  const tabChannels = document.getElementById('setTabChannels');
+  const panelProfile = document.getElementById('settingsProfilePanel');
+  const panelChannels = document.getElementById('settingsChannelsPanel');
+  
+  if (!tabProfile || !tabChannels || !panelProfile || !panelChannels) return;
+  
+  if (tabName === 'profile') {
+    tabProfile.classList.add('active');
+    tabChannels.classList.remove('active');
+    panelProfile.style.display = 'block';
+    panelChannels.style.display = 'none';
+  } else {
+    tabProfile.classList.remove('active');
+    tabChannels.classList.add('active');
+    panelProfile.style.display = 'none';
+    panelChannels.style.display = 'block';
+    renderSettingsChannelList();
+  }
+}
+
+function renderSettingsChannelList() {
+  const listEl = document.getElementById('settingsChannelList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  
+  if (currentChannels.length === 0) {
+    listEl.innerHTML = '<div style="padding:10px;font-size:0.85rem;color:var(--text-muted);text-align:center;">Nema povezanih kanala.</div>';
+    return;
+  }
+  
+  currentChannels.forEach(ch => {
+    const item = document.createElement('div');
+    item.className = 'modal-channel-item';
+    
+    const avatarHtml = ch.avatar
+      ? `<div class="modal-channel-avatar" style="background-image:url('${ch.avatar}');background-size:cover;background-position:center;"></div>`
+      : `<div class="modal-channel-avatar">${ch.username.charAt(0).toUpperCase()}</div>`;
+      
+    const badgeHtml = ch.is_primary 
+      ? `<span class="modal-ch-badge primary">Glavni</span>`
+      : `<button class="btn btn-outline btn-sm" onclick="makeChannelPrimary('${ch.id}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;cursor:pointer;">Glavni</button>`;
+      
+    item.innerHTML = `
+      <div class="modal-channel-info">
+        ${avatarHtml}
+        <div>
+          <div class="modal-channel-name">${ch.username}</div>
+          <div style="font-size:0.7rem;color:var(--text-muted)">ID: ${ch.id}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        ${badgeHtml}
+        <button class="btn btn-outline btn-sm" onclick="deleteConnectedChannel('${ch.id}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;border-color:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;" title="Ukloni kanal">✕</button>
+      </div>
+    `;
+    listEl.appendChild(item);
+  });
+}
+
+async function addNewChannel() {
+  const input = document.getElementById('settingsNewChannelInput');
+  const errEl = document.getElementById('settingsAddChannelError');
+  const btn = document.getElementById('settingsAddChannelBtn');
+  if (!input || !errEl) return;
+  
+  errEl.style.display = 'none';
+  const rawVal = input.value.trim();
+  if (!rawVal) {
+    errEl.textContent = 'Unesite Kick username ili URL kanala.';
+    errEl.style.display = 'block';
+    return;
+  }
+  
+  const username = extractKickUsername(rawVal);
+  if (currentChannels.some(c => c.username.toLowerCase() === username.toLowerCase())) {
+    errEl.textContent = 'Ovaj kanal je već dodat.';
+    errEl.style.display = 'block';
+    return;
+  }
+  
+  btn.disabled = true;
+  const resolved = await resolveChatroomId(username);
+  btn.disabled = false;
+  
+  if (!resolved) {
+    errEl.textContent = `Kanal "${username}" nije pronađen na Kick platformi.`;
+    errEl.style.display = 'block';
+    return;
+  }
+  
+  const newCh = {
+    id: resolved.id,
+    username: resolved.username,
+    avatar: resolved.avatar || null,
+    is_primary: currentChannels.length === 0
+  };
+  
+  const updatedChannels = [...currentChannels, newCh];
+  
+  const { error } = await sb.from('user_profiles')
+    .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+    .eq('id', currentUser.id);
+    
+  if (error) {
+    errEl.textContent = 'Greška pri čuvanju kanala.';
+    errEl.style.display = 'block';
+    return;
+  }
+  
+  currentChannels = updatedChannels;
+  input.value = '';
+  
+  if (newCh.is_primary) {
+    setActiveChannel(newCh);
+  }
+  
+  renderChannelList();
+  renderSettingsChannelList();
+  showToast('success', `Kanal @${newCh.username} je dodat!`, '✅');
+}
+
+async function makeChannelPrimary(channelId) {
+  const updatedChannels = currentChannels.map(c => ({
+    ...c,
+    is_primary: c.id === channelId
+  }));
+  
+  const { error } = await sb.from('user_profiles')
+    .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+    .eq('id', currentUser.id);
+    
+  if (error) {
+    showToast('error', 'Greška pri postavljanju glavnog kanala.', '❌');
+    return;
+  }
+  
+  currentChannels = updatedChannels;
+  const primary = currentChannels.find(c => c.is_primary);
+  if (primary) {
+    setActiveChannel(primary);
+  }
+  
+  renderChannelList();
+  renderSettingsChannelList();
+  showToast('success', 'Glavni kanal je ažuriran!', '✅');
+}
+
+async function deleteConnectedChannel(channelId) {
+  const channelToDelete = currentChannels.find(c => c.id === channelId);
+  if (!channelToDelete) return;
+  
+  if (!confirm(`Da li ste sigurni da želite da uklonite kanal @${channelToDelete.username}?`)) {
+    return;
+  }
+  
+  let updatedChannels = currentChannels.filter(c => c.id !== channelId);
+  
+  // If we deleted the primary channel, assign a new primary
+  if (channelToDelete.is_primary && updatedChannels.length > 0) {
+    updatedChannels[0].is_primary = true;
+  }
+  
+  const { error } = await sb.from('user_profiles')
+    .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+    .eq('id', currentUser.id);
+    
+  if (error) {
+    showToast('error', 'Greška pri uklanjanju kanala.', '❌');
+    return;
+  }
+  
+  currentChannels = updatedChannels;
+  
+  if (activeChannel?.id === channelId) {
+    if (currentChannels.length > 0) {
+      setActiveChannel(currentChannels.find(c => c.is_primary) || currentChannels[0]);
+    } else {
+      activeChannel = null;
+      const nameDisplay = document.getElementById('channelNameDisplay');
+      if (nameDisplay) nameDisplay.textContent = 'Nema kanala';
+      const topbarDisplay = document.getElementById('topbarChannel');
+      if (topbarDisplay) topbarDisplay.textContent = '—';
+    }
+  }
+  
+  renderChannelList();
+  renderSettingsChannelList();
+  showToast('success', 'Kanal je uspešno uklonjen.', '🗑️');
+}
+
 initAuth();
