@@ -18,15 +18,89 @@ let allLeaderboard = [];   // cached leaderboard rows
 let allWatchtime = [];   // cached watchtime rows
 let allMarriages = [];   // cached marriages
 let allLoveStatuses = [];  // cached love modifiers
+const avatarCache = {};
+
+async function getOrFetchAvatar(username, elementId) {
+  if (!username) return;
+  const key = username.toLowerCase();
+
+  if (avatarCache[key] && avatarCache[key] !== 'loading' && avatarCache[key] !== 'none') {
+    updateAvatarUI(elementId, avatarCache[key]);
+    return;
+  }
+
+  const cachedLocal = localStorage.getItem(`avatar-cache-${key}`);
+  if (cachedLocal && cachedLocal !== 'none') {
+    avatarCache[key] = cachedLocal;
+    updateAvatarUI(elementId, cachedLocal);
+    return;
+  }
+
+  if (avatarCache[key] === 'loading') {
+    const interval = setInterval(() => {
+      if (avatarCache[key] !== 'loading') {
+        clearInterval(interval);
+        if (avatarCache[key] && avatarCache[key] !== 'none') {
+          updateAvatarUI(elementId, avatarCache[key]);
+        }
+      }
+    }, 500);
+    return;
+  }
+
+  avatarCache[key] = 'loading';
+  const avatarUrl = await fetchKickAvatar(username);
+  if (avatarUrl) {
+    avatarCache[key] = avatarUrl;
+    try {
+      localStorage.setItem(`avatar-cache-${key}`, avatarUrl);
+    } catch (_) { }
+    updateAvatarUI(elementId, avatarUrl);
+  } else {
+    avatarCache[key] = 'none';
+    try {
+      localStorage.setItem(`avatar-cache-${key}`, 'none');
+    } catch (_) { }
+  }
+}
+
+function updateAvatarUI(elementId, avatarUrl) {
+  const el = document.getElementById(elementId);
+  if (el) {
+    el.style.backgroundImage = `url("${avatarUrl}")`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.border = '1px solid rgba(255,255,255,0.15)';
+    el.textContent = '';
+  }
+}
+
+function formatPorukeCount(count) {
+  const n = Math.abs(count || 0) % 100;
+  const n1 = n % 10;
+  if (n > 10 && n < 20) {
+    return `${count} poruka`;
+  }
+  if (n1 === 1) {
+    return `${count} poruka`;
+  }
+  if (n1 >= 2 && n1 <= 4) {
+    return `${count} poruke`;
+  }
+  return `${count} poruka`;
+}
+
 let editingCmdId = null; // null = new, UUID = edit
 let confirmCallback = null;
 let realtimeSub = null;
 let configLoaded = false;
 let localAnnounces = [];   // cached auto-announce messages
-let activeLeaderboardType = localStorage.getItem('active-leaderboard-tab') || 'chatters'; // 'chatters', 'watchtime', 'combined'
+let activeLeaderboardType = localStorage.getItem('active-leaderboard-tab') || 'combined'; // 'chatters', 'watchtime', 'combined'
 let activeMiniLbTab = 'combined'; // 'combined', 'chatters', 'watchtime'
 let activeCommandsTab = 'all'; // 'all', 'system', 'custom', 'builtin'
 let liveStatusInterval = null; // polling interval for live status
+let leaderboardPage = 1;
+let leaderboardLimit = parseInt(localStorage.getItem('lb-items-per-page')) || 15;
 
 // ── Built-in commands reference ────────────────────────────
 const BUILTIN_COMMANDS = [
@@ -35,15 +109,20 @@ const BUILTIN_COMMANDS = [
   { cmd: '!watchtime', desc: 'Tvoj ukupni watchtime' },
   { cmd: '!topwatchtime', desc: 'Top 10 gledalaca po watchtime-u' },
   { cmd: '!vreme', desc: 'Prognoza vremena za grad' },
-  { cmd: '!love', desc: 'Kompatibilnost između dva korisnika' },
-  { cmd: '!vencaj', desc: 'Zaprosi korisnika i sklopi brak' },
+  { cmd: '!posaljiljubav', desc: 'Pošalji ljubav korisniku (+2% kompatibilnosti, 10m cooldown)' },
+  { cmd: '!bacihejt', desc: 'Baci hejt na korisnika (-5% kompatibilnosti, 10m cooldown)' },
+  { cmd: '!love', desc: 'Prikaži ljubavni status između korisnika' },
+  { cmd: '!cooldown', desc: 'Proveri preostali ljubavni cooldown' },
+  { cmd: '!vencaj', desc: 'Pošalji zahtev za brak ako je ljubav iznad 90%' },
+  { cmd: '!prihvati', desc: 'Prihvati zahtev za brak u roku od 60 sekundi' },
+  { cmd: '!odbij', desc: 'Odbij zahtev za brak' },
   { cmd: '!razvod', desc: 'Razvedi se od partnera' },
+  { cmd: '!brakovi', desc: 'Prikaži aktivne brakove u kanalu' },
   { cmd: '!samar', desc: 'Pošalji šamar korisniku' },
   { cmd: '!roll', desc: 'Slučajni roll / dvoboj' },
   { cmd: '!duel', desc: 'Izazovi nekoga na duel' },
   { cmd: '!iq', desc: 'Izmeri IQ korisnika' },
   { cmd: '!info', desc: 'Nasumična zanimljivost' },
-  { cmd: '!cooldown', desc: 'Provera cooldown-a' },
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -124,7 +203,7 @@ async function loadUserProfile() {
       (data.plan || 'free').charAt(0).toUpperCase() + (data.plan || 'free').slice(1);
 
     currentChannels = data.kick_channels || [];
-    
+
     // Fetch avatars for channels that don't have one yet
     const needsAvatar = currentChannels.filter(c => !c.avatar);
     if (needsAvatar.length > 0) {
@@ -136,7 +215,7 @@ async function loadUserProfile() {
           updated = true;
         }
       }));
-      
+
       // Save updated channels with avatars back to db
       if (updated) {
         await sb.from('user_profiles')
@@ -144,7 +223,7 @@ async function loadUserProfile() {
           .eq('id', currentUser.id);
       }
     }
-    
+
     if (currentChannels.length > 0) {
       const primary = currentChannels.find(c => c.is_primary) || currentChannels[0];
       setActiveChannel(primary);
@@ -155,31 +234,97 @@ async function loadUserProfile() {
 }
 
 async function fetchKickAvatar(username) {
+  // 1. Pokušaj preko lokalnog bot API servera (koristi got-scraping, radi 100% bez Cloudflare blokade)
+  try {
+    const localRes = await fetch(`http://localhost:3000/api/avatar?username=${username}`);
+    if (localRes.ok) {
+      const localData = await localRes.json();
+      if (localData?.avatar) {
+        return localData.avatar;
+      }
+    }
+  } catch (_) { }
+
   const apiUrl = `https://kick.com/api/v2/channels/${username}`;
-  try {
-    const proxyUrl = `https://corsproxy.io/?` + encodeURIComponent(apiUrl);
-    const res = await fetch(proxyUrl);
-    if (res.ok) {
-      const data = await res.json();
-      return data?.user?.profile_pic || null;
+
+  const proxies = [
+    // 1. Allorigins (usually very reliable, has cached copies)
+    {
+      name: 'allorigins',
+      url: `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`,
+      parse: async (res) => {
+        const json = await res.json();
+        const data = json.contents ? JSON.parse(json.contents) : null;
+        return data?.user?.profile_pic || null;
+      }
+    },
+    // 2. Corsproxy.io
+    {
+      name: 'corsproxy.io',
+      url: `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
+      parse: async (res) => {
+        const data = await res.json();
+        return data?.user?.profile_pic || null;
+      }
+    },
+    // 3. Codetabs
+    {
+      name: 'codetabs',
+      url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(apiUrl)}`,
+      parse: async (res) => {
+        const data = await res.json();
+        return data?.user?.profile_pic || null;
+      }
+    },
+    // 4. Thingproxy
+    {
+      name: 'thingproxy',
+      url: `https://thingproxy.freeboard.io/fetch/${apiUrl}`,
+      parse: async (res) => {
+        const data = await res.json();
+        return data?.user?.profile_pic || null;
+      }
     }
-  } catch (_) {}
-  try {
-    const fallbackUrl = `https://api.allorigins.win/get?url=` + encodeURIComponent(apiUrl);
-    const res = await fetch(fallbackUrl);
-    if (res.ok) {
-      const resData = await res.json();
-      const data = resData?.contents ? JSON.parse(resData.contents) : null;
-      return data?.user?.profile_pic || null;
-    }
-  } catch (_) {}
-  return null;
+  ];
+
+  return new Promise((resolve) => {
+    let completed = 0;
+    let resolved = false;
+
+    proxies.forEach(proxy => {
+      fetch(proxy.url)
+        .then(async (res) => {
+          if (res.ok && !resolved) {
+            const pic = await proxy.parse(res);
+            if (pic && !resolved) {
+              resolved = true;
+              resolve(pic);
+            }
+          }
+        })
+        .catch(() => { })
+        .finally(() => {
+          completed++;
+          if (completed === proxies.length && !resolved) {
+            resolve(null);
+          }
+        });
+    });
+
+    // Safeguard timeout
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve(null);
+      }
+    }, 6000);
+  });
 }
 
 function setActiveChannel(ch) {
   activeChannel = ch;
   document.getElementById('channelNameDisplay').textContent = ch.username;
-  
+
   const avatarEl = document.getElementById('channelAvatar');
   if (avatarEl) {
     if (ch.avatar) {
@@ -212,7 +357,7 @@ function renderChannelList() {
   currentChannels.forEach(ch => {
     const div = document.createElement('div');
     div.className = 'channel-option' + (activeChannel?.id === ch.id ? ' selected' : '');
-    
+
     const avatarHtml = ch.avatar
       ? `<div class="channel-avatar" style="width:22px;height:22px;background-image:url('${ch.avatar}');background-size:cover;background-position:center;border-radius:50%"></div>`
       : `<div class="channel-avatar" style="width:22px;height:22px;font-size:0.65rem;border-radius:50%">${ch.username.charAt(0).toUpperCase()}</div>`;
@@ -630,6 +775,12 @@ function populateMonthSelector() {
 
 async function loadLeaderboard() {
   if (!activeChannel) return;
+  leaderboardPage = 1;
+
+  // Clear search input on month reload
+  const searchInput = document.getElementById('leaderboardSearchInput');
+  if (searchInput) searchInput.value = '';
+
   const sel = document.getElementById('lbMonthSelect');
   const month = sel?.value || getCurrentMonth();
 
@@ -643,7 +794,7 @@ async function loadLeaderboard() {
   if (error) { console.error('Leaderboard:', error); return; }
   allLeaderboard = data || [];
   renderMiniLeaderboard(allLeaderboard.slice(0, 5));
-  
+
   // "Najaktivniji korisnik" = zbir poruka + watchtime skor, prikazujemo ime korisnika
   if (allLeaderboard.length > 0 || allWatchtime.length > 0) {
     const combined = buildCombinedRows();
@@ -654,10 +805,8 @@ async function loadLeaderboard() {
     }
   }
 
-  // Nakon učitavanja leaderboarda, ako je aktivni tab 'chatters', renderujemo ga
-  if (activeLeaderboardType === 'chatters') {
-    renderUnifiedLeaderboard();
-  }
+  // Nakon učitavanja leaderboarda, uvek osvežavamo prikaz tabele
+  renderUnifiedLeaderboard();
 }
 
 async function loadWatchtime() {
@@ -685,6 +834,7 @@ async function loadWatchtime() {
 function setLeaderboardType(type) {
   activeLeaderboardType = type;
   localStorage.setItem('active-leaderboard-tab', type);
+  leaderboardPage = 1;
 
   // Izmeni klase na tab dugmadima
   const tabChatters = document.getElementById('lbTabChatters');
@@ -699,8 +849,7 @@ function setLeaderboardType(type) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const navItem = document.querySelector(`[data-panel="leaderboard"]`);
   if (navItem) navItem.classList.add('active');
-  document.getElementById('breadcrumbPage').textContent =
-    type === 'chatters' ? 'Chatters' : type === 'watchtime' ? 'Watchtime' : 'Zajedno';
+  updateBreadcrumbs('leaderboard');
 
   // Izmeni zaglavlje tabele
   const header = document.getElementById('leaderboardTableHeader');
@@ -725,7 +874,7 @@ function setLeaderboardType(type) {
       header.innerHTML = `
         <th style="width:60px">#</th>
         <th>Korisnik</th>
-        <th>Poruke (Chat)</th>
+        <th>Poruke</th>
         <th>Watchtime</th>
         <th>Mesec</th>
         <th>Ažurirano</th>
@@ -742,25 +891,53 @@ function setLeaderboardType(type) {
 
 function buildCombinedRows() {
   const map = {};
-  
+
   allLeaderboard.forEach(r => {
     const key = (r.username || '').toLowerCase();
-    if (!map[key]) map[key] = { username: r.display_name || r.username, points: 0, minutes: 0, month: r.month, updated_at: r.updated_at };
+    if (!map[key]) {
+      map[key] = {
+        username: r.username,
+        display_name: r.display_name || r.username,
+        points: 0,
+        minutes: 0,
+        month: r.month,
+        updated_at: r.updated_at
+      };
+    }
     map[key].points += r.points || 0;
     if (!map[key].month) map[key].month = r.month;
   });
-  
+
+  const sel = document.getElementById('lbMonthSelect');
+  const selectedMonth = sel?.value || getCurrentMonth();
+
   allWatchtime.forEach(r => {
+    // Profiltriši watchtime po izabranom mesecu koristeći updated_at
+    if (!r.updated_at) return;
+    const date = new Date(r.updated_at);
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const y = date.getFullYear();
+    const rowMonth = `${m}-${y}`;
+    if (rowMonth !== selectedMonth) return;
+
     const key = (r.username || '').toLowerCase();
-    if (!map[key]) map[key] = { username: r.display_name || r.username, points: 0, minutes: 0, month: '', updated_at: r.updated_at };
+    if (!map[key]) {
+      map[key] = {
+        username: r.username,
+        display_name: r.display_name || r.username,
+        points: 0,
+        minutes: 0,
+        month: selectedMonth,
+        updated_at: r.updated_at
+      };
+    }
     map[key].minutes += r.minutes || 0;
-    // prefer most recent updated_at
     if (!map[key].updated_at || (r.updated_at && r.updated_at > map[key].updated_at)) {
       map[key].updated_at = r.updated_at;
     }
   });
-  
-  // score = messages + (minutes / 60 * 10) — normalize watchtime to a comparable scale
+
+  // score = messages + (minutes / 6) — normalizacija watchtime-a na uporedivu skalu (1h watchtime = 10 poruka)
   return Object.values(map).sort((a, b) => {
     const scoreA = (a.points || 0) + Math.floor((a.minutes || 0) / 6);
     const scoreB = (b.points || 0) + Math.floor((b.minutes || 0) / 6);
@@ -781,7 +958,15 @@ function renderUnifiedLeaderboard(customRows = null) {
   } else if (isChatters) {
     rows = allLeaderboard;
   } else {
-    rows = allWatchtime;
+    const sel = document.getElementById('lbMonthSelect');
+    const selectedMonth = sel?.value || getCurrentMonth();
+    rows = allWatchtime.filter(row => {
+      if (!row.updated_at) return false;
+      const date = new Date(row.updated_at);
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const y = date.getFullYear();
+      return `${m}-${y}` === selectedMonth;
+    });
   }
 
   // Renderovanje podijuma (top 3)
@@ -795,25 +980,83 @@ function renderUnifiedLeaderboard(customRows = null) {
   if (rows.length === 0) {
     tbody.innerHTML = `<tr><td colspan="${colCount}" class="table-empty">Nema podataka za prikaz.</td></tr>`;
     document.getElementById('lbTableMeta').textContent = '0 korisnika';
+
+    // Sakrij paginaciju ako nema korisnika
+    const prevBtn = document.getElementById('lbPrevPageBtn');
+    const nextBtn = document.getElementById('lbNextPageBtn');
+    const pageInfo = document.getElementById('lbPageInfo');
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    if (pageInfo) pageInfo.textContent = 'Stranica 1 od 1';
     return;
   }
 
   document.getElementById('lbTableMeta').textContent = `${rows.length} korisnika`;
 
-  tbody.innerHTML = rows.map((row, i) => {
+  // Paginacija proračun
+  const totalPages = Math.ceil(rows.length / leaderboardLimit) || 1;
+  if (leaderboardPage > totalPages) leaderboardPage = totalPages;
+  if (leaderboardPage < 1) leaderboardPage = 1;
+
+  const startIndex = (leaderboardPage - 1) * leaderboardLimit;
+  const pageRows = rows.slice(startIndex, startIndex + leaderboardLimit);
+
+  // Ažuriraj dugmad i info o stranici
+  const prevBtn = document.getElementById('lbPrevPageBtn');
+  const nextBtn = document.getElementById('lbNextPageBtn');
+  const pageInfo = document.getElementById('lbPageInfo');
+  const limitSelect = document.getElementById('lbLimitSelect');
+
+  if (limitSelect) limitSelect.value = leaderboardLimit;
+  if (pageInfo) pageInfo.textContent = `Stranica ${leaderboardPage} od ${totalPages}`;
+  if (prevBtn) prevBtn.disabled = leaderboardPage === 1;
+  if (nextBtn) nextBtn.disabled = leaderboardPage === totalPages;
+
+  tbody.innerHTML = pageRows.map((row, i) => {
+    const globalIndex = startIndex + i;
+    const isTop3 = globalIndex < 3;
+
+    let avatarStyle = '';
+    let avatarContent = '';
+
+    if (isTop3) {
+      const avatarKey = (row.username || '').toLowerCase();
+      const cachedUrl = avatarCache[avatarKey];
+      const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
+      avatarStyle = hasAvatar
+        ? `background-image:url('${cachedUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
+        : '';
+      avatarContent = hasAvatar ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
+
+      // Pokreni fetch ako nije keširano i ako imamo username
+      if (!hasAvatar && row.username) {
+        setTimeout(() => {
+          getOrFetchAvatar(row.username, `lb-avatar-${i}`);
+        }, 80 * i);
+      }
+    }
+
+    const userCol = isTop3
+      ? `
+        <div style="display:flex;align-items:center;gap:0.5rem">
+          <div id="lb-avatar-${i}" style="width:24px;height:24px;border-radius:50%;background:var(--app-gradient);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0;${avatarStyle}">
+            ${avatarContent}
+          </div>
+          <span style="font-weight:600">${escapeHtml(row.display_name || row.username)}</span>
+        </div>
+      `
+      : `<span style="font-weight:600">${escapeHtml(row.display_name || row.username)}</span>`;
+
+    const rankDisplay = globalIndex === 0
+      ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color: #FBBF24; filter: drop-shadow(0 1px 4px rgba(251, 191, 36, 0.4)); display: inline-block; vertical-align: middle; margin-right: 4px;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"/></svg>`
+      : `<strong style="color:${rankColor(globalIndex)}">${globalIndex + 1}.</strong>`;
+
     if (isChatters) {
       return `
         <tr>
-          <td><strong style="color:${rankColor(i)}">${i + 1}.</strong></td>
-          <td>
-            <div style="display:flex;align-items:center;gap:0.5rem">
-              <div style="width:24px;height:24px;border-radius:50%;background:var(--app-gradient);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0">
-                ${(row.display_name || row.username || '?').charAt(0).toUpperCase()}
-              </div>
-              <span style="font-weight:600">${escapeHtml(row.display_name || row.username)}</span>
-            </div>
-          </td>
-          <td class="td-num" style="color:${rankColor(i)}">${row.points} poruke</td>
+          <td>${rankDisplay}</td>
+          <td>${userCol}</td>
+          <td class="td-num" style="color:${rankColor(globalIndex)}">${formatPorukeCount(row.points)}</td>
           <td style="color:var(--text-muted)">${row.month}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
@@ -823,15 +1066,8 @@ function renderUnifiedLeaderboard(customRows = null) {
       const mins = (row.minutes || 0) % 60;
       return `
         <tr>
-          <td><strong style="color:${rankColor(i)}">${i + 1}.</strong></td>
-          <td>
-            <div style="display:flex;align-items:center;gap:0.5rem">
-              <div style="width:24px;height:24px;border-radius:50%;background:var(--app-gradient);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0">
-                ${(row.display_name || row.username || '?').charAt(0).toUpperCase()}
-              </div>
-              <span style="font-weight:600">${escapeHtml(row.display_name || row.username)}</span>
-            </div>
-          </td>
+          <td>${rankDisplay}</td>
+          <td>${userCol}</td>
           <td class="td-num">${row.minutes} min</td>
           <td class="td-num" style="color:var(--kick-green); font-weight: 600;">${hours}h ${mins}min</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
@@ -843,16 +1079,9 @@ function renderUnifiedLeaderboard(customRows = null) {
       const mins = (row.minutes || 0) % 60;
       return `
         <tr>
-          <td><strong style="color:${rankColor(i)}">${i + 1}.</strong></td>
-          <td>
-            <div style="display:flex;align-items:center;gap:0.5rem">
-              <div style="width:24px;height:24px;border-radius:50%;background:var(--app-gradient);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0">
-                ${(row.username || '?').charAt(0).toUpperCase()}
-              </div>
-              <span style="font-weight:600">${escapeHtml(row.username)}</span>
-            </div>
-          </td>
-          <td class="td-num" style="color:var(--app-primary)">${row.points} poruke</td>
+          <td>${rankDisplay}</td>
+          <td>${userCol}</td>
+          <td class="td-num" style="color:var(--app-primary)">${formatPorukeCount(row.points)}</td>
           <td class="td-num" style="color:var(--kick-green); font-weight: 600;">${hours}h ${mins}min</td>
           <td style="color:var(--text-muted)">${row.month || '—'}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
@@ -873,22 +1102,43 @@ function renderPodium(top3) {
 
   const order = [top3[1], top3[0], top3[2]].filter(Boolean);
   const classes = ['podium-2', 'podium-1', 'podium-3'];
-  const nums = ['2.', '🥇', '3.'];
+  const crownSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="color: #FBBF24; filter: drop-shadow(0 2px 8px rgba(251, 191, 36, 0.6)); display: inline-block; vertical-align: middle;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"/></svg>`;
+  const nums = ['2.', crownSvg, '3.'];
   const isChatters = activeLeaderboardType === 'chatters';
+  const isWatchtime = activeLeaderboardType === 'watchtime';
 
   el.innerHTML = order.map((row, i) => {
     const cls = top3.length > 1 ? classes[i] : 'podium-1';
-    const num = top3.length > 1 ? nums[i] : '🥇';
+    const num = top3.length > 1 ? nums[i] : crownSvg;
     let valStr = '';
     if (isChatters) {
-      valStr = `${row.points} pt`;
-    } else {
+      valStr = formatPorukeCount(row.points);
+    } else if (isWatchtime) {
       const h = Math.floor((row.minutes || 0) / 60);
       valStr = `${h}h`;
+    } else {
+      const h = Math.floor((row.minutes || 0) / 60);
+      valStr = `${row.points}p / ${h}h`;
     }
+
+    const avatarKey = (row.username || '').toLowerCase();
+    const cachedUrl = avatarCache[avatarKey];
+    const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
+    const avatarStyle = hasAvatar
+      ? `background-image:url('${cachedUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
+      : '';
+    const avatarContent = hasAvatar ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
+
+    // Pokreni fetch ako nije keširano i ako imamo username
+    if (!hasAvatar && row.username) {
+      setTimeout(() => {
+        getOrFetchAvatar(row.username, `podium-avatar-${i}`);
+      }, 30 * i);
+    }
+
     return `
       <div class="podium-item ${cls}">
-        <div class="podium-avatar">${(row.display_name || row.username || '?').charAt(0).toUpperCase()}</div>
+        <div class="podium-avatar" id="podium-avatar-${i}" style="${avatarStyle}">${avatarContent}</div>
         <div class="podium-name">${escapeHtml(row.display_name || row.username)}</div>
         <div class="podium-points">${valStr}</div>
         <div class="podium-base">${num}</div>
@@ -905,12 +1155,13 @@ function renderMiniLeaderboard(rows) {
     <div class="mini-item">
       <div class="mini-rank rank-${i < 3 ? i + 1 : 'n'}">${i + 1}</div>
       <span class="mini-username">${escapeHtml(row.display_name || row.username)}</span>
-      <span class="mini-value">${row.points} poruke</span>
+      <span class="mini-value">${formatPorukeCount(row.points)}</span>
     </div>
   `).join('');
 }
 
 function filterLeaderboard(q) {
+  leaderboardPage = 1;
   const isChatters = activeLeaderboardType === 'chatters';
   const isCombined = activeLeaderboardType === 'combined';
   let source;
@@ -925,6 +1176,18 @@ function filterLeaderboard(q) {
     (r.display_name || r.username || r.username || '').toLowerCase().includes(q.toLowerCase())
   );
   renderUnifiedLeaderboard(filtered);
+}
+
+function changeLeaderboardPage(dir) {
+  leaderboardPage += dir;
+  renderUnifiedLeaderboard();
+}
+
+function changeLeaderboardLimit(limit) {
+  leaderboardLimit = parseInt(limit);
+  localStorage.setItem('lb-items-per-page', limit);
+  leaderboardPage = 1;
+  renderUnifiedLeaderboard();
 }
 
 function exportLeaderboard() {
@@ -1261,26 +1524,26 @@ async function toggleBotActive() {
 
 async function loadChannelLiveStatus() {
   if (!activeChannel) return;
-  
+
   // Clear any existing polling interval
   if (liveStatusInterval) {
     clearInterval(liveStatusInterval);
     liveStatusInterval = null;
   }
-  
+
   // Fetch once immediately
   await fetchKickLiveStatus();
-  
+
   // Then poll every 60 seconds
   liveStatusInterval = setInterval(fetchKickLiveStatus, 60000);
 }
 
 async function fetchKickLiveStatus() {
   if (!activeChannel) return;
-  
+
   const apiUrl = `https://kick.com/api/v2/channels/${activeChannel.username}`;
   const cacheBust = `&_t=${Date.now()}`;
-  
+
   // Try allorigins (no caching, fresh response)
   try {
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}${cacheBust}`;
@@ -1295,8 +1558,8 @@ async function fetchKickLiveStatus() {
         return;
       }
     }
-  } catch (_) {}
-  
+  } catch (_) { }
+
   // Fallback: try corsproxy with cache-bust header
   try {
     const proxyUrl2 = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
@@ -1307,8 +1570,8 @@ async function fetchKickLiveStatus() {
       updateLiveStatusUI(isLive);
       return;
     }
-  } catch (_) {}
-  
+  } catch (_) { }
+
   // Final fallback to DB
   try {
     const { data } = await sb.from('channels')
@@ -1316,14 +1579,14 @@ async function fetchKickLiveStatus() {
       .eq('id', activeChannel.id)
       .maybeSingle();
     updateLiveStatusUI(data ? !!data.is_active : false);
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function updateLiveStatusUI(isLive) {
   // Update the sidebar channel status indicator
   const statusDot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
-  
+
   if (statusDot) {
     statusDot.className = isLive ? 'status-dot status-on' : 'status-dot status-off';
   }
@@ -1526,11 +1789,40 @@ const PANEL_NAMES = {
   leaderboard: 'Leaderboard',
   watchtime: 'Watchtime',
   marriages: 'Ljubav i brakovi',
-  games: 'Mini igre',
+  games: 'Ugrađene komande',
   autoresponse: 'Auto odgovori',
   config: 'Bot Config',
   moderation: 'Moderacija',
 };
+
+function updateBreadcrumbs(panelId) {
+  const breadcrumb = document.getElementById('breadcrumb');
+  if (!breadcrumb) return;
+
+  let html = `<span>Kickot</span>`;
+
+  if (panelId === 'overview') {
+    html += `
+      <span class="bc-sep">›</span>
+      <span id="breadcrumbPage">Dashboard</span>
+    `;
+  } else if (panelId === 'leaderboard') {
+    const subTypeLabel = activeLeaderboardType === 'chatters' ? 'Chatters' : activeLeaderboardType === 'watchtime' ? 'Watchtime' : 'Zajedno';
+    html += `
+      <span class="bc-sep">›</span>
+      <span>Leaderboard</span>
+      <span class="bc-sep">›</span>
+      <span id="breadcrumbPage">${subTypeLabel}</span>
+    `;
+  } else {
+    html += `
+      <span class="bc-sep">›</span>
+      <span id="breadcrumbPage">${PANEL_NAMES[panelId] || panelId}</span>
+    `;
+  }
+
+  breadcrumb.innerHTML = html;
+}
 
 function switchPanel(panelId) {
   // Sačuvaj aktivni panel u localStorage
@@ -1547,7 +1839,7 @@ function switchPanel(panelId) {
   if (navItem) navItem.classList.add('active');
 
   // Breadcrumb
-  document.getElementById('breadcrumbPage').textContent = PANEL_NAMES[panelId] || panelId;
+  updateBreadcrumbs(panelId);
 
   // Lazy load panel data
   if (panelId === 'leaderboard') {
@@ -1722,7 +2014,7 @@ function openSettingsModal() {
       showToast('error', 'Moraš biti prijavljen da pristupiš podešavanjima.', '⚠️');
       return;
     }
-    
+
     // Fill in fields
     const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
     const avatarVal = user.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
@@ -1775,9 +2067,9 @@ function handleSettingsAvatarFileSelect(e) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(evt) {
+  reader.onload = function (evt) {
     const img = new Image();
-    img.onload = function() {
+    img.onload = function () {
       const canvas = document.createElement('canvas');
       const maxDim = 128;
       let width = img.width;
@@ -1856,7 +2148,7 @@ async function handleSaveSettings() {
 
     showToast('success', 'Podešavanja uspešno sačuvana!', '✅');
     closeSettingsModal();
-    
+
     // Refresh user state
     const { data: { user } } = await sb.auth.getUser();
     if (user) {
@@ -1891,9 +2183,9 @@ function switchSettingsTab(tabName) {
   const tabChannels = document.getElementById('setTabChannels');
   const panelProfile = document.getElementById('settingsProfilePanel');
   const panelChannels = document.getElementById('settingsChannelsPanel');
-  
+
   if (!tabProfile || !tabChannels || !panelProfile || !panelChannels) return;
-  
+
   if (tabName === 'profile') {
     tabProfile.classList.add('active');
     tabChannels.classList.remove('active');
@@ -1912,24 +2204,24 @@ function renderSettingsChannelList() {
   const listEl = document.getElementById('settingsChannelList');
   if (!listEl) return;
   listEl.innerHTML = '';
-  
+
   if (currentChannels.length === 0) {
     listEl.innerHTML = '<div style="padding:10px;font-size:0.85rem;color:var(--text-muted);text-align:center;">Nema povezanih kanala.</div>';
     return;
   }
-  
+
   currentChannels.forEach(ch => {
     const item = document.createElement('div');
     item.className = 'modal-channel-item';
-    
+
     const avatarHtml = ch.avatar
       ? `<div class="modal-channel-avatar" style="background-image:url('${ch.avatar}');background-size:cover;background-position:center;"></div>`
       : `<div class="modal-channel-avatar">${ch.username.charAt(0).toUpperCase()}</div>`;
-      
-    const badgeHtml = ch.is_primary 
+
+    const badgeHtml = ch.is_primary
       ? `<span class="modal-ch-badge primary">Glavni</span>`
       : `<button class="btn btn-outline btn-sm" onclick="makeChannelPrimary('${ch.id}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;cursor:pointer;">Glavni</button>`;
-      
+
     item.innerHTML = `
       <div class="modal-channel-info">
         ${avatarHtml}
@@ -1952,7 +2244,7 @@ async function addNewChannel() {
   const errEl = document.getElementById('settingsAddChannelError');
   const btn = document.getElementById('settingsAddChannelBtn');
   if (!input || !errEl) return;
-  
+
   errEl.style.display = 'none';
   const rawVal = input.value.trim();
   if (!rawVal) {
@@ -1960,50 +2252,50 @@ async function addNewChannel() {
     errEl.style.display = 'block';
     return;
   }
-  
+
   const username = extractKickUsername(rawVal);
   if (currentChannels.some(c => c.username.toLowerCase() === username.toLowerCase())) {
     errEl.textContent = 'Ovaj kanal je već dodat.';
     errEl.style.display = 'block';
     return;
   }
-  
+
   btn.disabled = true;
   const resolved = await resolveChatroomId(username);
   btn.disabled = false;
-  
+
   if (!resolved) {
     errEl.textContent = `Kanal "${username}" nije pronađen na Kick platformi.`;
     errEl.style.display = 'block';
     return;
   }
-  
+
   const newCh = {
     id: resolved.id,
     username: resolved.username,
     avatar: resolved.avatar || null,
     is_primary: currentChannels.length === 0
   };
-  
+
   const updatedChannels = [...currentChannels, newCh];
-  
+
   const { error } = await sb.from('user_profiles')
     .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
     .eq('id', currentUser.id);
-    
+
   if (error) {
     errEl.textContent = 'Greška pri čuvanju kanala.';
     errEl.style.display = 'block';
     return;
   }
-  
+
   currentChannels = updatedChannels;
   input.value = '';
-  
+
   if (newCh.is_primary) {
     setActiveChannel(newCh);
   }
-  
+
   renderChannelList();
   renderSettingsChannelList();
   showToast('success', `Kanal @${newCh.username} je dodat!`, '✅');
@@ -2014,22 +2306,22 @@ async function makeChannelPrimary(channelId) {
     ...c,
     is_primary: c.id === channelId
   }));
-  
+
   const { error } = await sb.from('user_profiles')
     .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
     .eq('id', currentUser.id);
-    
+
   if (error) {
     showToast('error', 'Greška pri postavljanju glavnog kanala.', '❌');
     return;
   }
-  
+
   currentChannels = updatedChannels;
   const primary = currentChannels.find(c => c.is_primary);
   if (primary) {
     setActiveChannel(primary);
   }
-  
+
   renderChannelList();
   renderSettingsChannelList();
   showToast('success', 'Glavni kanal je ažuriran!', '✅');
@@ -2038,29 +2330,29 @@ async function makeChannelPrimary(channelId) {
 async function deleteConnectedChannel(channelId) {
   const channelToDelete = currentChannels.find(c => c.id === channelId);
   if (!channelToDelete) return;
-  
+
   if (!confirm(`Da li ste sigurni da želite da uklonite kanal @${channelToDelete.username}?`)) {
     return;
   }
-  
+
   let updatedChannels = currentChannels.filter(c => c.id !== channelId);
-  
+
   // If we deleted the primary channel, assign a new primary
   if (channelToDelete.is_primary && updatedChannels.length > 0) {
     updatedChannels[0].is_primary = true;
   }
-  
+
   const { error } = await sb.from('user_profiles')
     .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
     .eq('id', currentUser.id);
-    
+
   if (error) {
     showToast('error', 'Greška pri uklanjanju kanala.', '❌');
     return;
   }
-  
+
   currentChannels = updatedChannels;
-  
+
   if (activeChannel?.id === channelId) {
     if (currentChannels.length > 0) {
       setActiveChannel(currentChannels.find(c => c.is_primary) || currentChannels[0]);
@@ -2072,7 +2364,7 @@ async function deleteConnectedChannel(channelId) {
       if (topbarDisplay) topbarDisplay.textContent = '—';
     }
   }
-  
+
   renderChannelList();
   renderSettingsChannelList();
   showToast('success', 'Kanal je uspešno uklonjen.', '🗑️');

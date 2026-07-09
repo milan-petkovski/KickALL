@@ -317,6 +317,13 @@ body.lang-en .lang-sr { display: none !important; }
     display: block;
 }
 
+.logo-img {
+    height: 28px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+}
+
 .logo-all {
     color: var(--color-text);
     font-size: 1.8rem;
@@ -879,6 +886,42 @@ body.lang-en .lang-sr { display: none !important; }
     border-radius: 24px;
     padding: 40px;
     box-shadow: var(--shadow-glass);
+}
+
+/* Selektor kategorija za komande */
+.commands-categories {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    background-color: rgba(6, 4, 10, 0.4);
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.category-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.category-btn:hover {
+    color: var(--color-text);
+}
+
+.category-btn.active {
+    background-color: var(--color-bg-dark);
+    color: var(--color-green);
+    border: 1px solid rgba(83, 252, 24, 0.15);
+    box-shadow: 0 0 10px rgba(83, 252, 24, 0.05);
 }
 
 .commands-list {

@@ -21,9 +21,9 @@
   --app-secondary: #6366F1;
   --app-gradient: linear-gradient(135deg, #8B5CF6 0%, #6366F1 60%, #4F46E5 100%);
 
-  --text-primary: #F2F2FF;
-  --text-secondary: #9898BF;
-  --text-muted: #5A5A7A;
+  --text-primary: #FFFFFF;
+  --text-secondary: #D1D1EB;
+  --text-muted: #9393B5;
 
   --border-subtle: rgba(255, 255, 255, 0.04);
   --border-normal: rgba(139, 92, 246, 0.15);
@@ -892,10 +892,15 @@ button:focus-visible {
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-base);
-  border: none;
+  border: 1px solid transparent;
   outline: none;
   white-space: nowrap;
   letter-spacing: -0.01em;
+}
+
+.btn:focus, .btn:active, .btn:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
 }
 
 .btn-primary {
@@ -2258,4 +2263,88 @@ button:focus-visible {
   background: rgba(83, 252, 24, 0.1);
   color: var(--kick-green);
   border: 1px solid rgba(83, 252, 24, 0.2);
+}
+
+/* ── Marriage Flow ── */
+.marriage-flow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgba(139, 92, 246, 0.03);
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.flow-step {
+  flex: 1;
+  min-width: 200px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-base);
+}
+
+.flow-step:hover {
+  border-color: var(--border-accent);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-purple);
+}
+
+.flow-step-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--app-primary-dim);
+  border-radius: var(--radius-sm);
+  color: var(--app-primary);
+  border: 1px solid var(--border-normal);
+}
+
+.flow-step-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.flow-step-content h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.flow-step-content p {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.flow-connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--border-accent);
+  flex-shrink: 0;
+}
+
+@media (max-width: 992px) {
+  .marriage-flow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .flow-connector {
+    transform: rotate(90deg);
+    margin: 0.25rem 0;
+  }
 }

@@ -700,7 +700,45 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // ─── HTTP SERVER (Uptime / Render Service fallback) ───────────────────────────
 const PORT = process.env.PORT || 3000;
-http.createServer((req, res) => {
+http.createServer(async (req, res) => {
+    // Add CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+        res.writeHead(200);
+        res.end();
+        return;
+    }
+
+    try {
+        const parsedUrl = new URL(req.url, 'http://localhost');
+        if (parsedUrl.pathname === '/api/avatar') {
+            const username = parsedUrl.searchParams.get('username');
+            if (!username) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing username parameter' }));
+                return;
+            }
+
+            const apiRes = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${username}`);
+            if (apiRes.ok) {
+                const data = await apiRes.json();
+                const avatar = data?.user?.profile_pic || null;
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ avatar }));
+                return;
+            } else {
+                res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ avatar: null, error: `Kick API returned status ${apiRes.status}` }));
+                return;
+            }
+        }
+    } catch (err) {
+        console.error('Error handling HTTP request in bot.js:', err);
+    }
+
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('🤖 Tutzot Kick Bot je aktivan i zdrav!\n');
 }).listen(PORT, () => {

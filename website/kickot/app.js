@@ -399,16 +399,52 @@ function playSynthSound(frequency = 440, type = 'sine', duration = 0.1, volume =
 
 // ── Commands Showcase ─────────────────────────────────────
 const commandPreviews = {
-  rank:   () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!rank</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">🏆 tutz_fan je na #3 mestu! Watchtime: 24h 35min | Bodovi: 1.204</span></div>`,
-  top:    () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!top</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">👑 Top 3: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. tutz_fan (24h)</span></div>`,
-  love:   () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!love novak99 tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F472B6">💕 novak99 i tutz_fan imaju 87% kompatibilnost! ❤️</span></div>`,
-  brak:   () => `<div class="cp-line"><span class="cp-user">stefan_v:</span> <span class="cp-msg">!brak @chat_queen</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F472B6">💍 stefan_v je zaprosio chat_queen! Čestitamo mladencima! 🎊</span></div>`,
-  duel:   () => `<div class="cp-line"><span class="cp-user">gamer_marko:</span> <span class="cp-msg">!duel @novak99</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">⚔️ Duel između gamer_marko i novak99! Pobednik: gamer_marko! 🏆</span></div>`,
-  '8ball':() => `<div class="cp-line"><span class="cp-user">user_aleksa:</span> <span class="cp-msg">!8ball pobedicu danas?</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">🎱 Znakovi ukazuju na DA! Verujem u tebe! 🔮</span></div>`,
-  roll:   () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!roll 100</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">🎲 chat_fan je bacio kockicu i dobio: 73!</span></div>`,
-  uptime: () => `<div class="cp-line"><span class="cp-user">new_viewer:</span> <span class="cp-msg">!uptime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ Stream traje: 2 sata 47 minuta i 32 sekunde!</span></div>`,
+  // Statistika i rangiranje
+  'top-watchtime': () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!top watchtime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. tutz_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>`,
+  'top-chat':      () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!top chat 3</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">💬 Najaktivniji u četu: 1. chat_queen (1.450 poruka) 2. tutz_fan (982 poruke) 3. VIP_stefan (820 poruka)</span></div>`,
+  'watchtime':     () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!watchtime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ tutz_fan, tvoj watchtime je: 24 sata i 35 minuta!</span></div>`,
+  'chat':          () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!chat</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">✉️ tutz_fan, poslao si ukupno 982 poruke u ovom četu!</span></div>`,
+  'me':            () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!me</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">📊 Korisnik: tutz_fan | Sati: 24.5h | Poruke: 982 | Rang: #3 | Uloga: VIP</span></div>`,
+
+  // Zabava i interakcija
+  'iq':            () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!iq @tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">🧠 Skeniram mozak korisnika @tutz_fan... Rezultat: IQ je 142! Genijalac! 💡</span></div>`,
+  'samar':         () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!samar @tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">💥 novak99 je opalio šamarčinu korisniku @tutz_fan sa mokrom haringom! 🐟</span></div>`,
+  'duel':          () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!duel @tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">⚔️ Duel: @novak99 vs @tutz_fan! Pucnjava počinje... @tutz_fan je izvukao brži revolver i pobedio sa 12 HP preostalo! 🏆</span></div>`,
+  'roll':          () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!roll @tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">🎲 Bacam kockicu za @tutz_fan... Rezultat: 78! (0-100)</span></div>`,
+
+  // Informacije i alati
+  'vreme':         () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!vreme Beograd</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⛅ Vreme u Beogradu: 24°C | Vetar: 12 km/h | Vlažnost: 65% | Delimično oblačno.</span></div>`,
+  'info':          () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!info</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">🤖 Kickot Chat Bot v2.4 | Pomažem u moderaciji, zabavi i statistici tvog kanala.</span></div>`,
+  'cinjenica':     () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!cinjenica</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">💡 Činjenica: Prvi kompjuterski bag bila je stvarna buba (moljac) zaglavljena u releju 1947. godine!</span></div>`,
+  'followage':     () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!followage</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F472B6">💖 tutz_fan prati ovaj kanal već 8 meseci, 12 dana i 4 sata!</span></div>`,
+  'uptime':        () => `<div class="cp-line"><span class="cp-user">new_viewer:</span> <span class="cp-msg">!uptime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ Stream traje: 2 sata, 47 minuta i 32 sekunde!</span></div>`,
 };
 
+// Logika za prebacivanje kategorija komandi
+document.querySelectorAll('.category-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const cat = btn.getAttribute('data-category');
+    
+    // Sakri sve komande i prikaži samo iz odabrane kategorije
+    document.querySelectorAll('.cmd-item').forEach(item => {
+      if (item.getAttribute('data-cat') === cat) {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+    
+    // Klikni na prvu komandu u toj kategoriji da se osveži preview
+    const firstVisible = document.querySelector(`.cmd-item[data-cat="${cat}"]`);
+    if (firstVisible) {
+      firstVisible.click();
+    }
+  });
+});
+
+// Logika za klik na pojedinačnu komandu
 document.querySelectorAll('.cmd-item').forEach(item => {
   item.addEventListener('click', () => {
     document.querySelectorAll('.cmd-item').forEach(i => i.classList.remove('active'));

@@ -35,14 +35,7 @@
                     <span data-i18n="nav.back">KickAll</span>
                 </a>
                 <div class="logo">
-                    <!-- Pixel KICK Logo -->
-                    <svg class="kick-logo-svg" viewBox="0 0 136 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M 0 0 H 12 V 16 H 18 V 8 H 30 V 20 H 18 V 24 H 30 V 40 H 18 V 32 H 12 V 40 H 0 Z" fill="#53FC18"/>
-                        <path d="M 38 0 H 62 V 10 H 55 V 30 H 62 V 40 H 38 V 30 H 45 V 10 H 38 Z" fill="#53FC18"/>
-                        <path d="M 70 0 H 98 V 10 H 81 V 30 H 98 V 40 H 70 Z" fill="#53FC18"/>
-                        <path d="M 106 0 H 118 V 16 H 124 V 8 H 136 V 20 H 124 V 24 H 136 V 40 H 124 V 32 H 118 V 40 H 106 Z" fill="#53FC18"/>
-                    </svg>
-                    <span class="logo-all">ot</span>
+                    <img src="logo.png" alt="Kickot Logo" class="logo-img" style="height: 48px;">
                 </div>
             </div>
 
@@ -269,46 +262,82 @@
                 </div>
 
                 <div class="commands-showcase" data-reveal>
-                    <div class="commands-list" id="commandsList">
-                        <div class="cmd-item active" data-cmd="rank">
-                            <span class="cmd-name">!rank</span>
-                            <span class="cmd-desc" data-i18n="cmd.rank">Tvoj rang i watchtime</span>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <div class="commands-categories">
+                            <button class="category-btn active" data-category="stats">Statistika</button>
+                            <button class="category-btn" data-category="fun">Zabava</button>
+                            <button class="category-btn" data-category="tools">Alati</button>
                         </div>
-                        <div class="cmd-item" data-cmd="top">
-                            <span class="cmd-name">!top</span>
-                            <span class="cmd-desc" data-i18n="cmd.top">Top 10 gledalaca</span>
-                        </div>
-                        <div class="cmd-item" data-cmd="love">
-                            <span class="cmd-name">!love</span>
-                            <span class="cmd-desc" data-i18n="cmd.love">Kompatibilnost sa nekim</span>
-                        </div>
-                        <div class="cmd-item" data-cmd="brak">
-                            <span class="cmd-name">!brak</span>
-                            <span class="cmd-desc" data-i18n="cmd.brak">Venčaj se sa nekim</span>
-                        </div>
-                        <div class="cmd-item" data-cmd="duel">
-                            <span class="cmd-name">!duel</span>
-                            <span class="cmd-desc" data-i18n="cmd.duel">Izazovi nekoga na duel</span>
-                        </div>
-                        <div class="cmd-item" data-cmd="8ball">
-                            <span class="cmd-name">!8ball</span>
-                            <span class="cmd-desc" data-i18n="cmd.8ball">Postavi pitanje sudbini</span>
-                        </div>
-                        <div class="cmd-item" data-cmd="roll">
-                            <span class="cmd-name">!roll</span>
-                            <span class="cmd-desc" data-i18n="cmd.roll">Baci kockicu</span>
-                        </div>
-                        <div class="cmd-item" data-cmd="uptime">
-                            <span class="cmd-name">!uptime</span>
-                            <span class="cmd-desc" data-i18n="cmd.uptime">Koliko stream traje</span>
+                        <div class="commands-list" id="commandsList">
+                            <!-- Statistika i rangiranje -->
+                            <div class="cmd-item active" data-cmd="top-watchtime" data-cat="stats">
+                                <span class="cmd-name">!top watchtime [broj]</span>
+                                <span class="cmd-desc">Top lista po satima gledanja</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="top-chat" data-cat="stats">
+                                <span class="cmd-name">!top chat [broj]</span>
+                                <span class="cmd-desc">Top lista najaktivnijih u četu</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="watchtime" data-cat="stats">
+                                <span class="cmd-name">!watchtime</span>
+                                <span class="cmd-desc">Tvoje vreme gledanja strima</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="chat" data-cat="stats">
+                                <span class="cmd-name">!chat</span>
+                                <span class="cmd-desc">Tvoj broj poslatih poruka</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="me" data-cat="stats">
+                                <span class="cmd-name">!me</span>
+                                <span class="cmd-desc">Prikaz tvoje kompletne statistike</span>
+                            </div>
+
+                            <!-- Zabava i interakcija -->
+                            <div class="cmd-item" data-cmd="iq" data-cat="fun" style="display: none;">
+                                <span class="cmd-name">!iq [@korisnik]</span>
+                                <span class="cmd-desc">Izmeri nasumičan IQ</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="samar" data-cat="fun" style="display: none;">
+                                <span class="cmd-name">!samar @korisnik</span>
+                                <span class="cmd-desc">Ošamari korisnika uz šalu</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="duel" data-cat="fun" style="display: none;">
+                                <span class="cmd-name">!duel @korisnik</span>
+                                <span class="cmd-desc">Pokreni simulaciju borbe</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="roll" data-cat="fun" style="display: none;">
+                                <span class="cmd-name">!roll @korisnik</span>
+                                <span class="cmd-desc">Baci kockicu za nekoga</span>
+                            </div>
+
+                            <!-- Informacije i alati -->
+                            <div class="cmd-item" data-cmd="vreme" data-cat="tools" style="display: none;">
+                                <span class="cmd-name">!vreme [grad]</span>
+                                <span class="cmd-desc">Vremenski podaci za grad</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="info" data-cat="tools" style="display: none;">
+                                <span class="cmd-name">!info</span>
+                                <span class="cmd-desc">Osnovne informacije o botu</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="cinjenica" data-cat="tools" style="display: none;">
+                                <span class="cmd-name">!cinjenica</span>
+                                <span class="cmd-desc">Ispiši nasumičnu činjenicu</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="followage" data-cat="tools" style="display: none;">
+                                <span class="cmd-name">!followage</span>
+                                <span class="cmd-desc">Proveri koliko dugo pratiš</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="uptime" data-cat="tools" style="display: none;">
+                                <span class="cmd-name">!uptime</span>
+                                <span class="cmd-desc">Koliko dugo strim traje</span>
+                            </div>
                         </div>
                     </div>
-
+ 
                     <div class="cmd-preview" id="mainPlayground">
                         <div class="cp-header" data-i18n="cmd.preview">// Preview — live chat simulacija</div>
                         <div id="cmdPreviewContent" class="cp-messages-container">
-                            <div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!rank</span></div>
-                            <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg">🏆 tutz_fan je na #3 mestu! Watchtime: 24h 35min</span></div>
+                            <div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!top watchtime</span></div>
+                            <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. tutz_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>
                         </div>
                     </div>
                 </div>
@@ -465,14 +494,7 @@
             <div class="footer-container">
                 <div class="footer-brand">
                     <div class="logo" style="font-size:1.125rem">
-                        <!-- Pixel KICK Logo -->
-                        <svg class="kick-logo-svg" viewBox="0 0 136 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="height: 18px;">
-                            <path d="M 0 0 H 12 V 16 H 18 V 8 H 30 V 20 H 18 V 24 H 30 V 40 H 18 V 32 H 12 V 40 H 0 Z" fill="#53FC18"/>
-                            <path d="M 38 0 H 62 V 10 H 55 V 30 H 62 V 40 H 38 V 30 H 45 V 10 H 38 Z" fill="#53FC18"/>
-                            <path d="M 70 0 H 98 V 10 H 81 V 30 H 98 V 40 H 70 Z" fill="#53FC18"/>
-                            <path d="M 106 0 H 118 V 16 H 124 V 8 H 136 V 20 H 124 V 24 H 136 V 40 H 124 V 32 H 118 V 40 H 106 Z" fill="#53FC18"/>
-                        </svg>
-                        <span class="logo-all" style="font-size:1.125rem">ot</span>
+                        <img src="logo.png" alt="Kickot Logo" class="logo-img" style="height: 36px;">
                     </div>
                     <p class="footer-tagline" data-i18n="footer.desc">Moćan chat bot za Kick platformu. Deo KickAll ekosistema.</p>
                 </div>
@@ -513,13 +535,7 @@
             <button class="modal-close" onclick="closeModal()" aria-label="Close">✕</button>
 
             <div class="modal-logo">
-                <svg class="kick-logo-svg" viewBox="0 0 136 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="height: 20px; width: auto;">
-                    <path d="M 0 0 H 12 V 16 H 18 V 8 H 30 V 20 H 18 V 24 H 30 V 40 H 18 V 32 H 12 V 40 H 0 Z" fill="#53FC18"/>
-                    <path d="M 38 0 H 62 V 10 H 55 V 30 H 62 V 40 H 38 V 30 H 45 V 10 H 38 Z" fill="#53FC18"/>
-                    <path d="M 70 0 H 98 V 10 H 81 V 30 H 98 V 40 H 70 Z" fill="#53FC18"/>
-                    <path d="M 106 0 H 118 V 16 H 124 V 8 H 136 V 20 H 124 V 24 H 136 V 40 H 124 V 32 H 118 V 40 H 106 Z" fill="#53FC18"/>
-                </svg>
-                <span class="logo-all" style="font-size: 1.4rem; font-weight: 800; color: #fff; margin-left: 2px;">ot</span>
+                <img src="logo.png" alt="Kickot Logo" class="logo-img" style="height: 38px;">
             </div>
             <p style="font-size:0.875rem;color:var(--color-text-muted);margin-bottom:20px;text-align:center" data-i18n="modal.tagline">Bot za Kick platformu</p>
 

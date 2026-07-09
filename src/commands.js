@@ -347,8 +347,8 @@ function handleVencaj(sender, targetRaw) {
     let procenat = baza + modifikator;
     procenat = Math.max(-100, Math.min(100, procenat));
 
-    if (procenat < 80) {
-        posaljiPoruku(`💔 Venčanje odbijeno! Nemate dovoljno ljubavi (potrebno je bar 80%, a vi imate ${procenat}%). Šaljite ljubav pomoću !posaljiljubav @user!`);
+    if (procenat < 90) {
+        posaljiPoruku(`💔 Venčanje odbijeno! Nemate dovoljno ljubavi (potrebno je bar 90%, a vi imate ${procenat}%). Šaljite ljubav pomoću !posaljiljubav @user!`);
         return;
     }
 
@@ -501,7 +501,7 @@ function handleBrakovi() {
     const parovi = Object.values(state.marriedCouples);
 
     if (parovi.length === 0) {
-        posaljiPoruku('💍 Niko na strimu još nije u braku! Budite prvi: skupite 80%+ ljubavi i kucajte !vencaj @user!');
+        posaljiPoruku('💍 Niko na strimu još nije u braku! Budite prvi: skupite 90%+ ljubavi i kucajte !vencaj @user!');
         return;
     }
 
