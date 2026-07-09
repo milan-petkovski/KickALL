@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title data-i18n="meta.title">KickAll — Sve što ti treba za Kick</title>
+  <meta name="description" data-i18n="meta.desc" content="KickAll je kompletan ekosistem alata za Kick streamere — bot, analitika, giveaway i overlay na jednom mestu." />
+  <meta property="og:title" content="KickAll — Sve što ti treba za Kick" />
+  <meta property="og:description" content="Bot, analitika, giveaway i overlay za Kick platformu." />
+  <meta property="og:type" content="website" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
+</head>
+<body>
+
+<!-- ══════════════ NAVBAR ══════════════ -->
+<nav class="navbar" id="navbar">
+  <div class="container navbar-inner">
+    <a href="." class="navbar-logo">
+      <div class="logo-icon">⚡</div>
+      <span class="logo-text">KickAll</span>
+    </a>
+    <div class="navbar-actions">
+      <div class="lang-switcher">
+        <button class="lang-btn active" id="btn-sr" onclick="setLang('sr')">SR</button>
+        <button class="lang-btn" id="btn-en" onclick="setLang('en')">EN</button>
+      </div>
+      <a href="../kickot/" class="btn btn-primary" data-i18n="nav.cta">Počni besplatno</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════ HERO ══════════════ -->
+<section class="hero" id="hero">
+  <div class="hero-bg">
+    <div class="hero-orb hero-orb-1"></div>
+    <div class="hero-orb hero-orb-2"></div>
+    <div class="hero-orb hero-orb-3"></div>
+    <canvas class="particles-canvas" id="particlesCanvas"></canvas>
+  </div>
+
+  <div class="container">
+    <div class="hero-content">
+      <div class="hero-text">
+        <div class="hero-eyebrow">
+          <span class="badge badge-kick">⚡ Powered by Kick</span>
+          <span class="badge badge-purple" data-i18n="hero.eyebrow">Srpski alati • Globalna kvaliteta</span>
+        </div>
+        <h1 class="hero-title">
+          <span class="gradient-text">KickAll</span><br/>
+          <span data-i18n="hero.title.line1">Sve što ti treba</span><br/>
+          <span class="kick-accent" data-i18n="hero.title.line2">za Kick</span>
+        </h1>
+        <p class="hero-subtitle" data-i18n="hero.subtitle">
+          Jedan ekosistem, pet alata. Bot, analitika, giveaway i overlay — sve napravljeno specijalno za Kick platformu i srpsku streaming zajednicu.
+        </p>
+        <div class="hero-cta">
+          <a href="../kickot/" class="btn btn-kick btn-lg" data-i18n="hero.cta.primary">🚀 Isprobaj Kickot Bot</a>
+          <a href="#products" class="btn btn-outline btn-lg" data-i18n="hero.cta.secondary">Vidi sve alate</a>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <div class="hero-stat-value">5</div>
+            <div class="hero-stat-label" data-i18n="hero.stat.products">Alata u ekosistemu</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">1</div>
+            <div class="hero-stat-label" data-i18n="hero.stat.live">Aktivan produkt</div>
+          </div>
+          <div class="hero-stat">
+            <div class="hero-stat-value">∞</div>
+            <div class="hero-stat-label" data-i18n="hero.stat.commands">Mogućnosti</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hero-visual-card">
+          <div class="hvc-header">
+            <div class="hvc-dot hvc-dot-r"></div>
+            <div class="hvc-dot hvc-dot-y"></div>
+            <div class="hvc-dot hvc-dot-g"></div>
+            <span class="hvc-title">kickall_ecosystem.json</span>
+          </div>
+          <div class="hvc-products">
+            <div class="hvc-product-row active-product">
+              <div class="hvc-product-icon" style="background:rgba(139,92,246,0.2)">🤖</div>
+              <div>
+                <div class="hvc-product-name">Kickot</div>
+                <div class="hvc-product-desc" data-i18n="hvc.kickot">Bot za Kick chat — aktivan</div>
+              </div>
+              <span class="badge badge-kick" style="font-size:0.6875rem">LIVE</span>
+            </div>
+            <div class="hvc-product-row">
+              <div class="hvc-product-icon" style="background:rgba(99,102,241,0.15)">📊</div>
+              <div>
+                <div class="hvc-product-name">KickAn</div>
+                <div class="hvc-product-desc" data-i18n="hvc.kickan">Analitika streamova</div>
+              </div>
+              <span class="badge badge-soon" style="font-size:0.6875rem" data-i18n="badge.soon">Uskoro</span>
+            </div>
+            <div class="hvc-product-row">
+              <div class="hvc-product-icon" style="background:rgba(251,191,36,0.15)">🎁</div>
+              <div>
+                <div class="hvc-product-name">KickAj</div>
+                <div class="hvc-product-desc" data-i18n="hvc.kickaj">Giveaway sistem</div>
+              </div>
+              <span class="badge badge-soon" style="font-size:0.6875rem" data-i18n="badge.soon">Uskoro</span>
+            </div>
+            <div class="hvc-product-row">
+              <div class="hvc-product-icon" style="background:rgba(52,211,153,0.15)">🎨</div>
+              <div>
+                <div class="hvc-product-name">KickOv</div>
+                <div class="hvc-product-desc" data-i18n="hvc.kickov">Stream overlay alat</div>
+              </div>
+              <span class="badge badge-soon" style="font-size:0.6875rem" data-i18n="badge.soon">Uskoro</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ PRODUCTS ══════════════ -->
+<section class="section" id="products">
+  <div class="container">
+    <div class="section-header" data-reveal>
+      <div class="section-label" data-i18n="products.label">Naši produkti</div>
+      <h2 data-i18n="products.title">Sve što treba jednom <span class="gradient-text">Kick streameru</span></h2>
+      <p data-i18n="products.subtitle">Pet specijalizovanih alata, svaki fokusiran na jedan aspekt Kick iskustva. Beri ono što ti treba.</p>
+    </div>
+
+    <div class="products-grid">
+
+      <!-- Kickot -->
+      <a href="../kickot/" class="product-card active-product-card" data-reveal style="text-decoration:none">
+        <div class="product-icon" style="background:rgba(139,92,246,0.2)">🤖</div>
+        <div class="product-name gradient-text">Kickot</div>
+        <div class="product-tagline" data-i18n="kickot.tagline">Chat Bot</div>
+        <p class="product-desc" data-i18n="kickot.desc">Moćan chat bot za Kick platformu. Komande, moderacija, mini-igre, watchtime, leaderboard i još mnogo toga — sve na srpskom i engleskom.</p>
+        <ul class="product-features">
+          <li data-i18n="kickot.f1">Prilagođene komande (!rank, !love, !brak...)</li>
+          <li data-i18n="kickot.f2">Automatska moderacija i anti-spam</li>
+          <li data-i18n="kickot.f3">Watchtime i leaderboard sistem</li>
+          <li data-i18n="kickot.f4">Mini-igre za chat</li>
+        </ul>
+        <div class="product-cta">
+          <span class="btn btn-primary" data-i18n="kickot.cta">Otvori Kickot →</span>
+        </div>
+      </a>
+
+      <!-- KickAn -->
+      <div class="product-card product-card-coming-soon" data-reveal style="transition-delay:0.1s">
+        <div class="coming-soon-overlay"><span data-i18n="badge.soon">Uskoro</span></div>
+        <div class="product-icon" style="background:rgba(99,102,241,0.15)">📊</div>
+        <div class="product-name" style="color:#A78BFA">KickAn</div>
+        <div class="product-tagline" data-i18n="kickan.tagline">Analitika</div>
+        <p class="product-desc" data-i18n="kickan.desc">Dubinska analitika tvojih Kick streamova. Prati rast, engagement, peak viewers, chat aktivnost i sve ostale bitne metrike.</p>
+        <ul class="product-features">
+          <li data-i18n="kickan.f1">Real-time dashboard metrika</li>
+          <li data-i18n="kickan.f2">Istorija i trendovi streamova</li>
+          <li data-i18n="kickan.f3">Analiza chat aktivnosti</li>
+          <li data-i18n="kickan.f4">Izveštaji i exporti</li>
+        </ul>
+      </div>
+
+      <!-- KickAj -->
+      <div class="product-card product-card-coming-soon" data-reveal style="transition-delay:0.2s">
+        <div class="coming-soon-overlay"><span data-i18n="badge.soon">Uskoro</span></div>
+        <div class="product-icon" style="background:rgba(251,191,36,0.15)">🎁</div>
+        <div class="product-name" style="color:#FCD34D">KickAj</div>
+        <div class="product-tagline" data-i18n="kickaj.tagline">Giveaway</div>
+        <p class="product-desc" data-i18n="kickaj.desc">Sistem za organizovanje nagradnih igara tokom live streama. Pravila, odbrojavanje, automatski odabir pobednika i objava u chatu.</p>
+        <ul class="product-features">
+          <li data-i18n="kickaj.f1">Automatski odabir pobednika</li>
+          <li data-i18n="kickaj.f2">Prilagođena pravila i uslovi</li>
+          <li data-i18n="kickaj.f3">Integracija sa KickOt botom</li>
+          <li data-i18n="kickaj.f4">Animirani overlay za pobednika</li>
+        </ul>
+      </div>
+
+      <!-- KickOv -->
+      <div class="product-card product-card-coming-soon" data-reveal style="transition-delay:0.3s">
+        <div class="coming-soon-overlay"><span data-i18n="badge.soon">Uskoro</span></div>
+        <div class="product-icon" style="background:rgba(52,211,153,0.15)">🎨</div>
+        <div class="product-name" style="color:#6EE7B7">KickOv</div>
+        <div class="product-tagline" data-i18n="kickov.tagline">Overlay</div>
+        <p class="product-desc" data-i18n="kickov.desc">Profesionalni stream overlay alat za Kick. Alerts, chat prikaz, ciljevi, brojač followers-a i potpuno prilagodljiv dizajn.</p>
+        <ul class="product-features">
+          <li data-i18n="kickov.f1">Followers/subscriber alertovi</li>
+          <li data-i18n="kickov.f2">Chat overlay na streamu</li>
+          <li data-i18n="kickov.f3">Prilagodljivi widgeti</li>
+          <li data-i18n="kickov.f4">Lak import u OBS/Streamlabs</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ HOW IT WORKS ══════════════ -->
+<section class="section" id="how">
+  <div class="container">
+    <div class="section-header" data-reveal>
+      <div class="section-label" data-i18n="how.label">Kako funkcioniše</div>
+      <h2 data-i18n="how.title">Tri koraka do <span class="gradient-text">savršenog streama</span></h2>
+      <p data-i18n="how.subtitle">Bez komplikacija, bez coding znanja. Kreiraj nalog, izaberi alate, i počni da streahuješ profesionalnije.</p>
+    </div>
+
+    <div class="how-grid">
+      <div class="how-step card" data-reveal>
+        <div class="how-step-number">1</div>
+        <div class="how-step-icon">👤</div>
+        <h3 data-i18n="how.step1.title">Kreiraj nalog</h3>
+        <p data-i18n="how.step1.desc">Registruj se na KickAll sa svojom email adresom. Jedan nalog za sve produkte u ekosistemu — besplatno za početak.</p>
+      </div>
+      <div class="how-step card" data-reveal style="transition-delay:0.15s">
+        <div class="how-step-number">2</div>
+        <div class="how-step-icon">⚙️</div>
+        <h3 data-i18n="how.step2.title">Izaberi alat</h3>
+        <p data-i18n="how.step2.desc">Povezi svoj Kick kanal, biraj alate koji ti trebaju i podesi ih prema svom stilu. Sve je intuitivno i na srpskom.</p>
+      </div>
+      <div class="how-step card" data-reveal style="transition-delay:0.3s">
+        <div class="how-step-number">3</div>
+        <div class="how-step-icon">🚀</div>
+        <h3 data-i18n="how.step3.title">Strejmuj bolje</h3>
+        <p data-i18n="how.step3.desc">Uključi stream i užívaj dok KickAll alati rade umesto tebe — moderacija, analitika, giveaway-ji, sve automatski.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ PRICING ══════════════ -->
+<section class="section" id="pricing">
+  <div class="container">
+    <div class="section-header" data-reveal>
+      <div class="section-label" data-i18n="pricing.label">Cene</div>
+      <h2 data-i18n="pricing.title">Poštene cene, <span class="gradient-text">pravi alati</span></h2>
+      <p data-i18n="pricing.subtitle">Počni besplatno i rastuć uz KickAll. Nadogradi se kada budeš spreman — bez obaveza, otkaži kad hoćeš.</p>
+    </div>
+
+    <div class="pricing-grid">
+
+      <!-- Free -->
+      <div class="pricing-card" data-reveal>
+        <div class="pricing-plan-name">Free</div>
+        <div class="pricing-price">
+          <div class="pricing-amount">€0</div>
+          <div class="pricing-period" data-i18n="pricing.forever">Zauvek besplatno</div>
+        </div>
+        <p class="pricing-desc" data-i18n="pricing.free.desc">Sve što treba za početak. Bez kreditne kartice.</p>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li><span class="check">✓</span> <span data-i18n="pricing.free.f1">KickOt bot (osnovno)</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.free.f2">Do 10 komandi</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.free.f3">Watchtime tracking</span></li>
+          <li class="disabled"><span class="cross">✗</span> <span data-i18n="pricing.free.f4">Napredna moderacija</span></li>
+          <li class="disabled"><span class="cross">✗</span> <span data-i18n="pricing.free.f5">Analitika (KickAn)</span></li>
+          <li class="disabled"><span class="cross">✗</span> <span data-i18n="pricing.free.f6">Prioritetna podrška</span></li>
+        </ul>
+        <a href="../kickot/" class="btn btn-outline" style="width:100%;justify-content:center" data-i18n="pricing.cta.free">Počni besplatno</a>
+      </div>
+
+      <!-- Pro -->
+      <div class="pricing-card featured" data-reveal style="transition-delay:0.15s">
+        <div class="pricing-popular-badge" data-i18n="pricing.popular">Najpopularniji</div>
+        <div class="pricing-plan-name">Pro</div>
+        <div class="pricing-price">
+          <div class="pricing-amount gradient-text">€5</div>
+          <div class="pricing-period" data-i18n="pricing.per.month">/mesec</div>
+        </div>
+        <p class="pricing-desc" data-i18n="pricing.pro.desc">Za ozbiljne streamere koji žele punu kontrolu.</p>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li><span class="check">✓</span> <span data-i18n="pricing.pro.f1">KickOt bot (napredno)</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.pro.f2">Neograničene komande</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.pro.f3">Napredna moderacija</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.pro.f4">KickAn analitika</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.pro.f5">KickAj giveaway sistem</span></li>
+          <li class="disabled"><span class="cross">✗</span> <span data-i18n="pricing.pro.f6">KickOv overlay (beta)</span></li>
+        </ul>
+        <a href="../kickot/" class="btn btn-primary" style="width:100%;justify-content:center" data-i18n="pricing.cta.pro">Uzmi Pro plan</a>
+      </div>
+
+      <!-- Business -->
+      <div class="pricing-card" data-reveal style="transition-delay:0.3s">
+        <div class="pricing-plan-name">Business</div>
+        <div class="pricing-price">
+          <div class="pricing-amount">€15</div>
+          <div class="pricing-period" data-i18n="pricing.per.month">/mesec</div>
+        </div>
+        <p class="pricing-desc" data-i18n="pricing.biz.desc">Za organizacije, agencije i multi-kanal operacije.</p>
+        <div class="pricing-divider"></div>
+        <ul class="pricing-features">
+          <li><span class="check">✓</span> <span data-i18n="pricing.biz.f1">Sve iz Pro plana</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.biz.f2">Do 5 Kick kanala</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.biz.f3">KickOv overlay (pun pristup)</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.biz.f4">Prilagođeni branding</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.biz.f5">API pristup</span></li>
+          <li><span class="check">✓</span> <span data-i18n="pricing.biz.f6">Dedikovan support</span></li>
+        </ul>
+        <a href="../kickot/" class="btn btn-outline" style="width:100%;justify-content:center" data-i18n="pricing.cta.biz">Uzmi Business</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ CTA BANNER ══════════════ -->
+<section class="section" id="cta-banner">
+  <div class="container">
+    <div class="card" style="text-align:center;background:linear-gradient(135deg,rgba(139,92,246,0.1) 0%,rgba(83,252,24,0.05) 100%);border-color:var(--border-normal);padding:4rem 2rem;" data-reveal>
+      <div class="badge badge-kick" style="margin:0 auto 1.5rem">⚡ Kick platforma</div>
+      <h2 style="margin-bottom:1rem" data-i18n="cta.title">Spreman da unapređuješ stream?</h2>
+      <p style="max-width:480px;margin:0 auto 2.5rem" data-i18n="cta.desc">Pridruži se zajednici Kick streamera koji koriste KickAll alate. Počni besplatno danas.</p>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap">
+        <a href="../kickot/" class="btn btn-kick btn-lg" data-i18n="cta.primary">🚀 Kreiraj nalog</a>
+        <a href="#products" class="btn btn-outline btn-lg" data-i18n="cta.secondary">Vidi alate</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ FOOTER ══════════════ -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="navbar-logo">
+          <div class="logo-icon">⚡</div>
+          <span class="logo-text">KickAll</span>
+        </div>
+        <p data-i18n="footer.desc">Ekosistem alata za Kick streamere. Napravljeno sa ❤️ za srpsku streaming zajednicu i svetsko tržište.</p>
+      </div>
+      <div class="footer-col">
+        <h4 data-i18n="footer.products">Produkti</h4>
+        <ul class="footer-links">
+          <li><a href="../kickot/">KickOt — Bot</a></li>
+          <li><a href="#" style="opacity:0.5" data-i18n="footer.soon">KickAn — Uskoro</a></li>
+          <li><a href="#" style="opacity:0.5" data-i18n="footer.soon">KickAj — Uskoro</a></li>
+          <li><a href="#" style="opacity:0.5" data-i18n="footer.soon">KickOv — Uskoro</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4 data-i18n="footer.company">Kompanija</h4>
+        <ul class="footer-links">
+          <li><a href="#" data-i18n="footer.about">O nama</a></li>
+          <li><a href="#pricing" data-i18n="footer.pricing">Cene</a></li>
+          <li><a href="#" data-i18n="footer.blog">Blog</a></li>
+          <li><a href="#" data-i18n="footer.contact">Kontakt</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4 data-i18n="footer.legal">Pravno</h4>
+        <ul class="footer-links">
+          <li><a href="#" data-i18n="footer.privacy">Politika privatnosti</a></li>
+          <li><a href="#" data-i18n="footer.terms">Uslovi korišćenja</a></li>
+          <li><a href="#" data-i18n="footer.cookies">Kolačići</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p data-i18n="footer.copy">© 2026 KickAll. Sva prava zadržana.</p>
+      <div class="footer-bottom-links">
+        <a href="https://kick.com" target="_blank" rel="noopener">kick.com</a>
+        <a href="#" data-i18n="footer.discord">Discord</a>
+        <a href="#" data-i18n="footer.twitter">Twitter</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

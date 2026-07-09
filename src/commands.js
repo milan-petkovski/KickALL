@@ -1024,14 +1024,16 @@ async function handleOsvezi(sender, isAuthorized) {
     }
 
     try {
-        const { ucitajLeaderboard, ucitajLjubav } = require('./database');
+        const { ucitajLeaderboard, ucitajLjubav, ucitajCustomKomande, ucitajBotConfig } = require('./database');
         const { ucitajWatchtime } = require('./watchtime');
 
         await ucitajLeaderboard();
         await ucitajLjubav();
         await ucitajWatchtime();
+        await ucitajCustomKomande();
+        await ucitajBotConfig();
 
-        posaljiPoruku('✅ Svi podaci (leaderboard, watchtime, ljubav) su uspešno osveženi direktno iz baze! 🚀');
+        posaljiPoruku('✅ Svi podaci (leaderboard, watchtime, ljubav, custom komande, bot config) su uspešno osveženi direktno iz baze! 🚀');
     } catch (err) {
         posaljiPoruku(`❌ Greška pri osvežavanju podataka: ${err.message}`);
     }

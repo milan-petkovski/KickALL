@@ -1,16 +1,89 @@
 require('dotenv').config();
 const WebSocket = require('ws');
-const http      = require('http');
+const http = require('http');
 
 // Uvoz pomoćnih modula
-const config    = require('./src/config');
-const state     = require('./src/state');
-const utils     = require('./src/utils');
-const database  = require('./src/database');
-const spam      = require('./src/spam');
-const commands  = require('./src/commands');
+const config = require('./src/config');
+const state = require('./src/state');
+const utils = require('./src/utils');
+const database = require('./src/database');
+const spam = require('./src/spam');
+const commands = require('./src/commands');
 const messenger = require('./src/messenger');
 const watchtime = require('./src/watchtime');
+
+function ukloniSrpskeDijakritike(str) {
+    if (!str) return '';
+    return str
+        .replace(/š/g, 's')
+        .replace(/đ/g, 'd')
+        .replace(/č/g, 'c')
+        .replace(/ć/g, 'c')
+        .replace(/ž/g, 'z')
+        .replace(/Š/g, 's')
+        .replace(/Đ/g, 'd')
+        .replace(/Č/g, 'c')
+        .replace(/Ć/g, 'c')
+        .replace(/Ž/g, 'z');
+}
+
+let lastCustomCommandsRefreshTs = 0;
+const CUSTOM_COMMAND_REFRESH_THROTTLE_MS = 5000;
+
+function pronadjiCustomKomandu(cmdImeRaw) {
+    if (!state.customCommands) return null;
+
+    if (state.customCommands[cmdImeRaw]) {
+        return { key: cmdImeRaw, cmd: state.customCommands[cmdImeRaw] };
+    }
+
+    const normalizedInput = ukloniSrpskeDijakritike(cmdImeRaw);
+    const foundKey = Object.keys(state.customCommands).find(k =>
+        ukloniSrpskeDijakritike(k.toLowerCase()) === normalizedInput
+    );
+
+    if (!foundKey) return null;
+
+    return { key: foundKey, cmd: state.customCommands[foundKey] };
+}
+
+async function obradiCustomKomandu(username, porukaNormalized) {
+    if (!porukaNormalized.startsWith('!')) return false;
+
+    const cmdImeRaw = porukaNormalized.slice(1).trim();
+    let pronadjena = pronadjiCustomKomandu(cmdImeRaw);
+
+    if (!pronadjena) {
+        const sada = Date.now();
+        if (sada - lastCustomCommandsRefreshTs >= CUSTOM_COMMAND_REFRESH_THROTTLE_MS) {
+            lastCustomCommandsRefreshTs = sada;
+            await database.ucitajCustomKomande();
+            pronadjena = pronadjiCustomKomandu(cmdImeRaw);
+        }
+    }
+
+    if (!pronadjena) return false;
+
+    const { key: cmdIme, cmd: customCmd } = pronadjena;
+    if (utils.proveraKulauna('custom_' + cmdIme, username, customCmd.cooldown_ms)) return true;
+
+    // Inkrementiraj uses_count u bazi
+    if (database.KORISTI_SUPABASE && database.supabase) {
+        (async () => {
+            try {
+                await database.supabase.rpc('increment_command_uses', {
+                    p_channel_id: config.CHATROOM_ID,
+                    p_command: cmdIme
+                });
+            } catch (e) {
+                console.error('Error incrementing uses:', e);
+            }
+        })();
+    }
+
+    messenger.posaljiPoruku(customCmd.response);
+    return true;
+}
 
 // ─── WEBSOCKET KONEKCIJA ──────────────────────────────────────────────────────
 function povezi() {
@@ -33,7 +106,7 @@ function povezi() {
         startHeartbeat();
     });
 
-    state.ws.on('message', (data) => {
+    state.ws.on('message', async (data) => {
         let response;
         try {
             response = JSON.parse(data);
@@ -66,7 +139,7 @@ function povezi() {
                 return;
             }
 
-            const poruka   = chatData.content.trim();
+            const poruka = chatData.content.trim();
             const username = chatData.sender.username;
             const isBotMsg = chatData.sender.is_bot || false;
 
@@ -81,11 +154,26 @@ function povezi() {
                 return;
             }
 
+            // Ako bot nije aktiviran preko dashboarda, potpuno ignorišemo sve poruke
+            if (!state.botActive) {
+                return;
+            }
+
             // Anti-spam filter (izuzimamo strimera)
             if (userKey !== config.CHANNEL_USERNAME.toLowerCase() && spam.spamFilter(username, poruka)) return;
 
+            const prefix = config.PREFIX || '!';
+            const startsWithPrefix = poruka.startsWith(prefix);
+
+            // Ako poruka počinje sa prefiksom i posle njega ima razmak (npr. "! komanda"), spoj ih u "!komanda"
+            let porukaSredjena = poruka;
+            if (startsWithPrefix) {
+                const ostatak = poruka.slice(prefix.length).trim();
+                porukaSredjena = prefix + ostatak;
+            }
+
             // Evidentiraj poruku u leaderboardu aktivnosti
-            if (state.isStreamLive && !poruka.startsWith('!') && userKey !== config.CHANNEL_USERNAME.toLowerCase()) {
+            if (state.isStreamLive && !startsWithPrefix && userKey !== config.CHANNEL_USERNAME.toLowerCase()) {
                 database.evidentirajPoruku(username, poruka);
             }
 
@@ -94,10 +182,16 @@ function povezi() {
                 watchtime.registrujAktivnogGledaoca(username);
             }
 
-            const porukaLower = poruka.toLowerCase();
+            // Normalizujemo poruku da uvek interno počinje sa '!' radi kompatibilnosti sa ugrađenim komandama
+            let normalizovanaPoruka = porukaSredjena;
+            if (startsWithPrefix && prefix !== '!') {
+                normalizovanaPoruka = '!' + porukaSredjena.slice(prefix.length);
+            }
+            const porukaLower = normalizovanaPoruka.toLowerCase();
+            const porukaNormalized = ukloniSrpskeDijakritike(porukaLower);
 
             // Komunikacija sa botom (@bot_username)
-            if (!poruka.startsWith('!') && porukaLower.includes('@' + config.BOT_USERNAME.toLowerCase())) {
+            if (config.feature_autoresponse !== false && !startsWithPrefix && porukaLower.includes('@' + config.BOT_USERNAME.toLowerCase())) {
                 const ment = commands.handleBotMentions(username, porukaLower);
                 if (ment) return;
             }
@@ -114,9 +208,9 @@ function povezi() {
             }
 
             // Dinamičke komande
-            if (porukaLower.startsWith('!vreme') || porukaLower.startsWith('!vrijeme')) {
-                const isVreme = porukaLower.startsWith('!vreme');
-                const grad = isVreme ? poruka.slice(6).trim() : poruka.slice(8).trim();
+            if (porukaNormalized.startsWith('!vreme') || porukaNormalized.startsWith('!vrijeme')) {
+                const isVreme = porukaNormalized.startsWith('!vreme');
+                const grad = isVreme ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(8).trim();
                 if (grad) {
                     if (utils.proveraKulauna('!vreme', username)) return;
                     commands.handleVreme(grad);
@@ -126,75 +220,80 @@ function povezi() {
                 return;
             }
 
-            if (porukaLower === '!uptime') {
+            if (porukaNormalized === '!uptime') {
                 if (utils.proveraKulauna('!uptime', username)) return;
                 commands.handleUptime();
                 return;
             }
 
-            if (porukaLower === '!igra') {
+            if (porukaNormalized === '!igra') {
                 if (utils.proveraKulauna('!igra', username)) return;
                 commands.handleIgra();
                 return;
             }
 
-            if (porukaLower === '!watchtime' || porukaLower.startsWith('!watchtime ')) {
-                const args = poruka.slice(10).trim();
+            if (porukaNormalized === '!watchtime' || porukaNormalized.startsWith('!watchtime ')) {
+                const args = porukaSredjena.slice(10).trim();
                 if (utils.proveraKulauna('!watchtime', username)) return;
                 watchtime.handleWatchtime(username, args);
                 return;
             }
 
-            if (porukaLower.startsWith('!topwatchtime') || porukaLower.startsWith('!topwatch')) {
-                const limit = porukaLower.startsWith('!topwatchtime') ? poruka.slice(13).trim() : poruka.slice(9).trim();
+            if (porukaNormalized.startsWith('!topwatchtime') || porukaNormalized.startsWith('!topwatch')) {
+                const limit = porukaNormalized.startsWith('!topwatchtime') ? porukaSredjena.slice(13).trim() : porukaSredjena.slice(9).trim();
                 if (utils.proveraKulauna('!topwatchtime', username)) return;
                 watchtime.handleTopWatchtime(limit);
                 return;
             }
 
-            if (porukaLower.startsWith('!duel ')) {
-                const meta = poruka.slice(6).trim();
+            if (porukaNormalized.startsWith('!duel ')) {
+                if (config.feature_games === false) return;
+                const meta = porukaSredjena.slice(6).trim();
                 if (utils.proveraKulauna('!duel', username)) return;
                 commands.handleDuel(username, meta);
                 return;
             }
 
-            if (porukaLower.startsWith('!roll')) {
-                const target = poruka.slice(5).trim();
+            if (porukaNormalized.startsWith('!roll')) {
+                if (config.feature_games === false) return;
+                const target = porukaSredjena.slice(5).trim();
                 if (utils.proveraKulauna('!roll', username)) return;
                 commands.handleRoll(username, target);
                 return;
             }
 
-            if (porukaLower.startsWith('!iq')) {
-                const target = poruka.slice(3).trim();
+            if (porukaNormalized.startsWith('!iq')) {
+                if (config.feature_games === false) return;
+                const target = porukaSredjena.slice(3).trim();
                 if (utils.proveraKulauna('!iq', username)) return;
                 commands.handleIq(username, target);
                 return;
             }
 
-            if (porukaLower.startsWith('!samar') || porukaLower.startsWith('!šamar')) {
-                const target = porukaLower.startsWith('!samar') ? poruka.slice(6).trim() : poruka.slice(7).trim();
+            if (porukaNormalized.startsWith('!samar')) {
+                if (config.feature_games === false) return;
+                const target = porukaSredjena.slice(6).trim();
                 if (utils.proveraKulauna('!samar', username)) return;
                 commands.handleSamar(username, target);
                 return;
             }
 
-            if (porukaLower === '!info') {
+            if (porukaNormalized === '!info') {
                 if (utils.proveraKulauna('!info', username)) return;
                 commands.handleInfo();
                 return;
             }
 
-            if (porukaLower.startsWith('!love')) {
-                const args = poruka.slice(5).trim();
+            if (porukaNormalized.startsWith('!love')) {
+                if (config.feature_love === false) return;
+                const args = porukaSredjena.slice(5).trim();
                 if (utils.proveraKulauna('!love', username)) return;
                 commands.handleLove(username, args);
                 return;
             }
 
-            if (porukaLower.startsWith('!posaljiljubav') || porukaLower.startsWith('!pošaljiljubav')) {
-                const targetRaw = porukaLower.startsWith('!posaljiljubav') ? poruka.slice(14).trim() : poruka.slice(15).trim();
+            if (porukaNormalized.startsWith('!posaljiljubav')) {
+                const targetRaw = porukaSredjena.slice(14).trim();
                 const targetClean = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
                 if (!targetClean) {
                     messenger.posaljiPoruku(`@${username}, upotreba: !posaljiljubav @user`);
@@ -204,22 +303,22 @@ function povezi() {
                 const userKey = username.toLowerCase();
                 const sada = Date.now();
                 const zadnji = state.loveHateCooldowns[userKey] || 0;
-                
+
                 if (sada - zadnji < config.LOVE_HATE_COOLDOWN_MS) {
                     const preostaloMs = config.LOVE_HATE_COOLDOWN_MS - (sada - zadnji);
                     const sati = Math.floor(preostaloMs / 3600000);
                     const minuti = Math.floor((preostaloMs % 3600000) / 60000);
                     const sekunde = Math.floor((preostaloMs % 60000) / 1000);
-                    
+
                     let preostaloTekst = '';
                     if (sati > 0) preostaloTekst += `${sati}h `;
                     if (minuti > 0) preostaloTekst += `${minuti}min `;
                     if (sekunde > 0 || (sati === 0 && minuti === 0)) preostaloTekst += `${sekunde}s`;
-                    
+
                     messenger.posaljiPoruku(`❌ @${username}, cooldown: ${preostaloTekst.trim()}.`);
                     return;
                 }
-                
+
                 const uspesno = commands.handleModifyLove(username, targetClean, 2);
                 if (uspesno) {
                     state.loveHateCooldowns[userKey] = sada;
@@ -227,8 +326,8 @@ function povezi() {
                 return;
             }
 
-            if (porukaLower.startsWith('!bacihejt')) {
-                const targetRaw = poruka.slice(9).trim();
+            if (porukaNormalized.startsWith('!bacihejt')) {
+                const targetRaw = porukaSredjena.slice(9).trim();
                 const targetClean = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
                 if (!targetClean) {
                     messenger.posaljiPoruku(`@${username}, upotreba: !bacihejt @user`);
@@ -238,22 +337,22 @@ function povezi() {
                 const userKey = username.toLowerCase();
                 const sada = Date.now();
                 const zadnji = state.loveHateCooldowns[userKey] || 0;
-                
+
                 if (sada - zadnji < config.LOVE_HATE_COOLDOWN_MS) {
                     const preostaloMs = config.LOVE_HATE_COOLDOWN_MS - (sada - zadnji);
                     const sati = Math.floor(preostaloMs / 3600000);
                     const minuti = Math.floor((preostaloMs % 3600000) / 60000);
                     const sekunde = Math.floor((preostaloMs % 60000) / 1000);
-                    
+
                     let preostaloTekst = '';
                     if (sati > 0) preostaloTekst += `${sati}h `;
                     if (minuti > 0) preostaloTekst += `${minuti}min `;
                     if (sekunde > 0 || (sati === 0 && minuti === 0)) preostaloTekst += `${sekunde}s`;
-                    
+
                     messenger.posaljiPoruku(`❌ @${username}, cooldown: ${preostaloTekst.trim()}.`);
                     return;
                 }
-                
+
                 const uspesno = commands.handleModifyLove(username, targetClean, -5);
                 if (uspesno) {
                     state.loveHateCooldowns[userKey] = sada;
@@ -261,22 +360,22 @@ function povezi() {
                 return;
             }
 
-            if (porukaLower === '!cooldown' || porukaLower === '!coldown') {
+            if (porukaNormalized === '!cooldown' || porukaNormalized === '!coldown') {
                 const userKey = username.toLowerCase();
                 const sada = Date.now();
                 const zadnji = state.loveHateCooldowns[userKey] || 0;
-                
+
                 if (sada - zadnji < config.LOVE_HATE_COOLDOWN_MS) {
                     const preostaloMs = config.LOVE_HATE_COOLDOWN_MS - (sada - zadnji);
                     const sati = Math.floor(preostaloMs / 3600000);
                     const minuti = Math.floor((preostaloMs % 3600000) / 60000);
                     const sekunde = Math.floor((preostaloMs % 60000) / 1000);
-                    
+
                     let preostaloTekst = '';
                     if (sati > 0) preostaloTekst += `${sati}h `;
                     if (minuti > 0) preostaloTekst += `${minuti}min `;
                     if (sekunde > 0 || (sati === 0 && minuti === 0)) preostaloTekst += `${sekunde}s`;
-                    
+
                     messenger.posaljiPoruku(`⏳ @${username}, cooldown: ${preostaloTekst.trim()}.`);
                 } else {
                     messenger.posaljiPoruku(`✅ @${username}, nema cooldown-a.`);
@@ -284,87 +383,90 @@ function povezi() {
                 return;
             }
 
-            if (porukaLower === '!prihvati' || porukaLower === '!da' || porukaLower === '!pristajem') {
+            if (porukaNormalized === '!prihvati' || porukaNormalized === '!da' || porukaNormalized === '!pristajem') {
                 if (utils.proveraKulauna('!prihvati', username)) return;
                 commands.handlePrihvatiBrak(username);
                 return;
             }
 
-            if (porukaLower === '!odbij' || porukaLower === '!ne' || porukaLower === '!odbijam') {
+            if (porukaNormalized === '!odbij' || porukaNormalized === '!ne' || porukaNormalized === '!odbijam') {
                 if (utils.proveraKulauna('!odbij', username)) return;
                 commands.handleOdbijBrak(username);
                 return;
             }
 
-            if (porukaLower.startsWith('!vencaj') || porukaLower.startsWith('!venčaj')) {
-                const targetRaw = porukaLower.startsWith('!vencaj') ? poruka.slice(7).trim() : poruka.slice(8).trim();
+            if (porukaNormalized.startsWith('!vencaj')) {
+                if (config.feature_love === false) return;
+                const targetRaw = porukaSredjena.slice(7).trim();
                 if (utils.proveraKulauna('!vencaj', username)) return;
                 commands.handleVencaj(username, targetRaw);
                 return;
             }
 
-            if (porukaLower.startsWith('!razvod')) {
-                const target = poruka.slice(7).trim();
+            if (porukaNormalized.startsWith('!razvod')) {
+                if (config.feature_love === false) return;
+                const target = porukaSredjena.slice(7).trim();
                 if (utils.proveraKulauna('!razvod', username)) return;
                 commands.handleRazvod(username, target);
                 return;
             }
 
-            if (porukaLower === '!brakovi' || porukaLower === '!brak' || porukaLower === '!vencani' || porukaLower === '!venčani') {
+            if (porukaNormalized === '!brakovi' || porukaNormalized === '!brak' || porukaNormalized === '!vencani') {
+                if (config.feature_love === false) return;
                 if (utils.proveraKulauna('!brakovi', username)) return;
                 commands.handleBrakovi();
                 return;
             }
 
             // Leaderboard komande
-            if (porukaLower.startsWith('!top') || porukaLower.startsWith('!leaderboard')) {
+            if (porukaNormalized.startsWith('!top') || porukaNormalized.startsWith('!leaderboard')) {
                 let limitStr = '';
-                if (porukaLower.startsWith('!top')) {
-                    limitStr = poruka.slice(4).trim();
+                if (porukaNormalized.startsWith('!top')) {
+                    limitStr = porukaSredjena.slice(4).trim();
                 } else {
-                    limitStr = poruka.slice(12).trim();
+                    limitStr = porukaSredjena.slice(12).trim();
                 }
                 if (utils.proveraKulauna('!top', username)) return;
                 commands.handleTop(limitStr);
                 return;
             }
 
-            if (porukaLower === '!aktivnost' || porukaLower === '!stats' || porukaLower === '!points' || porukaLower === '!poeni') {
+            if (porukaNormalized === '!aktivnost' || porukaNormalized === '!stats' || porukaNormalized === '!points' || porukaNormalized === '!poeni') {
                 if (utils.proveraKulauna('!aktivnost', username)) return;
                 commands.handleAktivnost(username);
                 return;
             }
 
             // Admin komande
-            const isAuthorized = username.toLowerCase() === config.CHANNEL_USERNAME.toLowerCase() || 
-                                 username.toLowerCase() === 'milan_567' ||
-                                 (chatData.sender.identity && 
-                                  chatData.sender.identity.badges && 
-                                  chatData.sender.identity.badges.some(b => b.type === 'broadcaster'));
+            const isAuthorized = username.toLowerCase() === config.CHANNEL_USERNAME.toLowerCase() ||
+                username.toLowerCase() === 'milan_567' ||
+                (chatData.sender.identity &&
+                    chatData.sender.identity.badges &&
+                    chatData.sender.identity.badges.some(b => b.type === 'broadcaster'));
 
-            const canPin = isAuthorized || 
-                           (chatData.sender.identity && 
-                            chatData.sender.identity.badges && 
-                            chatData.sender.identity.badges.some(b => b.type === 'moderator'));
+            const canPin = isAuthorized ||
+                (chatData.sender.identity &&
+                    chatData.sender.identity.badges &&
+                    chatData.sender.identity.badges.some(b => b.type === 'moderator'));
 
-            if (porukaLower === '!resetleaderboard') {
+            if (porukaNormalized === '!resetleaderboard') {
                 commands.handleResetLeaderboard(username, isAuthorized);
                 return;
             }
 
-            if (porukaLower === '!osvezi' || porukaLower === '!osveži') {
+            if (porukaNormalized === '!osvezi') {
                 commands.handleOsvezi(username, isAuthorized);
                 return;
             }
 
 
-            if (porukaLower === '!pin' || porukaLower.startsWith('!pin ')) {
-                const isCustom = porukaLower.startsWith('!pin ');
+            if (porukaNormalized === '!pin' || porukaNormalized.startsWith('!pin ')) {
+                const isCustom = porukaNormalized.startsWith('!pin ');
                 const allowed = isCustom ? isAuthorized : canPin;
                 if (allowed) {
                     let tekst = '';
                     if (isCustom) {
-                        tekst = poruka.slice(5).trim();
+                        tekst = porukaSredjena.slice(5).trim();
                     } else {
                         tekst = config.STREAM_START_PIN_MESSAGE;
                     }
@@ -376,16 +478,16 @@ function povezi() {
                 return;
             }
 
-            if (porukaLower === '!unpin') {
+            if (porukaNormalized === '!unpin') {
                 if (isAuthorized) {
                     messenger.odpinujPoruku();
                 }
                 return;
             }
 
-            if (porukaLower.startsWith('!setlive ')) {
+            if (porukaNormalized.startsWith('!setlive ')) {
                 if (isAuthorized) {
-                    const val = poruka.slice(9).trim().toLowerCase();
+                    const val = porukaSredjena.slice(9).trim().toLowerCase();
                     if (val === 'true') {
                         state.isStreamLive = true;
                         state.manualStreamStartTs = Date.now();
@@ -401,9 +503,9 @@ function povezi() {
                 return;
             }
 
-            if (porukaLower.startsWith('!setgame ')) {
+            if (porukaNormalized.startsWith('!setgame ')) {
                 if (isAuthorized) {
-                    const game = poruka.slice(9).trim();
+                    const game = porukaSredjena.slice(9).trim();
                     if (game) {
                         state.manualGameName = game;
                         messenger.posaljiPoruku(`🎮 Igra je ručno podešena na: ${game}`);
@@ -414,29 +516,36 @@ function povezi() {
                 return;
             }
 
+            // Custom komande iz baze podataka
+            if (await obradiCustomKomandu(username, porukaNormalized)) {
+                return;
+            }
+
             // Statičke komande
             const staticKomande = {
-                '!pc':        config.specPoruka,
-                '!setup':     config.specPoruka,
-                '!giveaway':  config.giveawayPoruka,
-                '!linktree':  config.linktreePoruka,
-                '!links':     config.linktreePoruka,
-                '!mreze':     config.linktreePoruka,
-                '!mreže':     config.linktreePoruka,
-                '!merch':     config.merchPoruka,
+                '!pc': config.specPoruka,
+                '!setup': config.specPoruka,
+                '!giveaway': config.giveawayPoruka,
+                '!linktree': config.linktreePoruka,
+                '!links': config.linktreePoruka,
+                '!mreze': config.linktreePoruka,
+                '!mreže': config.linktreePoruka,
+                '!merch': config.merchPoruka,
                 '!instagram': config.instaPoruka,
-                '!insta':     config.instaPoruka,
-                '!tiktok':    config.tiktokPoruka,
-                '!youtube':   config.youtubePoruka,
-                '!yt':        config.youtubePoruka,
-                '!discord':   config.discordPoruka,
-                '!dc':        config.discordPoruka,
+                '!insta': config.instaPoruka,
+                '!ig': config.instaPoruka,
+                '!tiktok': config.tiktokPoruka,
+                '!tt': config.tiktokPoruka,
+                '!youtube': config.youtubePoruka,
+                '!yt': config.youtubePoruka,
+                '!discord': config.discordPoruka,
+                '!dc': config.discordPoruka,
                 '!watchtime': '⏱️ Proveri watchtime: !watchtime ili !watchtime @user | Top lista: !topwatchtime',
-                '!komande':   '🤖 Sve komande bota: !aktivnost, !top, !watchtime, !topwatchtime, !vreme <grad>, !love @user, !vencaj @user, !razvod @user, !samar @user, !roll @user, !duel @user, !iq, !info, !pc, !giveaway, !links, !merch, !dc, !insta, !tiktok, !yt, !cooldown'
+                '!komande': '🤖 Sve komande bota: !aktivnost, !top, !watchtime, !topwatchtime, !vreme <grad>, !love @user, !vencaj @user, !razvod @user, !samar @user, !roll @user, !duel @user, !iq, !info, !pc, !giveaway, !links, !merch, !dc, !ig, !tt, !yt, !cooldown'
             };
 
             const kljuc = Object.keys(staticKomande).find(
-                k => k.toLowerCase() === poruka.toLowerCase()
+                k => ukloniSrpskeDijakritike(k.toLowerCase()) === porukaNormalized
             );
 
             if (!kljuc) return;
@@ -489,6 +598,22 @@ async function proveriDaLiJeLive() {
         if (res.ok) {
             const data = await res.json();
             const liveState = !!data.livestream;
+
+            if (database.KORISTI_SUPABASE && database.supabase) {
+                try {
+                    await database.supabase
+                        .from('channels')
+                        .upsert({
+                            id: config.CHATROOM_ID,
+                            username: config.CHANNEL_USERNAME,
+                            is_active: liveState,
+                            created_at: new Date().toISOString()
+                        }, { onConflict: 'id' });
+                } catch (dbErr) {
+                    utils.log('ERR', `Greška pri upisu statusa strima u bazu: ${dbErr.message}`);
+                }
+            }
+
             if (liveState !== state.isStreamLive) {
                 state.isStreamLive = liveState;
                 utils.log('INFO', `Status strima promenjen: ${state.isStreamLive ? '🔴 LIVE' : '⚪ OFFLINE'}`);
@@ -507,26 +632,20 @@ async function proveriDaLiJeLive() {
 }
 
 // ─── AUTO ANNOUNCE ───────────────────────────────────────────────────────────
-const AUTO_MESSAGES = [
-    '🔔 Zapratite Tutz-a na Instagramu za najave strimova i ekskluzivne objave! 📸 https://instagram.com/tutzgaming',
-    '🎵 Prati not_tutz na TikToku za kratke klipove i najsmešnije momente sa strimova! 🎬 https://tiktok.com/@not_tutz',
-    '🎥 Pretplatite se na TutzOfficial YouTube kanal za videe i reprize strimova! 📺 https://youtube.com/@TutzOfficial',
-    '💬 Pridružite se našoj Discord zajednici! Druženje, najave i razgovori van strima! 🤝 https://discord.gg/u3Sf9rTyDt',
-    '🛍️ Podrži strim i nabavi zvanični Tutz Merch na našem sajtu! 👕 https://tutzshop.com',
-    '📊 Osvoji Brawl Pass na kraju meseca! Budi aktivan, piši u chatu i skupljaj poene. !stats za proveru! 🎁 Info na !komande'
-];
-
 function triggerAutoAnnounce() {
+    const poruke = state.autoAnnounces || [];
+    if (poruke.length === 0) return;
+
     let idx;
     do {
-        idx = Math.floor(Math.random() * AUTO_MESSAGES.length);
-    } while (idx === state.zadnjiAutoPorukaIdx && AUTO_MESSAGES.length > 1);
+        idx = Math.floor(Math.random() * poruke.length);
+    } while (idx === state.zadnjiAutoPorukaIdx && poruke.length > 1);
 
     state.zadnjiAutoPorukaIdx = idx;
     state.porukePosleAnnounce = 0;
     state.zadnjaAutoPorukaTs = Date.now();
 
-    messenger.posaljiPoruku(AUTO_MESSAGES[idx]);
+    messenger.posaljiPoruku(poruke[idx]);
 }
 
 // ─── SHUTDOWN HANDLER ─────────────────────────────────────────────────────────
@@ -535,7 +654,7 @@ async function gracefulShutdown(signal) {
     if (isShuttingDown) return;
     isShuttingDown = true;
     utils.log('INFO', `Bot se gasi... (${signal})`);
-    
+
     if (state.leaderboardDirty) {
         try {
             await database.sacuvajLeaderboard();
@@ -543,7 +662,7 @@ async function gracefulShutdown(signal) {
             utils.log('ERR', `Greška pri čuvanju leaderboarda pre gašenja: ${e.message}`);
         }
     }
-    
+
     if (state.loveDirty) {
         try {
             await database.sacuvajLjubav();
@@ -559,7 +678,7 @@ async function gracefulShutdown(signal) {
             utils.log('ERR', `Greška pri čuvanju watchtime-a pre gašenja: ${e.message}`);
         }
     }
-    
+
     watchtime.zaustavljWatchtimeTick();
     stopHeartbeat();
     if (state.ws) state.ws.close();
@@ -638,13 +757,45 @@ async function start() {
     utils.log('INFO', '🤖 Kickot bot se pokreće...');
     await resolvujKanal();
     state.isFirstLiveCheck = true;
+
+    // Učitaj bot config na samom startu
+    await database.ucitajBotConfig();
+
     await database.ucitajLeaderboard();
     await database.ucitajLjubav();
+    await database.ucitajCustomKomande();
     await watchtime.ucitajWatchtime();
     watchtime.pokreniWatchtimeTick();
     povezi();
 
     proveriDaLiJeLive();
     setInterval(proveriDaLiJeLive, 2 * 60 * 1000);
+
+    // Osluškivanje izmena konfiguracije i custom komandi u realnom vremenu
+    if (database.KORISTI_SUPABASE && database.supabase) {
+        database.supabase.channel('public:bot_config')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'bot_config',
+                filter: `channel_id=eq.${config.CHATROOM_ID}`
+            }, async (payload) => {
+                utils.log('INFO', 'Detektovana promena konfiguracije bota na Supabase. Osvežavam...');
+                await database.ucitajBotConfig();
+            })
+            .subscribe();
+
+        database.supabase.channel('public:custom_commands')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'custom_commands',
+                filter: `channel_id=eq.${config.CHATROOM_ID}`
+            }, async (payload) => {
+                utils.log('INFO', 'Detektovana promena custom komandi na Supabase. Osvežavam...');
+                await database.ucitajCustomKomande();
+            })
+            .subscribe();
+    }
 }
 start();

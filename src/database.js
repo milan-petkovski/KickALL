@@ -529,6 +529,83 @@ async function sacuvajBackupUGist(mesec, stariPodaci) {
     }
 }
 
+async function ucitajCustomKomande() {
+    try {
+        if (!KORISTI_SUPABASE) return;
+        log('INFO', `Učitavam custom komande sa Supabase za kanal: ${config.CHANNEL_USERNAME}...`);
+        const { data, error } = await supabase
+            .from('custom_commands')
+            .select('command, response, cooldown_ms, enabled')
+            .eq('channel_id', config.CHATROOM_ID)
+            .eq('enabled', true);
+
+        if (error) throw error;
+
+        state.customCommands = {};
+        if (data) {
+            data.forEach(row => {
+                // Podržavamo više komandi odvojenih zarezom (npr. "insta, instagram")
+                const aliases = row.command.split(',').map(c => c.trim().toLowerCase());
+                aliases.forEach(alias => {
+                    if (alias) {
+                        state.customCommands[alias] = {
+                            response: row.response,
+                            cooldown_ms: row.cooldown_ms || 5000
+                        };
+                    }
+                });
+            });
+            log('INFO', `Custom komande učitane: ${data.length} redova (sa podrškom za više aliasa).`);
+        }
+    } catch (err) {
+        log('ERR', `Greška pri učitavanju custom komandi: ${err.message}`);
+    }
+}
+
+async function ucitajBotConfig() {
+    try {
+        if (!KORISTI_SUPABASE) return;
+        log('INFO', `Učitavam bot konfiguraciju sa Supabase za kanal: ${config.CHANNEL_USERNAME}...`);
+        const { data, error } = await supabase
+            .from('bot_config')
+            .select('*')
+            .eq('channel_id', config.CHATROOM_ID)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+            // Dinamički override u config objektu
+            config.PREFIX = data.prefix || '!';
+            config.COOLDOWN_MS = data.cooldown_ms ?? 3000;
+            config.SPAM_THRESHOLD = data.spam_threshold ?? 3;
+            config.SPAM_WINDOW_MS = data.spam_window_ms ?? 15000;
+            
+            if (data.stream_pin_msg) {
+                config.STREAM_START_PIN_MESSAGE = data.stream_pin_msg;
+            }
+            
+            config.feature_leaderboard = data.feature_leaderboard ?? true;
+            config.feature_watchtime = data.feature_watchtime ?? true;
+            config.feature_games = data.feature_games ?? true;
+            config.feature_love = data.feature_love ?? true;
+            config.feature_moderation = data.feature_moderation ?? false;
+            config.feature_autoresponse = data.feature_autoresponse ?? true;
+            config.welcome_message = data.welcome_message;
+            
+            state.botActive = data.bot_active || false;
+            state.autoAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
+            
+            log('INFO', `Bot konfiguracija uspešno učitana. Prefix: '${config.PREFIX}', Cooldown: ${config.COOLDOWN_MS}ms, Aktivnost: ${state.botActive}, Auto poruke: ${state.autoAnnounces.length}`);
+        } else {
+            state.botActive = false;
+            state.autoAnnounces = [];
+        }
+    } catch (err) {
+        log('ERR', `Greška pri učitavanju bot konfiguracije: ${err.message}`);
+    }
+}
+
 module.exports = {
     supabase,
     KORISTI_SUPABASE,
@@ -539,5 +616,7 @@ module.exports = {
     sacuvajLeaderboard,
     proveriIResetujMesec,
     evidentirajPoruku,
-    smanjiPoruku
+    smanjiPoruku,
+    ucitajCustomKomande,
+    ucitajBotConfig
 };

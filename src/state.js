@@ -6,6 +6,9 @@ module.exports = {
     marriedCouples: {},
     watchtime: {},
     watchtimeDeltas: {},
+    customCommands: {},
+    autoAnnounces: [],
+    botActive: false,
 
     // State / Trackers
     pendingProposals: {},
