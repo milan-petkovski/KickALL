@@ -278,6 +278,15 @@ function povezi() {
                 return;
             }
 
+            if (porukaNormalized.startsWith('!rulet')) {
+                if (config.feature_games === false) return;
+                if (utils.proveraKulauna('!rulet', username)) return;
+                commands.handleRulet(username);
+                return;
+            }
+
+
+
             if (porukaNormalized === '!info') {
                 if (utils.proveraKulauna('!info', username)) return;
                 commands.handleInfo();
@@ -541,7 +550,7 @@ function povezi() {
                 '!discord': config.discordPoruka,
                 '!dc': config.discordPoruka,
                 '!watchtime': '⏱️ Proveri watchtime: !watchtime ili !watchtime @user | Top lista: !topwatchtime',
-                '!komande': '🤖 Sve komande bota: !aktivnost, !top, !watchtime, !topwatchtime, !vreme <grad>, !love @user, !vencaj @user, !razvod @user, !samar @user, !roll @user, !duel @user, !iq, !info, !pc, !giveaway, !links, !merch, !dc, !ig, !tt, !yt, !cooldown'
+                '!komande': '🤖 Sve komande bota: !aktivnost, !top, !watchtime, !topwatchtime, !vreme <grad>, !love @user, !vencaj @user, !razvod @user, !samar @user, !roll @user, !duel @user, !iq, !rulet, !info, !pc, !giveaway, !links, !merch, !dc, !ig, !tt, !yt, !cooldown'
             };
 
             const kljuc = Object.keys(staticKomande).find(

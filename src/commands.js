@@ -202,6 +202,29 @@ function handleDuel(sender, meta) {
     posaljiPoruku(poruka);
 }
 
+// ─── RUSKI RULET ─────────────────────────────────────────────────────────────
+function handleRulet(sender) {
+    if (!isValidUsername(sender)) return;
+    const cleanSender = sanitizeInput(sender);
+    const komore = [false, false, false, false, false, true]; // 1 u 6 šansa
+    const metak = komore[Math.floor(Math.random() * komore.length)];
+    if (metak) {
+        const porazi = [
+            `💀 *KLIK*... BUM! @${cleanSender} je popio metak u ruskom ruletu! Bolje sreće u sledećem životu. 🪦`,
+            `💀 *KLIK*... ŠKLJOC... BUM! @${cleanSender} je izvukao kraći kraj. Počivaj u miru! 🥀`,
+            `💀 *KLIK*... BUM! @${cleanSender} je eliminisan iz četa (simulirano)! Kakav hrabar, ali tragičan pokušaj! 🔫`
+        ];
+        posaljiPoruku(porazi[Math.floor(Math.random() * porazi.length)]);
+    } else {
+        const prezivljavanja = [
+            `🔫 *KLIK*... Prazno! @${cleanSender} je preživeo ovu rundu ruskog ruleta. Znoj se cedi sa čela... 😰`,
+            `🔫 *KLIK*... Tišina. Srce kuca ubrzano, ali @${cleanSender} je još uvek živ! Sreća te prati danas! 🍀`,
+            `🔫 *KLIK*... Ništa! @${cleanSender} se samo nasmejao sudbini u lice. Sledeći! 😎`
+        ];
+        posaljiPoruku(prezivljavanja[Math.floor(Math.random() * prezivljavanja.length)]);
+    }
+}
+
 // ─── LJUBAVNI KALKULATOR ──────────────────────────────────────────────────────
 function handleLove(sender, args) {
     if (!args) {
@@ -1044,6 +1067,7 @@ module.exports = {
     handleSamar,
     handleRoll,
     handleDuel,
+    handleRulet,
     handleLove,
     handleModifyLove,
     handleVencaj,

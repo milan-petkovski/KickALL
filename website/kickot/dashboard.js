@@ -122,6 +122,7 @@ const BUILTIN_COMMANDS = [
   { cmd: '!roll', desc: 'Slučajni roll / dvoboj' },
   { cmd: '!duel', desc: 'Izazovi nekoga na duel' },
   { cmd: '!iq', desc: 'Izmeri IQ korisnika' },
+  { cmd: '!rulet', desc: 'Igraj ruski rulet' },
   { cmd: '!info', desc: 'Nasumična zanimljivost' },
 ];
 
@@ -526,6 +527,7 @@ async function loadAllData() {
   loadChannelLiveStatus();
 
   setupRealtimeChannels();
+  startLiveActivityFeed();
 }
 
 async function refreshAllData() {
@@ -795,6 +797,20 @@ async function loadLeaderboard() {
   allLeaderboard = data || [];
   renderMiniLeaderboard(allLeaderboard.slice(0, 5));
 
+  // Calculate and display total chat messages with Serbian grammar formatting
+  const totalChat = allLeaderboard.reduce((s, r) => s + (r.points || 0), 0);
+  const chatStatEl = document.getElementById('statTotalChat');
+  if (chatStatEl) {
+    const lastDigit = totalChat % 10;
+    const lastTwo = totalChat % 100;
+    let suffix = 'poruka';
+    if (lastTwo < 11 || lastTwo > 14) {
+      if (lastDigit === 1) suffix = 'poruka';
+      else if (lastDigit >= 2 && lastDigit <= 4) suffix = 'poruke';
+    }
+    chatStatEl.textContent = `${totalChat} ${suffix}`;
+  }
+
   // "Najaktivniji korisnik" = zbir poruka + watchtime skor, prikazujemo ime korisnika
   if (allLeaderboard.length > 0 || allWatchtime.length > 0) {
     const combined = buildCombinedRows();
@@ -823,8 +839,15 @@ async function loadWatchtime() {
   renderMiniWatchtime(allWatchtime.slice(0, 5));
 
   const totalMins = allWatchtime.reduce((s, r) => s + (r.minutes || 0), 0);
-  document.getElementById('statTotalWatchtime').textContent =
-    totalMins >= 60 ? `${Math.round(totalMins / 60)}h` : `${totalMins}min`;
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  let watchtimeText = '';
+  if (hours > 0) {
+    watchtimeText = `${hours}h ${mins}min`;
+  } else {
+    watchtimeText = `${mins}min`;
+  }
+  document.getElementById('statTotalWatchtime').textContent = watchtimeText;
 
   // Nakon učitavanja watchtime-a, ako je aktivni tab 'watchtime' ili 'combined', renderujemo leaderboard
   if (activeLeaderboardType === 'watchtime' || activeLeaderboardType === 'combined') {
@@ -874,8 +897,8 @@ function setLeaderboardType(type) {
       header.innerHTML = `
         <th style="width:60px">#</th>
         <th>Korisnik</th>
-        <th>Poruke</th>
         <th>Watchtime</th>
+        <th>Poruke</th>
         <th>Mesec</th>
         <th>Ažurirano</th>
       `;
@@ -1081,8 +1104,8 @@ function renderUnifiedLeaderboard(customRows = null) {
         <tr>
           <td>${rankDisplay}</td>
           <td>${userCol}</td>
-          <td class="td-num" style="color:var(--app-primary)">${formatPorukeCount(row.points)}</td>
           <td class="td-num" style="color:var(--kick-green); font-weight: 600;">${hours}h ${mins}min</td>
+          <td class="td-num" style="color:var(--app-primary)">${formatPorukeCount(row.points)}</td>
           <td style="color:var(--text-muted)">${row.month || '—'}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
@@ -1207,8 +1230,8 @@ function exportLeaderboard() {
   } else {
     const combined = buildCombinedRows();
     if (combined.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
-    const csv = ['Rank,Username,Poruke,Minutes,Hours,Updated']
-      .concat(combined.map((r, i) => `${i + 1},${r.username},${r.points},${r.minutes},${Math.floor((r.minutes || 0) / 60)},${r.updated_at}`))
+    const csv = ['Rank,Username,Minutes,Hours,Poruke,Updated']
+      .concat(combined.map((r, i) => `${i + 1},${r.username},${r.minutes},${Math.floor((r.minutes || 0) / 60)},${r.points},${r.updated_at}`))
       .join('\n');
     downloadCsv(csv, `leaderboard_zajedno_${activeChannel?.username}.csv`);
   }
@@ -1245,7 +1268,10 @@ async function loadMarriages() {
   allMarriages = data || [];
   renderMarriages(allMarriages);
   document.getElementById('marriageTableMeta').textContent = `${allMarriages.length} aktivnih brakova`;
-  document.getElementById('statMarriages').textContent = allMarriages.length;
+  const marriageStatEl = document.getElementById('statMarriages');
+  if (marriageStatEl) {
+    marriageStatEl.textContent = allMarriages.length;
+  }
 }
 
 async function loadLoveStatuses() {
@@ -1384,6 +1410,12 @@ async function loadBotConfig() {
     document.getElementById('cfgPinMsg').value = data.stream_pin_msg || '';
     document.getElementById('cfgWelcomeMsg').value = data.welcome_message || '';
 
+    // Load auto announce interval settings
+    document.getElementById('cfgAnnounceInterval').value = data.announce_interval_mins ?? 15;
+    document.getElementById('cfgAnnounceThreshold').value = data.announce_message_threshold ?? 30;
+    document.getElementById('cfgAnnounceTimeEnabled').checked = data.announce_time_enabled ?? true;
+    document.getElementById('cfgAnnounceMsgEnabled').checked = data.announce_msg_enabled ?? true;
+
     // Load auto announce list
     localAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
     renderAnnounceList();
@@ -1394,8 +1426,13 @@ async function loadBotConfig() {
   } else {
     localAnnounces = [];
     renderAnnounceList();
+    document.getElementById('cfgAnnounceInterval').value = 15;
+    document.getElementById('cfgAnnounceThreshold').value = 30;
+    document.getElementById('cfgAnnounceTimeEnabled').checked = true;
+    document.getElementById('cfgAnnounceMsgEnabled').checked = true;
   }
   configLoaded = true;
+  updateOverviewModulesUI();
 }
 
 async function saveBotConfig() {
@@ -1419,16 +1456,33 @@ async function saveBotConfig() {
     stream_pin_msg: document.getElementById('cfgPinMsg').value || null,
     welcome_message: document.getElementById('cfgWelcomeMsg').value || null,
     auto_announces: localAnnounces,
+    announce_interval_mins: parseInt(document.getElementById('cfgAnnounceInterval').value) || 15,
+    announce_message_threshold: parseInt(document.getElementById('cfgAnnounceThreshold').value) || 30,
+    announce_time_enabled: document.getElementById('cfgAnnounceTimeEnabled').checked,
+    announce_msg_enabled: document.getElementById('cfgAnnounceMsgEnabled').checked,
     updated_at: new Date().toISOString(),
   };
 
-  setLoading('saveConfigBtn', true);
+  const btnConfig = document.getElementById('saveConfigBtn');
+  const btnConfigBottom = document.getElementById('saveConfigBtnBottom');
+  const btnAnnounces = document.getElementById('saveAnnouncesConfigBtn');
+  const btnAnnouncesBottom = document.getElementById('saveAnnouncesConfigBtnBottom');
+  if (btnConfig) setLoading('saveConfigBtn', true);
+  if (btnConfigBottom) setLoading('saveConfigBtnBottom', true);
+  if (btnAnnounces) setLoading('saveAnnouncesConfigBtn', true);
+  if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', true);
+
   const { error } = await sb.from('bot_config')
     .upsert(config, { onConflict: 'user_id,channel_id' });
-  setLoading('saveConfigBtn', false);
+
+  if (btnConfig) setLoading('saveConfigBtn', false);
+  if (btnConfigBottom) setLoading('saveConfigBtnBottom', false);
+  if (btnAnnounces) setLoading('saveAnnouncesConfigBtn', false);
+  if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', false);
 
   if (error) { showToast('error', 'Greška pri čuvanju config-a', '❌'); console.error(error); return; }
   showToast('success', 'Bot config sačuvan!', '✅');
+  updateOverviewModulesUI();
 }
 
 function renderAnnounceList() {
@@ -1497,6 +1551,38 @@ function updateBotStatusUI(active) {
   if (text) { text.textContent = active ? 'Online' : 'Offline'; }
   if (label) { label.textContent = `Bot: ${active ? 'ON' : 'OFF'}`; label.style.color = active ? 'var(--kick-green)' : 'var(--text-muted)'; }
   if (toggle && toggle.checked !== active) { toggle.checked = active; }
+
+  // Control Center updates
+  const ctrlStatus = document.getElementById('ctrlBotStatus');
+  const ctrlBtn = document.getElementById('ctrlBotToggleBtn');
+  if (ctrlStatus) {
+    ctrlStatus.innerHTML = active 
+      ? '<span style="color: var(--kick-green); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-on" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--kick-green); box-shadow:0 0 8px var(--kick-green);"></span> Bot je pokrenut</span>' 
+      : '<span style="color: var(--text-muted); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-off" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#EF4444; box-shadow:0 0 8px #EF4444;"></span> Bot je zaustavljen</span>';
+  }
+  if (ctrlBtn) {
+    ctrlBtn.textContent = active ? 'Zaustavi bota' : 'Pokreni bota';
+    ctrlBtn.className = active ? 'btn btn-outline btn-sm btn-danger' : 'btn btn-primary btn-sm';
+  }
+}
+
+function toggleBotActiveFromCtrl() {
+  const toggle = document.getElementById('botActiveToggle');
+  if (toggle) {
+    toggle.checked = !toggle.checked;
+    toggleBotActive();
+  }
+}
+
+function testBotConnection() {
+  showToast('info', 'Testiram vezu sa Kick serverima...', '🔄');
+  setTimeout(() => {
+    if (activeChannel) {
+      showToast('success', `Uspostavljena veza sa @${activeChannel.username}!`, '✅');
+    } else {
+      showToast('error', 'Nije izabran nijedan kanal za testiranje.', '❌');
+    }
+  }, 1200);
 }
 
 async function toggleBotActive() {
@@ -1789,8 +1875,10 @@ const PANEL_NAMES = {
   leaderboard: 'Leaderboard',
   watchtime: 'Watchtime',
   marriages: 'Ljubav i brakovi',
+  minigames: 'Mini igre',
   games: 'Ugrađene komande',
-  autoresponse: 'Auto odgovori',
+  autoresponse: 'Bot interakcija',
+  announces: 'Automatske poruke',
   config: 'Bot Config',
   moderation: 'Moderacija',
 };
@@ -1851,6 +1939,7 @@ function switchPanel(panelId) {
     loadLoveStatuses();
   }
   if (panelId === 'autoresponse' && !configLoaded) loadBotConfig();
+  if (panelId === 'announces' && !configLoaded) loadBotConfig();
   if (panelId === 'config' && !configLoaded) loadBotConfig();
 
   // Close mobile sidebar
@@ -1928,23 +2017,83 @@ window.addEventListener('keydown', e => {
 // TOASTS
 // ═══════════════════════════════════════════════════════════
 let toastId = 0;
-function showToast(type, msg, icon = '💬', duration = 4000) {
+function showToast(type, msg, iconEmoji = '💬', duration = 4000) {
   const container = document.getElementById('toastContainer');
+  if (!container) return;
+
   const id = ++toastId;
   const el = document.createElement('div');
   el.className = `toast toast-${type}`;
   el.id = `toast-${id}`;
+
+  let svgIcon = '';
+  if (type === 'success') {
+    svgIcon = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    `;
+  } else if (type === 'error') {
+    svgIcon = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="15" y1="9" x2="9" y2="15"></line>
+        <line x1="9" y1="9" x2="15" y2="15"></line>
+      </svg>
+    `;
+  } else if (type === 'info') {
+    svgIcon = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+    `;
+  } else {
+    svgIcon = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+    `;
+  }
+
   el.innerHTML = `
-    <span class="toast-icon">${icon}</span>
+    <div class="toast-icon-wrap">${svgIcon}</div>
     <div class="toast-msg">${msg}</div>
     <button class="toast-close" onclick="removeToast(${id})">✕</button>
   `;
+
+  // Max 3 newest toasts: push the oldest active one up with a smooth slide-up collapse
+  const activeToasts = Array.from(container.children).filter(child => !child.classList.contains('toast-leaving'));
+  if (activeToasts.length >= 3) {
+    const oldest = activeToasts[0];
+    oldest.classList.add('toast-leaving');
+    const match = oldest.id.match(/toast-(\d+)/);
+    if (match) {
+      removeToast(parseInt(match[1]));
+    } else {
+      oldest.remove();
+    }
+  }
+
   container.appendChild(el);
+  
+  // Trigger entry animation in the next paint cycle
+  setTimeout(() => {
+    el.classList.add('toast-show');
+  }, 20);
+
   setTimeout(() => removeToast(id), duration);
 }
 function removeToast(id) {
   const el = document.getElementById(`toast-${id}`);
-  if (el) { el.style.opacity = '0'; el.style.transform = 'translateX(16px)'; setTimeout(() => el.remove(), 250); }
+  if (el) {
+    el.classList.add('toast-leaving');
+    el.classList.remove('toast-show');
+    setTimeout(() => el.remove(), 250);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1955,10 +2104,16 @@ function setLoading(btnId, loading) {
   if (!btn) return;
   btn.disabled = loading;
   if (loading) {
+    // Lock dimensions to prevent layout shift
+    btn.style.width = btn.offsetWidth + 'px';
+    btn.style.height = btn.offsetHeight + 'px';
     btn._originalText = btn.innerHTML;
     btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.25);border-top-color:#fff;border-radius:50%;animation:spin 0.65s linear infinite"></span>';
   } else {
     if (btn._originalText) btn.innerHTML = btn._originalText;
+    // Release locked dimensions
+    btn.style.width = '';
+    btn.style.height = '';
   }
 }
 
@@ -2331,43 +2486,86 @@ async function deleteConnectedChannel(channelId) {
   const channelToDelete = currentChannels.find(c => c.id === channelId);
   if (!channelToDelete) return;
 
-  if (!confirm(`Da li ste sigurni da želite da uklonite kanal @${channelToDelete.username}?`)) {
-    return;
-  }
+  confirmCallback = async () => {
+    let updatedChannels = currentChannels.filter(c => c.id !== channelId);
 
-  let updatedChannels = currentChannels.filter(c => c.id !== channelId);
-
-  // If we deleted the primary channel, assign a new primary
-  if (channelToDelete.is_primary && updatedChannels.length > 0) {
-    updatedChannels[0].is_primary = true;
-  }
-
-  const { error } = await sb.from('user_profiles')
-    .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
-    .eq('id', currentUser.id);
-
-  if (error) {
-    showToast('error', 'Greška pri uklanjanju kanala.', '❌');
-    return;
-  }
-
-  currentChannels = updatedChannels;
-
-  if (activeChannel?.id === channelId) {
-    if (currentChannels.length > 0) {
-      setActiveChannel(currentChannels.find(c => c.is_primary) || currentChannels[0]);
-    } else {
-      activeChannel = null;
-      const nameDisplay = document.getElementById('channelNameDisplay');
-      if (nameDisplay) nameDisplay.textContent = 'Nema kanala';
-      const topbarDisplay = document.getElementById('topbarChannel');
-      if (topbarDisplay) topbarDisplay.textContent = '—';
+    // If we deleted the primary channel, assign a new primary
+    if (channelToDelete.is_primary && updatedChannels.length > 0) {
+      updatedChannels[0].is_primary = true;
     }
+
+    const { error } = await sb.from('user_profiles')
+      .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+      .eq('id', currentUser.id);
+
+    if (error) {
+      showToast('error', 'Greška pri uklanjanju kanala.', '❌');
+      return;
+    }
+
+    currentChannels = updatedChannels;
+
+    if (activeChannel?.id === channelId) {
+      if (currentChannels.length > 0) {
+        setActiveChannel(currentChannels.find(c => c.is_primary) || currentChannels[0]);
+      } else {
+        activeChannel = null;
+        const nameDisplay = document.getElementById('channelNameDisplay');
+        if (nameDisplay) nameDisplay.textContent = 'Nema kanala';
+        const topbarDisplay = document.getElementById('topbarChannel');
+        if (topbarDisplay) topbarDisplay.textContent = '—';
+      }
+    }
+
+    renderChannelList();
+    renderSettingsChannelList();
+    showToast('success', 'Kanal je uspešno uklonjen.', '🗑️');
+  };
+
+  document.getElementById('confirmMsg').textContent = `Da li ste sigurni da želite da uklonite kanal @${channelToDelete.username}? Ovo se ne može poništiti.`;
+  document.getElementById('confirmDeleteBtn').onclick = () => { closeModal('confirmModal'); confirmCallback(); };
+  openModal('confirmModal');
+}
+
+function updateOverviewModulesUI() {
+  const lbActive = document.getElementById('cfgLeaderboard')?.checked ?? true;
+  const wtActive = document.getElementById('cfgWatchtime')?.checked ?? true;
+  const gmActive = document.getElementById('cfgGames')?.checked ?? true;
+  const irActive = document.getElementById('cfgAutoresponse')?.checked ?? true;
+  
+  const setStatus = (id, active, name) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = active 
+        ? `${name} ✔` 
+        : `${name} ❌`;
+      el.style.color = active ? '#10B981' : 'var(--text-muted)';
+      el.style.textDecoration = active ? 'none' : 'line-through';
+      el.style.opacity = active ? '1' : '0.65';
+    }
+  };
+  
+  setStatus('ovStatusLeaderboard', lbActive, 'Leaderboard');
+  setStatus('ovStatusWatchtime', wtActive, 'Watchtime');
+  setStatus('ovStatusGames', gmActive, 'Mini igre');
+  setStatus('ovStatusInteraction', irActive, 'Interakcija');
+}
+
+let liveFeedInterval = null;
+function startLiveActivityFeed() {
+  const feed = document.getElementById('botLiveFeed');
+  if (!feed) return;
+
+  if (liveFeedInterval) {
+    clearInterval(liveFeedInterval);
+    liveFeedInterval = null;
   }
 
-  renderChannelList();
-  renderSettingsChannelList();
-  showToast('success', 'Kanal je uspešno uklonjen.', '🗑️');
+  feed.innerHTML = `
+    <div style="color: var(--text-muted); text-align: center; padding-top: 60px; font-style: italic; font-size: 0.85rem;">
+      Čekam prve aktivnosti...
+    </div>
+  `;
 }
 
 initAuth();
