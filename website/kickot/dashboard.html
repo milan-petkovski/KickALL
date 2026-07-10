@@ -5,14 +5,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kickot Dashboard</title>
-  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
   <meta name="description" content="Kickot bot control panel — upravljaj komandama, leaderboard-om i podešavanjima."/>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;700&display=swap"
     rel="stylesheet" />
-  <link rel="stylesheet" href="dashboard.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -22,7 +22,7 @@
   <div id="authGate" class="auth-gate">
     <div class="auth-gate-card">
       <div class="auth-gate-logo">
-        <img src="logo.png" alt="Kickot Logo" class="logo-img" style="height: 52px;">
+        <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 52px;">
       </div>
       <div class="auth-gate-spinner"></div>
       <p class="auth-gate-msg" id="authGateMsg">Proveravamo sesiju...</p>
@@ -36,7 +36,7 @@
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <a href="index.html" class="sidebar-logo">
-          <img src="logo.png" alt="Kickot Logo" class="logo-img" style="height: 38px;">
+          <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 38px;">
         </a>
       </div>
 
@@ -102,6 +102,7 @@
           </svg>
           Ugrađene komande
         </button>
+
         <button class="nav-item" data-panel="announces" onclick="switchPanel('announces')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
@@ -230,8 +231,19 @@
         <!-- ══ OVERVIEW ══ -->
         <section id="panel-overview" class="panel active">
           <div class="panel-header">
-            <h1 class="panel-title">Overview</h1>
-            <p class="panel-desc" id="overviewDesc">Pregled aktivnosti tvog kanala</p>
+            <div>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--app-primary-dim); color: var(--app-primary);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </div>
+                <span>Overview</span>
+              </h1>
+              <p class="panel-desc" id="overviewDesc">Pregled aktivnosti tvog kanala</p>
+            </div>
           </div>
 
           <div class="stats-grid">
@@ -404,7 +416,16 @@
         <section id="panel-commands" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title">Komande</h1>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--app-primary-dim); color: var(--app-primary);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="16 18 22 12 16 6" />
+                    <polyline points="8 6 2 12 8 18" />
+                  </svg>
+                </div>
+                <span>Komande</span>
+              </h1>
               <p class="panel-desc">Upravljaj prilagođenim komandama bota</p>
             </div>
             <button class="btn btn-primary" onclick="openNewCmdModal()">
@@ -415,50 +436,7 @@
             </button>
           </div>
 
-          <!-- Komande tabovi selector -->
-          <div class="commands-tabs"
-            style="display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-surface); padding: 0.375rem; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); max-width: fit-content;">
-            <button class="btn btn-sm btn-primary" id="cmdTabAll" onclick="setCommandsTab('all')"
-              style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="2" y1="12" x2="22" y2="12" />
-                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-              </svg>
-              Sve komande
-            </button>
-            <button class="btn btn-sm btn-outline" id="cmdTabSystem" onclick="setCommandsTab('system')"
-              style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round">
-                <polygon
-                  points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-              Specijalne (Kanal)
-            </button>
-            <button class="btn btn-sm btn-outline" id="cmdTabCustom" onclick="setCommandsTab('custom')"
-              style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              Korisničke
-            </button>
-            <button class="btn btn-sm btn-outline" id="cmdTabBuiltin" onclick="setCommandsTab('builtin')"
-              style="border-radius: var(--radius-md); padding: 0.5rem 1rem; display: flex; align-items: center; gap: 0.5rem; font-weight: 600;">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="11" width="18" height="10" rx="2" />
-                <circle cx="12" cy="5" r="2" />
-                <path d="M12 7v4" />
-                <line x1="8" y1="16" x2="8.01" y2="16" />
-                <line x1="16" y1="16" x2="16.01" y2="16" />
-              </svg>
-              Ugrađene (Bot)
-            </button>
-          </div>
+
 
           <div class="table-toolbar" id="cmdTableToolbar">
             <div class="search-wrap">
@@ -478,7 +456,6 @@
               <thead>
                 <tr>
                   <th>Komanda</th>
-                  <th>Tip</th>
                   <th>Odgovor</th>
                   <th>Cooldown</th>
                   <th>Korišćeno</th>
@@ -488,10 +465,40 @@
               </thead>
               <tbody id="commandsBody">
                 <tr>
-                  <td colspan="7" class="table-empty">Učitavanje...</td>
+                  <td colspan="6" class="table-empty">Učitavanje...</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <div class="pagination-bar"
+            style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.25rem; flex-wrap: wrap; gap: 15px; padding-top: 10px; border-top: 1px solid var(--border-subtle);">
+            <div
+              style="flex: 1; display: flex; justify-content: flex-start; align-items: center; gap: 8px; min-width: 150px;">
+              <span style="font-size: 0.8rem; color: var(--text-muted);">Prikaži:</span>
+              <select class="select-input" id="cmdLimitSelect" onchange="changeCommandsLimit(this.value)"
+                style="padding: 4px 8px; font-size: 0.8rem; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: var(--text-main);">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+
+            <div
+              style="flex: 1; display: flex; justify-content: center; align-items: center; gap: 8px; min-width: 250px;">
+              <button class="btn btn-sm btn-outline" id="cmdPrevPageBtn" onclick="changeCommandsPage(-1)"
+                style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">
+                ‹ Prethodna
+              </button>
+              <span id="cmdPageInfo"
+                style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; min-width: 100px; text-align: center;">Stranica 1 od 1</span>
+              <button class="btn btn-sm btn-outline" id="cmdNextPageBtn" onclick="changeCommandsPage(1)"
+                style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px;">
+                Sledeća ›
+              </button>
+            </div>
+
+            <div style="flex: 1; min-width: 150px;"></div>
           </div>
         </section>
 
@@ -499,14 +506,14 @@
         <section id="panel-leaderboard" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title" style="display: flex; align-items: center; gap: 10px;">
-                Leaderboard
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                  stroke-linecap="round" stroke-linejoin="round" style="color: #e2b522;">
-                  <line x1="18" y1="20" x2="18" y2="10" />
-                  <line x1="12" y1="20" x2="12" y2="4" />
-                  <line x1="6" y1="20" x2="6" y2="14" />
-                </svg>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: rgba(226, 181, 34, 0.1); color: #e2b522;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                  </svg>
+                </div>
+                <span>Leaderboard</span>
               </h1>
               <p class="panel-desc">Kompletan pregled aktivnosti, vremena gledanja i broja poslatih poruka za gledaoce
                 na jednom mestu.</p>
@@ -628,13 +635,15 @@
         <section id="panel-marriages" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title" style="display: flex; align-items: center; gap: 10px;">
-                Ljubav i brakovi
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                  stroke-linecap="round" stroke-linejoin="round" style="color: #F472B6;">
-                  <path
-                    d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-                </svg>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: rgba(244, 114, 182, 0.1); color: #F472B6;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path
+                      d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                  </svg>
+                </div>
+                <span>Ljubav i brakovi</span>
               </h1>
               <p class="panel-desc">Sve ljubavne komande, trenutni statusi parova i kompletan pregled aktivnih brakova
                 na jednom mestu.</p>
@@ -817,16 +826,18 @@
         <section id="panel-minigames" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title" style="display: flex; align-items: center; gap: 10px;">
-                Mini igre
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                  stroke-linecap="round" stroke-linejoin="round" style="color: var(--app-primary);">
-                  <rect x="2" y="6" width="20" height="12" rx="3"></rect>
-                  <line x1="6" y1="12" x2="10" y2="12"></line>
-                  <line x1="8" y1="10" x2="8" y2="14"></line>
-                  <line x1="15" y1="13" x2="15.01" y2="13"></line>
-                  <line x1="18" y1="11" x2="18.01" y2="11"></line>
-                </svg>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--app-primary-dim); color: var(--app-primary);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="6" width="20" height="12" rx="3"></rect>
+                    <line x1="6" y1="12" x2="10" y2="12"></line>
+                    <line x1="8" y1="10" x2="8" y2="14"></line>
+                    <line x1="15" y1="13" x2="15.01" y2="13"></line>
+                    <line x1="18" y1="11" x2="18.01" y2="11"></line>
+                  </svg>
+                </div>
+                <span>Mini igre</span>
               </h1>
               <p class="panel-desc">Pregled svih ugrađenih mini igara za tvoje gledaoce.</p>
             </div>
@@ -912,13 +923,15 @@
         <section id="panel-games" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title" style="display: flex; align-items: center; gap: 10px;">
-                Ugrađene bot komande
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                  stroke-linecap="round" stroke-linejoin="round" style="color: var(--app-primary);">
-                  <polyline points="4 17 10 11 4 5" />
-                  <line x1="12" y1="19" x2="20" y2="19" />
-                </svg>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--app-primary-dim); color: var(--app-primary);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="4 17 10 11 4 5" />
+                    <line x1="12" y1="19" x2="20" y2="19" />
+                  </svg>
+                </div>
+                <span>Ugrađene bot komande</span>
               </h1>
               <p class="panel-desc">Sve ugrađene podrazumevane komande koje bot podržava</p>
             </div>
@@ -1117,16 +1130,18 @@
         <section id="panel-autoresponse" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title" style="display: flex; align-items: center; gap: 10px;">
-                Bot interakcija
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                  stroke-linecap="round" stroke-linejoin="round" style="color: #6366F1;">
-                  <rect x="3" y="11" width="18" height="10" rx="2" />
-                  <circle cx="12" cy="5" r="2" />
-                  <path d="M12 7v4" />
-                  <line x1="8" y1="16" x2="8.01" y2="16" />
-                  <line x1="16" y1="16" x2="16.01" y2="16" />
-                </svg>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: rgba(139, 92, 246, 0.1); color: var(--app-primary);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="10" rx="2" />
+                    <circle cx="12" cy="5" r="2" />
+                    <path d="M12 7v4" />
+                    <line x1="8" y1="16" x2="8.01" y2="16" />
+                    <line x1="16" y1="16" x2="16.01" y2="16" />
+                  </svg>
+                </div>
+                <span>Bot interakcija</span>
               </h1>
               <p class="panel-desc">Bot odgovara na pitanja, uvrede, dosadu i druge ključne fraze</p>
             </div>
@@ -1350,13 +1365,15 @@
         <section id="panel-announces" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title" style="display: flex; align-items: center; gap: 10px;">
-                Automatske poruke
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                  stroke-linecap="round" stroke-linejoin="round" style="color: var(--kick-green);">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: rgba(139, 92, 246, 0.1); color: var(--app-primary);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                </div>
+                <span>Automatske poruke</span>
               </h1>
               <p class="panel-desc">Konfiguriši poruke koje bot automatski periodično šalje tokom tvog strima.</p>
             </div>
@@ -1473,7 +1490,16 @@
         <section id="panel-config" class="panel">
           <div class="panel-header">
             <div>
-              <h1 class="panel-title">Bot Config</h1>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--app-primary-dim); color: var(--app-primary);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
+                  </svg>
+                </div>
+                <span>Bot Config</span>
+              </h1>
               <p class="panel-desc">Podešavanja bota za izabrani kanal</p>
             </div>
           </div>
@@ -1749,13 +1775,15 @@
 
   <!-- Command Modal -->
   <div class="modal-backdrop" id="cmdModal" onclick="handleModalBg(event, 'cmdModal')">
-    <div class="modal-box">
-      <div class="modal-head">
-        <h3 style="display: flex; align-items: center; gap: 8px;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="4 17 10 11 4 5"></polyline>
-            <line x1="12" y1="19" x2="20" y2="19"></line>
-          </svg>
+    <div class="modal-box" style="max-width: 500px; width: 90%; padding: 0;">
+      <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--border-subtle);">
+        <h3 style="display: flex; align-items: center; gap: 10px;">
+          <div style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: var(--radius-sm); background: var(--app-primary-dim); color: var(--app-primary);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+          </div>
           <span id="cmdModalTitle">Nova komanda</span>
         </h3>
         <button class="modal-close" onclick="closeModal('cmdModal')">
@@ -1765,42 +1793,56 @@
           </svg>
         </button>
       </div>
-      <div class="modal-body">
+      
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px; padding: 24px; max-height: calc(85vh - 120px); overflow-y: auto;">
+        
+
+        <!-- Command Input -->
         <div class="form-group">
-          <label class="form-label">Komanda (Aliasi)</label>
-          <div class="cmd-input-wrap">
+          <label class="form-label" style="font-size: 0.85rem;">Komanda i aliasi</label>
+          <div class="cmd-input-wrap" style="margin-top: 6px;">
             <span class="cmd-prefix-badge" id="cmdPrefixBadge">!</span>
-            <input type="text" class="form-input" id="cmdName" placeholder="npr. instagram, insta, ig" />
+            <input type="text" class="form-input" id="cmdName" placeholder="npr. instagram, insta, ig" oninput="updateModalPreview()" />
           </div>
-          <span class="config-hint">Možeš uneti više aliasa odvojenih zarezom (npr. <code>setup, pc</code>)</span>
+          <span class="config-hint">Možeš uneti više aliasa odvojenih zarezom</span>
         </div>
+
+        <!-- Response -->
         <div class="form-group">
-          <label class="form-label">Odgovor bota</label>
-          <textarea class="form-input form-textarea" id="cmdResponse" rows="4"
-            placeholder="Bot će odgovoriti ovim tekstom kada neko ukuca komandu..."></textarea>
-          <div class="char-count"><span id="cmdCharCount">0</span>/500</div>
+          <label class="form-label" style="font-size: 0.85rem;">Odgovor bota</label>
+          <textarea class="form-input form-textarea" id="cmdResponse" rows="4" style="margin-top: 6px;"
+            placeholder="Bot će poslati ovaj tekst kada neko ukuca komandu..." oninput="updateModalPreview()"></textarea>
+          <div class="char-count" style="margin-top: 4px;"><span id="cmdCharCount">0</span>/500</div>
         </div>
+
+        <!-- Cooldown -->
         <div class="form-group">
-          <label class="form-label">Cooldown (ms)</label>
-          <input type="number" class="form-input" id="cmdCooldown" value="5000" min="0" max="600000" />
-          <span class="config-hint">0 = bez cooldown-a</span>
+          <label class="form-label" style="font-size: 0.85rem;">Vreme čekanja u milisekundama</label>
+          <div style="position: relative; display: flex; align-items: center; margin-top: 6px;">
+            <input type="number" class="form-input" id="cmdCooldown" value="5000" min="0" max="600000" style="padding-right: 48px; width: 100%;" oninput="updateCooldownLabel()" />
+            <span style="position: absolute; right: 12px; font-size: 0.75rem; color: var(--text-muted); font-weight: bold; pointer-events: none;">ms</span>
+          </div>
+          <span class="config-hint" id="cooldownSecondsLabel">5 sekundi čekanja</span>
         </div>
-        <div class="form-group toggle-row">
-          <span class="form-label">Aktivna komanda</span>
+
+        <!-- Status -->
+        <div class="form-group toggle-row" style="margin-top: 10px;">
+          <label class="form-label" style="font-size: 0.85rem; margin: 0;">Aktivna komanda</label>
           <label class="toggle-switch">
-            <input type="checkbox" id="cmdEnabled" checked>
+            <input type="checkbox" id="cmdEnabled" checked onchange="updateModalPreview()">
             <span class="toggle-track"></span>
           </label>
         </div>
-        <div class="form-alert" id="cmdModalError" style="display:none"></div>
+
+        <div class="form-alert" id="cmdModalError" style="display:none; margin: 0;"></div>
       </div>
-      <div class="modal-foot">
+      
+      <div class="modal-foot" style="padding: 20px 24px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; margin-top: 0;">
         <button class="btn btn-outline" onclick="closeModal('cmdModal')">Otkaži</button>
-        <button class="btn btn-primary" onclick="saveCommand()" id="saveCmdBtn">Sačuvaj</button>
+        <button class="btn btn-primary" onclick="saveCommand()" id="saveCmdBtn" style="padding: 10px 24px;">Sačuvaj</button>
       </div>
     </div>
   </div>
-
   <!-- Add Channel Modal -->
   <div class="modal-backdrop" id="addChannelModal" onclick="handleModalBg(event, 'addChannelModal')">
     <div class="modal-box">
@@ -1892,8 +1934,9 @@
         <button class="settings-tab active" id="setTabProfile" onclick="switchSettingsTab('profile')"
           style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-family: var(--font-heading); font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Profil</button>
         <button class="settings-tab" id="setTabChannels" onclick="switchSettingsTab('channels')"
-          style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-family: var(--font-heading); font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Kick
-          Kanali</button>
+          style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-family: var(--font-heading); font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Kick Kanali</button>
+        <button class="settings-tab" id="setTabManagers" onclick="switchSettingsTab('managers')"
+          style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-family: var(--font-heading); font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Menadžeri</button>
       </div>
 
       <div class="modal-body" style="padding: 0;">
@@ -1984,6 +2027,41 @@
           </div>
         </div>
 
+        <!-- PANEL 3: UPRAVLJANJE MENADŽERIMA -->
+        <div id="settingsManagersPanel" style="display: none; padding: 0 5px;">
+          <!-- Owner View -->
+          <div id="settingsManagersOwnerView">
+            <div class="form-group" style="margin-bottom: 12px;">
+              <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase;">
+                Dodaj menadžera za aktivni kanal
+              </label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="settingsNewManagerInput" class="form-control" placeholder="Kick username menadžera" style="flex: 1;" />
+                <button class="btn btn-primary btn-sm" onclick="addNewManager()" id="settingsAddManagerBtn" style="white-space: nowrap;">Dodaj</button>
+              </div>
+              <div class="ch-error-msg" id="settingsAddManagerError" style="color: #f87171; font-size: 0.8rem; margin-top: 4px; display: none;"></div>
+              <span class="config-hint" style="margin-top: 4px; display: block;">Unesi Kick korisničko ime osobe koja već ima nalog na sajtu.</span>
+            </div>
+
+            <div style="max-height: 200px; overflow-y: auto; margin-top: 15px;">
+              <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+                Aktivni menadžeri
+              </label>
+              <div id="settingsManagerList" style="display: flex; flex-direction: column; gap: 8px;">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+          <!-- Guest View -->
+          <div id="settingsManagersGuestView" style="display: none; text-align: center; padding: 20px 10px; color: var(--text-muted);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 8px; opacity: 0.5;">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <p style="font-size: 0.85rem; line-height: 1.4;">Samo vlasnik kanala može da upravlja menadžerima.</p>
+          </div>
+        </div>
+
       </div>
       <div class="modal-foot"
         style="border-top: none; padding-top: 15px; margin-top: 0; padding-bottom: 0; display: flex; gap: 8px; width: 100%;">
@@ -1998,7 +2076,7 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <script src="dashboard.js"></script>
+  <script src="js/dashboard.js"></script>
 </body>
 
 </html>

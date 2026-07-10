@@ -12,7 +12,14 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 // ── State ─────────────────────────────────────────────────
 let currentUser = null;
 let currentChannels = [];   // [{id, username, is_primary}]
+let managedChannels = [];   // [{id, username, avatar, is_managed: true, owner_id}]
 let activeChannel = null; // {id, username}
+function getChannelOwnerId() {
+  if (activeChannel && activeChannel.is_managed && activeChannel.owner_id) {
+    return activeChannel.owner_id;
+  }
+  return currentUser ? currentUser.id : null;
+}
 let allCommands = [];   // cached custom commands
 let allLeaderboard = [];   // cached leaderboard rows
 let allWatchtime = [];   // cached watchtime rows
@@ -97,34 +104,12 @@ let configLoaded = false;
 let localAnnounces = [];   // cached auto-announce messages
 let activeLeaderboardType = localStorage.getItem('active-leaderboard-tab') || 'combined'; // 'chatters', 'watchtime', 'combined'
 let activeMiniLbTab = 'combined'; // 'combined', 'chatters', 'watchtime'
-let activeCommandsTab = 'all'; // 'all', 'system', 'custom', 'builtin'
+let activeCommandsTab = 'custom'; // only custom commands are used now
 let liveStatusInterval = null; // polling interval for live status
 let leaderboardPage = 1;
 let leaderboardLimit = parseInt(localStorage.getItem('lb-items-per-page')) || 15;
-
-// ── Built-in commands reference ────────────────────────────
-const BUILTIN_COMMANDS = [
-  { cmd: '!aktivnost', desc: 'Tvoja aktivnost ovog meseca' },
-  { cmd: '!top', desc: 'Top 10 aktivnih gledalaca' },
-  { cmd: '!watchtime', desc: 'Tvoj ukupni watchtime' },
-  { cmd: '!topwatchtime', desc: 'Top 10 gledalaca po watchtime-u' },
-  { cmd: '!vreme', desc: 'Prognoza vremena za grad' },
-  { cmd: '!posaljiljubav', desc: 'Pošalji ljubav korisniku (+2% kompatibilnosti, 10m cooldown)' },
-  { cmd: '!bacihejt', desc: 'Baci hejt na korisnika (-5% kompatibilnosti, 10m cooldown)' },
-  { cmd: '!love', desc: 'Prikaži ljubavni status između korisnika' },
-  { cmd: '!cooldown', desc: 'Proveri preostali ljubavni cooldown' },
-  { cmd: '!vencaj', desc: 'Pošalji zahtev za brak ako je ljubav iznad 90%' },
-  { cmd: '!prihvati', desc: 'Prihvati zahtev za brak u roku od 60 sekundi' },
-  { cmd: '!odbij', desc: 'Odbij zahtev za brak' },
-  { cmd: '!razvod', desc: 'Razvedi se od partnera' },
-  { cmd: '!brakovi', desc: 'Prikaži aktivne brakove u kanalu' },
-  { cmd: '!samar', desc: 'Pošalji šamar korisniku' },
-  { cmd: '!roll', desc: 'Slučajni roll / dvoboj' },
-  { cmd: '!duel', desc: 'Izazovi nekoga na duel' },
-  { cmd: '!iq', desc: 'Izmeri IQ korisnika' },
-  { cmd: '!rulet', desc: 'Igraj ruski rulet' },
-  { cmd: '!info', desc: 'Nasumična zanimljivost' },
-];
+let commandsPage = 1;
+let commandsLimit = parseInt(localStorage.getItem('cmd-items-per-page')) || 10;
 
 // ═══════════════════════════════════════════════════════════
 // AUTH GUARD
@@ -188,7 +173,6 @@ async function initApp() {
     showNoChannelState();
   }
 
-  renderBuiltinCommands();
   populateMonthSelector();
 }
 
@@ -199,7 +183,9 @@ async function loadUserProfile() {
     .eq('id', currentUser.id)
     .maybeSingle();
 
+  let myUsername = '';
   if (data) {
+    myUsername = data.display_name || '';
     document.getElementById('sidebarPlan').textContent =
       (data.plan || 'free').charAt(0).toUpperCase() + (data.plan || 'free').slice(1);
 
@@ -224,11 +210,39 @@ async function loadUserProfile() {
           .eq('id', currentUser.id);
       }
     }
+  }
 
-    if (currentChannels.length > 0) {
-      const primary = currentChannels.find(c => c.is_primary) || currentChannels[0];
-      setActiveChannel(primary);
+  // Učitavanje kanala kojima upravljamo (menadžeri)
+  managedChannels = [];
+  try {
+    const { data: allProfiles } = await sb.from('user_profiles').select('*');
+    if (allProfiles && myUsername) {
+      allProfiles.forEach(p => {
+        if (p.id === currentUser.id) return; // preskoči sopstveni profil
+        const channels = p.kick_channels || [];
+        channels.forEach(ch => {
+          if (ch.managers && ch.managers.map(m => m.toLowerCase()).includes(myUsername.toLowerCase())) {
+            managedChannels.push({
+              ...ch,
+              owner_id: p.id,
+              is_managed: true
+            });
+          }
+        });
+      });
     }
+  } catch (err) {
+    console.error('Failed to load managed channels:', err);
+  }
+
+  if (currentChannels.length > 0) {
+    const primary = currentChannels.find(c => c.is_primary) || currentChannels[0];
+    setActiveChannel(primary);
+  } else if (managedChannels.length > 0) {
+    setActiveChannel(managedChannels[0]);
+  } else {
+    // No channel configured — prompt
+    showNoChannelState();
   }
 
   renderChannelList();
@@ -350,27 +364,67 @@ function renderChannelList() {
   if (!list) return;
   list.innerHTML = '';
 
+  // 1. Tvoji kanali (own channels)
+  const ownHeader = document.createElement('div');
+  ownHeader.style = 'padding: 6px 12px 2px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.03); margin-bottom: 4px;';
+  ownHeader.textContent = 'Tvoji kanali';
+  list.appendChild(ownHeader);
+
   if (currentChannels.length === 0) {
-    list.innerHTML = '<div style="padding:0.5rem 0.75rem;font-size:0.8125rem;color:var(--text-muted)">Nema dodanih kanala</div>';
-    return;
+    const emptyOwn = document.createElement('div');
+    emptyOwn.style = 'padding: 6px 12px; font-size: 0.8rem; color: var(--text-muted);';
+    emptyOwn.textContent = 'Nema dodatih kanala';
+    list.appendChild(emptyOwn);
+  } else {
+    currentChannels.forEach(ch => {
+      const div = document.createElement('div');
+      div.className = 'channel-option' + (activeChannel?.id === ch.id ? ' selected' : '');
+
+      const avatarHtml = ch.avatar
+        ? `<div class="channel-avatar" style="width:22px;height:22px;background-image:url('${ch.avatar}');background-size:cover;background-position:center;border-radius:50%"></div>`
+        : `<div class="channel-avatar" style="width:22px;height:22px;font-size:0.65rem;border-radius:50%">${ch.username.charAt(0).toUpperCase()}</div>`;
+
+      div.innerHTML = `
+        ${avatarHtml}
+        <span class="ch-name">${ch.username}</span>
+        ${activeChannel?.id === ch.id ? '<span class="ch-check">✓</span>' : ''}
+      `;
+      div.onclick = () => selectChannel(ch);
+      list.appendChild(div);
+    });
   }
 
-  currentChannels.forEach(ch => {
-    const div = document.createElement('div');
-    div.className = 'channel-option' + (activeChannel?.id === ch.id ? ' selected' : '');
+  // 2. Kanali kojima upravljaš (managed channels)
+  const managedHeader = document.createElement('div');
+  managedHeader.style = 'padding: 10px 12px 2px; font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.03); margin-bottom: 4px;';
+  managedHeader.textContent = 'Kanali kojima upravljaš';
+  list.appendChild(managedHeader);
 
-    const avatarHtml = ch.avatar
-      ? `<div class="channel-avatar" style="width:22px;height:22px;background-image:url('${ch.avatar}');background-size:cover;background-position:center;border-radius:50%"></div>`
-      : `<div class="channel-avatar" style="width:22px;height:22px;font-size:0.65rem;border-radius:50%">${ch.username.charAt(0).toUpperCase()}</div>`;
+  if (managedChannels.length === 0) {
+    const emptyManaged = document.createElement('div');
+    emptyManaged.style = 'padding: 6px 12px; font-size: 0.8rem; color: var(--text-muted);';
+    emptyManaged.textContent = 'Nema kanala za upravljanje';
+    list.appendChild(emptyManaged);
+  } else {
+    managedChannels.forEach(ch => {
+      const div = document.createElement('div');
+      div.className = 'channel-option' + (activeChannel?.id === ch.id ? ' selected' : '');
 
-    div.innerHTML = `
-      ${avatarHtml}
-      <span class="ch-name">${ch.username}</span>
-      ${activeChannel?.id === ch.id ? '<span class="ch-check">✓</span>' : ''}
-    `;
-    div.onclick = () => selectChannel(ch);
-    list.appendChild(div);
-  });
+      const avatarHtml = ch.avatar
+        ? `<div class="channel-avatar" style="width:22px;height:22px;background-image:url('${ch.avatar}');background-size:cover;background-position:center;border-radius:50%"></div>`
+        : `<div class="channel-avatar" style="width:22px;height:22px;font-size:0.65rem;border-radius:50%">${ch.username.charAt(0).toUpperCase()}</div>`;
+
+      div.innerHTML = `
+        ${avatarHtml}
+        <span class="ch-name" style="display: flex; align-items: center; gap: 4px;">
+          ${ch.username} <span style="font-size: 0.75rem;" title="Menadžer kanala">🛠️</span>
+        </span>
+        ${activeChannel?.id === ch.id ? '<span class="ch-check">✓</span>' : ''}
+      `;
+      div.onclick = () => selectChannel(ch);
+      list.appendChild(div);
+    });
+  }
 }
 
 async function selectChannel(ch) {
@@ -544,39 +598,17 @@ async function loadCommands() {
 
   const { data, error } = await sb.from('custom_commands')
     .select('*')
-    .eq('user_id', currentUser.id)
+    .eq('user_id', getChannelOwnerId())
     .eq('channel_id', activeChannel.id)
     .order('created_at', { ascending: false });
 
   if (error) { console.error('Commands:', error); return; }
   allCommands = data || [];
   renderMiniCommands(allCommands);
-  document.getElementById('cmdCount').textContent = allCommands.length;
-  document.getElementById('statCmdCount').textContent = allCommands.length;
-
-  renderUnifiedCommands();
-}
-
-function setCommandsTab(tab) {
-  activeCommandsTab = tab;
-
-  // Promeni aktivne klase na tab dugmadima
-  const tabs = {
-    all: document.getElementById('cmdTabAll'),
-    system: document.getElementById('cmdTabSystem'),
-    custom: document.getElementById('cmdTabCustom'),
-    builtin: document.getElementById('cmdTabBuiltin')
-  };
-
-  Object.keys(tabs).forEach(k => {
-    if (tabs[k]) {
-      tabs[k].className = k === tab ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
-    }
-  });
-
-  // Očisti pretragu
-  const searchInput = document.getElementById('cmdSearchInput');
-  if (searchInput) searchInput.value = '';
+  const cmdCountEl = document.getElementById('cmdCount');
+  if (cmdCountEl) cmdCountEl.textContent = allCommands.length;
+  const statCmdCountEl = document.getElementById('statCmdCount');
+  if (statCmdCountEl) statCmdCountEl.textContent = allCommands.length;
 
   renderUnifiedCommands();
 }
@@ -585,99 +617,78 @@ function renderUnifiedCommands(customCmds = null) {
   const tbody = document.getElementById('commandsBody');
   if (!tbody) return;
 
-  let rows = [];
-  const tab = activeCommandsTab;
-
-  if (tab === 'builtin') {
-    // Renderovanje ugrađenih bot komandi
-    rows = BUILTIN_COMMANDS.map(c => ({
-      command: c.cmd.slice(1),
-      response: c.desc,
-      cooldown_ms: 3000,
-      uses_count: '—',
-      enabled: true,
-      is_default: false,
-      is_builtin: true
-    }));
-  } else {
-    // Filtriranje podataka iz baze
-    let source = customCmds || allCommands;
-    if (tab === 'system') {
-      rows = source.filter(c => c.is_default);
-    } else if (tab === 'custom') {
-      rows = source.filter(c => !c.is_default);
-    } else {
-      rows = source;
-    }
-  }
+  let rows = customCmds || allCommands;
 
   updateCmdTableMeta(rows.length);
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" class="table-empty">Nema komandi za prikaz u ovoj kategoriji.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Nema komandi za prikaz.</td></tr>';
+    const prevBtn = document.getElementById('cmdPrevPageBtn');
+    const nextBtn = document.getElementById('cmdNextPageBtn');
+    const pageInfo = document.getElementById('cmdPageInfo');
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    if (pageInfo) pageInfo.textContent = 'Stranica 1 od 1';
     return;
   }
 
-  tbody.innerHTML = rows.map(cmd => {
+  // Pagination calculation
+  const totalPages = Math.ceil(rows.length / commandsLimit) || 1;
+  if (commandsPage > totalPages) commandsPage = totalPages;
+  if (commandsPage < 1) commandsPage = 1;
+
+  const startIndex = (commandsPage - 1) * commandsLimit;
+  const pageRows = rows.slice(startIndex, startIndex + commandsLimit);
+
+  // Update buttons and page info
+  const prevBtn = document.getElementById('cmdPrevPageBtn');
+  const nextBtn = document.getElementById('cmdNextPageBtn');
+  const pageInfo = document.getElementById('cmdPageInfo');
+  const limitSelect = document.getElementById('cmdLimitSelect');
+
+  if (limitSelect) limitSelect.value = commandsLimit;
+  if (pageInfo) pageInfo.textContent = `Stranica ${commandsPage} od ${totalPages}`;
+  if (prevBtn) prevBtn.disabled = commandsPage === 1;
+  if (nextBtn) nextBtn.disabled = commandsPage === totalPages;
+
+  tbody.innerHTML = pageRows.map(cmd => {
     // Više aliasa prikazujemo kao zasebne bedževe
     const cmdBadges = cmd.command.split(',').map(c => `<span class="td-cmd">!${escapeHtml(c.trim())}</span>`).join(' ');
 
-    // Tip bedž
-    let typeBadge = '';
-    if (cmd.is_builtin) {
-      typeBadge = '<span class="badge-type badge-builtin">🤖 Default (Bot)</span>';
-    } else if (cmd.is_default) {
-      typeBadge = '<span class="badge-type badge-system">⭐ Specijalna (Kanal)</span>';
-    } else {
-      typeBadge = '<span class="badge-type badge-custom">👤 Korisnička</span>';
-    }
+    // Akcije i prebacivanje statusa
+    let actionsHtml = '';
+    let statusHtml = `
+      <span class="status-pill ${cmd.enabled ? 'status-active' : 'status-inactive'}">
+        <span class="status-dot ${cmd.enabled ? 'status-on' : 'status-off'}"></span>
+        ${cmd.enabled ? 'Aktivna' : 'Isključena'}
+      </span>
+    `;
 
-    // Akcije i prebacivanje statusa su onemogućeni za ugrađene komande
-    let actionsHtml = '—';
-    let statusHtml = '';
+    const toggleIcon = cmd.enabled
+      ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>`
+      : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`;
 
-    if (cmd.is_builtin) {
-      statusHtml = `
-        <span class="status-pill status-active" style="opacity: 0.7">
-          <span class="status-dot status-on"></span>
-          Aktivna
-        </span>
-      `;
-    } else {
-      statusHtml = `
-        <span class="status-pill ${cmd.enabled ? 'status-active' : 'status-inactive'}">
-          <span class="status-dot ${cmd.enabled ? 'status-on' : 'status-off'}"></span>
-          ${cmd.enabled ? 'Aktivna' : 'Isključena'}
-        </span>
-      `;
+    const editIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
 
-      const toggleIcon = cmd.enabled
-        ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>`
-        : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`;
+    const deleteIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
 
-      const editIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`;
-
-      const deleteIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
-
-      actionsHtml = `
-        <div class="actions-cell">
-          <button class="action-btn" onclick="toggleCommand('${cmd.id}', ${cmd.enabled})" title="${cmd.enabled ? 'Isključi' : 'Uključi'}">
-            ${toggleIcon}
-          </button>
-          <button class="action-btn" onclick="editCommand('${cmd.id}')" title="Izmeni">
-            ${editIcon}
-          </button>
-          <button class="action-btn danger" onclick="deleteCommandConfirm('${cmd.id}', '!${escapeHtml(cmd.command)}')" title="Obriši">
-            ${deleteIcon}
-          </button>
-        </div>
-      `;
-    }
+    actionsHtml = `
+      <div class="actions-cell">
+        <button class="action-btn" onclick="toggleCommand('${cmd.id}', ${cmd.enabled})" title="${cmd.enabled ? 'Isključi' : 'Uključi'}">
+          ${toggleIcon}
+        </button>
+        <button class="action-btn" onclick="editCommand('${cmd.id}')" title="Izmeni">
+          ${editIcon}
+        </button>
+        <button class="action-btn danger" onclick="deleteCommandConfirm('${cmd.id}', '!${escapeHtml(cmd.command)}')" title="Obriši">
+          ${deleteIcon}
+        </button>
+      </div>
+    `;
 
     return `
       <tr>
         <td><div class="cmd-badge-list">${cmdBadges}</div></td>
-        <td>${typeBadge}</td>
         <td><span class="td-response" title="${escapeHtml(cmd.response)}">${escapeHtml(cmd.response)}</span></td>
         <td class="td-num">${(cmd.cooldown_ms / 1000).toFixed(0)}s</td>
         <td class="td-num">${cmd.uses_count ?? 0}</td>
@@ -688,11 +699,23 @@ function renderUnifiedCommands(customCmds = null) {
   }).join('');
 }
 
+function changeCommandsPage(dir) {
+  commandsPage += dir;
+  renderUnifiedCommands();
+}
+
+function changeCommandsLimit(limit) {
+  commandsLimit = parseInt(limit);
+  localStorage.setItem('cmd-items-per-page', limit);
+  commandsPage = 1;
+  renderUnifiedCommands();
+}
+
 function renderMiniCommands(cmds) {
   const el = document.getElementById('miniCommands');
   if (!el) return;
 
-  // Prikaži specijalne i prilagođene komande (ne ugrađene bot komande)
+  // Prikaži specijalne i prilagođene komande
   const customOnly = cmds.filter(c => !c.is_builtin);
 
   if (customOnly.length === 0) {
@@ -715,45 +738,17 @@ function renderMiniCommands(cmds) {
 }
 
 function filterCommands(query) {
+  commandsPage = 1;
   const q = query.toLowerCase();
-  const tab = activeCommandsTab;
-
-  if (tab === 'builtin') {
-    // Filtriranje ugrađenih
-    const filtered = BUILTIN_COMMANDS.filter(c =>
-      c.cmd.toLowerCase().includes(q) ||
-      c.desc.toLowerCase().includes(q)
-    ).map(c => ({
-      command: c.cmd.slice(1),
-      response: c.desc,
-      cooldown_ms: 3000,
-      uses_count: '—',
-      enabled: true,
-      is_default: false,
-      is_builtin: true
-    }));
-    renderUnifiedCommands(filtered);
-  } else {
-    // Filtriranje custom iz baze
-    let source = allCommands;
-    if (tab === 'system') {
-      source = allCommands.filter(c => c.is_default);
-    } else if (tab === 'custom') {
-      source = allCommands.filter(c => !c.is_default);
-    }
-
-    const filtered = source.filter(c =>
-      c.command.toLowerCase().includes(q) ||
-      c.response.toLowerCase().includes(q)
-    );
-    renderUnifiedCommands(filtered);
-  }
+  const filtered = allCommands.filter(c =>
+    c.command.toLowerCase().includes(q) ||
+    c.response.toLowerCase().includes(q)
+  );
+  renderUnifiedCommands(filtered);
 }
 
 function updateCmdTableMeta(n) {
-  const tab = activeCommandsTab;
-  const label = tab === 'builtin' ? 'ugrađenih komandi' : 'prilagođenih komandi';
-  document.getElementById('cmdTableMeta').textContent = `${n} ${label}`;
+  document.getElementById('cmdTableMeta').textContent = `${n} prilagođenih komandi`;
 }
 
 // ── Leaderboard ───────────────────────────────────────────
@@ -1389,7 +1384,7 @@ async function loadBotConfig() {
 
   const { data, error } = await sb.from('bot_config')
     .select('*')
-    .eq('user_id', currentUser.id)
+    .eq('user_id', getChannelOwnerId())
     .eq('channel_id', activeChannel.id)
     .maybeSingle();
 
@@ -1439,7 +1434,7 @@ async function saveBotConfig() {
   if (!activeChannel) { showToast('error', 'Nema izabranog kanala', '❌'); return; }
 
   const config = {
-    user_id: currentUser.id,
+    user_id: getChannelOwnerId(),
     channel_id: activeChannel.id,
     channel_name: activeChannel.username,
     prefix: document.getElementById('cfgPrefix').value || '!',
@@ -1535,7 +1530,7 @@ async function loadBotStatus() {
   if (!activeChannel) return;
   const { data } = await sb.from('bot_config')
     .select('bot_active')
-    .eq('user_id', currentUser.id)
+    .eq('user_id', getChannelOwnerId())
     .eq('channel_id', activeChannel.id)
     .maybeSingle();
   if (data) updateBotStatusUI(data.bot_active || false);
@@ -1592,7 +1587,7 @@ async function toggleBotActive() {
 
   const { error } = await sb.from('bot_config')
     .upsert({
-      user_id: currentUser.id,
+      user_id: getChannelOwnerId(),
       channel_id: activeChannel.id,
       channel_name: activeChannel.username,
       bot_active: active,
@@ -1715,6 +1710,9 @@ function openNewCmdModal() {
   document.getElementById('cmdCharCount').textContent = '0';
   document.getElementById('cmdModalError').style.display = 'none';
   document.getElementById('saveCmdBtn').textContent = 'Sačuvaj';
+
+  updateModalPreview();
+  updateCooldownLabel();
   openModal('cmdModal');
 }
 
@@ -1731,7 +1729,58 @@ function editCommand(id) {
   document.getElementById('cmdCharCount').textContent = cmd.response.length;
   document.getElementById('cmdModalError').style.display = 'none';
   document.getElementById('saveCmdBtn').textContent = 'Sačuvaj izmene';
+
+  updateModalPreview();
+  updateCooldownLabel();
   openModal('cmdModal');
+}
+
+function updateModalPreview() {
+  const response = document.getElementById('cmdResponse').value;
+  const charCountEl = document.getElementById('cmdCharCount');
+  if (charCountEl) {
+    charCountEl.textContent = response.length;
+    if (response.length > 500) {
+      charCountEl.style.color = '#EF4444';
+    } else {
+      charCountEl.style.color = 'var(--text-muted)';
+    }
+  }
+
+  const rawCommand = document.getElementById('cmdName').value.trim();
+  const enabled = document.getElementById('cmdEnabled').checked;
+
+  const firstAlias = rawCommand.split(',')[0].trim().replace(/^!/, '').toLowerCase();
+  const triggerDisplay = firstAlias ? `!${firstAlias}` : '!komanda';
+  const previewTriggerTextEl = document.getElementById('previewTriggerText');
+  if (previewTriggerTextEl) previewTriggerTextEl.textContent = triggerDisplay;
+
+  const responseDisplay = response.trim() || 'Bot će poslati ovaj tekst kada neko ukuca komandu...';
+  const previewBotResponseTextEl = document.getElementById('previewBotResponseText');
+  if (previewBotResponseTextEl) previewBotResponseTextEl.textContent = responseDisplay;
+
+  const botMsgEl = document.getElementById('previewBotMsg');
+  if (botMsgEl) {
+    botMsgEl.style.opacity = enabled ? '1' : '0.35';
+  }
+}
+
+function updateCooldownLabel() {
+  const val = parseInt(document.getElementById('cmdCooldown').value);
+  const labelEl = document.getElementById('cooldownSecondsLabel');
+  if (!labelEl) return;
+  
+  if (isNaN(val) || val < 0) {
+    labelEl.textContent = '0 sekundi cooldown-a';
+    return;
+  }
+  if (val === 0) {
+    labelEl.textContent = 'Bez cooldown-a';
+    return;
+  }
+  const seconds = (val / 1000).toFixed(1);
+  const secondsStr = seconds.endsWith('.0') ? seconds.slice(0, -2) : seconds;
+  labelEl.textContent = `${secondsStr} sekundi cooldown-a`;
 }
 
 async function saveCommand() {
@@ -1758,13 +1807,7 @@ async function saveCommand() {
 
   const command = enteredAliases.join(', ');
 
-  // Check builtin conflict za svaki uneti alias
-  const builtinNames = BUILTIN_COMMANDS.map(c => c.cmd.slice(1));
-  const conflictBuiltin = enteredAliases.find(a => builtinNames.includes(a));
-  if (conflictBuiltin) {
-    errEl.textContent = `Komanda "!${conflictBuiltin}" je ugrađena i ne može se zameniti.`;
-    errEl.style.display = 'block'; return;
-  }
+
 
   // Check duplicate za svaki uneti alias sa drugim custom komandama
   const otherCmds = allCommands.filter(c => c.id !== editingCmdId);
@@ -1788,7 +1831,7 @@ async function saveCommand() {
   setLoading('saveCmdBtn', true);
 
   const payload = {
-    user_id: currentUser.id,
+    user_id: getChannelOwnerId(),
     channel_id: activeChannel.id,
     command,
     response,
@@ -1853,18 +1896,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ── Built-in commands reference ────────────────────────────
-function renderBuiltinCommands() {
-  const grid = document.getElementById('builtinGrid');
-  if (!grid) return;
 
-  grid.innerHTML = BUILTIN_COMMANDS.map(c => `
-    <div class="builtin-card">
-      <span class="builtin-cmd">${c.cmd}</span>
-      <span class="builtin-desc">${c.desc}</span>
-    </div>
-  `).join('');
-}
 
 // ═══════════════════════════════════════════════════════════
 // NAVIGATION
@@ -1876,7 +1908,6 @@ const PANEL_NAMES = {
   watchtime: 'Watchtime',
   marriages: 'Ljubav i brakovi',
   minigames: 'Mini igre',
-  games: 'Ugrađene komande',
   autoresponse: 'Bot interakcija',
   announces: 'Automatske poruke',
   config: 'Bot Config',
@@ -2336,22 +2367,185 @@ async function handleSaveSettings() {
 function switchSettingsTab(tabName) {
   const tabProfile = document.getElementById('setTabProfile');
   const tabChannels = document.getElementById('setTabChannels');
+  const tabManagers = document.getElementById('setTabManagers');
+  
   const panelProfile = document.getElementById('settingsProfilePanel');
   const panelChannels = document.getElementById('settingsChannelsPanel');
+  const panelManagers = document.getElementById('settingsManagersPanel');
 
-  if (!tabProfile || !tabChannels || !panelProfile || !panelChannels) return;
+  if (!tabProfile || !tabChannels || !tabManagers || !panelProfile || !panelChannels || !panelManagers) return;
+
+  // Reset active states
+  tabProfile.classList.remove('active');
+  tabChannels.classList.remove('active');
+  tabManagers.classList.remove('active');
+
+  panelProfile.style.display = 'none';
+  panelChannels.style.display = 'none';
+  panelManagers.style.display = 'none';
 
   if (tabName === 'profile') {
     tabProfile.classList.add('active');
-    tabChannels.classList.remove('active');
     panelProfile.style.display = 'block';
-    panelChannels.style.display = 'none';
-  } else {
-    tabProfile.classList.remove('active');
+  } else if (tabName === 'channels') {
     tabChannels.classList.add('active');
-    panelProfile.style.display = 'none';
     panelChannels.style.display = 'block';
     renderSettingsChannelList();
+  } else if (tabName === 'managers') {
+    tabManagers.classList.add('active');
+    panelManagers.style.display = 'block';
+    renderSettingsManagersList();
+  }
+}
+
+function renderSettingsManagersList() {
+  const listEl = document.getElementById('settingsManagerList');
+  const ownerView = document.getElementById('settingsManagersOwnerView');
+  const guestView = document.getElementById('settingsManagersGuestView');
+  if (!listEl || !ownerView || !guestView) return;
+
+  // Proveri da li smo mi vlasnik ovog kanala
+  const isManaged = activeChannel && activeChannel.is_managed === true;
+  if (isManaged) {
+    ownerView.style.display = 'none';
+    guestView.style.display = 'block';
+    return;
+  }
+
+  ownerView.style.display = 'block';
+  guestView.style.display = 'none';
+  listEl.innerHTML = '';
+
+  const managers = activeChannel?.managers || [];
+
+  if (managers.length === 0) {
+    listEl.innerHTML = '<div style="padding:10px;font-size:0.85rem;color:var(--text-muted);text-align:center;">Nema aktivnih menadžera za ovaj kanal.</div>';
+    return;
+  }
+
+  managers.forEach(m => {
+    const item = document.createElement('div');
+    item.className = 'modal-channel-item';
+    item.style = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: 6px;';
+
+    item.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--app-gradient);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;">
+          ${m.charAt(0).toUpperCase()}
+        </div>
+        <span style="font-weight:600;font-size:0.85rem;">${escapeHtml(m)}</span>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="removeChannelManager('${escapeHtml(m)}')" style="padding: 2px 8px; font-size: 0.75rem;">Ukloni</button>
+    `;
+    listEl.appendChild(item);
+  });
+}
+
+async function addNewManager() {
+  const input = document.getElementById('settingsNewManagerInput');
+  const errEl = document.getElementById('settingsAddManagerError');
+  if (!input || !errEl) return;
+  
+  errEl.style.display = 'none';
+  const username = input.value.trim().toLowerCase();
+  
+  if (!username) {
+    errEl.textContent = 'Unesi Kick korisničko ime.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('settingsAddManagerBtn');
+  if (btn) btn.disabled = true;
+
+  try {
+    const { data: profileUser, error: profileErr } = await sb.from('user_profiles')
+      .select('id, display_name')
+      .eq('display_name', username)
+      .maybeSingle();
+
+    if (profileErr || !profileUser) {
+      errEl.textContent = 'Ovaj korisnik nema kreiran nalog na našem sajtu.';
+      errEl.style.display = 'block';
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    // Dobavi naše korisničko ime iz sopstvenog profila
+    const { data: myProfile } = await sb.from('user_profiles').select('display_name').eq('id', currentUser.id).maybeSingle();
+    const myName = myProfile?.display_name || '';
+
+    if (username === myName.toLowerCase()) {
+      errEl.textContent = 'Ne možeš dodati samog sebe kao menadžera.';
+      errEl.style.display = 'block';
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    if (!activeChannel.managers) activeChannel.managers = [];
+    
+    if (activeChannel.managers.map(m => m.toLowerCase()).includes(username)) {
+      errEl.textContent = 'Korisnik je već menadžer ovog kanala.';
+      errEl.style.display = 'block';
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    activeChannel.managers.push(username);
+
+    const updatedChannels = currentChannels.map(c => {
+      if (c.id === activeChannel.id) {
+        return { ...c, managers: activeChannel.managers };
+      }
+      return c;
+    });
+
+    const { error: updateErr } = await sb.from('user_profiles')
+      .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+      .eq('id', currentUser.id);
+
+    if (updateErr) throw updateErr;
+
+    currentChannels = updatedChannels;
+    input.value = '';
+    showToast('success', `Korisnik @${username} je dodat kao menadžer!`, '✅');
+    renderSettingsManagersList();
+
+  } catch (err) {
+    console.error('Failed to add manager:', err);
+    errEl.textContent = 'Greška pri dodavanju menadžera. Pokušaj ponovo.';
+    errEl.style.display = 'block';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function removeChannelManager(username) {
+  if (!confirm(`Da li sigurno želiš da ukloniš menadžera @${username}?`)) return;
+
+  try {
+    activeChannel.managers = (activeChannel.managers || []).filter(m => m.toLowerCase() !== username.toLowerCase());
+
+    const updatedChannels = currentChannels.map(c => {
+      if (c.id === activeChannel.id) {
+        return { ...c, managers: activeChannel.managers };
+      }
+      return c;
+    });
+
+    const { error: updateErr } = await sb.from('user_profiles')
+      .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+      .eq('id', currentUser.id);
+
+    if (updateErr) throw updateErr;
+
+    currentChannels = updatedChannels;
+    showToast('success', `Menadžer @${username} je uklonjen.`, '✅');
+    renderSettingsManagersList();
+
+  } catch (err) {
+    console.error('Failed to remove manager:', err);
+    showToast('error', 'Greška pri uklanjanju menadžera.', '❌');
   }
 }
 

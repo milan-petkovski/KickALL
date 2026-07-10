@@ -468,20 +468,84 @@ document.querySelectorAll('.cmd-item').forEach(item => {
   });
 });
 
+// ── Auth Helper Functions ──────────────────────────────────
+function validateEmail(email) {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email);
+}
+
+function clearAllErrors() {
+  document.querySelectorAll('.field-error').forEach(el => {
+    el.textContent = '';
+    el.classList.remove('visible');
+  });
+  document.querySelectorAll('.form-input').forEach(el => {
+    el.classList.remove('error');
+  });
+  document.querySelectorAll('.form-alert').forEach(el => {
+    el.textContent = '';
+    el.style.display = 'none';
+  });
+}
+
+function showFieldError(id, msg) {
+  const errEl = document.getElementById(id);
+  if (errEl) {
+    errEl.textContent = msg;
+    errEl.classList.add('visible');
+  }
+  const inputId = id.replace('Err', '');
+  const inputEl = document.getElementById(inputId);
+  if (inputEl) {
+    inputEl.classList.add('error');
+  }
+}
+
+function showFormAlert(id, msg, type = 'error') {
+  const alertEl = document.getElementById(id);
+  if (alertEl) {
+    alertEl.textContent = msg;
+    alertEl.style.display = 'block';
+    if (type === 'success') {
+      alertEl.classList.remove('form-alert-error');
+      alertEl.classList.add('form-alert-success');
+    } else {
+      alertEl.classList.remove('form-alert-success');
+      alertEl.classList.add('form-alert-error');
+    }
+  }
+}
+
+function setLoading(type, loading) {
+  const btnId = type.endsWith('Btn') ? type : `${type}Btn`;
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  const spinner = btn.querySelector('.auth-spinner');
+  if (spinner) {
+    spinner.style.display = loading ? 'inline-block' : 'none';
+  }
+}
+
+// ── Modal ─────────────────────────────────────────────────
 // ── Modal ─────────────────────────────────────────────────
 let currentTab = 'login';
 
 function openModal(tab = 'login') {
   const modal = document.getElementById('authModal');
-  modal.classList.add('open');
-  document.body.style.overflow = 'hidden';
-  switchTab(tab);
+  if (modal) {
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    switchTab(tab);
+  }
 }
 
 function closeModal() {
   const modal = document.getElementById('authModal');
-  modal.classList.remove('open');
-  document.body.style.overflow = '';
+  if (modal) {
+    modal.classList.remove('open');
+    document.body.style.overflow = '';
+  }
   clearAllErrors();
 }
 
@@ -503,48 +567,6 @@ function switchTab(tab) {
     if (formEl) formEl.style.display = t === tab ? 'flex' : 'none';
   });
   clearAllErrors();
-}
-
-// ── Form Helpers ───────────────────────────────────────────
-function clearAllErrors() {
-  document.querySelectorAll('.field-error').forEach(e => { e.textContent = ''; e.classList.remove('show'); });
-  document.querySelectorAll('.form-alert').forEach(e => { e.textContent = ''; e.classList.remove('show'); });
-  document.querySelectorAll('.form-input').forEach(e => e.classList.remove('error'));
-}
-
-function showFieldError(fieldId, msg) {
-  const el = document.getElementById(fieldId);
-  if (el) { el.textContent = msg; el.classList.add('show'); }
-  const input = document.getElementById(fieldId.replace('Err', ''));
-  if (input) input.classList.add('error');
-}
-
-function showFormAlert(alertId, msg, type = 'error') {
-  const el = document.getElementById(alertId);
-  if (!el) return;
-  el.textContent = msg;
-  el.className = `form-alert form-alert-${type} show`;
-}
-
-function setLoading(formName, loading) {
-  const btn = document.getElementById(`${formName}Btn`);
-  if (!btn) return;
-  btn.disabled = loading;
-  btn.classList.toggle('loading', loading);
-}
-
-function validateEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-function togglePw(inputId, btn) {
-  const input = document.getElementById(inputId);
-  if (!input) return;
-  const show = input.type === 'password';
-  input.type = show ? 'text' : 'password';
-  btn.innerHTML = show 
-    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>` 
-    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 }
 
 // ── Auth Error Mapper ─────────────────────────────────────
@@ -616,23 +638,50 @@ async function handleSignup() {
 
   setLoading('signup', true);
   try {
-    const { data, error } = await sb.auth.signUp({
+    const { data: signUpData, error: signUpError } = await sb.auth.signUp({
       email,
       password,
       options: {
         data: { display_name: name }
       }
     });
-    if (error) {
-      showFormAlert('signupError', mapAuthError(error));
-    } else if (data.user && !data.session) {
-      // Email confirmation required
+
+    if (signUpError) {
+      showFormAlert('signupError', mapAuthError(signUpError));
+      return;
+    }
+
+    const user = signUpData.user;
+    
+    // Proveri da li profil već postoji u user_profiles
+    const { data: existingProfile } = await sb.from('user_profiles').select('id').eq('id', user.id).maybeSingle();
+    
+    if (!existingProfile) {
+      await sb.from('user_profiles').insert({
+        id: user.id,
+        display_name: name,
+        plan: 'free',
+        kick_channels: [
+          {
+            id: Math.floor(1000000 + Math.random() * 9000000).toString(),
+            username: name,
+            avatar: null,
+            is_primary: true
+          }
+        ],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
+
+    if (user && !signUpData.session) {
       showFormAlert('signupSuccess', t('auth.signup.success'), 'success');
-    } else if (data.session) {
+    } else if (signUpData.session) {
       showToast('success', t('auth.signup.success'), '🎉');
       closeModal();
-      onUserChange(data.user);
+      onUserChange(user);
     }
+
   } catch (err) {
     showFormAlert('signupError', t('auth.err.generic'));
   } finally {
@@ -663,6 +712,16 @@ async function handleForgot() {
   } finally {
     setLoading('forgot', false);
   }
+}
+
+function togglePw(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.innerHTML = show 
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>` 
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 }
 
 // ── Sign Out ───────────────────────────────────────────────

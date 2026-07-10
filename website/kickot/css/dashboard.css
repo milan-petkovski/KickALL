@@ -805,22 +805,22 @@ button:focus-visible {
 
 .panel {
   display: none;
-  animation: fade-in 0.3s var(--ease-expo) both;
 }
 
 .panel.active {
   display: block;
+  animation: panel-reveal 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-@keyframes fade-in {
+@keyframes panel-reveal {
   from {
     opacity: 0;
-    transform: translateY(8px)
+    transform: translateY(15px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0)
+    transform: translateY(0);
   }
 }
 
@@ -997,7 +997,7 @@ button:focus-visible {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 .stat-card {
@@ -1287,16 +1287,29 @@ button:focus-visible {
 
 .td-cmd {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8125rem;
+  font-size: 0.775rem;
   font-weight: 700;
   color: var(--kick-green);
+  background: var(--kick-green-dim);
+  border: 1px solid rgba(83, 252, 24, 0.12);
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  box-shadow: 0 2px 6px rgba(83, 252, 24, 0.03);
+  transition: all var(--transition-fast);
+}
+
+.td-cmd:hover {
+  background: rgba(83, 252, 24, 0.16);
+  border-color: rgba(83, 252, 24, 0.3);
+  transform: translateY(-1px);
 }
 
 .td-response {
-  max-width: 280px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
 }
 
 .td-num {
@@ -1336,28 +1349,30 @@ button:focus-visible {
 }
 
 .action-btn {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border-subtle);
-  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--text-muted);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 0.8rem;
-  transition: var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
 .action-btn:hover {
-  border-color: var(--border-normal);
+  background: var(--app-primary-dim);
+  border-color: var(--app-primary);
   color: var(--text-primary);
+  transform: scale(1.05);
 }
 
 .action-btn.danger:hover {
-  border-color: rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.35);
   color: #FCA5A5;
-  background: rgba(239, 68, 68, 0.06);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 /* ── Leaderboard Podium ── */
@@ -2089,31 +2104,31 @@ button:focus-visible {
 /* Prilagođavanje širina kolona u tabeli sa komandama */
 #commandsTable th:nth-child(1),
 #commandsTable td:nth-child(1) {
-  width: 18%;
+  width: 17%;
   /* Komanda */
 }
 
 #commandsTable th:nth-child(2),
 #commandsTable td:nth-child(2) {
-  width: 12%;
+  width: auto;
   /* Tip */
 }
 
 #commandsTable th:nth-child(3),
 #commandsTable td:nth-child(3) {
-  width: 32%;
+  width: 8%;
   /* Odgovor (najšira kolona koja se prelama) */
 }
 
 #commandsTable th:nth-child(4),
 #commandsTable td:nth-child(4) {
-  width: 7%;
+  width: 8%;
   /* Cooldown */
 }
 
 #commandsTable th:nth-child(5),
 #commandsTable td:nth-child(5) {
-  width: 7%;
+  width: 11%;
   /* Korišćeno */
 }
 
