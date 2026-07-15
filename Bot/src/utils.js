@@ -87,15 +87,18 @@ function dobijTrenutniMesec() {
 /**
  * Proverava i beleži cooldown za komandu
  */
-function proveraKulauna(kljuc, username) {
+function proveraKulauna(chatroomId, kljuc, username, customCooldownMs) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return false;
     const sada   = Date.now();
-    const zadnji = state.cooldowns[kljuc] || 0;
-    if (sada - zadnji < config.COOLDOWN_MS) {
-        const preostalo = ((config.COOLDOWN_MS - (sada - zadnji)) / 1000).toFixed(1);
-        log('WARN', `[${username}] Komanda ${kljuc} na cooldown-u još ${preostalo}s`);
+    const zadnji = channelState.cooldowns[kljuc] || 0;
+    const limit = customCooldownMs !== undefined ? customCooldownMs : (channelState.COOLDOWN_MS !== undefined ? channelState.COOLDOWN_MS : config.COOLDOWN_MS);
+    if (sada - zadnji < limit) {
+        const preostalo = ((limit - (sada - zadnji)) / 1000).toFixed(1);
+        log('WARN', `[${channelState.channelUsername || chatroomId}] [${username}] Komanda ${kljuc} na cooldown-u još ${preostalo}s`);
         return true;
     }
-    state.cooldowns[kljuc] = sada;
+    channelState.cooldowns[kljuc] = sada;
     return false;
 }
 

@@ -166,7 +166,10 @@ async function initApp() {
   // Load initial panel
   if (activeChannel) {
     loadAllData();
-    const lastPanel = localStorage.getItem('active-dashboard-panel') || 'overview';
+    let lastPanel = localStorage.getItem('active-dashboard-panel') || 'overview';
+    if (lastPanel === 'no-channel') {
+      lastPanel = 'overview';
+    }
     switchPanel(lastPanel);
   } else {
     // No channel configured — prompt
@@ -357,6 +360,17 @@ function setActiveChannel(ch) {
   if (topbarCh) topbarCh.textContent = `@${ch.username}`;
   const cmdBadge = document.getElementById('cmdPrefixBadge');
   if (cmdBadge) cmdBadge.textContent = '!';
+
+  // Ako je sidebar bio sakriven (showNoChannelState), vrati ga
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar && sidebar.style.display === 'none') {
+    sidebar.style.display = '';
+  }
+  // Vrati mainContent na normalan grid layout
+  const mainContent = document.getElementById('mainContent');
+  if (mainContent && mainContent.style.gridColumn) {
+    mainContent.style.gridColumn = '';
+  }
 }
 
 function renderChannelList() {
@@ -434,9 +448,39 @@ async function selectChannel(ch) {
   await loadAllData();
 }
 
+function bindEnterKey(inputId, buttonId) {
+  const input = document.getElementById(inputId);
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const btn = document.getElementById(buttonId);
+        if (btn) btn.click();
+      }
+    });
+  }
+}
+
 function showNoChannelState() {
-  showToast('info', 'Dodaj Kick kanal da počneš', 'ℹ️');
-  setTimeout(() => showAddChannelModal(), 800);
+  // Sakrij sidebar kad nema kanala
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) sidebar.style.display = 'none';
+
+  const mainContent = document.getElementById('mainContent');
+  if (mainContent) {
+    mainContent.style.gridColumn = '1 / -1'; // zauzmi pun prostor
+  }
+
+  // Prebaci panel na no-channel
+  switchPanel('no-channel');
+
+  // Poveži dugme
+  const addBtn = document.getElementById('noChannelAddBtn');
+  if (addBtn) {
+    const newBtn = addBtn.cloneNode(true);
+    addBtn.parentNode.replaceChild(newBtn, addBtn);
+    newBtn.addEventListener('click', () => showAddChannelModal());
+  }
 }
 
 // ── Channel Management ────────────────────────────────────
@@ -454,7 +498,23 @@ function extractKickUsername(input) {
 async function resolveChatroomId(username) {
   const apiUrl = `https://kick.com/api/v2/channels/${username}`;
 
-  // 1. Pokušavamo preko corsproxy.io
+  // 1. Pokušavamo preko lokalnog bota
+  try {
+    const localRes = await fetch(`http://localhost:3000/api/avatar?username=${username}`);
+    if (localRes.ok) {
+      const localData = await localRes.json();
+      if (localData && localData.chatroom_id) {
+        return {
+          id: localData.chatroom_id.toString(),
+          username: localData.slug || username,
+          avatar: localData.avatar || null,
+          bio: localData.bio || ''
+        };
+      }
+    }
+  } catch (_) { }
+
+  // 2. Pokušavamo preko corsproxy.io
   try {
     const proxyUrl = `https://corsproxy.io/?` + encodeURIComponent(apiUrl);
     const res = await fetch(proxyUrl);
@@ -464,7 +524,8 @@ async function resolveChatroomId(username) {
         return {
           id: data.chatroom.id.toString(),
           username: data.slug || username,
-          avatar: data.user?.profile_pic || null
+          avatar: data.user?.profile_pic || null,
+          bio: data.user?.bio || ''
         };
       }
     }
@@ -472,7 +533,7 @@ async function resolveChatroomId(username) {
     console.warn('corsproxy.io failed, trying fallback...', err);
   }
 
-  // 2. Pokušavamo preko allorigins.win
+  // 3. Pokušavamo preko allorigins.win
   try {
     const fallbackUrl = `https://api.allorigins.win/get?url=` + encodeURIComponent(apiUrl);
     const res = await fetch(fallbackUrl);
@@ -484,7 +545,8 @@ async function resolveChatroomId(username) {
           return {
             id: data.chatroom.id.toString(),
             username: data.slug || username,
-            avatar: data.user?.profile_pic || null
+            avatar: data.user?.profile_pic || null,
+            bio: data.user?.bio || ''
           };
         }
       }
@@ -496,43 +558,151 @@ async function resolveChatroomId(username) {
   return null;
 }
 
-// ── Channel Management ────────────────────────────────────
-async function addChannel() {
-  const rawInput = document.getElementById('newChannelInput').value.trim();
-  const errEl = document.getElementById('addChannelError');
-  errEl.style.display = 'none';
+// ── Verifikacioni tok za dodavanje kanala ─────────────────
+let _addChannelPending = null; // { resolved, verificationCode }
+
+function showAddChannelModal() {
+  _addChannelPending = null;
+  const titleEl = document.getElementById('addChannelModalTitle');
+  if (titleEl) titleEl.textContent = 'Dodaj Kick kanal';
+  renderAddChannelStep1();
+  openModal('addChannelModal');
+}
+
+function renderAddChannelStep1(errorMsg = '') {
+  const body = document.getElementById('addChannelModalBody');
+  if (!body) return;
+  body.innerHTML = `
+    <div class="form-group" style="margin-bottom:16px;">
+      <label class="form-label">Kick username ili URL kanala</label>
+      <input type="text" class="form-input" id="newChannelInput"
+        placeholder="npr. milan-567 ili https://kick.com/milan-567" />
+      <span class="config-hint">Unesi korisničko ime kanala ili puni link do Kick profila</span>
+    </div>
+    ${errorMsg ? `<div class="form-alert" style="display:block;color:#EF4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);padding:10px 14px;border-radius:8px;font-size:0.85rem;margin-bottom:12px;">${errorMsg}</div>` : ''}
+    <div class="modal-foot" style="padding:0; margin-top:8px; border:none; background:none; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="closeModal('addChannelModal')">Otkaži</button>
+      <button class="btn btn-primary" id="addChannelBtn" onclick="addChannelStep1()">
+        <span class="btn-spinner" id="addChannelBtnSpinner" style="display:none; width:14px; height:14px; border:2px solid rgba(0,0,0,0.3); border-top-color:#000; border-radius:50%; animation:spin 0.7s linear infinite;"></span>
+        <span>Nastavi</span>
+      </button>
+    </div>
+  `;
+  const inp = document.getElementById('newChannelInput');
+  if (inp) {
+    inp.focus();
+    bindEnterKey('newChannelInput', 'addChannelBtn');
+  }
+}
+
+function renderAddChannelStep2(channelName, verificationCode, errorMsg = '') {
+  const body = document.getElementById('addChannelModalBody');
+  const titleEl = document.getElementById('addChannelModalTitle');
+  if (!body) return;
+  if (titleEl) titleEl.textContent = 'Verifikuj vlasništvo';
+  body.innerHTML = `
+    <p style="color:var(--color-text-muted); font-size:0.9rem; line-height:1.6; margin-bottom:14px;">
+      Da potvrdimo da si vlasnik kanala <strong style="color:var(--color-text);">@${channelName}</strong>, stavi ovaj kod 
+      <strong>bilo gde</strong> u opis (Bio/About) svog Kick profila:
+    </p>
+    <div style="background:rgba(83,252,24,0.08); border:1px dashed rgba(83,252,24,0.5); padding:14px; border-radius:10px; font-family:monospace; font-size:1.1rem; font-weight:700; color:#53fc18; text-align:center; margin-bottom:16px; letter-spacing:1px; user-select:all;">
+      ${verificationCode}
+    </div>
+    <p style="color:var(--color-text-muted); font-size:0.82rem; line-height:1.5; margin-bottom:16px;">
+      💡 Kod možeš staviti uz ostali tekst, npr:<br>
+      <em style="color:var(--color-text-secondary);">"Profesionalni streamer 🔥 ${verificationCode}"</em><br>
+      Nakon verifikacije možeš ukloniti kod iz opisa.
+    </p>
+    ${errorMsg ? `<div class="form-alert" style="display:block;color:#EF4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);padding:10px 14px;border-radius:8px;font-size:0.85rem;margin-bottom:12px;">${errorMsg}</div>` : ''}
+    <div class="modal-foot" style="padding:0; margin-top:8px; border:none; background:none; display:flex; gap:10px; justify-content:flex-end;">
+      <button class="btn btn-outline" onclick="renderAddChannelStep1()">Nazad</button>
+      <button class="btn btn-primary" id="addChannelVerifyBtn" onclick="addChannelVerify()">
+        <span class="btn-spinner" id="addChannelVerifySpinner" style="display:none; width:14px; height:14px; border:2px solid rgba(0,0,0,0.3); border-top-color:#000; border-radius:50%; animation:spin 0.7s linear infinite;"></span>
+        <span>Verifikuj i dodaj</span>
+      </button>
+    </div>
+  `;
+}
+
+async function addChannelStep1() {
+  const inp = document.getElementById('newChannelInput');
+  const rawInput = inp ? inp.value.trim() : '';
 
   if (!rawInput) {
-    errEl.textContent = 'Unesi Kick username ili link kanala.';
-    errEl.style.display = 'block';
+    renderAddChannelStep1('Unesi Kick username ili link kanala.');
     return;
   }
 
   const username = extractKickUsername(rawInput);
   if (!username) {
-    errEl.textContent = 'Nevalidan unos kanala.';
-    errEl.style.display = 'block';
+    renderAddChannelStep1('Nevalidan unos kanala.');
     return;
   }
 
-  setLoading('addChannelBtn', true);
+  // Loading state
+  const btn = document.getElementById('addChannelBtn');
+  const spinner = document.getElementById('addChannelBtnSpinner');
+  if (btn) btn.disabled = true;
+  if (spinner) spinner.style.display = 'inline-block';
+
   const resolved = await resolveChatroomId(username);
 
+  if (btn) btn.disabled = false;
+  if (spinner) spinner.style.display = 'none';
+
   if (!resolved) {
-    setLoading('addChannelBtn', false);
-    errEl.textContent = `Kanal "${username}" nije pronađen na Kick platformi. Proveri ispravnost.`;
-    errEl.style.display = 'block';
+    renderAddChannelStep1(`Kanal "${username}" nije pronađen na Kick platformi. Proveri ispravnost.`);
     return;
   }
 
+  if (currentChannels.some(c => c.id === resolved.id)) {
+    renderAddChannelStep1('Ovaj kanal je već dodat na tvoj nalog.');
+    return;
+  }
+
+  // Provera da li je ovaj Kick kanal već registrovan na nekom drugom nalogu
+  const { data: taken, error: checkErr } = await sb.from('user_profiles')
+    .select('id')
+    .contains('kick_channels', [{ id: resolved.id }]);
+
+  if (!checkErr && taken && taken.length > 0) {
+    renderAddChannelStep1('Ovaj kanal je već povezan sa drugim nalogom.');
+    return;
+  }
+
+  // Generiši verifikacioni kod i idi na korak 2
+  const verificationCode = `kickot-${Math.floor(100000 + Math.random() * 900000)}`;
+  _addChannelPending = { resolved, verificationCode };
+  renderAddChannelStep2(resolved.username, verificationCode);
+}
+
+async function addChannelVerify() {
+  if (!_addChannelPending) return;
+
+  const { resolved, verificationCode } = _addChannelPending;
   const { id: channelId, username: channelName } = resolved;
 
-  if (currentChannels.some(c => c.id === channelId)) {
-    setLoading('addChannelBtn', false);
-    errEl.textContent = 'Ovaj kanal je već dodat na tvoj nalog.';
-    errEl.style.display = 'block';
+  const btn = document.getElementById('addChannelVerifyBtn');
+  const spinner = document.getElementById('addChannelVerifySpinner');
+  if (btn) btn.disabled = true;
+  if (spinner) spinner.style.display = 'inline-block';
+
+  // Ponovo povuci svež bio da proverimo kod
+  const freshResolved = await resolveChatroomId(channelName);
+  const freshBio = freshResolved?.bio || '';
+
+  if (btn) btn.disabled = false;
+  if (spinner) spinner.style.display = 'none';
+
+  if (!freshBio.toLowerCase().includes(verificationCode.toLowerCase())) {
+    renderAddChannelStep2(channelName, verificationCode,
+      'Verifikacioni kod nije pronađen u tvom Kick opisu (Bio/About). Stavi kod u bio i pokušaj ponovo.');
     return;
   }
+
+  // Bio proveren — dodaj kanal
+  if (btn) btn.disabled = true;
+  if (spinner) spinner.style.display = 'inline-block';
 
   const newChannel = {
     id: channelId,
@@ -547,22 +717,27 @@ async function addChannel() {
     .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
     .eq('id', currentUser.id);
 
-  setLoading('addChannelBtn', false);
-
   if (error) {
-    errEl.textContent = 'Greška pri čuvanju kanala u bazu. Pokušaj ponovo.';
-    errEl.style.display = 'block';
+    renderAddChannelStep2(channelName, verificationCode,
+      'Greška pri čuvanju kanala u bazu. Pokušaj ponovo.');
     return;
   }
 
   currentChannels = updatedChannels;
+  _addChannelPending = null;
   setActiveChannel(newChannel);
   renderChannelList();
   closeModal('addChannelModal');
-  document.getElementById('newChannelInput').value = '';
-  showToast('success', `Kanal @${channelName} je uspešno dodat!`, '✅');
+  showToast('success', `Kanal @${channelName} je uspešno dodat i verifikovan!`, '✅');
   await loadAllData();
+  switchPanel('overview');
 }
+
+// Legacy wrapper — poziva novi tok
+async function addChannel() {
+  addChannelStep1();
+}
+
 
 // ═══════════════════════════════════════════════════════════
 // DATA LOADERS
@@ -1468,7 +1643,7 @@ async function saveBotConfig() {
   if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', true);
 
   const { error } = await sb.from('bot_config')
-    .upsert(config, { onConflict: 'user_id,channel_id' });
+    .upsert(config, { onConflict: 'channel_id' });
 
   if (btnConfig) setLoading('saveConfigBtn', false);
   if (btnConfigBottom) setLoading('saveConfigBtnBottom', false);
@@ -1592,7 +1767,7 @@ async function toggleBotActive() {
       channel_name: activeChannel.username,
       bot_active: active,
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,channel_id' });
+    }, { onConflict: 'channel_id' });
 
   if (error) {
     showToast('error', 'Greška pri promeni statusa', '❌');
@@ -2027,12 +2202,6 @@ function closeModal(id) {
 }
 function handleModalBg(e, id) {
   if (e.target.id === id) closeModal(id);
-}
-function showAddChannelModal() {
-  document.getElementById('addChannelError').style.display = 'none';
-  const inp = document.getElementById('newChannelInput');
-  if (inp) inp.value = '';
-  openModal('addChannelModal');
 }
 
 window.addEventListener('keydown', e => {

@@ -11,17 +11,20 @@ const KORISTI_SUPABASE = !!supabase;
 
 // ─── LEADERBOARD ─────────────────────────────────────────────────────────────
 
-async function ucitajLeaderboard() {
+async function ucitajLeaderboard(chatroomId) {
     try {
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+        const channelUsername = channelState.channelUsername || chatroomId;
         let json = null;
         const trenutniMesec = dobijTrenutniMesec();
 
         if (KORISTI_SUPABASE) {
-            log('INFO', `Učitavam leaderboard sa Supabase baze za kanal: ${config.CHANNEL_USERNAME} (${config.CHATROOM_ID})...`);
+            log('INFO', `[${channelUsername}] Učitavam leaderboard sa Supabase baze...`);
             const { data, error } = await supabase
                 .from('leaderboard')
                 .select('username, display_name, points')
-                .eq('channel_id', config.CHATROOM_ID)
+                .eq('channel_id', chatroomId)
                 .eq('month', trenutniMesec);
 
             if (error) throw error;
@@ -55,11 +58,7 @@ async function ucitajLeaderboard() {
                 const file = gistData.files['leaderboard.json'];
                 if (file && file.content) {
                     json = JSON.parse(file.content);
-                } else {
-                    log('WARN', 'Fajl leaderboard.json nije pronađen u Gist-u, kreiram novi...');
                 }
-            } else {
-                throw new Error(`GitHub API status: ${res.status}`);
             }
         } else {
             if (fs.existsSync(config.LEADERBOARD_FILE)) {
@@ -71,17 +70,7 @@ async function ucitajLeaderboard() {
         if (json) {
             let resetMeseca = false;
             if (!KORISTI_SUPABASE && json.mesec && json.mesec !== trenutniMesec) {
-                const staroUparivanje = json.mesec.match(/^(\d{4})-(\d{2})$/);
-                const novoUparivanje = trenutniMesec.match(/^(\d{2})-(\d{4})$/);
-                if (staroUparivanje && novoUparivanje) {
-                    const [, sG, sM] = staroUparivanje;
-                    const [, nM, nG] = novoUparivanje;
-                    if (sG !== nG || sM !== nM) {
-                        resetMeseca = true;
-                    }
-                } else {
-                    resetMeseca = true;
-                }
+                resetMeseca = true;
             }
 
             if (resetMeseca) {
@@ -94,60 +83,61 @@ async function ucitajLeaderboard() {
                     await sacuvajBackupUGist(stariMesec, json);
                 }
 
-                state.leaderboard = {};
-                state.leaderboardDeltas = {};
-                state.tekuciMesecLeaderboarda = trenutniMesec;
-                state.leaderboardDirty = true;
-                await sacuvajLeaderboard();
+                channelState.leaderboard = {};
+                channelState.leaderboardDeltas = {};
+                channelState.tekuciMesecLeaderboarda = trenutniMesec;
+                channelState.leaderboardDirty = true;
+                await sacuvajLeaderboard(chatroomId);
             } else {
-                state.leaderboard = json.podaci || {};
-                state.leaderboardDeltas = {};
-                state.tekuciMesecLeaderboarda = trenutniMesec;
+                channelState.leaderboard = json.podaci || {};
+                channelState.leaderboardDeltas = {};
+                channelState.tekuciMesecLeaderboarda = trenutniMesec;
                 if (json.mesec !== trenutniMesec) {
-                    state.leaderboardDirty = true;
+                    channelState.leaderboardDirty = true;
                 }
-                log('INFO', `Učitan leaderboard za mesec: ${state.tekuciMesecLeaderboarda} (${Object.keys(state.leaderboard).length} aktivnih korisnika)`);
+                log('INFO', `[${channelUsername}] Učitan leaderboard za mesec: ${channelState.tekuciMesecLeaderboarda} (${Object.keys(channelState.leaderboard).length} aktivnih korisnika)`);
             }
         } else {
-            state.leaderboard = {};
-            state.leaderboardDeltas = {};
-            state.tekuciMesecLeaderboarda = trenutniMesec;
-            state.leaderboardDirty = true;
-            await sacuvajLeaderboard();
+            channelState.leaderboard = {};
+            channelState.leaderboardDeltas = {};
+            channelState.tekuciMesecLeaderboarda = trenutniMesec;
+            channelState.leaderboardDirty = true;
+            await sacuvajLeaderboard(chatroomId);
         }
     } catch (err) {
-        log('ERR', `Greška pri učitavanju leaderboarda: ${err.message}`);
-        state.leaderboard = {};
-        state.leaderboardDeltas = {};
-        state.tekuciMesecLeaderboarda = dobijTrenutniMesec();
+        log('ERR', `Greška pri učitavanju leaderboarda za ${chatroomId}: ${err.message}`);
+        const channelState = state.getChannelState(chatroomId);
+        if (channelState) {
+            channelState.leaderboard = {};
+            channelState.leaderboardDeltas = {};
+            channelState.tekuciMesecLeaderboarda = dobijTrenutniMesec();
+        }
     }
 }
 
-async function sacuvajLeaderboard() {
-    if (!state.leaderboardDirty) return;
+async function sacuvajLeaderboard(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || !channelState.leaderboardDirty) return;
     try {
         const trenutniMesec = dobijTrenutniMesec();
 
         if (KORISTI_SUPABASE) {
-            // Uzmi samo korisnike sa nenultim deltama
-            const dirtyKeys = Object.keys(state.leaderboardDeltas).filter(k => state.leaderboardDeltas[k] !== 0);
+            const dirtyKeys = Object.keys(channelState.leaderboardDeltas).filter(k => channelState.leaderboardDeltas[k] !== 0);
 
             if (dirtyKeys.length === 0) {
-                state.leaderboardDirty = false;
+                channelState.leaderboardDirty = false;
                 return;
             }
 
-            // Povuci trenutne vrednosti iz baze za te korisnike
             const { data, error: fetchError } = await supabase
                 .from('leaderboard')
                 .select('username, display_name, points')
-                .eq('channel_id', config.CHATROOM_ID)
-                .eq('month', state.tekuciMesecLeaderboarda)
+                .eq('channel_id', chatroomId)
+                .eq('month', channelState.tekuciMesecLeaderboarda)
                 .in('username', dirtyKeys);
 
             if (fetchError) throw fetchError;
 
-            // Napravi mapu username -> trenutni poeni iz baze
             const dbMap = {};
             if (data) {
                 data.forEach(row => {
@@ -155,24 +145,22 @@ async function sacuvajLeaderboard() {
                 });
             }
 
-            // Pripremi redove: baza + delta = novi total
             const rowsToUpsert = dirtyKeys.map(key => {
                 const dbPoints = dbMap[key] !== undefined ? dbMap[key] : 0;
-                const delta = state.leaderboardDeltas[key];
+                const delta = channelState.leaderboardDeltas[key];
                 const newPoints = Math.max(0, dbPoints + delta);
 
                 return {
-                    channel_id: config.CHATROOM_ID,
+                    channel_id: chatroomId,
                     username: key,
-                    display_name: (state.leaderboard[key] && state.leaderboard[key].username) || key,
+                    display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
                     points: newPoints,
-                    month: state.tekuciMesecLeaderboarda,
+                    month: channelState.tekuciMesecLeaderboarda,
                     updated_at: new Date().toISOString(),
-                    _newPoints: newPoints // privremeno za sinhronizaciju memorije
+                    _newPoints: newPoints
                 };
             });
 
-            // Upsert - tek NAKON uspešnog upisa resetuj delte i ažuriraj memoriju
             const rowsClean = rowsToUpsert.map(({ _newPoints, ...r }) => r);
             const { error: upsertError } = await supabase
                 .from('leaderboard')
@@ -180,34 +168,32 @@ async function sacuvajLeaderboard() {
 
             if (upsertError) throw upsertError;
 
-            // Uspešno - sinhronizuj in-memory stanje sa vrednostima koje smo upisali
             rowsToUpsert.forEach(row => {
                 const key = row.username;
-                if (state.leaderboard[key]) {
-                    state.leaderboard[key].count = row._newPoints;
+                if (channelState.leaderboard[key]) {
+                    channelState.leaderboard[key].count = row._newPoints;
                 } else {
-                    state.leaderboard[key] = {
+                    channelState.leaderboard[key] = {
                         username: row.display_name,
                         count: row._newPoints
                     };
                 }
-                delete state.leaderboardDeltas[key]; // ukloni, ne ostavljaj 0
+                delete channelState.leaderboardDeltas[key];
             });
 
-            state.leaderboardDirty = false;
-            log('INFO', `Leaderboard uspešno sačuvan na Supabase (${rowsClean.length} korisnika).`);
+            channelState.leaderboardDirty = false;
+            log('INFO', `[${channelState.channelUsername || chatroomId}] Leaderboard uspešno sačuvan na Supabase (${rowsClean.length} korisnika).`);
         } else {
-            // Primeni delte na lokalno stanje pre čuvanja
-            Object.keys(state.leaderboardDeltas).forEach(key => {
-                if (state.leaderboard[key]) {
-                    state.leaderboard[key].count = Math.max(0, state.leaderboard[key].count + state.leaderboardDeltas[key]);
+            Object.keys(channelState.leaderboardDeltas).forEach(key => {
+                if (channelState.leaderboard[key]) {
+                    channelState.leaderboard[key].count = Math.max(0, channelState.leaderboard[key].count + channelState.leaderboardDeltas[key]);
                 }
-                delete state.leaderboardDeltas[key];
+                delete channelState.leaderboardDeltas[key];
             });
 
             const json = {
                 mesec: trenutniMesec,
-                podaci: state.leaderboard
+                podaci: channelState.leaderboard
             };
 
             if (config.KORISTI_GIST) {
@@ -230,43 +216,43 @@ async function sacuvajLeaderboard() {
                 });
 
                 if (res.ok) {
-                    state.leaderboardDirty = false;
+                    channelState.leaderboardDirty = false;
                     log('INFO', 'Leaderboard uspešno sačuvan na GitHub Gist.');
                 } else {
                     throw new Error(`GitHub API status: ${res.status}`);
                 }
             } else {
                 fs.writeFileSync(config.LEADERBOARD_FILE, JSON.stringify(json, null, 2), 'utf8');
-                state.leaderboardDirty = false;
+                channelState.leaderboardDirty = false;
                 log('INFO', 'Leaderboard uspešno sačuvan na disk.');
             }
         }
     } catch (err) {
-        // Delte se NAMERNO ne resetuju - čuvaju se za sledeći pokušaj
-        log('ERR', `Greška pri čuvanju leaderboarda: ${err.message}`);
+        log('ERR', `Greška pri čuvanju leaderboarda za ${chatroomId}: ${err.message}`);
     }
 }
 
-function proveriIResetujMesec() {
+function proveriIResetujMesec(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
     const trenutniMesec = dobijTrenutniMesec();
-    if (state.tekuciMesecLeaderboarda && state.tekuciMesecLeaderboarda !== trenutniMesec) {
-        const stariMesec = state.tekuciMesecLeaderboarda;
-        log('INFO', `Novi mesec detektovan tokom rada bota (${stariMesec} -> ${trenutniMesec}). Resetujem leaderboard.`);
+    if (channelState.tekuciMesecLeaderboarda && channelState.tekuciMesecLeaderboarda !== trenutniMesec) {
+        const stariMesec = channelState.tekuciMesecLeaderboarda;
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Novi mesec detektovan tokom rada bota (${stariMesec} -> ${trenutniMesec}). Resetujem leaderboard.`);
 
         const stariPodaci = {
             mesec: stariMesec,
-            podaci: { ...state.leaderboard }
+            podaci: { ...channelState.leaderboard }
         };
 
-        // Resetuj sve za novi mesec - stare delte ne prenosi
-        state.leaderboard = {};
-        state.leaderboardDeltas = {};
-        state.tekuciMesecLeaderboarda = trenutniMesec;
+        channelState.leaderboard = {};
+        channelState.leaderboardDeltas = {};
+        channelState.tekuciMesecLeaderboarda = trenutniMesec;
 
         if (KORISTI_SUPABASE) {
-            state.leaderboardDirty = false;
+            channelState.leaderboardDirty = false;
         } else {
-            state.leaderboardDirty = true;
+            channelState.leaderboardDirty = true;
             (async () => {
                 if (!config.KORISTI_GIST) {
                     try {
@@ -276,63 +262,69 @@ function proveriIResetujMesec() {
                         log('ERR', `Greška pri čuvanju lokalnog backupa: ${e.message}`);
                     }
                 }
-                await sacuvajLeaderboard();
+                await sacuvajLeaderboard(chatroomId);
             })();
         }
     }
 }
 
-function evidentirajPoruku(username, poruka) {
+function evidentirajPoruku(chatroomId, username, poruka) {
     if (!poruka || poruka.trim().length < 3) return;
     if (!isValidUsername(username)) {
         log('WARN', `Blokirano evidentiranje poruke za nevalidno korisničko ime: ${username}`);
         return;
     }
 
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
     const cleanUsername = sanitizeInput(username);
     const key = cleanUsername.toLowerCase();
     const sada = Date.now();
-    const zadnji = state.lastPointEarned[key] || 0;
+    const zadnji = channelState.lastPointEarned[key] || 0;
     if (sada - zadnji < config.POINT_COOLDOWN_MS) {
         return;
     }
 
-    proveriIResetujMesec();
+    proveriIResetujMesec(chatroomId);
 
-    if (!state.leaderboard[key]) {
-        state.leaderboard[key] = {
+    if (!channelState.leaderboard[key]) {
+        channelState.leaderboard[key] = {
             username: cleanUsername,
             count: 0
         };
     }
-    state.leaderboard[key].count++;
-    state.leaderboard[key].username = cleanUsername;
-    state.leaderboardDeltas[key] = (state.leaderboardDeltas[key] || 0) + 1;
-    state.leaderboardDirty = true;
-    state.lastPointEarned[key] = sada;
+    channelState.leaderboard[key].count++;
+    channelState.leaderboard[key].username = cleanUsername;
+    channelState.leaderboardDeltas[key] = (channelState.leaderboardDeltas[key] || 0) + 1;
+    channelState.leaderboardDirty = true;
+    channelState.lastPointEarned[key] = sada;
 
-    if (!state.leaderboardSaveTimer) {
-        state.leaderboardSaveTimer = setTimeout(() => {
-            sacuvajLeaderboard();
-            state.leaderboardSaveTimer = null;
+    if (!channelState.leaderboardSaveTimer) {
+        channelState.leaderboardSaveTimer = setTimeout(() => {
+            sacuvajLeaderboard(chatroomId);
+            channelState.leaderboardSaveTimer = null;
         }, config.LEADERBOARD_SAVE_INTERVAL_MS);
     }
 }
 
-function smanjiPoruku(username, iznos) {
+function smanjiPoruku(chatroomId, username, iznos) {
     if (!isValidUsername(username)) return;
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
     const cleanUsername = sanitizeInput(username);
     const key = cleanUsername.toLowerCase();
-    if (state.leaderboard[key]) {
-        state.leaderboard[key].count = Math.max(0, state.leaderboard[key].count - iznos);
-        state.leaderboard[key].username = cleanUsername;
-        state.leaderboardDeltas[key] = (state.leaderboardDeltas[key] || 0) - iznos;
-        state.leaderboardDirty = true;
+    if (channelState.leaderboard[key]) {
+        channelState.leaderboard[key].count = Math.max(0, channelState.leaderboard[key].count - iznos);
+        channelState.leaderboard[key].username = cleanUsername;
+        channelState.leaderboardDeltas[key] = (channelState.leaderboardDeltas[key] || 0) - iznos;
+        channelState.leaderboardDirty = true;
 
-        if (!state.leaderboardSaveTimer) {
-            state.leaderboardSaveTimer = setTimeout(() => {
-                sacuvajLeaderboard();
-                state.leaderboardSaveTimer = null;
+        if (!channelState.leaderboardSaveTimer) {
+            channelState.leaderboardSaveTimer = setTimeout(() => {
+                sacuvajLeaderboard(chatroomId);
+                channelState.leaderboardSaveTimer = null;
             }, config.LEADERBOARD_SAVE_INTERVAL_MS);
         }
     }
@@ -340,38 +332,41 @@ function smanjiPoruku(username, iznos) {
 
 // ─── LJUBAV / BRAKOVI ─────────────────────────────────────────────────────────
 
-async function ucitajLjubav() {
+async function ucitajLjubav(chatroomId) {
     try {
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+        const channelUsername = channelState.channelUsername || chatroomId;
         let json = null;
 
         if (KORISTI_SUPABASE) {
-            log('INFO', `Učitavam ljubavne podatke sa Supabase baze za kanal: ${config.CHANNEL_USERNAME} (${config.CHATROOM_ID})...`);
+            log('INFO', `[${channelUsername}] Učitavam ljubavne podatke sa Supabase baze...`);
 
             const { data: modData, error: modError } = await supabase
                 .from('love_modifiers')
                 .select('user1, user2, modifier')
-                .eq('channel_id', config.CHATROOM_ID);
+                .eq('channel_id', chatroomId);
 
             if (modError) throw modError;
 
             const { data: marData, error: marError } = await supabase
                 .from('marriages')
                 .select('user1, user2, user1_display, user2_display, married_at')
-                .eq('channel_id', config.CHATROOM_ID);
+                .eq('channel_id', chatroomId);
 
             if (marError) throw marError;
 
             if (modData) {
                 modData.forEach(row => {
                     const key = [row.user1, row.user2].sort().join('::');
-                    state.loveModifiers[key] = row.modifier;
+                    channelState.loveModifiers[key] = row.modifier;
                 });
             }
 
             if (marData) {
                 marData.forEach(row => {
                     const key = [row.user1, row.user2].sort().join('::');
-                    state.marriedCouples[key] = {
+                    channelState.marriedCouples[key] = {
                         user1: row.user1_display,
                         user2: row.user2_display,
                         datum: new Date(row.married_at).toLocaleDateString('sr-RS')
@@ -379,7 +374,7 @@ async function ucitajLjubav() {
                 });
             }
 
-            log('INFO', `Učitani ljubavni podaci sa Supabase (${Object.keys(state.loveModifiers).length} modifikatora, ${Object.keys(state.marriedCouples).length} brakova).`);
+            log('INFO', `[${channelUsername}] Učitani ljubavni podaci sa Supabase (${Object.keys(channelState.loveModifiers).length} modifikatora, ${Object.keys(channelState.marriedCouples).length} brakova).`);
             return;
         } else if (config.KORISTI_GIST) {
             log('INFO', `Učitavam ljubavne podatke sa GitHub Gist-a (${config.GIST_ID})...`);
@@ -397,11 +392,7 @@ async function ucitajLjubav() {
                 const file = gistData.files['love_data.json'];
                 if (file && file.content) {
                     json = JSON.parse(file.content);
-                } else {
-                    log('WARN', 'Fajl love_data.json nije pronađen u Gist-u, kreiram novi...');
                 }
-            } else {
-                throw new Error(`GitHub API status: ${res.status}`);
             }
         } else {
             if (fs.existsSync(config.LOVE_DATA_FILE)) {
@@ -412,33 +403,32 @@ async function ucitajLjubav() {
 
         if (json) {
             if (json.loveModifiers) {
-                Object.assign(state.loveModifiers, json.loveModifiers);
+                Object.assign(channelState.loveModifiers, json.loveModifiers);
             }
             if (json.marriedCouples) {
-                Object.assign(state.marriedCouples, json.marriedCouples);
+                Object.assign(channelState.marriedCouples, json.marriedCouples);
             }
-            log('INFO', `Učitani ljubavni podaci (${Object.keys(state.loveModifiers).length} modifikatora, ${Object.keys(state.marriedCouples).length} brakova).`);
-        } else {
-            log('INFO', 'Nema sačuvanih ljubavnih podataka, počinjemo od nule.');
+            log('INFO', `Učitani ljubavni podaci (${Object.keys(channelState.loveModifiers).length} modifikatora, ${Object.keys(channelState.marriedCouples).length} brakova).`);
         }
     } catch (err) {
-        log('ERR', `Greška pri učitavanju ljubavnih podataka: ${err.message}`);
+        log('ERR', `Greška pri učitavanju ljubavnih podataka za ${chatroomId}: ${err.message}`);
     }
 }
 
-async function sacuvajLjubav() {
-    if (!state.loveDirty) return;
+async function sacuvajLjubav(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || !channelState.loveDirty) return;
     try {
         const json = {
-            loveModifiers: state.loveModifiers,
-            marriedCouples: state.marriedCouples
+            loveModifiers: channelState.loveModifiers,
+            marriedCouples: channelState.marriedCouples
         };
 
         if (KORISTI_SUPABASE) {
-            const rows = Object.entries(state.loveModifiers).map(([key, val]) => {
+            const rows = Object.entries(channelState.loveModifiers).map(([key, val]) => {
                 const [u1, u2] = key.split('::');
                 return {
-                    channel_id: config.CHATROOM_ID,
+                    channel_id: chatroomId,
                     user1: u1,
                     user2: u2,
                     modifier: val,
@@ -453,8 +443,8 @@ async function sacuvajLjubav() {
 
                 if (error) throw error;
             }
-            state.loveDirty = false;
-            log('INFO', 'Ljubavni modifikatori uspešno sačuvani na Supabase.');
+            channelState.loveDirty = false;
+            log('INFO', `[${channelState.channelUsername || chatroomId}] Ljubavni modifikatori uspešno sačuvani na Supabase.`);
         } else if (config.KORISTI_GIST) {
             const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
                 method: 'PATCH',
@@ -475,26 +465,28 @@ async function sacuvajLjubav() {
             });
 
             if (res.ok) {
-                state.loveDirty = false;
+                channelState.loveDirty = false;
                 log('INFO', 'Ljubavni podaci uspešno sačuvani na GitHub Gist.');
             } else {
                 throw new Error(`GitHub API status: ${res.status}`);
             }
         } else {
             fs.writeFileSync(config.LOVE_DATA_FILE, JSON.stringify(json, null, 2), 'utf8');
-            state.loveDirty = false;
+            channelState.loveDirty = false;
             log('INFO', 'Ljubavni podaci uspešno sačuvani na disk.');
         }
     } catch (err) {
-        log('ERR', `Greška pri čuvanju ljubavnih podataka: ${err.message}`);
+        log('ERR', `Greška pri čuvanju ljubavnih podataka za ${chatroomId}: ${err.message}`);
     }
 }
 
-function osigurajCuvanjeLjubavi() {
-    if (!state.loveSaveTimer) {
-        state.loveSaveTimer = setTimeout(() => {
-            sacuvajLjubav();
-            state.loveSaveTimer = null;
+function osigurajCuvanjeLjubavi(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    if (!channelState.loveSaveTimer) {
+        channelState.loveSaveTimer = setTimeout(() => {
+            sacuvajLjubav(chatroomId);
+            channelState.loveSaveTimer = null;
         }, config.LOVE_SAVE_INTERVAL_MS);
     }
 }
@@ -529,80 +521,115 @@ async function sacuvajBackupUGist(mesec, stariPodaci) {
     }
 }
 
-async function ucitajCustomKomande() {
+async function ucitajCustomKomande(chatroomId) {
     try {
         if (!KORISTI_SUPABASE) return;
-        log('INFO', `Učitavam custom komande sa Supabase za kanal: ${config.CHANNEL_USERNAME}...`);
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+        const channelUsername = channelState.channelUsername || chatroomId;
+
+        log('INFO', `[${channelUsername}] Učitavam custom komande sa Supabase...`);
         const { data, error } = await supabase
             .from('custom_commands')
             .select('command, response, cooldown_ms, enabled')
-            .eq('channel_id', config.CHATROOM_ID)
+            .eq('channel_id', chatroomId)
             .eq('enabled', true);
 
         if (error) throw error;
 
-        state.customCommands = {};
+        channelState.customCommands = {};
         if (data) {
             data.forEach(row => {
-                // Podržavamo više komandi odvojenih zarezom (npr. "insta, instagram")
                 const aliases = row.command.split(',').map(c => c.trim().toLowerCase());
                 aliases.forEach(alias => {
                     if (alias) {
-                        state.customCommands[alias] = {
+                        channelState.customCommands[alias] = {
                             response: row.response,
                             cooldown_ms: row.cooldown_ms || 5000
                         };
                     }
                 });
             });
-            log('INFO', `Custom komande učitane: ${data.length} redova (sa podrškom za više aliasa).`);
+            log('INFO', `[${channelUsername}] Custom komande učitane: ${data.length} redova.`);
         }
     } catch (err) {
-        log('ERR', `Greška pri učitavanju custom komandi: ${err.message}`);
+        log('ERR', `Greška pri učitavanju custom komandi za ${chatroomId}: ${err.message}`);
     }
 }
 
-async function ucitajBotConfig() {
+async function ucitajBotConfig(chatroomId) {
     try {
         if (!KORISTI_SUPABASE) return;
-        log('INFO', `Učitavam bot konfiguraciju sa Supabase za kanal: ${config.CHANNEL_USERNAME}...`);
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+        const channelUsername = channelState.channelUsername || 'Nepoznat';
+
+        log('INFO', `[${channelUsername}] Učitavam bot konfiguraciju sa Supabase...`);
         const { data, error } = await supabase
             .from('bot_config')
             .select('*')
-            .eq('channel_id', config.CHATROOM_ID)
+            .eq('channel_id', chatroomId)
             .maybeSingle();
 
         if (error) throw error;
 
         if (data) {
-            // Dinamički override u config objektu
-            config.PREFIX = data.prefix || '!';
-            config.COOLDOWN_MS = data.cooldown_ms ?? 3000;
-            config.SPAM_THRESHOLD = data.spam_threshold ?? 3;
-            config.SPAM_WINDOW_MS = data.spam_window_ms ?? 15000;
+            // Dinamički override u stanju kanala
+            channelState.PREFIX = data.prefix || '!';
+            channelState.COOLDOWN_MS = data.cooldown_ms ?? 3000;
+            channelState.SPAM_THRESHOLD = data.spam_threshold ?? 3;
+            channelState.SPAM_WINDOW_MS = data.spam_window_ms ?? 15000;
             
             if (data.stream_pin_msg) {
-                config.STREAM_START_PIN_MESSAGE = data.stream_pin_msg;
+                channelState.STREAM_START_PIN_MESSAGE = data.stream_pin_msg;
+            } else {
+                channelState.STREAM_START_PIN_MESSAGE = '';
             }
             
-            config.feature_leaderboard = data.feature_leaderboard ?? true;
-            config.feature_watchtime = data.feature_watchtime ?? true;
-            config.feature_games = data.feature_games ?? true;
-            config.feature_love = data.feature_love ?? true;
-            config.feature_moderation = data.feature_moderation ?? false;
-            config.feature_autoresponse = data.feature_autoresponse ?? true;
-            config.welcome_message = data.welcome_message;
+            channelState.feature_leaderboard = data.feature_leaderboard ?? true;
+            channelState.feature_watchtime = data.feature_watchtime ?? true;
+            channelState.feature_games = data.feature_games ?? true;
+            channelState.feature_love = data.feature_love ?? true;
+            channelState.feature_moderation = data.feature_moderation ?? false;
+            channelState.feature_autoresponse = data.feature_autoresponse ?? true;
+            channelState.welcome_message = data.welcome_message || '';
             
-            state.botActive = data.bot_active || false;
-            state.autoAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
+            channelState.botActive = data.bot_active || false;
+            channelState.autoAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
             
-            log('INFO', `Bot konfiguracija uspešno učitana. Prefix: '${config.PREFIX}', Cooldown: ${config.COOLDOWN_MS}ms, Aktivnost: ${state.botActive}, Auto poruke: ${state.autoAnnounces.length}`);
+            channelState.announce_interval_mins = data.announce_interval_mins ?? 15;
+            channelState.announce_message_threshold = data.announce_message_threshold ?? 30;
+            channelState.announce_time_enabled = data.announce_time_enabled ?? true;
+            channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
+
+            if (data.channel_name && data.channel_name !== channelState.channelUsername) {
+                channelState.channelUsername = data.channel_name;
+            }
+            
+            log('INFO', `[${channelState.channelUsername}] Bot konfiguracija uspešno učitana. Prefix: '${channelState.PREFIX}', Cooldown: ${channelState.COOLDOWN_MS}ms, Aktivnost: ${channelState.botActive}, Auto poruke: ${channelState.autoAnnounces.length}`);
         } else {
-            state.botActive = false;
-            state.autoAnnounces = [];
+            channelState.botActive = false;
+            channelState.autoAnnounces = [];
         }
     } catch (err) {
-        log('ERR', `Greška pri učitavanju bot konfiguracije: ${err.message}`);
+        log('ERR', `Greška pri učitavanju bot konfiguracije za ${chatroomId}: ${err.message}`);
+    }
+}
+
+async function ucitajSveAktivneKanale() {
+    try {
+        if (!KORISTI_SUPABASE) return [];
+        log('INFO', 'Učitavam sve aktivne kanale iz bot_config tabele...');
+        const { data, error } = await supabase
+            .from('bot_config')
+            .select('*')
+            .eq('bot_active', true);
+
+        if (error) throw error;
+        return data || [];
+    } catch (err) {
+        log('ERR', `Greška pri učitavanju svih aktivnih kanala: ${err.message}`);
+        return [];
     }
 }
 
@@ -618,5 +645,6 @@ module.exports = {
     evidentirajPoruku,
     smanjiPoruku,
     ucitajCustomKomande,
-    ucitajBotConfig
+    ucitajBotConfig,
+    ucitajSveAktivneKanale
 };

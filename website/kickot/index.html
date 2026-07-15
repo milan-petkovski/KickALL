@@ -16,9 +16,18 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-
+    <link rel="shortcut icon" href="assets/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="css/style.css">
-    <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+    <style>
+        .btn-kick-login:hover {
+            background: #47e212 !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(83, 252, 24, 0.2);
+        }
+        .btn-kick-login:active {
+            transform: translateY(0);
+        }
+    </style>
 </head>
 
 <body class="lang-sr"> <!-- Default lang class -->
@@ -208,18 +217,18 @@
                                         <span class="lang-sr">NOVI PRATILAC!</span>
                                         <span class="lang-en">NEW FOLLOWER!</span>
                                     </span>
-                                    <span class="db-alert-desc">tutz_fan (Lojalan član)</span>
+                                    <span class="db-alert-desc">milan_fan (Lojalan član)</span>
                                 </div>
                             </div>
 
                             <!-- Mini Live Chat Mockup -->
                             <div class="db-mini-chat">
-                                <div class="db-chat-msg"><span class="chat-user">novak99</span>: !love @tutz_fan</div>
+                                <div class="db-chat-msg"><span class="chat-user">novak99</span>: !love @milan_fan</div>
                                 <div class="db-chat-msg bot">
                                     <span class="chat-user bot-tag">kickot</span>:
-                                    <span class="lang-sr">novak99 i tutz_fan imaju <strong>87%</strong> kompatibilnost!
+                                    <span class="lang-sr">novak99 i milan_fan imaju <strong>87%</strong> kompatibilnost!
                                         💕</span>
-                                    <span class="lang-en">novak99 and tutz_fan have <strong>87%</strong> compatibility!
+                                    <span class="lang-en">novak99 and milan_fan have <strong>87%</strong> compatibility!
                                         💕</span>
                                 </div>
                             </div>
@@ -417,11 +426,8 @@
                     <div class="cmd-preview" id="mainPlayground">
                         <div class="cp-header" data-i18n="cmd.preview">// Preview — live chat simulacija</div>
                         <div id="cmdPreviewContent" class="cp-messages-container">
-                            <div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!top
-                                    watchtime</span></div>
-                            <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg"
-                                    style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen
-                                    (36h) 3. tutz_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>
+                            <div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!top watchtime</span></div>
+                            <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. milan_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>
                         </div>
                     </div>
                 </div>
@@ -655,7 +661,7 @@
         </div>
     </footer>
     <div class="modal-backdrop" id="authModal" onclick="handleModalBackdropClick(event)">
-        <div class="auth-modal" id="authModalInner" style="max-width: 420px;">
+        <div class="auth-modal" id="authModalInner">
             <button class="modal-close" onclick="closeModal()" aria-label="Close">✕</button>
 
             <div class="modal-logo">
@@ -669,19 +675,30 @@
             </div>
 
             <!-- LOGIN FORM -->
-            <div id="loginForm" class="auth-form" style="display: flex; flex-direction: column; gap: 16px;">
+            <div id="loginForm" class="auth-form">
                 <div class="form-alert form-alert-error" id="loginError"></div>
 
+                <button class="btn-kick-login" onclick="openKickLogin()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><path d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z"/></svg>
+                    <span>Prijavi se preko Kicka</span>
+                </button>
+                
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 4px 0; opacity: 0.5;">
+                    <div style="height: 1px; background: var(--border-subtle); flex: 1;"></div>
+                    <span style="font-size: 0.8rem; font-family: 'Space Grotesk', sans-serif;">ILI</span>
+                    <div style="height: 1px; background: var(--border-subtle); flex: 1;"></div>
+                </div>
+
                 <div class="form-group">
-                    <label class="form-label" for="loginEmail">Email adresa</label>
-                    <input type="email" id="loginEmail" class="form-input" placeholder="npr. ime@email.com" style="width: 100%;" />
+                    <label class="form-label" for="loginEmail">Email ili Kick korisničko ime</label>
+                    <input type="text" id="loginEmail" class="form-input" placeholder="npr. ime@email.com ili milan-567" />
                     <span class="field-error" id="loginEmailErr"></span>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="loginPassword">Lozinka</label>
                     <div class="form-input-wrapper">
-                        <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" style="width: 100%;" />
+                        <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" />
                         <button type="button" class="pw-toggle" onclick="togglePw('loginPassword', this)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
@@ -699,27 +716,32 @@
                 </div>
             </div>
 
+            <!-- KICK LOGIN FORM -->
+            <div id="kickLoginForm" class="auth-form" style="display: none;">
+                <div id="kickLoginContent"></div>
+            </div>
+
             <!-- SIGNUP FORM -->
-            <div id="signupForm" class="auth-form" style="display: none; flex-direction: column; gap: 16px;">
+            <div id="signupForm" class="auth-form" style="display: none;">
                 <div class="form-alert form-alert-error" id="signupError"></div>
                 <div class="form-alert form-alert-success" id="signupSuccess"></div>
 
                 <div class="form-group">
                     <label class="form-label" for="signupName">Korisničko ime</label>
-                    <input type="text" id="signupName" class="form-input" placeholder="npr. tutz_live" style="width: 100%;" />
+                    <input type="text" id="signupName" class="form-input" placeholder="npr. milan-567" />
                     <span class="field-error" id="signupNameErr"></span>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="signupEmail">Email adresa</label>
-                    <input type="email" id="signupEmail" class="form-input" placeholder="npr. ime@email.com" style="width: 100%;" />
+                    <input type="email" id="signupEmail" class="form-input" placeholder="npr. ime@email.com" />
                     <span class="field-error" id="signupEmailErr"></span>
                 </div>
 
                 <div class="form-group">
                     <label class="form-label" for="signupPassword">Lozinka (min. 8 karaktera)</label>
                     <div class="form-input-wrapper">
-                        <input type="password" id="signupPassword" class="form-input" placeholder="••••••••" style="width: 100%;" />
+                        <input type="password" id="signupPassword" class="form-input" placeholder="••••••••" />
                         <button type="button" class="pw-toggle" onclick="togglePw('signupPassword', this)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
@@ -734,7 +756,7 @@
             </div>
 
             <!-- FORGOT PASSWORD FORM -->
-            <div id="forgotForm" class="auth-form" style="display: none; flex-direction: column; gap: 16px;">
+            <div id="forgotForm" class="auth-form" style="display: none;">
                 <div class="form-alert form-alert-error" id="forgotError"></div>
                 <div class="form-alert form-alert-success" id="forgotSuccess"></div>
 
@@ -744,7 +766,7 @@
 
                 <div class="form-group">
                     <label class="form-label" for="forgotEmail">Email adresa</label>
-                    <input type="email" id="forgotEmail" class="form-input" placeholder="npr. ime@email.com" style="width: 100%;" />
+                    <input type="email" id="forgotEmail" class="form-input" placeholder="npr. ime@email.com" />
                     <span class="field-error" id="forgotEmailErr"></span>
                 </div>
 
@@ -755,17 +777,6 @@
 
                 <div style="text-align: center; margin-top: 8px;">
                     <a href="#" onclick="switchTab('login')" style="font-size: 0.85rem; color: var(--color-violet); text-decoration: none;">← Nazad na prijavu</a>
-                </div>
-            </div>
-        </div>
-    </div>5,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #fff; display: flex; justify-content: center; align-items: center; cursor: pointer;">
-                        <span class="btn-text" style="color: var(--color-green);">Simuliraj verifikaciju (Test)</span>
-                    </button>
-
-                    <button class="btn btn-outline" onclick="goBackToUsernameInput()"
-                        style="margin-top: 4px; padding: 10px;">
-                        ← Nazad
-                    </button>
                 </div>
             </div>
         </div>
@@ -873,7 +884,7 @@
                             Kick kanal</label>
                         <div style="display: flex; gap: 8px;">
                             <input type="text" id="settingsNewChannelInput" class="form-control"
-                                placeholder="npr. tutz_live" style="flex: 1;" />
+                                placeholder="npr. milan-567" style="flex: 1;" />
                             <button class="btn btn-primary btn-sm" onclick="addNewChannel()" id="settingsAddChannelBtn"
                                 style="white-space: nowrap; background: var(--color-violet, #8B5CF6); border: none; color: #fff; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer;">Dodaj</button>
                         </div>

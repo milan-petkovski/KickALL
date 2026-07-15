@@ -7,72 +7,67 @@ const { posaljiPoruku } = require('./messenger');
 // Interval ažuriranja i prozor aktivnosti (10 minuta)
 const UPDATE_INTERVAL_MS = 10 * 60 * 1000;
 
-// Inicijalizacija in-memory watchtime stanja (sigurno, bez override-a)
-if (!state.watchtime) state.watchtime = {};
-if (!state.watchtimeDirty) state.watchtimeDirty = false;
-if (!state.watchtimeLastSeen) state.watchtimeLastSeen = {};
-if (!state.watchtimeDeltas) state.watchtimeDeltas = {};
-if (!state.watchtimeTickTimer) state.watchtimeTickTimer = null;
-
 // ─── UČITAVANJE SA SUPABASE ───────────────────────────────────────────────────
-async function ucitajWatchtime() {
+async function ucitajWatchtime(chatroomId) {
     try {
         if (!KORISTI_SUPABASE) {
-            log('WARN', 'Watchtime: Supabase nije konfigurisan, watchtime neće biti praćen.');
+            log('WARN', `Watchtime: Supabase nije konfigurisan, watchtime za ${chatroomId} neće biti praćen.`);
             return;
         }
 
-        log('INFO', `Učitavam watchtime sa Supabase za kanal: ${config.CHANNEL_USERNAME}...`);
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+        const channelUsername = channelState.channelUsername || chatroomId;
+
+        log('INFO', `[${channelUsername}] Učitavam watchtime sa Supabase...`);
         const { data, error } = await supabase
             .from('watchtime')
             .select('username, display_name, minutes')
-            .eq('channel_id', config.CHATROOM_ID);
+            .eq('channel_id', chatroomId);
 
         if (error) throw error;
 
-        // Resetuj in-memory i delte pri svakom ucitavanju
-        state.watchtime = {};
-        state.watchtimeDeltas = {};
+        channelState.watchtime = {};
+        channelState.watchtimeDeltas = {};
 
         if (data && data.length > 0) {
             data.forEach(row => {
-                state.watchtime[row.username.toLowerCase()] = {
+                channelState.watchtime[row.username.toLowerCase()] = {
                     display_name: row.display_name,
                     minutes: row.minutes
                 };
             });
-            log('INFO', `Watchtime učitan: ${data.length} korisnika.`);
+            log('INFO', `[${channelUsername}] Watchtime učitan: ${data.length} korisnika.`);
         } else {
-            log('INFO', 'Watchtime: Nema podataka u bazi, počinjemo od nule.');
+            log('INFO', `[${channelUsername}] Watchtime: Nema podataka u bazi, počinjemo od nule.`);
         }
     } catch (err) {
-        log('ERR', `Greška pri učitavanju watchtime-a: ${err.message}`);
+        log('ERR', `Greška pri učitavanju watchtime-a za ${chatroomId}: ${err.message}`);
     }
 }
 
-// ─── ČUVANJE NA SUPABASE (odmah pri tick-u jer je na svakih 10 min) ───────────
-async function sacuvajWatchtime() {
-    if (!state.watchtimeDirty) return;
+// ─── ČUVANJE NA SUPABASE ──────────────────────────────────────────────────────
+async function sacuvajWatchtime(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || !channelState.watchtimeDirty) return;
     if (!KORISTI_SUPABASE) return;
 
     try {
-        const dirtyKeys = Object.keys(state.watchtimeDeltas).filter(k => state.watchtimeDeltas[k] !== 0);
+        const dirtyKeys = Object.keys(channelState.watchtimeDeltas).filter(k => channelState.watchtimeDeltas[k] !== 0);
 
         if (dirtyKeys.length === 0) {
-            state.watchtimeDirty = false;
+            channelState.watchtimeDirty = false;
             return;
         }
 
-        // Povuci trenutni watchtime iz baze za aktivne korisnike
         const { data, error: fetchError } = await supabase
             .from('watchtime')
             .select('username, minutes')
-            .eq('channel_id', config.CHATROOM_ID)
+            .eq('channel_id', chatroomId)
             .in('username', dirtyKeys);
 
         if (fetchError) throw fetchError;
 
-        // Mapa username -> trenutni minuti iz baze
         const dbMap = {};
         if (data) {
             data.forEach(row => {
@@ -80,23 +75,21 @@ async function sacuvajWatchtime() {
             });
         }
 
-        // Pripremi redove: baza + delta = novi total
         const rowsToUpsert = dirtyKeys.map(key => {
             const dbMinutes = dbMap[key] !== undefined ? dbMap[key] : 0;
-            const delta = state.watchtimeDeltas[key];
+            const delta = channelState.watchtimeDeltas[key];
             const newMinutes = Math.max(0, dbMinutes + delta);
 
             return {
-                channel_id: config.CHATROOM_ID,
+                channel_id: chatroomId,
                 username: key,
-                display_name: (state.watchtime[key] && state.watchtime[key].display_name) || key,
+                display_name: (channelState.watchtime[key] && channelState.watchtime[key].display_name) || key,
                 minutes: newMinutes,
                 updated_at: new Date().toISOString(),
-                _newMinutes: newMinutes // privremeno za sinhronizaciju memorije
+                _newMinutes: newMinutes
             };
         });
 
-        // Upsert - tek NAKON uspešnog upisa resetuj delte i ažuriraj memoriju
         const rowsClean = rowsToUpsert.map(({ _newMinutes, ...r }) => r);
         const { error: upsertError } = await supabase
             .from('watchtime')
@@ -104,86 +97,97 @@ async function sacuvajWatchtime() {
 
         if (upsertError) throw upsertError;
 
-        // Uspešno - sinhronizuj in-memory sa vrednostima koje smo upisali
         rowsToUpsert.forEach(row => {
             const key = row.username;
-            if (state.watchtime[key]) {
-                state.watchtime[key].minutes = row._newMinutes;
+            if (channelState.watchtime[key]) {
+                channelState.watchtime[key].minutes = row._newMinutes;
             } else {
-                state.watchtime[key] = {
+                channelState.watchtime[key] = {
                     display_name: row.display_name,
                     minutes: row._newMinutes
                 };
             }
-            delete state.watchtimeDeltas[key]; // ukloni, ne ostavljaj 0
+            delete channelState.watchtimeDeltas[key];
         });
 
-        state.watchtimeDirty = false;
-        log('INFO', `Watchtime sačuvan na Supabase (${rowsClean.length} korisnika).`);
+        channelState.watchtimeDirty = false;
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Watchtime sačuvan na Supabase (${rowsClean.length} korisnika).`);
     } catch (err) {
-        // Delte se NAMERNO ne resetuju - čuvaju se za sledeći pokušaj
-        log('ERR', `Greška pri čuvanju watchtime-a: ${err.message}`);
+        log('ERR', `Greška pri čuvanju watchtime-a za ${chatroomId}: ${err.message}`);
     }
 }
 
-// ─── TICK: Dodaje 10 minuta gledaocima koji su poslali poruku u poslednjih 10 min
-async function watchtimeTick() {
-    if (!state.isStreamLive) return;
+// ─── TICK ────────────────────────────────────────────────────────────────────
+async function watchtimeTick(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || !channelState.isStreamLive) return;
 
     const sada = Date.now();
     let nesto = false;
     let dodatiKorisnici = [];
 
-    for (const [username, lastSeenTs] of Object.entries(state.watchtimeLastSeen)) {
+    for (const [username, lastSeenTs] of Object.entries(channelState.watchtimeLastSeen)) {
         if (sada - lastSeenTs <= UPDATE_INTERVAL_MS) {
             const key = username.toLowerCase();
-            if (!state.watchtime[key]) {
-                state.watchtime[key] = { display_name: username, minutes: 0 };
+            if (!channelState.watchtime[key]) {
+                channelState.watchtime[key] = { display_name: username, minutes: 0 };
             }
-            // Povecaj in-memory i delta
-            state.watchtime[key].minutes += 10;
-            state.watchtimeDeltas[key] = (state.watchtimeDeltas[key] || 0) + 10;
-            dodatiKorisnici.push(state.watchtime[key].display_name);
+            channelState.watchtime[key].minutes += 10;
+            channelState.watchtimeDeltas[key] = (channelState.watchtimeDeltas[key] || 0) + 10;
+            dodatiKorisnici.push(channelState.watchtime[key].display_name);
             nesto = true;
         }
     }
 
     if (nesto) {
-        log('INFO', `Watchtime tick pokrenut. Dodato po +10 minuta za: ${dodatiKorisnici.join(', ')}`);
-        state.watchtimeDirty = true;
-        await sacuvajWatchtime();
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Watchtime tick. Dodato po +10 minuta za: ${dodatiKorisnici.join(', ')}`);
+        channelState.watchtimeDirty = true;
+        await sacuvajWatchtime(chatroomId);
     }
 }
 
-// ─── Registruj korisnika (poziva se na svaku poslatu poruku na lajvu) ──────────
-function registrujAktivnogGledaoca(username) {
-    if (!state.isStreamLive) return;
+async function watchtimeTickSve() {
+    for (const chatroomId of Object.keys(state.channels)) {
+        const channelState = state.channels[chatroomId];
+        if (channelState && channelState.botActive && channelState.isStreamLive && channelState.feature_watchtime) {
+            await watchtimeTick(chatroomId);
+        }
+    }
+}
+
+// ─── Registruj aktivnog gledaoca ──────────────────────────────────────────────
+function registrujAktivnogGledaoca(chatroomId, username) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    if (!channelState.isStreamLive) return;
     if (!isValidUsername(username)) return;
 
     const clean = sanitizeInput(username);
     const key = clean.toLowerCase();
 
-    state.watchtimeLastSeen[key] = Date.now();
+    channelState.watchtimeLastSeen[key] = Date.now();
 
-    if (!state.watchtime[key]) {
-        state.watchtime[key] = { display_name: clean, minutes: 0 };
+    if (!channelState.watchtime[key]) {
+        channelState.watchtime[key] = { display_name: clean, minutes: 0 };
     } else {
-        state.watchtime[key].display_name = clean;
+        channelState.watchtime[key].display_name = clean;
     }
 }
 
 // Čišćenje kada strim ode offline
-function ocistiAktivneGledaoce() {
-    log('INFO', 'Strim je offline, praznim registre aktivnosti gledalaca.');
-    state.watchtimeLastSeen = {};
-    sacuvajWatchtime();
+function ocistiAktivneGledaoce(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    log('INFO', `[${channelState.channelUsername || chatroomId}] Strim je offline, praznim registre aktivnosti gledalaca.`);
+    channelState.watchtimeLastSeen = {};
+    sacuvajWatchtime(chatroomId);
 }
 
 // ─── POKRETANJE I ZAUSTAVLJANJE TIMERA ─────────────────────────────────────────
 function pokreniWatchtimeTick() {
     if (state.watchtimeTickTimer) return;
-    state.watchtimeTickTimer = setInterval(watchtimeTick, UPDATE_INTERVAL_MS);
-    log('INFO', 'Watchtime tick pokrenut (svakih 10 minuta).');
+    state.watchtimeTickTimer = setInterval(watchtimeTickSve, UPDATE_INTERVAL_MS);
+    log('INFO', 'Globalni watchtime tick pokrenut (svakih 10 minuta).');
 }
 
 function zaustavljWatchtimeTick() {
@@ -210,7 +214,10 @@ function formatWatchtime(ukupnoMinuta) {
 }
 
 // ─── KOMANDA: !watchtime [@user] ─────────────────────────────────────────────
-function handleWatchtime(sender, targetRaw) {
+function handleWatchtime(chatroomId, sender, targetRaw) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
     const target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : '';
 
     let user;
@@ -219,24 +226,27 @@ function handleWatchtime(sender, targetRaw) {
     } else if (!target) {
         user = sender;
     } else {
-        posaljiPoruku('❌ Nevalidno korisničko ime.');
+        posaljiPoruku(chatroomId, '❌ Nevalidno korisničko ime.');
         return;
     }
 
     const key = user.toLowerCase();
-    const podaci = state.watchtime[key];
+    const podaci = channelState.watchtime[key];
 
     if (!podaci || podaci.minutes === 0) {
-        posaljiPoruku(`⏱️ @${user} još uvek nema zabeleženog watchtime-a na ovom kanalu.`);
+        posaljiPoruku(chatroomId, `⏱️ @${user} još uvek nema zabeleženog watchtime-a na ovom kanalu.`);
         return;
     }
 
     const tekst = formatWatchtime(podaci.minutes);
-    posaljiPoruku(`⏱️ @${user} je gledao strim ukupno: ${tekst}`);
+    posaljiPoruku(chatroomId, `⏱️ @${user} je gledao strim ukupno: ${tekst}`);
 }
 
 // ─── KOMANDA: !topwatchtime [broj] ───────────────────────────────────────────
-function handleTopWatchtime(numRaw) {
+function handleTopWatchtime(chatroomId, numRaw) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
     let limit = 5;
     if (numRaw) {
         const parsed = parseInt(numRaw.trim(), 10);
@@ -245,12 +255,12 @@ function handleTopWatchtime(numRaw) {
         }
     }
 
-    const sortirani = Object.values(state.watchtime)
+    const sortirani = Object.values(channelState.watchtime)
         .sort((a, b) => b.minutes - a.minutes)
         .filter(x => x.minutes > 0);
 
     if (sortirani.length === 0) {
-        posaljiPoruku('⏱️ Još nema watchtime podataka za ovaj kanal!');
+        posaljiPoruku(chatroomId, '⏱️ Još nema watchtime podataka za ovaj kanal!');
         return;
     }
 

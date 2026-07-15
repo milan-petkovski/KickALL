@@ -680,16 +680,18 @@
               </h2>
 
               <!-- Forma za dodavanje kanala -->
-              <div class="settings-form-group" style="margin-bottom: 0.5rem;">
-                <label>Dodaj novi Kick kanal</label>
-                <div class="settings-input-wrap">
-                  <span class="settings-input-icon">🟢</span>
-                  <input type="text" id="newChannelInput" class="settings-input" placeholder="kick.com/tvoj-kanal" style="padding-right: 120px;" />
-                  <button class="settings-btn green" id="addChannelBtn" onclick="addNewChannel()" style="position: absolute; right: 4px; padding: 0.5rem 1rem; font-size: 0.8rem; height: calc(100% - 8px);">
-                    Dodaj kanal
-                  </button>
+              <div id="addChannelFormContainer">
+                <div class="settings-form-group" style="margin-bottom: 0.5rem;">
+                  <label>Dodaj novi Kick kanal</label>
+                  <div class="settings-input-wrap">
+                    <span class="settings-input-icon">🟢</span>
+                    <input type="text" id="newChannelInput" class="settings-input" placeholder="kick.com/tvoj-kanal" style="padding-right: 120px;" />
+                    <button class="settings-btn green" id="addChannelBtn" onclick="addNewChannel()" style="position: absolute; right: 4px; padding: 0.5rem 1rem; font-size: 0.8rem; height: calc(100% - 8px);">
+                      Dodaj kanal
+                    </button>
+                  </div>
+                  <div class="ch-error-msg" id="addChannelError"></div>
                 </div>
-                <div class="ch-error-msg" id="addChannelError"></div>
               </div>
               <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom: 1.5rem;">
                 *Napomena: Bot radi automatski na svim povezanim kanalima u listi ispod. Možeš postaviti jedan kanal kao primarni.
@@ -1062,67 +1064,239 @@
       return null;
     }
 
+    let tempResolvedChannel = null;
+    let tempVerificationCode = '';
+
     // Add New Kick Channel Action
     async function addNewChannel() {
       const rawInput = document.getElementById('newChannelInput').value.trim();
       const errEl = document.getElementById('addChannelError');
-      errEl.style.display = 'none';
+      if (errEl) errEl.style.display = 'none';
 
       if (!rawInput) {
-        errEl.textContent = 'Unesi Kick username ili link kanala.';
-        errEl.style.display = 'block';
+        if (errEl) {
+          errEl.textContent = 'Unesi Kick username ili link kanala.';
+          errEl.style.display = 'block';
+        }
         return;
       }
 
       const username = extractKickUsername(rawInput);
       if (!username) {
-        errEl.textContent = 'Nevalidan unos kanala.';
-        errEl.style.display = 'block';
+        if (errEl) {
+          errEl.textContent = 'Nevalidan unos kanala.';
+          errEl.style.display = 'block';
+        }
         return;
       }
 
-      document.getElementById('addChannelBtn').disabled = true;
+      const addBtn = document.getElementById('addChannelBtn');
+      if (addBtn) addBtn.disabled = true;
+      
       const resolved = await resolveChatroomId(username);
 
       if (!resolved) {
-        document.getElementById('addChannelBtn').disabled = false;
-        errEl.textContent = `Kanal "${username}" nije pronađen na Kick platformi. Proveri ispravnost.`;
-        errEl.style.display = 'block';
+        if (addBtn) addBtn.disabled = false;
+        if (errEl) {
+          errEl.textContent = `Kanal "${username}" nije pronađen na Kick platformi. Proveri ispravnost.`;
+          errEl.style.display = 'block';
+        }
         return;
       }
 
       const { id: channelId, username: channelName } = resolved;
 
       if (currentChannels.some(c => c.id === channelId)) {
-        document.getElementById('addChannelBtn').disabled = false;
-        errEl.textContent = 'Ovaj kanal je već dodat na tvoj nalog.';
-        errEl.style.display = 'block';
+        if (addBtn) addBtn.disabled = false;
+        if (errEl) {
+          errEl.textContent = 'Ovaj kanal je već dodat na tvoj nalog.';
+          errEl.style.display = 'block';
+        }
         return;
       }
 
-      const newChannel = {
-        id: channelId,
-        username: channelName,
-        is_primary: currentChannels.length === 0
-      };
+      // Provera da li je ovaj Kick kanal već registrovan na nekom drugom nalogu
+      const { data: taken, error: checkErr } = await sb.from('user_profiles')
+        .select('id')
+        .contains('kick_channels', [{ id: channelId }]);
 
-      const updatedChannels = [...currentChannels, newChannel];
-
-      const { error } = await sb.from('user_profiles')
-        .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
-        .eq('id', currentUser.id);
-
-      document.getElementById('addChannelBtn').disabled = false;
-
-      if (error) {
-        errEl.textContent = 'Greška pri čuvanju kanala u bazu. Pokušaj ponovo.';
-        errEl.style.display = 'block';
+      if (!checkErr && taken && taken.length > 0) {
+        if (addBtn) addBtn.disabled = false;
+        if (errEl) {
+          errEl.textContent = 'Ovaj kanal je već povezan sa drugim nalogom.';
+          errEl.style.display = 'block';
+        }
         return;
       }
 
-      document.getElementById('newChannelInput').value = '';
-      showToast('success', `Kanal @${channelName} je uspešno dodat!`, '✅');
-      await loadUserProfile();
+      tempResolvedChannel = resolved;
+      tempVerificationCode = `kickot-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      showVerificationStep(channelName);
+    }
+
+    function showVerificationStep(channelName) {
+      const container = document.getElementById('addChannelFormContainer');
+      if (container) {
+        container.innerHTML = `
+          <div class="settings-form-group" style="margin-bottom: 0.5rem; display: flex; flex-direction: column; gap: 8px;">
+            <label>Verifikacija vlasništva za @<strong>${channelName}</strong></label>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4; margin: 0 0 4px 0;">
+              Da bismo potvrdili da poseduješ ovaj kanal, kopiraj i stavi ovaj kod u svoj opis kanala (Bio/About) na Kick-u:
+            </p>
+            <div style="background: rgba(83,252,24,0.1); border: 1px dashed #53fc18; padding: 10px; border-radius: 6px; font-family: monospace; font-size: 1.1rem; font-weight: 700; color: #53fc18; text-align: center; margin-bottom: 4px; letter-spacing: 1px;">
+              ${tempVerificationCode}
+            </div>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <button class="settings-btn green" id="verifyChannelBtn" onclick="verifyAndAddChannel()" style="flex: 1; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600;">
+                Verifikuj i dodaj
+              </button>
+              <button class="settings-btn" type="button" onclick="resetAddChannelForm()" style="padding: 0.5rem 1rem; font-size: 0.85rem; background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); color: var(--text-secondary);">
+                Otkaži
+              </button>
+            </div>
+            <div class="ch-error-msg" id="verifyChannelError" style="margin-top: 4px;"></div>
+          </div>
+        `;
+      }
+    }
+
+    function resetAddChannelForm() {
+      tempResolvedChannel = null;
+      tempVerificationCode = '';
+      const container = document.getElementById('addChannelFormContainer');
+      if (container) {
+        container.innerHTML = `
+          <div class="settings-form-group" style="margin-bottom: 0.5rem;">
+            <label>Dodaj novi Kick kanal</label>
+            <div class="settings-input-wrap">
+              <span class="settings-input-icon">🟢</span>
+              <input type="text" id="newChannelInput" class="settings-input" placeholder="kick.com/tvoj-kanal" style="padding-right: 120px;" />
+              <button class="settings-btn green" id="addChannelBtn" onclick="addNewChannel()" style="position: absolute; right: 4px; padding: 0.5rem 1rem; font-size: 0.8rem; height: calc(100% - 8px);">
+                Dodaj kanal
+              </button>
+            </div>
+            <div class="ch-error-msg" id="addChannelError"></div>
+          </div>
+        `;
+      }
+    }
+
+    async function fetchKickBio(username) {
+      try {
+        const localRes = await fetch(`http://localhost:3000/api/avatar?username=${username}`);
+        if (localRes.ok) {
+          const localData = await localRes.json();
+          return localData?.bio || '';
+        }
+      } catch (_) { }
+
+      const apiUrl = `https://kick.com/api/v2/channels/${username}`;
+      const proxies = [
+        {
+          url: `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`,
+          parse: async (res) => {
+            const json = await res.json();
+            const data = json.contents ? JSON.parse(json.contents) : null;
+            return data?.user?.bio || '';
+          }
+        },
+        {
+          url: `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
+          parse: async (res) => {
+            const data = await res.json();
+            return data?.user?.bio || '';
+          }
+        }
+      ];
+
+      return new Promise((resolve) => {
+        let completed = 0;
+        let resolved = false;
+
+        proxies.forEach(proxy => {
+          fetch(proxy.url)
+            .then(async (res) => {
+              if (res.ok && !resolved) {
+                const bio = await proxy.parse(res);
+                if (bio !== undefined && bio !== null && !resolved) {
+                  resolved = true;
+                  resolve(bio);
+                }
+              }
+            })
+            .catch(() => { })
+            .finally(() => {
+              completed++;
+              if (completed === proxies.length && !resolved) {
+                resolve('');
+              }
+            });
+        });
+
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            resolve('');
+          }
+        }, 6000);
+      });
+    }
+
+    async function verifyAndAddChannel() {
+      const errEl = document.getElementById('verifyChannelError');
+      if (errEl) errEl.style.display = 'none';
+
+      if (!tempResolvedChannel || !tempVerificationCode) return;
+
+      const btn = document.getElementById('verifyChannelBtn');
+      if (btn) btn.disabled = true;
+
+      try {
+        const bio = await fetchKickBio(tempResolvedChannel.username);
+        const hasCode = bio.toLowerCase().includes(tempVerificationCode.toLowerCase());
+
+        if (!hasCode) {
+          if (errEl) {
+            errEl.textContent = 'Verifikacioni kod nije pronađen u tvom Kick opisu (Bio/About). Molimo te dodaj kod i pokušaj ponovo.';
+            errEl.style.display = 'block';
+          }
+          if (btn) btn.disabled = false;
+          return;
+        }
+
+        const newChannel = {
+          id: tempResolvedChannel.id,
+          username: tempResolvedChannel.username,
+          is_primary: currentChannels.length === 0
+        };
+
+        const updatedChannels = [...currentChannels, newChannel];
+
+        const { error } = await sb.from('user_profiles')
+          .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+          .eq('id', currentUser.id);
+
+        if (error) {
+          if (errEl) {
+            errEl.textContent = 'Greška pri čuvanju kanala u bazu. Pokušaj ponovo.';
+            errEl.style.display = 'block';
+          }
+          if (btn) btn.disabled = false;
+          return;
+        }
+
+        showToast('success', `Kanal @${tempResolvedChannel.username} je uspešno dodat!`, '✅');
+        resetAddChannelForm();
+        await loadUserProfile();
+      } catch (err) {
+        if (errEl) {
+          errEl.textContent = 'Greška tokom verifikacije opisa kanala.';
+          errEl.style.display = 'block';
+        }
+        if (btn) btn.disabled = false;
+        console.error(err);
+      }
     }
 
     // Save Profile Info (updates metadata name + base64 avatar URL)

@@ -4,7 +4,7 @@ const CHATROOM_ID      = process.env.CHATROOM_ID;
 const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
 const BEARER_TOKEN     = process.env.BEARER_TOKEN;
 const BOT_COOKIE       = process.env.BOT_COOKIE;
-const BOT_USERNAME     = process.env.BOT_USERNAME || "tutzonja";
+const BOT_USERNAME     = process.env.BOT_USERNAME || "kickot_bot";
 const SUPABASE_URL     = process.env.SUPABASE_URL;
 const SUPABASE_KEY     = process.env.SUPABASE_KEY;
 
@@ -47,17 +47,5 @@ module.exports = {
     // Fajl banze i keš
     LEADERBOARD_FILE: './leaderboard.json',
     LOVE_DATA_FILE: './love_data.json',
-
-    // Poruke na lajvu
-    STREAM_START_PIN_MESSAGE: '🎁 BRAWL PASS ZA TOP 10 NAJAKTIVNIJIH! Gledaj lajv, piši u chatu, podrži priču i osvoji nagradu na kraju meseca! 🔥 Info na !komande',
-    
-    // Statičke poruke
-    specPoruka: '🖥️ Tutz PC Setup: Ryzen 9 5900X | RTX 4080 16GB | 32GB RAM | Asus ROG B550-F | 2.5TB SSD | ROG 750W Gold | Corsair H150i LCD | Ekran: 2x Asus 144Hz | Miš: G502 Hero | Tastatura: Scope RX',
-    giveawayPoruka: '🎁 Tutz Giveaway: https://tutzz.netlify.app/giveaway',
-    linktreePoruka: '🌳 Sve mreže i linkovi: https://tutzz.netlify.app/linktree',
-    merchPoruka: '🛍️ Tutz Merch: https://tutzshop.com',
-    instaPoruka: '📸 Instagram: https://instagram.com/tutzgaming',
-    tiktokPoruka: '🎵 TikTok: https://tiktok.com/@not_tutz',
-    youtubePoruka: '🎥 YouTube: https://youtube.com/@TutzOfficial',
-    discordPoruka: '💬 Discord: https://discord.gg/u3Sf9rTyDt'
 };
+

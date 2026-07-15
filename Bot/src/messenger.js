@@ -2,32 +2,38 @@ const config = require('./config');
 const state = require('./state');
 const { log } = require('./utils');
 
-function posaljiPoruku(tekst) {
-    state.messageQueue.push(tekst);
-    processQueue();
+function posaljiPoruku(chatroomId, tekst) {
+    if (!chatroomId) return;
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    channelState.messageQueue.push(tekst);
+    processQueue(chatroomId);
 }
 
-async function processQueue() {
-    if (state.isProcessingQueue) return;
-    if (state.messageQueue.length === 0) return;
+async function processQueue(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    if (channelState.isProcessingQueue) return;
+    if (channelState.messageQueue.length === 0) return;
 
-    state.isProcessingQueue = true;
-    const tekst = state.messageQueue.shift();
+    channelState.isProcessingQueue = true;
+    const tekst = channelState.messageQueue.shift();
 
     try {
-        await izvrsiSlanje(tekst);
+        await izvrsiSlanje(chatroomId, tekst);
     } catch (error) {
-        log('ERR', `Greška pri izvršavanju slanja poruke: ${error.message}`);
+        log('ERR', `[${channelState.channelUsername || chatroomId}] Greška pri izvršavanju slanja poruke: ${error.message}`);
     }
 
     setTimeout(() => {
-        state.isProcessingQueue = false;
-        processQueue();
+        channelState.isProcessingQueue = false;
+        processQueue(chatroomId);
     }, 1500);
 }
 
-async function izvrsiSlanje(tekst) {
-    const response = await fetch(`https://kick.com/api/v2/messages/send/${config.CHATROOM_ID}`, {
+async function izvrsiSlanje(chatroomId, tekst) {
+    const response = await fetch(`https://kick.com/api/v2/messages/send/${chatroomId}`, {
         method: 'POST',
         headers: {
             'accept':        'application/json',
@@ -44,7 +50,8 @@ async function izvrsiSlanje(tekst) {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    log('BOT', tekst);
+    const channelState = state.getChannelState(chatroomId);
+    log('BOT', `[${(channelState && channelState.channelUsername) || chatroomId}] ${tekst}`);
 
     try {
         const json = await response.json();
@@ -55,26 +62,32 @@ async function izvrsiSlanje(tekst) {
     }
 }
 
-async function posaljiIPinujPoruku(tekst) {
+async function posaljiIPinujPoruku(chatroomId, tekst) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    const channelUsername = channelState.channelUsername;
     try {
-        log('INFO', `Šaljem poruku za pin: "${tekst}"`);
-        const msgId = await izvrsiSlanje(tekst);
+        log('INFO', `[${channelUsername}] Šaljem poruku za pin: "${tekst}"`);
+        const msgId = await izvrsiSlanje(chatroomId, tekst);
         if (msgId) {
-            log('INFO', `Poruka poslata sa ID-jem: ${msgId}. Pokušavam da je pinujem...`);
+            log('INFO', `[${channelUsername}] Poruka poslata sa ID-jem: ${msgId}. Pokušavam da je pinujem...`);
             await new Promise(resolve => setTimeout(resolve, 1500));
-            await pinujPoruku(msgId);
+            await pinujPoruku(chatroomId, msgId);
         } else {
-            log('WARN', 'Nije dobijen ID poruke, nemoguće je pinovati.');
+            log('WARN', `[${channelUsername}] Nije dobijen ID poruke, nemoguće je pinovati.`);
         }
     } catch (err) {
-        log('ERR', `Greška pri slanju i pinovanju poruke: ${err.message}`);
+        log('ERR', `[${channelUsername}] Greška pri slanju i pinovanju poruke: ${err.message}`);
     }
 }
 
-async function pinujPoruku(messageId) {
+async function pinujPoruku(chatroomId, messageId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    const channelUsername = channelState.channelUsername;
     try {
         const { gotScraping } = await import('got-scraping');
-        const url = `https://kick.com/api/v2/channels/${config.CHANNEL_USERNAME}/pinned-message`;
+        const url = `https://kick.com/api/v2/channels/${channelUsername}/pinned-message`;
         const res = await gotScraping({
             url: url,
             method: 'POST',
@@ -93,19 +106,22 @@ async function pinujPoruku(messageId) {
         });
 
         if (res.statusCode >= 200 && res.statusCode < 300) {
-            log('INFO', `Poruka uspešno pinovana na lajvu!`);
+            log('INFO', `[${channelUsername}] Poruka uspešno pinovana na lajvu!`);
         } else {
-            log('ERR', `Neuspešan pin poruke: HTTP ${res.statusCode} - ${JSON.stringify(res.body)}`);
+            log('ERR', `[${channelUsername}] Neuspešan pin poruke: HTTP ${res.statusCode} - ${JSON.stringify(res.body)}`);
         }
     } catch (err) {
-        log('ERR', `Greška pri pinovanju poruke: ${err.message}`);
+        log('ERR', `[${channelUsername}] Greška pri pinovanju poruke: ${err.message}`);
     }
 }
 
-async function odpinujPoruku() {
+async function odpinujPoruku(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    const channelUsername = channelState.channelUsername;
     try {
         const { gotScraping } = await import('got-scraping');
-        const url = `https://kick.com/api/v2/channels/${config.CHANNEL_USERNAME}/pinned-message`;
+        const url = `https://kick.com/api/v2/channels/${channelUsername}/pinned-message`;
         const res = await gotScraping({
             url: url,
             method: 'DELETE',
@@ -118,12 +134,12 @@ async function odpinujPoruku() {
         });
 
         if (res.statusCode >= 200 && res.statusCode < 300) {
-            log('INFO', `Poruka uspešno odpinovana sa lajva!`);
+            log('INFO', `[${channelUsername}] Poruka uspešno odpinovana sa lajva!`);
         } else {
-            log('ERR', `Neuspešan unpin poruke: HTTP ${res.statusCode} - ${JSON.stringify(res.body)}`);
+            log('ERR', `[${channelUsername}] Neuspešan unpin poruke: HTTP ${res.statusCode} - ${JSON.stringify(res.body)}`);
         }
     } catch (err) {
-        log('ERR', `Greška pri unpinovanju poruke: ${err.message}`);
+        log('ERR', `[${channelUsername}] Greška pri unpinovanju poruke: ${err.message}`);
     }
 }
 

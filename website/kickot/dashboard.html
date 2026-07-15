@@ -1764,10 +1764,93 @@
                 <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
               </svg>
             </div>
+        </section>
+
+        <!-- ══ NO CHANNEL PANEL ══ -->
+        <section id="panel-no-channel" class="panel">
+          <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:85vh; text-align:center; padding:40px 20px; font-family:'Space Grotesk', sans-serif;">
+            
+            <!-- Central Glassmorphism Card -->
+            <div style="background:rgba(15, 11, 30, 0.7); border:1px solid rgba(139, 92, 246, 0.2); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border-radius:24px; padding:40px 30px; max-width:520px; width:100%; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 40px rgba(139, 92, 246, 0.05); display:flex; flex-direction:column; align-items:center; gap:20px;">
+              
+              <!-- Shield/Lock SVG with glow -->
+              <div style="background:rgba(139, 92, 246, 0.05); border:1px solid rgba(139, 92, 246, 0.15); width:80px; height:80px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 0 25px rgba(139, 92, 246, 0.15);">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="url(#violetGradient3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.55));">
+                  <defs>
+                    <linearGradient id="violetGradient3" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#a78bfa" />
+                      <stop offset="100%" stop-color="#8b5cf6" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              </div>
+
+              <!-- Title and Description -->
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <h2 style="font-size:1.6rem; font-weight:700; color:#fff; margin:0; letter-spacing:-0.5px;">Poveži svoj Kick kanal</h2>
+                <p style="color:var(--color-text-muted); font-size:0.9rem; line-height:1.5; margin:0; max-width:440px;">
+                  Kako bi pristupio dashboardu i upravljao botom, potrebno je da verifikuješ vlasništvo nad svojim kanalom ili sačekaš da te streamer doda za menadžera.
+                </p>
+              </div>
+
+              <!-- Two Options Grid -->
+              <div style="display:flex; flex-direction:column; gap:16px; width:100%; margin-top:8px; text-align:left;">
+                
+                <!-- Vlasnik kanala Card -->
+                <div style="background:rgba(83, 252, 24, 0.02); border:1px solid rgba(83, 252, 24, 0.12); border-radius:16px; padding:20px; display:flex; flex-direction:column; gap:12px;">
+                  <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="background:rgba(83, 252, 24, 0.08); width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(83, 252, 24, 0.2);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                        <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+                        <line x1="12" y1="19" x2="12" y2="22" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 style="margin:0; font-size:1rem; font-weight:700; color:#fff;">Ja sam vlasnik kanala</h4>
+                      <span style="font-size:0.7rem; color:#53fc18; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Direktno povezivanje</span>
+                    </div>
+                  </div>
+                  <p style="color:var(--color-text-muted); font-size:0.85rem; line-height:1.4; margin:0;">
+                    Poveži svoj Kick nalog u 2 brza koraka pomoću privremenog verifikacionog koda u opisu profila.
+                  </p>
+                  
+                  <button id="noChannelAddBtn" style="width:100%; margin-top:4px; background:linear-gradient(135deg, #53fc18, #3fba0e); color:#000; font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:0.9rem; text-transform:uppercase; letter-spacing:0.5px; border:none; padding:12px; border-radius:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 15px rgba(83, 252, 24, 0.2); transition:transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 25px rgba(83, 252, 24, 0.4)'; this.style.filter='brightness(1.12)';" onmouseout="this.style.transform='none'; this.style.boxShadow='0 4px 15px rgba(83, 252, 24, 0.2)'; this.style.filter='none';">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Dodaj svoj Kick kanal
+                  </button>
+                </div>
+
+                <!-- Menadžer kanala Card -->
+                <div style="background:rgba(139, 92, 246, 0.02); border:1px solid rgba(139, 92, 246, 0.12); border-radius:16px; padding:20px; display:flex; flex-direction:column; gap:12px;">
+                  <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="background:rgba(139, 92, 246, 0.08); width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; border:1px solid rgba(139, 92, 246, 0.2);">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 style="margin:0; font-size:1rem; font-weight:700; color:#fff;">Ja sam menadžer</h4>
+                      <span style="font-size:0.7rem; color:#a78bfa; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Čekanje na dozvolu</span>
+                    </div>
+                  </div>
+                  <p style="color:var(--color-text-muted); font-size:0.85rem; line-height:1.4; margin:0;">
+                    Zatraži od vlasnika kanala da te doda kao menadžera u sekciji Podešavanja. Kanal će se odmah pojaviti na tvom profilu.
+                  </p>
+                </div>
+
+              </div>
+
+            </div>
           </div>
         </section>
 
-  </div><!-- /panels-wrap -->
+      </div><!-- /panels-wrap -->
   </main>
   </div><!-- /app -->
 
@@ -1854,7 +1937,7 @@
             <line x1="20" y1="8" x2="20" y2="14"></line>
             <line x1="23" y1="11" x2="17" y2="11"></line>
           </svg>
-          <span>Dodaj Kick kanal</span>
+          <span id="addChannelModalTitle">Dodaj Kick kanal</span>
         </h3>
         <button class="modal-close" onclick="closeModal('addChannelModal')">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1863,18 +1946,8 @@
           </svg>
         </button>
       </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label class="form-label">Kick username ili URL kanala</label>
-          <input type="text" class="form-input" id="newChannelInput"
-            placeholder="npr. tutz_live ili https://kick.com/tutz_live" />
-          <span class="config-hint">Unesi samo korisničko ime kanala ili puni link do Kick profila</span>
-        </div>
-        <div class="form-alert" id="addChannelError" style="display:none"></div>
-      </div>
-      <div class="modal-foot">
-        <button class="btn btn-outline" onclick="closeModal('addChannelModal')">Otkaži</button>
-        <button class="btn btn-primary" onclick="addChannel()" id="addChannelBtn">Dodaj kanal</button>
+      <div class="modal-body" id="addChannelModalBody">
+        <!-- Dynamically rendered by JavaScript -->
       </div>
     </div>
   </div>
@@ -2008,7 +2081,7 @@
               style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; text-transform: uppercase;">Dodaj
               Kick kanal</label>
             <div style="display: flex; gap: 8px;">
-              <input type="text" id="settingsNewChannelInput" class="form-control" placeholder="npr. tutz_live"
+              <input type="text" id="settingsNewChannelInput" class="form-control" placeholder="npr. milan-567"
                 style="flex: 1;" />
               <button class="btn btn-primary btn-sm" onclick="addNewChannel()" id="settingsAddChannelBtn"
                 style="white-space: nowrap;">Dodaj</button>

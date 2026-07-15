@@ -400,23 +400,23 @@ function playSynthSound(frequency = 440, type = 'sine', duration = 0.1, volume =
 // ── Commands Showcase ─────────────────────────────────────
 const commandPreviews = {
   // Statistika i rangiranje
-  'top-watchtime': () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!top watchtime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. tutz_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>`,
-  'top-chat':      () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!top chat 3</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">💬 Najaktivniji u četu: 1. chat_queen (1.450 poruka) 2. tutz_fan (982 poruke) 3. VIP_stefan (820 poruka)</span></div>`,
-  'watchtime':     () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!watchtime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ tutz_fan, tvoj watchtime je: 24 sata i 35 minuta!</span></div>`,
-  'chat':          () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!chat</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">✉️ tutz_fan, poslao si ukupno 982 poruke u ovom četu!</span></div>`,
-  'me':            () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!me</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">📊 Korisnik: tutz_fan | Sati: 24.5h | Poruke: 982 | Rang: #3 | Uloga: VIP</span></div>`,
+  'top-watchtime': () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!top watchtime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. milan_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>`,
+  'top-chat':      () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!top chat 3</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">💬 Najaktivniji u četu: 1. chat_queen (1.450 poruka) 2. milan_fan (982 poruke) 3. VIP_stefan (820 poruka)</span></div>`,
+  'watchtime':     () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!watchtime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ milan_fan, tvoj watchtime je: 24 sata i 35 minuta!</span></div>`,
+  'chat':          () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!chat</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">✉️ milan_fan, poslao si ukupno 982 poruke u ovom četu!</span></div>`,
+  'me':            () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!me</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">📊 Korisnik: milan_fan | Sati: 24.5h | Poruke: 982 | Rang: #3 | Uloga: VIP</span></div>`,
 
   // Zabava i interakcija
-  'iq':            () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!iq @tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">🧠 Skeniram mozak korisnika @tutz_fan... Rezultat: IQ je 142! Genijalac! 💡</span></div>`,
-  'samar':         () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!samar @tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">💥 novak99 je opalio šamarčinu korisniku @tutz_fan sa mokrom haringom! 🐟</span></div>`,
-  'duel':          () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!duel @tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">⚔️ Duel: @novak99 vs @tutz_fan! Pucnjava počinje... @tutz_fan je izvukao brži revolver i pobedio sa 12 HP preostalo! 🏆</span></div>`,
-  'roll':          () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!roll @tutz_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">🎲 Bacam kockicu za @tutz_fan... Rezultat: 78! (0-100)</span></div>`,
+  'iq':            () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!iq @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">🧠 Skeniram mozak korisnika @milan_fan... Rezultat: IQ je 142! Genijalac! 💡</span></div>`,
+  'samar':         () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!samar @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">💥 novak99 je opalio šamarčinu korisniku @milan_fan sa mokrom haringom! 🐟</span></div>`,
+  'duel':          () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!duel @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">⚔️ Duel: @novak99 vs @milan_fan! Pucnjava počinje... @milan_fan je izvukao brži revolver i pobedio sa 12 HP preostalo! 🏆</span></div>`,
+  'roll':          () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!roll @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">🎲 Bacam kockicu za @milan_fan... Rezultat: 78! (0-100)</span></div>`,
 
   // Informacije i alati
   'vreme':         () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!vreme Beograd</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⛅ Vreme u Beogradu: 24°C | Vetar: 12 km/h | Vlažnost: 65% | Delimično oblačno.</span></div>`,
   'info':          () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!info</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">🤖 Kickot Chat Bot v2.4 | Pomažem u moderaciji, zabavi i statistici tvog kanala.</span></div>`,
   'cinjenica':     () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!cinjenica</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">💡 Činjenica: Prvi kompjuterski bag bila je stvarna buba (moljac) zaglavljena u releju 1947. godine!</span></div>`,
-  'followage':     () => `<div class="cp-line"><span class="cp-user">tutz_fan:</span> <span class="cp-msg">!followage</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F472B6">💖 tutz_fan prati ovaj kanal već 8 meseci, 12 dana i 4 sata!</span></div>`,
+  'followage':     () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!followage</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F472B6">💖 milan_fan prati ovaj kanal već 8 meseci, 12 dana i 4 sata!</span></div>`,
   'uptime':        () => `<div class="cp-line"><span class="cp-user">new_viewer:</span> <span class="cp-msg">!uptime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ Stream traje: 2 sata, 47 minuta i 32 sekunde!</span></div>`,
 };
 
@@ -566,7 +566,434 @@ function switchTab(tab) {
     if (tabEl) tabEl.classList.toggle('active', t === tab);
     if (formEl) formEl.style.display = t === tab ? 'flex' : 'none';
   });
+  const kickForm = document.getElementById('kickLoginForm');
+  if (kickForm) kickForm.style.display = 'none';
+  const authTabs = document.getElementById('authTabs');
+  if (authTabs) authTabs.style.display = 'flex';
   clearAllErrors();
+}
+
+let kickLoginUsername = '';
+let kickLoginVerificationCode = '';
+let kickLoginEmail = '';
+
+function openKickLogin() {
+  const loginForm = document.getElementById('loginForm');
+  const kickForm = document.getElementById('kickLoginForm');
+  const authTabs = document.getElementById('authTabs');
+  if (loginForm) loginForm.style.display = 'none';
+  if (kickForm) kickForm.style.display = 'flex';
+  if (authTabs) authTabs.style.display = 'none';
+  showKickLoginStep('input');
+}
+
+function cancelKickLogin() {
+  const loginForm = document.getElementById('loginForm');
+  const kickForm = document.getElementById('kickLoginForm');
+  const authTabs = document.getElementById('authTabs');
+  if (loginForm) loginForm.style.display = 'flex';
+  if (kickForm) kickForm.style.display = 'none';
+  if (authTabs) authTabs.style.display = 'flex';
+  clearAllErrors();
+}
+
+function generateVerificationCode() {
+  const num = Math.floor(100000 + Math.random() * 900000);
+  return `kickot-${num}`;
+}
+
+function showKickLoginStep(step, data = {}) {
+  const contentEl = document.getElementById('kickLoginContent');
+  if (!contentEl) return;
+
+  if (step === 'input') {
+    contentEl.innerHTML = `
+      <div class="form-alert form-alert-error" id="kickLoginError"></div>
+      <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" for="kickUsername">Kick korisničko ime</label>
+          <input type="text" id="kickUsername" class="form-input" placeholder="npr. milan-567" style="width: 100%;" value="${kickLoginUsername}" />
+          <span class="field-error" id="kickUsernameErr"></span>
+      </div>
+      <button class="auth-submit" id="kickLoginNextBtn" onclick="handleKickLoginNext()" style="background: #53fc18; color: #000; border: none; padding: 12px; border-radius: 8px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span class="auth-spinner" id="kickLoginNextSpinner" style="display: none;"></span>
+          <span class="btn-text">Nastavi</span>
+      </button>
+      <div style="text-align: center; margin-top: 16px;">
+          <a href="#" onclick="cancelKickLogin()" style="font-size: 0.85rem; color: var(--color-violet); text-decoration: none;">Nazad na standardnu prijavu</a>
+      </div>
+    `;
+    bindEnterKey('kickUsername', 'kickLoginNextBtn');
+  } else if (step === 'login') {
+    contentEl.innerHTML = `
+      <div class="form-alert form-alert-error" id="kickLoginError"></div>
+      <div style="font-size: 0.9rem; line-height: 1.4; color: var(--color-text-muted); margin-bottom: 12px; font-family: 'Space Grotesk', sans-serif;">
+          Kanal @<strong>${kickLoginUsername}</strong> je već registrovan. Unesi lozinku da se prijaviš:
+      </div>
+      <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" for="kickPassword">Lozinka</label>
+          <input type="password" id="kickPassword" class="form-input" placeholder="••••••••" style="width: 100%;" />
+          <span class="field-error" id="kickPasswordErr"></span>
+      </div>
+      <button class="auth-submit" id="kickLoginSubmitBtn" onclick="handleKickLoginSubmit()" style="background: #53fc18; color: #000; border: none; padding: 12px; border-radius: 8px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span class="auth-spinner" id="kickLoginSubmitSpinner" style="display: none;"></span>
+          <span class="btn-text">Prijavi se</span>
+      </button>
+      <div style="text-align: center; margin-top: 16px;">
+          <a href="#" onclick="showKickLoginStep('input')" style="font-size: 0.85rem; color: var(--color-violet); text-decoration: none;">Nazad</a>
+      </div>
+    `;
+    bindEnterKey('kickPassword', 'kickLoginSubmitBtn');
+  } else if (step === 'register') {
+    contentEl.innerHTML = `
+      <div class="form-alert form-alert-error" id="kickLoginError"></div>
+      <div style="font-size: 0.9rem; line-height: 1.4; color: var(--color-text-muted); margin-bottom: 12px; font-family: 'Space Grotesk', sans-serif;">
+          Da kreiraš nalog za @<strong>${kickLoginUsername}</strong> i potvrdiš vlasništvo, kopiraj i stavi ovaj kod u svoj Kick opis (Bio/About):
+      </div>
+      <div style="background: rgba(83,252,24,0.1); border: 1px dashed #53fc18; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 1.1rem; font-weight: 700; color: #53fc18; text-align: center; margin-bottom: 16px; letter-spacing: 1px;">
+          ${kickLoginVerificationCode}
+      </div>
+      <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" for="kickPassword">Izaberi lozinku za nalog (min. 8 karaktera)</label>
+          <input type="password" id="kickPassword" class="form-input" placeholder="••••••••" style="width: 100%;" />
+          <span class="field-error" id="kickPasswordErr"></span>
+      </div>
+      <button class="auth-submit" id="kickRegisterSubmitBtn" onclick="handleKickRegisterSubmit()" style="background: #53fc18; color: #000; border: none; padding: 12px; border-radius: 8px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span class="auth-spinner" id="kickRegisterSubmitSpinner" style="display: none;"></span>
+          <span class="btn-text">Verifikuj i registruj se</span>
+      </button>
+      <div style="text-align: center; margin-top: 16px;">
+          <a href="#" onclick="showKickLoginStep('input')" style="font-size: 0.85rem; color: var(--color-violet); text-decoration: none;">Nazad</a>
+      </div>
+    `;
+    bindEnterKey('kickPassword', 'kickRegisterSubmitBtn');
+  }
+}
+
+async function handleKickLoginNext() {
+  clearAllErrors();
+  const usernameInput = document.getElementById('kickUsername');
+  const username = usernameInput ? usernameInput.value.trim() : '';
+
+  if (!username) {
+    showFieldError('kickUsernameErr', 'Korisničko ime je obavezno.');
+    return;
+  }
+
+  const cleanUsername = username.replace(/^@/, '').trim();
+  if (!/^[a-zA-Z0-9_-]+$/.test(cleanUsername)) {
+    showFieldError('kickUsernameErr', 'Nevalidno korisničko ime.');
+    return;
+  }
+
+  kickLoginUsername = cleanUsername;
+  setLoading('kickLoginNext', true);
+
+  try {
+    let ownerProfile = null;
+
+    // 1. Direktna REST pretraga po kick_channels JSONB sadržaju (username field)
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/user_profiles?select=id,display_name,email&kick_channels=cs.${encodeURIComponent(JSON.stringify([{username: cleanUsername}]))}`,
+        { headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` } }
+      );
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows && rows.length > 0) ownerProfile = rows[0];
+      }
+    } catch (_) {}
+
+    // 2. RPC pretraga (ako je REST fallback bio neuspešan)
+    if (!ownerProfile) {
+      try {
+        const { data: byRpc } = await sb.rpc('find_profile_by_kick_username', { kick_user: cleanUsername });
+        if (byRpc && byRpc.length > 0) ownerProfile = byRpc[0];
+      } catch (_) {}
+    }
+
+    // 3. Pokušaj po chatroom_id sa Kick API-ja
+    if (!ownerProfile) {
+      try {
+        const channelData = await fetchKickChannelData(cleanUsername);
+        if (channelData && channelData.chatroom_id) {
+          const channelId = channelData.chatroom_id.toString();
+          const { data: byId } = await sb.rpc('find_profile_by_kick_channel_id', { channel_id: channelId });
+          if (byId && byId.length > 0) ownerProfile = byId[0];
+        }
+      } catch (_) {}
+    }
+
+    // 4. Poslednji fallback — po display_name (hvatamo slučaj kada je display_name = kick username)
+    if (!ownerProfile) {
+      const { data: byDisplayName } = await sb.from('user_profiles')
+        .select('id, display_name, email')
+        .ilike('display_name', cleanUsername)
+        .maybeSingle();
+      if (byDisplayName) ownerProfile = byDisplayName;
+    }
+
+    if (ownerProfile) {
+      // Nalog postoji — samo traži lozinku
+      kickLoginUsername = ownerProfile.display_name;
+      kickLoginEmail = ownerProfile.email || `kick_user_${ownerProfile.display_name.toLowerCase()}@kickot.com`;
+      showKickLoginStep('login');
+    } else {
+      // Novi korisnik — ide na registraciju sa bio verifikacijom
+      kickLoginUsername = cleanUsername;
+      kickLoginEmail = `kick_user_${cleanUsername.toLowerCase()}@kickot.com`;
+      kickLoginVerificationCode = generateVerificationCode();
+      showKickLoginStep('register');
+    }
+  } catch (err) {
+    showFormAlert('kickLoginError', 'Greška pri proveri naloga.');
+    console.error(err);
+  } finally {
+    setLoading('kickLoginNext', false);
+  }
+}
+
+
+async function handleKickLoginSubmit() {
+  clearAllErrors();
+  const pwInput = document.getElementById('kickPassword');
+  const password = pwInput ? pwInput.value : '';
+
+  if (!password) {
+    showFieldError('kickPasswordErr', 'Lozinka je obavezna.');
+    return;
+  }
+
+  setLoading('kickLoginSubmit', true);
+
+  const email = kickLoginEmail || `kick_user_${kickLoginUsername.toLowerCase()}@kickot.com`;
+
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      showFormAlert('kickLoginError', 'Netačna lozinka za ovaj nalog.');
+    } else {
+      // ── Posle uspešne prijave, automatski dodaj vlasništvo nad kanalnom ──
+      try {
+        const user = data.user;
+        // Dohvati profil da proverimo kick_channels
+        const { data: profile } = await sb.from('user_profiles')
+          .select('kick_channels')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        const existingChannels = (profile && profile.kick_channels) ? profile.kick_channels : [];
+        const usernameLC = kickLoginUsername.toLowerCase();
+
+        // Proveri da li kanal već postoji u listi
+        const alreadyAdded = existingChannels.some(
+          ch => (ch.username || '').toLowerCase() === usernameLC
+        );
+
+        if (!alreadyAdded) {
+          // Dohvati podatke kanala sa Kick API-ja
+          const channelData = await fetchKickChannelData(kickLoginUsername);
+          const channelId = channelData.chatroom_id
+            ? channelData.chatroom_id.toString()
+            : `kick_${usernameLC}`;
+
+          const updatedChannels = [
+            ...existingChannels,
+            {
+              id: channelId,
+              username: channelData.slug || kickLoginUsername,
+              avatar: channelData.avatar || null,
+              is_primary: existingChannels.length === 0
+            }
+          ];
+
+          await sb.from('user_profiles')
+            .update({
+              kick_channels: updatedChannels,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id);
+        }
+      } catch (chanErr) {
+        console.warn('Nije moguće automatski dodati kanal:', chanErr);
+      }
+
+      showToast('success', `Uspešna prijava kao @${kickLoginUsername}!`, '💚');
+      closeModal();
+      onUserChange(data.user);
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 800);
+    }
+  } catch (err) {
+    showFormAlert('kickLoginError', 'Greška pri prijavi.');
+  } finally {
+    setLoading('kickLoginSubmit', false);
+  }
+}
+
+async function fetchKickChannelData(username) {
+  // 1. Pokušaj preko lokalnog bot API servera
+  try {
+    const localRes = await fetch(`http://localhost:3000/api/avatar?username=${username}`);
+    if (localRes.ok) {
+      const d = await localRes.json();
+      if (d && d.bio !== undefined) {
+        return { bio: d.bio || '', chatroom_id: d.chatroom_id || null, slug: d.slug || username, avatar: d.avatar || null };
+      }
+    }
+  } catch (_) { }
+
+  const apiUrl = `https://kick.com/api/v2/channels/${username}`;
+  const proxies = [
+    {
+      url: `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`,
+      parse: async (res) => {
+        const json = await res.json();
+        const data = json.contents ? JSON.parse(json.contents) : null;
+        return data ? {
+          bio: data.user?.bio || '',
+          chatroom_id: data.chatroom?.id || null,
+          slug: data.slug || username,
+          avatar: data.user?.profile_pic || null
+        } : null;
+      }
+    },
+    {
+      url: `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
+      parse: async (res) => {
+        const data = await res.json();
+        return data ? {
+          bio: data.user?.bio || '',
+          chatroom_id: data.chatroom?.id || null,
+          slug: data.slug || username,
+          avatar: data.user?.profile_pic || null
+        } : null;
+      }
+    }
+  ];
+
+  return new Promise((resolve) => {
+    let completed = 0;
+    let resolved = false;
+
+    proxies.forEach(proxy => {
+      fetch(proxy.url)
+        .then(async (res) => {
+          if (res.ok && !resolved) {
+            const result = await proxy.parse(res);
+            if (result && !resolved) {
+              resolved = true;
+              resolve(result);
+            }
+          }
+        })
+        .catch(() => { })
+        .finally(() => {
+          completed++;
+          if (completed === proxies.length && !resolved) {
+            resolve({ bio: '', chatroom_id: null, slug: username, avatar: null });
+          }
+        });
+    });
+
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve({ bio: '', chatroom_id: null, slug: username, avatar: null });
+      }
+    }, 6000);
+  });
+}
+
+// Legacy wrapper — vraća samo bio string
+async function fetchKickBio(username) {
+  const data = await fetchKickChannelData(username);
+  return data.bio || '';
+}
+
+async function handleKickRegisterSubmit() {
+  clearAllErrors();
+  const pwInput = document.getElementById('kickPassword');
+  const password = pwInput ? pwInput.value : '';
+
+  if (!password) {
+    showFieldError('kickPasswordErr', 'Lozinka je obavezna.');
+    return;
+  }
+  if (password.length < 8) {
+    showFieldError('kickPasswordErr', 'Lozinka mora imati bar 8 karaktera.');
+    return;
+  }
+
+  setLoading('kickRegisterSubmit', true);
+
+  try {
+    // Dohvati sve podatke kanala uključujući bio za verifikaciju i chatroom_id
+    const channelData = await fetchKickChannelData(kickLoginUsername);
+    const hasCode = channelData.bio.toLowerCase().includes(kickLoginVerificationCode.toLowerCase());
+
+    if (!hasCode) {
+      showFormAlert('kickLoginError', 'Verifikacioni kod nije pronađen u tvom Kick opisu (Bio/About). Stavi kod i pokušaj ponovo.');
+      setLoading('kickRegisterSubmit', false);
+      return;
+    }
+
+    const email = `kick_user_${kickLoginUsername.toLowerCase()}@kickot.com`;
+    const { data: signUpData, error: signUpError } = await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { display_name: kickLoginUsername }
+      }
+    });
+
+    if (signUpError) {
+      showFormAlert('kickLoginError', signUpError.message);
+      setLoading('kickRegisterSubmit', false);
+      return;
+    }
+
+    const user = signUpData.user;
+    if (user) {
+      // Koristi pravi chatroom_id sa Kick API-ja
+      const channelId = channelData.chatroom_id
+        ? channelData.chatroom_id.toString()
+        : Math.floor(1000000 + Math.random() * 9000000).toString();
+
+      const { error: insertError } = await sb.from('user_profiles').insert({
+        id: user.id,
+        display_name: kickLoginUsername,
+        email: email,
+        plan: 'free',
+        kick_channels: [
+          {
+            id: channelId,
+            username: channelData.slug || kickLoginUsername,
+            avatar: channelData.avatar || null,
+            is_primary: true
+          }
+        ],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+      if (insertError) {
+        console.error('Greška pri kreiranju profila:', insertError);
+      }
+
+      showToast('success', `Uspešna registracija i prijava za @${kickLoginUsername}!`, '🎉');
+      closeModal();
+      onUserChange(user);
+      setTimeout(() => {
+        window.location.href = 'dashboard.html';
+      }, 800);
+    }
+  } catch (err) {
+    showFormAlert('kickLoginError', 'Greška tokom registracije.');
+    console.error(err);
+  } finally {
+    setLoading('kickRegisterSubmit', false);
+  }
 }
 
 // ── Auth Error Mapper ─────────────────────────────────────
@@ -595,14 +1022,34 @@ function mapAuthError(error) {
 // ── Login ──────────────────────────────────────────────────
 async function handleLogin() {
   clearAllErrors();
-  const email = document.getElementById('loginEmail').value.trim();
+  const inputVal = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
   let valid = true;
 
-  if (!email) { showFieldError('loginEmailErr', t('err.email.required')); valid = false; }
-  else if (!validateEmail(email)) { showFieldError('loginEmailErr', t('err.email.invalid')); valid = false; }
+  if (!inputVal) { 
+    showFieldError('loginEmailErr', t('err.email.required')); 
+    valid = false; 
+  } else if (inputVal.includes('@')) {
+    if (!validateEmail(inputVal)) { 
+      showFieldError('loginEmailErr', t('err.email.invalid')); 
+      valid = false; 
+    }
+  } else {
+    // Ako je korisničko ime (nema @), proveri format
+    const cleanUser = inputVal.replace(/^@/, '').trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(cleanUser)) {
+      showFieldError('loginEmailErr', 'Nevalidno korisničko ime.'); 
+      valid = false; 
+    }
+  }
+
   if (!password) { showFieldError('loginPasswordErr', t('err.pw.required')); valid = false; }
   if (!valid) return;
+
+  // Ako sadrži @ koristi kao email, inače pretvori u sistemski email
+  const email = inputVal.includes('@') 
+    ? inputVal 
+    : `kick_user_${inputVal.replace(/^@/, '').trim().toLowerCase()}@kickot.com`;
 
   setLoading('login', true);
   try {
@@ -660,15 +1107,9 @@ async function handleSignup() {
       await sb.from('user_profiles').insert({
         id: user.id,
         display_name: name,
+        email: email,
         plan: 'free',
-        kick_channels: [
-          {
-            id: Math.floor(1000000 + Math.random() * 9000000).toString(),
-            username: name,
-            avatar: null,
-            is_primary: true
-          }
-        ],
+        kick_channels: [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       });
@@ -993,8 +1434,38 @@ cards.forEach(card => {
     });
 });
 
+// ── Enter Key Bindings Helper ─────────────────────────────
+function bindEnterKey(inputId, buttonId) {
+  const input = document.getElementById(inputId);
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const btn = document.getElementById(buttonId);
+        if (btn) btn.click();
+      }
+    });
+  }
+}
+
+function setupEnterKeyBindings() {
+  const bindings = [
+    { inputId: 'loginEmail', buttonId: 'loginBtn' },
+    { inputId: 'loginPassword', buttonId: 'loginBtn' },
+    { inputId: 'signupName', buttonId: 'signupBtn' },
+    { inputId: 'signupEmail', buttonId: 'signupBtn' },
+    { inputId: 'signupPassword', buttonId: 'signupBtn' },
+    { inputId: 'forgotEmail', buttonId: 'forgotBtn' }
+  ];
+
+  bindings.forEach(({ inputId, buttonId }) => {
+    bindEnterKey(inputId, buttonId);
+  });
+}
+
 // ── Init ──────────────────────────────────────────────────
 setLang(currentLang);
+setupEnterKeyBindings();
 
 // Check for password reset redirect
 if (window.location.search.includes('reset=true')) {
