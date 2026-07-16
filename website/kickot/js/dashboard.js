@@ -116,6 +116,24 @@ let commandsLimit = parseInt(localStorage.getItem('cmd-items-per-page')) || 10;
 // ═══════════════════════════════════════════════════════════
 async function initAuth() {
   try {
+    // ── Proveri da li dolazimo sa Kick OAuth callbacka ────────────────
+    const urlParams = new URLSearchParams(window.location.search);
+    const isKickOAuth = urlParams.get('kick_oauth') === '1';
+    const kickAccessToken = sessionStorage.getItem('kick_access_token');
+
+    if (isKickOAuth && kickAccessToken) {
+      document.getElementById('authGateMsg').textContent = 'Učitavamo tvoj Kick profil...';
+
+      try {
+        await handleKickOAuthSession(kickAccessToken);
+        return;
+      } catch (kickErr) {
+        console.warn('Kick OAuth sesija nije uspela, proveravamo standardnu sesiju:', kickErr);
+        // Pad-through na standardnu proveru sesije
+      }
+    }
+
+    // ── Standardna Supabase sesija ─────────────────────────────────────
     const { data: { session } } = await sb.auth.getSession();
     if (!session) {
       document.getElementById('authGateMsg').textContent = 'Preusmerjavanje na prijavu...';
@@ -127,6 +145,170 @@ async function initAuth() {
   } catch (err) {
     document.getElementById('authGateMsg').textContent = 'Greška pri proveri sesije.';
     console.error(err);
+  }
+}
+
+// ── Kick OAuth sesija ─────────────────────────────────────────────────────
+async function handleKickOAuthSession(accessToken) {
+  const gateMsg = document.getElementById('authGateMsg');
+
+  // 1. Dohvati Kick korisnički profil koristeći access_token
+  gateMsg.textContent = 'Dohvatamo podatke sa Kick platforme...';
+  const kickUserRes = await fetch('https://api.kick.com/public/v1/users', {
+    headers: { 'Authorization': `Bearer ${accessToken}` }
+  });
+
+  let kickUsername = '';
+  let kickUserId   = '';
+  let kickAvatar   = '';
+  let kickBio      = '';
+
+  if (kickUserRes.ok) {
+    const kickData = await kickUserRes.json();
+    const kickUser = Array.isArray(kickData?.data) ? kickData.data[0] : kickData?.data || kickData;
+    kickUsername = kickUser?.username || kickUser?.name || '';
+    kickUserId   = kickUser?.user_id  || kickUser?.id   || '';
+    kickAvatar   = kickUser?.profile_picture || kickUser?.profile_pic || '';
+    kickBio      = kickUser?.bio || '';
+  } else {
+    console.warn('Kick users API nije vratio uspeh, pokušavamo alternativni endpoint...');
+    // Alternativni endpoint
+    const altRes = await fetch('https://id.kick.com/oauth/userinfo', {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (altRes.ok) {
+      const altData = await altRes.json();
+      kickUsername = altData?.preferred_username || altData?.name || altData?.sub || '';
+      kickUserId   = altData?.sub || '';
+      kickAvatar   = altData?.picture || '';
+    }
+  }
+
+  if (!kickUsername) {
+    throw new Error('Nije moguće dohvatiti Kick korisničko ime.');
+  }
+
+  gateMsg.textContent = `Dobrodošao, @${kickUsername}! Priprema naloga...`;
+
+  // 2. Proveri da li u Supabase-u već postoji nalog za ovog Kick korisnika
+  const kickEmail = `kick_user_${kickUsername.toLowerCase()}@kickot.com`;
+
+  // Pokušaj prijave sa postojećim nalogom
+  const { data: signInData, error: signInError } = await sb.auth.signInWithPassword({
+    email: kickEmail,
+    password: `kick_oauth_${kickUsername.toLowerCase()}_kickot_2026`
+  });
+
+  if (!signInError && signInData?.user) {
+    // Postoji nalog — ažuriraj kick_channels i access_token
+    currentUser = signInData.user;
+    await upsertKickProfile(currentUser.id, kickUsername, kickAvatar, kickUserId, accessToken);
+    sessionStorage.removeItem('kick_access_token');
+    // Ukloni kick_oauth param iz URL-a
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+    await initApp();
+    return;
+  }
+
+  // 3. Novi korisnik — kreiraj Supabase nalog
+  gateMsg.textContent = 'Kreiramo nalog...';
+  const password = `kick_oauth_${kickUsername.toLowerCase()}_kickot_2026`;
+
+  const { data: signUpData, error: signUpError } = await sb.auth.signUp({
+    email: kickEmail,
+    password: password,
+    options: {
+      data: {
+        display_name:  kickUsername,
+        avatar_url:    kickAvatar,
+        kick_username: kickUsername,
+        kick_user_id:  kickUserId
+      }
+    }
+  });
+
+  if (signUpError) {
+    throw new Error(`Greška pri kreiranju naloga: ${signUpError.message}`);
+  }
+
+  const user = signUpData?.user;
+  if (!user) {
+    throw new Error('Nalog nije kreiran — Supabase nije vratio korisnika.');
+  }
+
+  currentUser = user;
+
+  // Kreiraj profil u user_profiles tabeli
+  const channelId = String(kickUserId || `kick_${kickUsername.toLowerCase()}`);
+  const { error: profileError } = await sb.from('user_profiles').upsert({
+    id:           user.id,
+    display_name: kickUsername,
+    email:        kickEmail,
+    plan:         'free',
+    kick_channels: [{
+      id:         channelId,
+      username:   kickUsername,
+      avatar:     kickAvatar || null,
+      is_primary: true,
+      kick_access_token: accessToken
+    }],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'id' });
+
+  if (profileError) {
+    console.error('Greška pri kreiranju user_profiles:', profileError);
+  }
+
+  // Odmah prijavi novog korisnika
+  const { data: loginAfterSignup, error: loginAfterErr } = await sb.auth.signInWithPassword({
+    email: kickEmail,
+    password: password
+  });
+
+  if (!loginAfterErr && loginAfterSignup?.user) {
+    currentUser = loginAfterSignup.user;
+  }
+
+  sessionStorage.removeItem('kick_access_token');
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState({}, '', cleanUrl);
+  await initApp();
+}
+
+// Ažurira Kick profil podatke u Supabase-u
+async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, accessToken) {
+  try {
+    const { data: profile } = await sb.from('user_profiles')
+      .select('kick_channels')
+      .eq('id', userId)
+      .maybeSingle();
+
+    const existingChannels = (profile?.kick_channels) || [];
+    const usernameLC = kickUsername.toLowerCase();
+    const channelId  = String(kickUserId || `kick_${usernameLC}`);
+
+    const idx = existingChannels.findIndex(ch => (ch.username || '').toLowerCase() === usernameLC);
+    if (idx >= 0) {
+      existingChannels[idx].avatar = kickAvatar || existingChannels[idx].avatar;
+      existingChannels[idx].kick_access_token = accessToken;
+    } else {
+      existingChannels.push({
+        id:         channelId,
+        username:   kickUsername,
+        avatar:     kickAvatar || null,
+        is_primary: existingChannels.length === 0,
+        kick_access_token: accessToken
+      });
+    }
+
+    await sb.from('user_profiles').update({
+      kick_channels: existingChannels,
+      updated_at:    new Date().toISOString()
+    }).eq('id', userId);
+  } catch (err) {
+    console.warn('Nije moguće ažurirati Kick profil:', err);
   }
 }
 

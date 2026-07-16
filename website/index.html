@@ -52,18 +52,49 @@
             </nav>
             <div class="nav-actions">
                 <!-- Language Switcher -->
-                <button class="lang-switcher" id="langSwitcherBtn" aria-label="Promeni jezik">
-                    <span class="lang-sr">EN</span>
-                    <span class="lang-en">SR</span>
-                </button>
-                <a href="#playground" class="btn btn-secondary nav-btn" id="navBtnSecondary">
-                    <span class="lang-sr">Isprobaj</span>
-                    <span class="lang-en">Try Demo</span>
+                <div class="lang-switcher">
+                    <button class="lang-btn active" id="btn-sr">SR</button>
+                    <button class="lang-btn" id="btn-en">EN</button>
+                </div>
+                
+                <!-- Guest Login Button -->
+                <a href="kickot/index.html?action=login" class="btn btn-primary nav-btn" id="navBtnLogin">
+                    <span class="lang-sr">Prijavi se</span>
+                    <span class="lang-en">Log In</span>
                 </a>
-                <a href="kickot/index.html" class="btn btn-primary nav-btn" id="navBtnPrimary">
-                    <span class="lang-sr">Pokreni kickot</span>
-                    <span class="lang-en">Start kickot</span>
-                </a>
+
+                <!-- User Dropdown Menu (Hidden by default, displayed via js if logged in) -->
+                <div class="user-menu" id="userMenu">
+                    <button class="user-menu-trigger" id="userMenuTrigger">
+                        <img src="" alt="Avatar" class="user-avatar" id="userAvatar" style="display: none;">
+                        <span class="user-name" id="userName">Profil</span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="chevron-icon">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="kickot/index.html" class="dropdown-item">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+                                <rect x="3" y="3" width="7" height="9"></rect>
+                                <rect x="14" y="3" width="7" height="5"></rect>
+                                <rect x="14" y="12" width="7" height="9"></rect>
+                                <rect x="3" y="16" width="7" height="5"></rect>
+                            </svg>
+                            <span class="lang-sr">Dashboard</span>
+                            <span class="lang-en">Dashboard</span>
+                        </a>
+                        <a href="kickot/index.html?action=logout" class="dropdown-item danger">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                                <polyline points="16 17 21 12 16 7" />
+                                <line x1="21" y1="12" x2="9" y2="12" />
+                            </svg>
+                            <span class="lang-sr">Odjavi se</span>
+                            <span class="lang-en">Log Out</span>
+                        </a>
+                    </div>
+                </div>
             </div>
             <button class="mobile-toggle" id="mobileToggle" aria-label="Meni">
                 <span></span>
@@ -88,19 +119,16 @@
                         <span class="lang-en">Conquer the <span class="gradient-text">Kick</span> Scene Globally</span>
                     </h1>
                     <p class="hero-description">
-                        <span class="lang-sr">Poveži svoj kanal sa najmoćnijim čet botom. <strong>kickot</strong> je
-                            dostupan odmah i donosi automatizaciju chata, poene i igre, dok moduli
-                            <strong>kickaj</strong>, <strong>kickov</strong> i <strong>kickan</strong> dolaze uskoro i
-                            upotpuniće tvoj strim ekosistem.</span>
-                        <span class="lang-en">Connect your channel with the most powerful chat bot.
-                            <strong>kickot</strong> is available immediately, bringing chat automation, points and
-                            games, while <strong>kickaj</strong>, <strong>kickov</strong> and <strong>kickan</strong>
-                            modules are coming soon.</span>
+                        <span class="lang-sr">Poveži svoj kanal sa najmoćnijim chatbot-om! <br><strong>Kickot</strong> je
+                            dostupan odmah i donosi automatizaciju chata, poene i igre.
+                            Tvoj strim ekosistem uskoro postaje kompletan uz module <strong>kickaj</strong>, <strong>kickov</strong> i <strong>kickan</strong> koji stižu uskoro.</span>
+                        <span class="lang-en">Connect your channel with the most powerful chat bot.<br>
+                            <strong>Kickot</strong> is available immediately, bringing chat automation, points and games, while <strong>kickaj</strong>, <strong>kickov</strong> and <strong>kickan</strong> modules are coming soon to complete your stream ecosystem.</span>
                     </p>
                     <div class="hero-actions">
                         <a href="kickot/index.html" class="btn btn-primary btn-large" id="heroBtnPrimary">
-                            <span class="lang-sr">Pokreni kickot odmah</span>
-                            <span class="lang-en">Launch kickot Now</span>
+                            <span class="lang-sr">Pokreni kickot</span>
+                            <span class="lang-en">Launch kickot</span>
                         </a>
                         <a href="#pricing" class="btn btn-secondary btn-large" id="heroBtnSecondary">
                             <span class="lang-sr">Pogledaj cene</span>
@@ -110,76 +138,96 @@
                 </div>
 
                 <!-- Marketing orijentisan vizuelni deo u herou (Dashboard Mockup) -->
+                <!-- Marketing orijentisan vizuelni deo u herou (Izbor modula) -->
                 <div class="hero-visual">
-                    <div class="dashboard-preview-card" id="heroDashboardCard">
-                        <div class="card-header">
-                            <span class="dot red pulse-dot"></span>
-                            <span class="status-text font-bold text-green"
-                                style="font-size: 0.82rem; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 0.05em;">
-                                <span class="lang-sr">Streamer • UŽIVO</span>
-                                <span class="lang-en">Streamer • LIVE</span>
+                    <div class="module-selector-grid">
+                        <!-- kickot Card -->
+                        <a href="kickot/index.html" class="module-card card-active">
+                            <div class="module-header">
+                                <span class="module-badge badge-active">
+                                    <span class="lang-sr">AKTIVAN</span>
+                                    <span class="lang-en">ACTIVE</span>
+                                </span>
+                                <span class="module-icon" style="display: flex; align-items: center; justify-content: center; color: var(--color-green); filter: drop-shadow(0 0 4px rgba(83, 252, 24, 0.4));">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M9 12v2"/><path d="M15 12v2"/><path d="M19 12h2"/><path d="M3 12h2"/></svg>
+                                </span>
+                            </div>
+                            <h3 class="module-name">kickot</h3>
+                            <p class="module-desc">
+                                <span class="lang-sr">Chatbot sa moderacijom, poenima i igrama.</span>
+                                <span class="lang-en">Chatbot with moderation, points and games.</span>
+                            </p>
+                            <span class="module-link-action">
+                                <span class="lang-sr">Pokreni bota →</span>
+                                <span class="lang-en">Launch bot →</span>
                             </span>
-                            <span class="window-title" style="margin-left: auto;">KICKall BETA</span>
-                        </div>
-                        <div class="card-body dashboard-layout">
-                            <div class="db-row">
-                                <div class="db-col">
-                                    <span class="db-label">
-                                        <span class="lang-sr">Gledaoci</span>
-                                        <span class="lang-en">Viewers</span>
-                                    </span>
-                                    <span class="db-value text-green">1,482</span>
-                                </div>
-                                <div class="db-col">
-                                    <span class="db-label">
-                                        <span class="lang-sr">Status bota</span>
-                                        <span class="lang-en">Bot Status</span>
-                                    </span>
-                                    <span class="db-value text-violet">
-                                        <span class="lang-sr">AKTIVAN</span>
-                                        <span class="lang-en">ACTIVE</span>
-                                    </span>
-                                </div>
-                            </div>
+                        </a>
 
-                            <!-- Mini Graph Preview -->
-                            <div class="db-mini-chart">
-                                <div class="mini-chart-header">
-                                    <span class="lang-sr">Angažovanje četa (Proteklih 6h)</span>
-                                    <span class="lang-en">Chat Engagement (Last 6h)</span>
-                                </div>
-                                <div class="mini-chart-bars">
-                                    <div class="bar" style="height: 30%"></div>
-                                    <div class="bar" style="height: 45%"></div>
-                                    <div class="bar" style="height: 35%"></div>
-                                    <div class="bar" style="height: 60%"></div>
-                                    <div class="bar" style="height: 85%"></div>
-                                    <div class="bar active" style="height: 98%"></div>
-                                </div>
+                        <!-- kickaj Card -->
+                        <a href="#playground" class="module-card card-soon feature-simulate-trigger" data-target-tab="kickaj">
+                            <div class="module-header">
+                                <span class="module-badge badge-soon">
+                                    <span class="lang-sr">USKORO</span>
+                                    <span class="lang-en">SOON</span>
+                                </span>
+                                <span class="module-icon" style="display: flex; align-items: center; justify-content: center; color: var(--color-violet); filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.4));">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+                                </span>
                             </div>
+                            <h3 class="module-name">kickaj</h3>
+                            <p class="module-desc">
+                                <span class="lang-sr">Sistem nagradnih igara sa izvlačenjem uživo na strimu.</span>
+                                <span class="lang-en">Giveaway system with live drawing on stream.</span>
+                            </p>
+                            <span class="module-link-action disabled">
+                                <span class="lang-sr">Testiraj simulaciju →</span>
+                                <span class="lang-en">Test simulation →</span>
+                            </span>
+                        </a>
 
-                            <!-- Live Alert Mockup -->
-                            <div class="db-alert-preview">
-                                <div class="db-alert-icon">👑</div>
-                                <div class="db-alert-content">
-                                    <span class="db-alert-title">
-                                        <span class="lang-sr">NOVA PRETPLATA!</span>
-                                        <span class="lang-en">NEW SUBSCRIBER!</span>
-                                    </span>
-                                    <span class="db-alert-desc">JecaPlay (Pro Booster)</span>
-                                </div>
+                        <!-- kickov Card -->
+                        <a href="#playground" class="module-card card-soon feature-simulate-trigger" data-target-tab="kickov">
+                            <div class="module-header">
+                                <span class="module-badge badge-soon">
+                                    <span class="lang-sr">USKORO</span>
+                                    <span class="lang-en">SOON</span>
+                                </span>
+                                <span class="module-icon" style="display: flex; align-items: center; justify-content: center; color: var(--color-violet); filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.4));">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                </span>
                             </div>
+                            <h3 class="module-name">kickov</h3>
+                            <p class="module-desc">
+                                <span class="lang-sr">OBS stream overlay-i, alerti i chat boxovi.</span>
+                                <span class="lang-en">OBS stream overlays, alerts and chat boxes.</span>
+                            </p>
+                            <span class="module-link-action disabled">
+                                <span class="lang-sr">Testiraj simulaciju →</span>
+                                <span class="lang-en">Test simulation →</span>
+                            </span>
+                        </a>
 
-                            <!-- Mini Live Chat Mockup -->
-                            <div class="db-mini-chat">
-                                <div class="db-chat-msg"><span class="chat-user">Gamer_01</span>: !poeni</div>
-                                <div class="db-chat-msg bot">
-                                    <span class="chat-user bot-tag">kickot</span>:
-                                    <span class="lang-sr">Korisnik Gamer_01 ima <strong>120</strong> poena! 🏆</span>
-                                    <span class="lang-en">User Gamer_01 has <strong>120</strong> points! 🏆</span>
-                                </div>
+                        <!-- kickan Card -->
+                        <a href="#playground" class="module-card card-soon feature-simulate-trigger" data-target-tab="kickan">
+                            <div class="module-header">
+                                <span class="module-badge badge-soon">
+                                    <span class="lang-sr">USKORO</span>
+                                    <span class="lang-en">SOON</span>
+                                </span>
+                                <span class="module-icon" style="display: flex; align-items: center; justify-content: center; color: var(--color-violet); filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.4));">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                                </span>
                             </div>
-                        </div>
+                            <h3 class="module-name">kickan</h3>
+                            <p class="module-desc">
+                                <span class="lang-sr">Analitika i grafici rasta gledalaca, pratioca, itd.</span>
+                                <span class="lang-en">Analytics and viewer growth charts, etc.</span>
+                            </p>
+                            <span class="module-link-action disabled">
+                                <span class="lang-sr">Testiraj simulaciju →</span>
+                                <span class="lang-en">Test simulation →</span>
+                            </span>
+                        </a>
                     </div>
                 </div>
             </div>

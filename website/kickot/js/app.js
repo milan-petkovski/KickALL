@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════════════ */
 
 // ── Supabase Init ──────────────────────────────────────────
-const SUPABASE_URL  = 'https://rcukparptzzyssqdmydt.supabase.co';
+const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
 
 const { createClient } = window.supabase;
@@ -15,248 +15,248 @@ let currentUser = null;
 // ── Translations ───────────────────────────────────────────
 const translations = {
   sr: {
-    'meta.title':         'Kickot — Bot za Kick platformu',
-    'meta.desc':          'Kickot je moćan chat bot za Kick platformu. Komande, moderacija, watchtime, leaderboard i mini-igre.',
-    'nav.back':           'KickAll',
-    'nav.login':          'Prijavi se',
-    'nav.signup':         'Registruj se',
-    'nav.dashboard':      'Dashboard',
-    'nav.settings':       'Podešavanja',
-    'nav.logout':         'Odjavi se',
-    'hero.live':          'Aktivan · U produkciji',
-    'hero.title':         'Bot za Kick koji radi dok ti odmaraš',
-    'hero.subtitle':      'Moćan chat bot za Kick platformu sa prilagođenim komandama, automatskom moderacijom, watchtime sistemom, mini-igrama i leaderboard-om. Na srpskom i engleskom.',
-    'hero.cta.primary':   '🚀 Počni besplatno',
+    'meta.title': 'Kickot — Bot za Kick platformu',
+    'meta.desc': 'Kickot je moćan chat bot za Kick platformu. Komande, moderacija, watchtime, leaderboard i mini-igre.',
+    'nav.back': 'KickAll',
+    'nav.login': 'Prijavi se',
+    'nav.signup': 'Registruj se',
+    'nav.dashboard': 'Dashboard',
+    'nav.settings': 'Podešavanja',
+    'nav.logout': 'Odjavi se',
+    'hero.live': 'Aktivan',
+    'hero.title': 'za KICK koji radi dok ti strimuješ',
+    'hero.subtitle': 'Moćan chat bot za Kick platformu sa prilagođenim komandama, automatskom moderacijom, watchtime sistemom, mini-igrama i leaderboard-om. Na srpskom i engleskom.',
+    'hero.cta.primary': 'Počni besplatno',
     'hero.cta.secondary': 'Vidi funkcionalnosti',
-    'hero.note':          'Besplatan plan dostupan. Bez kreditne kartice.',
-    'features.label':     'Funkcionalnosti',
-    'features.title':     'Sve što jedan Kick bot treba',
-    'features.subtitle':  'Kickot dolazi sa bogatim setom funkcionalnosti koje možeš koristiti odmah, bez ikakve konfiguracije.',
-    'feat.cmd.title':     'Prilagođene Komande',
-    'feat.cmd.desc':      'Definiši vlastite komande sa odgovorima, varijablama i cool-down-om. Sistem komandi radi u realnom vremenu.',
-    'feat.mod.title':     'Automatska Moderacija',
-    'feat.mod.desc':      'Anti-spam, filter reči, timeout i ban sistem. Bot pazi na chat dok ti uživaš u streamu.',
-    'feat.wt.title':      'Watchtime & Leaderboard',
-    'feat.wt.desc':       'Automatsko praćenje watchtime-a svakog gledalaca. Rangovi, top liste i nagrade za lojalne fanove.',
-    'feat.games.title':   'Mini-igre za Chat',
-    'feat.games.desc':    '!duel, !8ball, !love, !brak, !roll — igre koje drže chat aktivan i zabavnim tokom celog streama.',
-    'feat.lang.title':    'Srpski i Engleski',
-    'feat.lang.desc':     'Bot odgovara na srpskom ili engleskom, u zavisnosti od podešavanja kanala.',
-    'feat.stats.title':   'Statistike uživo',
-    'feat.stats.desc':    'Dashboard sa svim statistikama kanala, aktivnim korisnicima, top komandama i aktivnošću chata.',
-    'cmds.label':         'Komande',
-    'cmds.title':         'Bogata biblioteka komandi',
-    'cmds.subtitle':      'Klikni na komandu da vidiš kako izgleda u chatu.',
-    'cmd.rank':           'Tvoj rang i watchtime',
-    'cmd.top':            'Top 10 gledalaca',
-    'cmd.love':           'Kompatibilnost sa nekim',
-    'cmd.brak':           'Venčaj se sa nekim',
-    'cmd.duel':           'Izazovi nekoga na duel',
-    'cmd.8ball':          'Postavi pitanje sudbini',
-    'cmd.roll':           'Baci kockicu',
-    'cmd.uptime':         'Koliko stream traje',
-    'cmd.preview':        '// Preview — live chat simulacija',
-    'pricing.label':      'Cene',
-    'pricing.title':      'Poštene cene za pravi alat',
-    'pricing.subtitle':   'Počni besplatno. Nadogradi se kada budeš spreman.',
-    'pricing.forever':    'Zauvek besplatno',
-    'pricing.per.month':  '/mesec',
-    'pricing.popular':    'Najpopularniji',
-    'pricing.free.desc':  'Sve što treba za početak.',
-    'pricing.pro.desc':   'Za ozbiljne streamere.',
-    'pricing.biz.desc':   'Za više kanala i organizacije.',
-    'pf.f1':              'Bot uvek aktivan',
-    'pf.f2':              'Do 10 komandi',
-    'pf.f3':              'Watchtime tracking',
-    'pf.f4':              'Osnovna moderacija',
-    'pf.f5':              'Napredna moderacija',
-    'pf.f6':              'Prioritetna podrška',
-    'pp.f1':              'Neograničene komande',
-    'pp.f2':              'Napredna moderacija',
-    'pp.f3':              'Sve mini-igre',
-    'pp.f4':              'Analytics dashboard',
-    'pp.f5':              'Prilagođeni prefix',
-    'pp.f6':              'Prioritetna podrška',
-    'pb.f1':              'Sve iz Pro plana',
-    'pb.f2':              'Do 5 Kick kanala',
-    'pb.f3':              'API pristup',
-    'pb.f4':              'Prilagođeni branding',
-    'pb.f5':              'Webhooks integracija',
-    'pb.f6':              'Dedikovan support',
-    'pricing.cta.free':   'Počni besplatno',
-    'pricing.cta.pro':    'Uzmi Pro plan',
-    'pricing.cta.biz':    'Uzmi Business',
-    'cta.title':          'Spreman da poboljšaš chat?',
-    'cta.desc':           'Registruj se i povezi Kickot sa svojim Kick kanalom. Za manje od 5 minuta.',
-    'cta.primary':        '🚀 Kreiraj nalog',
-    'cta.login':          'Prijavi se',
-    'footer.desc':        'Moćan chat bot za Kick platformu. Deo KickAll ekosistema.',
-    'footer.product':     'Produkt',
-    'footer.features':    'Funkcionalnosti',
-    'footer.commands':    'Komande',
-    'footer.pricing':     'Cene',
-    'footer.ecosystem':   'Ekosistem',
-    'footer.copy':        '© 2026 KickAll / Kickot. Sva prava zadržana.',
-    'footer.privacy':     'Privatnost',
-    'footer.terms':       'Uslovi',
-    'modal.tagline':      'Bot za Kick platformu',
-    'tab.login':          'Prijava',
-    'tab.signup':         'Registracija',
-    'form.email':         'Email adresa',
-    'form.password':      'Lozinka',
-    'form.name':          'Ime / Nadimak',
-    'form.name.ph':       'Tvoje ime',
-    'form.pw.ph':         'Min. 8 karaktera',
-    'form.pw.hint':       'Minimum 8 karaktera',
-    'form.forgot':        'Zaboravljena lozinka?',
-    'form.login.submit':  'Prijavi se',
+    'hero.note': 'Besplatan plan dostupan. Bez kreditne kartice.',
+    'features.label': 'Funkcionalnosti',
+    'features.title': 'Sve što jedan Kick bot treba',
+    'features.subtitle': 'Kickot dolazi sa bogatim setom funkcionalnosti koje možeš koristiti odmah, bez ikakve konfiguracije.',
+    'feat.cmd.title': 'Prilagođene Komande',
+    'feat.cmd.desc': 'Definiši vlastite komande sa odgovorima, varijablama i cool-down-om. Sistem komandi radi u realnom vremenu.',
+    'feat.mod.title': 'Automatska Moderacija',
+    'feat.mod.desc': 'Anti-spam, filter reči, timeout i ban sistem. Bot pazi na chat dok ti uživaš u streamu.',
+    'feat.wt.title': 'Watchtime & Leaderboard',
+    'feat.wt.desc': 'Automatsko praćenje watchtime-a svakog gledalaca. Rangovi, top liste i nagrade za lojalne fanove.',
+    'feat.games.title': 'Mini-igre za Chat',
+    'feat.games.desc': '!duel, !8ball, !love, !brak, !roll — igre koje drže chat aktivan i zabavnim tokom celog streama.',
+    'feat.lang.title': 'Srpski i Engleski',
+    'feat.lang.desc': 'Bot odgovara na srpskom ili engleskom, u zavisnosti od podešavanja kanala.',
+    'feat.stats.title': 'Statistike uživo',
+    'feat.stats.desc': 'Dashboard sa svim statistikama kanala, aktivnim korisnicima, top komandama i aktivnošću chata.',
+    'cmds.label': 'Komande',
+    'cmds.title': 'Bogata biblioteka komandi',
+    'cmds.subtitle': 'Klikni na komandu da vidiš kako izgleda u chatu.',
+    'cmd.rank': 'Tvoj rang i watchtime',
+    'cmd.top': 'Top 10 gledalaca',
+    'cmd.love': 'Kompatibilnost sa nekim',
+    'cmd.brak': 'Venčaj se sa nekim',
+    'cmd.duel': 'Izazovi nekoga na duel',
+    'cmd.8ball': 'Postavi pitanje sudbini',
+    'cmd.roll': 'Baci kockicu',
+    'cmd.uptime': 'Koliko stream traje',
+    'cmd.preview': '// Preview — live chat simulacija',
+    'pricing.label': 'Cene',
+    'pricing.title': 'Poštene cene za pravi alat',
+    'pricing.subtitle': 'Počni besplatno. Nadogradi se kada budeš spreman.',
+    'pricing.forever': 'Zauvek besplatno',
+    'pricing.per.month': '/mesec',
+    'pricing.popular': 'Najpopularniji',
+    'pricing.free.desc': 'Sve što treba za početak.',
+    'pricing.pro.desc': 'Za ozbiljne streamere.',
+    'pricing.biz.desc': 'Za više kanala i organizacije.',
+    'pf.f1': 'Bot uvek aktivan',
+    'pf.f2': 'Do 10 komandi',
+    'pf.f3': 'Watchtime tracking',
+    'pf.f4': 'Osnovna moderacija',
+    'pf.f5': 'Napredna moderacija',
+    'pf.f6': 'Prioritetna podrška',
+    'pp.f1': 'Neograničene komande',
+    'pp.f2': 'Napredna moderacija',
+    'pp.f3': 'Sve mini-igre',
+    'pp.f4': 'Analytics dashboard',
+    'pp.f5': 'Prilagođeni prefix',
+    'pp.f6': 'Prioritetna podrška',
+    'pb.f1': 'Sve iz Pro plana',
+    'pb.f2': 'Do 5 Kick kanala',
+    'pb.f3': 'API pristup',
+    'pb.f4': 'Prilagođeni branding',
+    'pb.f5': 'Webhooks integracija',
+    'pb.f6': 'Dedikovan support',
+    'pricing.cta.free': 'Počni besplatno',
+    'pricing.cta.pro': 'Uzmi Pro plan',
+    'pricing.cta.biz': 'Uzmi Business',
+    'cta.title': 'Spreman da poboljšaš chat?',
+    'cta.desc': 'Registruj se i povezi Kickot sa svojim Kick kanalom. Za manje od 5 minuta.',
+    'cta.primary': 'Kreiraj nalog',
+    'cta.login': 'Prijavi se',
+    'footer.desc': 'Moćan chat bot za Kick platformu. Deo KickAll ekosistema.',
+    'footer.product': 'Produkt',
+    'footer.features': 'Funkcionalnosti',
+    'footer.commands': 'Komande',
+    'footer.pricing': 'Cene',
+    'footer.ecosystem': 'Ekosistem',
+    'footer.copy': '© 2026 KickAll / Kickot. Sva prava zadržana.',
+    'footer.privacy': 'Privatnost',
+    'footer.terms': 'Uslovi',
+    'modal.tagline': 'Bot za Kick platformu',
+    'tab.login': 'Prijava',
+    'tab.signup': 'Registracija',
+    'form.email': 'Email adresa',
+    'form.password': 'Lozinka',
+    'form.name': 'Ime / Nadimak',
+    'form.name.ph': 'Tvoje ime',
+    'form.pw.ph': 'Min. 8 karaktera',
+    'form.pw.hint': 'Minimum 8 karaktera',
+    'form.forgot': 'Zaboravljena lozinka?',
+    'form.login.submit': 'Prijavi se',
     'form.signup.submit': 'Kreiraj nalog',
     'form.register.link': 'Registruj se',
-    'form.login.link':    'Prijavi se',
-    'form.have.account':  'Već imaš nalog?',
-    'form.terms.note':    'Registracijom prihvataš naše Uslove korišćenja i Politiku privatnosti.',
-    'forgot.desc':        'Unesi svoju email adresu i poslaćemo ti link za reset lozinke.',
-    'forgot.submit':      'Pošalji reset link',
-    'forgot.back':        '← Nazad na prijavu',
+    'form.login.link': 'Prijavi se',
+    'form.have.account': 'Već imaš nalog?',
+    'form.terms.note': 'Registracijom prihvataš naše Uslove korišćenja i Politiku privatnosti.',
+    'forgot.desc': 'Unesi svoju email adresu i poslaćemo ti link za reset lozinke.',
+    'forgot.submit': 'Pošalji reset link',
+    'forgot.back': '← Nazad na prijavu',
     // Validation
     'err.email.required': 'Email adresa je obavezna',
-    'err.email.invalid':  'Unesi validnu email adresu',
-    'err.pw.required':    'Lozinka je obavezna',
-    'err.pw.short':       'Lozinka mora imati minimum 8 karaktera',
-    'err.name.required':  'Ime je obavezno',
+    'err.email.invalid': 'Unesi validnu email adresu',
+    'err.pw.required': 'Lozinka je obavezna',
+    'err.pw.short': 'Lozinka mora imati minimum 8 karaktera',
+    'err.name.required': 'Ime je obavezno',
     // Auth responses
-    'auth.login.success':    'Uspešno prijavljen!',
-    'auth.signup.success':   'Nalog kreiran! Proveri email za potvrdu.',
-    'auth.forgot.success':   'Link za reset je poslat na tvoj email.',
-    'auth.logout.success':   'Uspešno odjavljen.',
-    'auth.err.invalid':      'Pogrešan email ili lozinka.',
-    'auth.err.exists':       'Nalog sa ovim emailom već postoji.',
-    'auth.err.generic':      'Došlo je do greške. Pokušaj ponovo.',
-    'auth.err.email.confirm':'Ovaj email već postoji ali nije potvrđen. Proveri inbox.',
-    'auth.err.rate_limit':   'Previše pokušaja. Sačekaj nekoliko minuta pa pokušaj ponovo.',
-    'auth.err.email_invalid':'Email adresa nije prihvaćena. Pokušaj sa drugom adresom.',
+    'auth.login.success': 'Uspešno prijavljen!',
+    'auth.signup.success': 'Nalog kreiran! Proveri email za potvrdu.',
+    'auth.forgot.success': 'Link za reset je poslat na tvoj email.',
+    'auth.logout.success': 'Uspešno odjavljen.',
+    'auth.err.invalid': 'Pogrešan email ili lozinka.',
+    'auth.err.exists': 'Nalog sa ovim emailom već postoji.',
+    'auth.err.generic': 'Došlo je do greške. Pokušaj ponovo.',
+    'auth.err.email.confirm': 'Ovaj email već postoji ali nije potvrđen. Proveri inbox.',
+    'auth.err.rate_limit': 'Previše pokušaja. Sačekaj nekoliko minuta pa pokušaj ponovo.',
+    'auth.err.email_invalid': 'Email adresa nije prihvaćena. Pokušaj sa drugom adresom.',
   },
   en: {
-    'meta.title':         'Kickot — Bot for Kick Platform',
-    'meta.desc':          'Kickot is a powerful chat bot for the Kick platform. Commands, moderation, watchtime, leaderboard and mini-games.',
-    'nav.back':           'KickAll',
-    'nav.login':          'Log in',
-    'nav.signup':         'Sign up',
-    'nav.dashboard':      'Dashboard',
-    'nav.settings':       'Settings',
-    'nav.logout':         'Log out',
-    'hero.live':          'Active · In Production',
-    'hero.title':         'The Kick Bot That Works While You Stream',
-    'hero.subtitle':      'A powerful chat bot for the Kick platform with custom commands, automatic moderation, watchtime system, mini-games and leaderboard. In both Serbian and English.',
-    'hero.cta.primary':   '🚀 Get started free',
+    'meta.title': 'Kickot — Bot for Kick Platform',
+    'meta.desc': 'Kickot is a powerful chat bot for the Kick platform. Commands, moderation, watchtime, leaderboard and mini-games.',
+    'nav.back': 'KickAll',
+    'nav.login': 'Log in',
+    'nav.signup': 'Sign up',
+    'nav.dashboard': 'Dashboard',
+    'nav.settings': 'Settings',
+    'nav.logout': 'Log out',
+    'hero.live': 'Active · In Production',
+    'hero.title': 'The Kick Bot That Works While You Stream',
+    'hero.subtitle': 'A powerful chat bot for the Kick platform with custom commands, automatic moderation, watchtime system, mini-games and leaderboard. In both Serbian and English.',
+    'hero.cta.primary': 'Get started free',
     'hero.cta.secondary': 'See features',
-    'hero.note':          'Free plan available. No credit card required.',
-    'features.label':     'Features',
-    'features.title':     'Everything a Kick Bot Needs',
-    'features.subtitle':  'Kickot comes with a rich set of features you can use immediately, with no configuration.',
-    'feat.cmd.title':     'Custom Commands',
-    'feat.cmd.desc':      'Define your own commands with responses, variables and cooldowns. The command system works in real time.',
-    'feat.mod.title':     'Automatic Moderation',
-    'feat.mod.desc':      'Anti-spam, word filter, timeout and ban system. The bot watches chat while you enjoy streaming.',
-    'feat.wt.title':      'Watchtime & Leaderboard',
-    'feat.wt.desc':       'Automatic watchtime tracking for every viewer. Ranks, top lists and rewards for loyal fans.',
-    'feat.games.title':   'Chat Mini-games',
-    'feat.games.desc':    '!duel, !8ball, !love, !marry, !roll — games that keep chat active and fun throughout the stream.',
-    'feat.lang.title':    'Serbian & English',
-    'feat.lang.desc':     'The bot responds in Serbian or English depending on channel settings.',
-    'feat.stats.title':   'Live Statistics',
-    'feat.stats.desc':    'Dashboard with all channel stats, active users, top commands and chat activity.',
-    'cmds.label':         'Commands',
-    'cmds.title':         'Rich Command Library',
-    'cmds.subtitle':      'Click a command to see how it looks in chat.',
-    'cmd.rank':           'Your rank and watchtime',
-    'cmd.top':            'Top 10 viewers',
-    'cmd.love':           'Compatibility with someone',
-    'cmd.brak':           'Marry someone',
-    'cmd.duel':           'Challenge someone to a duel',
-    'cmd.8ball':          'Ask fate a question',
-    'cmd.roll':           'Roll a dice',
-    'cmd.uptime':         'How long the stream has been live',
-    'cmd.preview':        '// Preview — live chat simulation',
-    'pricing.label':      'Pricing',
-    'pricing.title':      'Fair Prices for a Real Tool',
-    'pricing.subtitle':   'Start free. Upgrade when you\'re ready.',
-    'pricing.forever':    'Forever free',
-    'pricing.per.month':  '/month',
-    'pricing.popular':    'Most Popular',
-    'pricing.free.desc':  'Everything you need to get started.',
-    'pricing.pro.desc':   'For serious streamers.',
-    'pricing.biz.desc':   'For multiple channels and organizations.',
-    'pf.f1':              'Bot always active',
-    'pf.f2':              'Up to 10 commands',
-    'pf.f3':              'Watchtime tracking',
-    'pf.f4':              'Basic moderation',
-    'pf.f5':              'Advanced moderation',
-    'pf.f6':              'Priority support',
-    'pp.f1':              'Unlimited commands',
-    'pp.f2':              'Advanced moderation',
-    'pp.f3':              'All mini-games',
-    'pp.f4':              'Analytics dashboard',
-    'pp.f5':              'Custom prefix',
-    'pp.f6':              'Priority support',
-    'pb.f1':              'Everything in Pro',
-    'pb.f2':              'Up to 5 Kick channels',
-    'pb.f3':              'API access',
-    'pb.f4':              'Custom branding',
-    'pb.f5':              'Webhooks integration',
-    'pb.f6':              'Dedicated support',
-    'pricing.cta.free':   'Get started free',
-    'pricing.cta.pro':    'Get Pro plan',
-    'pricing.cta.biz':    'Get Business',
-    'cta.title':          'Ready to Upgrade Your Chat?',
-    'cta.desc':           'Sign up and connect Kickot to your Kick channel. In less than 5 minutes.',
-    'cta.primary':        '🚀 Get started free',
-    'cta.login':          'Log in',
-    'footer.desc':        'Powerful chat bot for the Kick platform. Part of the KickAll ecosystem.',
-    'footer.product':     'Product',
-    'footer.features':    'Features',
-    'footer.commands':    'Commands',
-    'footer.pricing':     'Pricing',
-    'footer.ecosystem':   'Ecosystem',
-    'footer.copy':        '© 2026 KickAll / Kickot. All rights reserved.',
-    'footer.privacy':     'Privacy',
-    'footer.terms':       'Terms',
-    'modal.tagline':      'Bot for Kick Platform',
-    'tab.login':          'Login',
-    'tab.signup':         'Register',
-    'form.email':         'Email address',
-    'form.password':      'Password',
-    'form.name':          'Name / Nickname',
-    'form.name.ph':       'Your name',
-    'form.pw.ph':         'Min. 8 characters',
-    'form.pw.hint':       'Minimum 8 characters',
-    'form.forgot':        'Forgot password?',
-    'form.login.submit':  'Log in',
+    'hero.note': 'Free plan available. No credit card required.',
+    'features.label': 'Features',
+    'features.title': 'Everything a Kick Bot Needs',
+    'features.subtitle': 'Kickot comes with a rich set of features you can use immediately, with no configuration.',
+    'feat.cmd.title': 'Custom Commands',
+    'feat.cmd.desc': 'Define your own commands with responses, variables and cooldowns. The command system works in real time.',
+    'feat.mod.title': 'Automatic Moderation',
+    'feat.mod.desc': 'Anti-spam, word filter, timeout and ban system. The bot watches chat while you enjoy streaming.',
+    'feat.wt.title': 'Watchtime & Leaderboard',
+    'feat.wt.desc': 'Automatic watchtime tracking for every viewer. Ranks, top lists and rewards for loyal fans.',
+    'feat.games.title': 'Chat Mini-games',
+    'feat.games.desc': '!duel, !8ball, !love, !marry, !roll — games that keep chat active and fun throughout the stream.',
+    'feat.lang.title': 'Serbian & English',
+    'feat.lang.desc': 'The bot responds in Serbian or English depending on channel settings.',
+    'feat.stats.title': 'Live Statistics',
+    'feat.stats.desc': 'Dashboard with all channel stats, active users, top commands and chat activity.',
+    'cmds.label': 'Commands',
+    'cmds.title': 'Rich Command Library',
+    'cmds.subtitle': 'Click a command to see how it looks in chat.',
+    'cmd.rank': 'Your rank and watchtime',
+    'cmd.top': 'Top 10 viewers',
+    'cmd.love': 'Compatibility with someone',
+    'cmd.brak': 'Marry someone',
+    'cmd.duel': 'Challenge someone to a duel',
+    'cmd.8ball': 'Ask fate a question',
+    'cmd.roll': 'Roll a dice',
+    'cmd.uptime': 'How long the stream has been live',
+    'cmd.preview': '// Preview — live chat simulation',
+    'pricing.label': 'Pricing',
+    'pricing.title': 'Fair Prices for a Real Tool',
+    'pricing.subtitle': 'Start free. Upgrade when you\'re ready.',
+    'pricing.forever': 'Forever free',
+    'pricing.per.month': '/month',
+    'pricing.popular': 'Most Popular',
+    'pricing.free.desc': 'Everything you need to get started.',
+    'pricing.pro.desc': 'For serious streamers.',
+    'pricing.biz.desc': 'For multiple channels and organizations.',
+    'pf.f1': 'Bot always active',
+    'pf.f2': 'Up to 10 commands',
+    'pf.f3': 'Watchtime tracking',
+    'pf.f4': 'Basic moderation',
+    'pf.f5': 'Advanced moderation',
+    'pf.f6': 'Priority support',
+    'pp.f1': 'Unlimited commands',
+    'pp.f2': 'Advanced moderation',
+    'pp.f3': 'All mini-games',
+    'pp.f4': 'Analytics dashboard',
+    'pp.f5': 'Custom prefix',
+    'pp.f6': 'Priority support',
+    'pb.f1': 'Everything in Pro',
+    'pb.f2': 'Up to 5 Kick channels',
+    'pb.f3': 'API access',
+    'pb.f4': 'Custom branding',
+    'pb.f5': 'Webhooks integration',
+    'pb.f6': 'Dedicated support',
+    'pricing.cta.free': 'Get started free',
+    'pricing.cta.pro': 'Get Pro plan',
+    'pricing.cta.biz': 'Get Business',
+    'cta.title': 'Ready to Upgrade Your Chat?',
+    'cta.desc': 'Sign up and connect Kickot to your Kick channel. In less than 5 minutes.',
+    'cta.primary': 'Get started free',
+    'cta.login': 'Log in',
+    'footer.desc': 'Powerful chat bot for the Kick platform. Part of the KickAll ecosystem.',
+    'footer.product': 'Product',
+    'footer.features': 'Features',
+    'footer.commands': 'Commands',
+    'footer.pricing': 'Pricing',
+    'footer.ecosystem': 'Ecosystem',
+    'footer.copy': '© 2026 KickAll / Kickot. All rights reserved.',
+    'footer.privacy': 'Privacy',
+    'footer.terms': 'Terms',
+    'modal.tagline': 'Bot for Kick Platform',
+    'tab.login': 'Login',
+    'tab.signup': 'Register',
+    'form.email': 'Email address',
+    'form.password': 'Password',
+    'form.name': 'Name / Nickname',
+    'form.name.ph': 'Your name',
+    'form.pw.ph': 'Min. 8 characters',
+    'form.pw.hint': 'Minimum 8 characters',
+    'form.forgot': 'Forgot password?',
+    'form.login.submit': 'Log in',
     'form.signup.submit': 'Create Account',
     'form.register.link': 'Register',
-    'form.login.link':    'Log in',
-    'form.have.account':  'Already have an account?',
-    'form.terms.note':    'By registering you agree to our Terms of Service and Privacy Policy.',
-    'forgot.desc':        'Enter your email address and we\'ll send you a password reset link.',
-    'forgot.submit':      'Send reset link',
-    'forgot.back':        '← Back to login',
+    'form.login.link': 'Log in',
+    'form.have.account': 'Already have an account?',
+    'form.terms.note': 'By registering you agree to our Terms of Service and Privacy Policy.',
+    'forgot.desc': 'Enter your email address and we\'ll send you a password reset link.',
+    'forgot.submit': 'Send reset link',
+    'forgot.back': '← Back to login',
     // Validation
     'err.email.required': 'Email address is required',
-    'err.email.invalid':  'Please enter a valid email address',
-    'err.pw.required':    'Password is required',
-    'err.pw.short':       'Password must be at least 8 characters',
-    'err.name.required':  'Name is required',
+    'err.email.invalid': 'Please enter a valid email address',
+    'err.pw.required': 'Password is required',
+    'err.pw.short': 'Password must be at least 8 characters',
+    'err.name.required': 'Name is required',
     // Auth responses
-    'auth.login.success':    'Successfully logged in!',
-    'auth.signup.success':   'Account created! Check your email for confirmation.',
-    'auth.forgot.success':   'Reset link sent to your email.',
-    'auth.logout.success':   'Successfully logged out.',
-    'auth.err.invalid':      'Invalid email or password.',
-    'auth.err.exists':       'An account with this email already exists.',
-    'auth.err.generic':      'An error occurred. Please try again.',
-    'auth.err.email.confirm':'This email exists but is not confirmed. Check your inbox.',
-    'auth.err.rate_limit':   'Too many attempts. Please wait a few minutes and try again.',
-    'auth.err.email_invalid':'Email address was not accepted. Please try a different address.',
+    'auth.login.success': 'Successfully logged in!',
+    'auth.signup.success': 'Account created! Check your email for confirmation.',
+    'auth.forgot.success': 'Reset link sent to your email.',
+    'auth.logout.success': 'Successfully logged out.',
+    'auth.err.invalid': 'Invalid email or password.',
+    'auth.err.exists': 'An account with this email already exists.',
+    'auth.err.generic': 'An error occurred. Please try again.',
+    'auth.err.email.confirm': 'This email exists but is not confirmed. Check your inbox.',
+    'auth.err.rate_limit': 'Too many attempts. Please wait a few minutes and try again.',
+    'auth.err.email_invalid': 'Email address was not accepted. Please try a different address.',
   }
 };
 
@@ -328,7 +328,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
 });
 
 // ── Particles ─────────────────────────────────────────────
-(function() {
+(function () {
   const canvas = document.getElementById('particlesCanvas');
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -336,7 +336,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
   resize();
   window.addEventListener('resize', resize, { passive: true });
-  const colors = ['#8B5CF6','#6366F1','#53FC18','#A78BFA'];
+  const colors = ['#8B5CF6', '#6366F1', '#53FC18', '#A78BFA'];
   for (let i = 0; i < 50; i++) {
     particles.push({
       x: Math.random() * window.innerWidth,
@@ -371,53 +371,53 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
 // ── Web Audio API Synth Sound Helper ───────────────────────
 let audioCtx = null;
 function playSynthSound(frequency = 440, type = 'sine', duration = 0.1, volume = 0.1) {
-    try {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-        const osc = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        osc.type = type;
-        osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-
-        gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
-
-        osc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        osc.start();
-        osc.stop(audioCtx.currentTime + duration);
-    } catch (e) {
-        console.warn('Audio is blocked or not supported:', e);
+  try {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+
+    gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+  } catch (e) {
+    console.warn('Audio is blocked or not supported:', e);
+  }
 }
 
 // ── Commands Showcase ─────────────────────────────────────
 const commandPreviews = {
   // Statistika i rangiranje
   'top-watchtime': () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!top watchtime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. milan_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>`,
-  'top-chat':      () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!top chat 3</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">💬 Najaktivniji u četu: 1. chat_queen (1.450 poruka) 2. milan_fan (982 poruke) 3. VIP_stefan (820 poruka)</span></div>`,
-  'watchtime':     () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!watchtime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ milan_fan, tvoj watchtime je: 24 sata i 35 minuta!</span></div>`,
-  'chat':          () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!chat</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">✉️ milan_fan, poslao si ukupno 982 poruke u ovom četu!</span></div>`,
-  'me':            () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!me</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">📊 Korisnik: milan_fan | Sati: 24.5h | Poruke: 982 | Rang: #3 | Uloga: VIP</span></div>`,
+  'top-chat': () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!top chat 3</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">💬 Najaktivniji u četu: 1. chat_queen (1.450 poruka) 2. milan_fan (982 poruke) 3. VIP_stefan (820 poruka)</span></div>`,
+  'watchtime': () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!watchtime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ milan_fan, tvoj watchtime je: 24 sata i 35 minuta!</span></div>`,
+  'chat': () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!chat</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">✉️ milan_fan, poslao si ukupno 982 poruke u ovom četu!</span></div>`,
+  'me': () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!me</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">📊 Korisnik: milan_fan | Sati: 24.5h | Poruke: 982 | Rang: #3 | Uloga: VIP</span></div>`,
 
   // Zabava i interakcija
-  'iq':            () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!iq @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">🧠 Skeniram mozak korisnika @milan_fan... Rezultat: IQ je 142! Genijalac! 💡</span></div>`,
-  'samar':         () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!samar @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">💥 novak99 je opalio šamarčinu korisniku @milan_fan sa mokrom haringom! 🐟</span></div>`,
-  'duel':          () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!duel @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">⚔️ Duel: @novak99 vs @milan_fan! Pucnjava počinje... @milan_fan je izvukao brži revolver i pobedio sa 12 HP preostalo! 🏆</span></div>`,
-  'roll':          () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!roll @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">🎲 Bacam kockicu za @milan_fan... Rezultat: 78! (0-100)</span></div>`,
+  'iq': () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!iq @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#A78BFA">🧠 Skeniram mozak korisnika @milan_fan... Rezultat: IQ je 142! Genijalac! 💡</span></div>`,
+  'samar': () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!samar @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">💥 novak99 je opalio šamarčinu korisniku @milan_fan sa mokrom haringom! 🐟</span></div>`,
+  'duel': () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!duel @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F87171">⚔️ Duel: @novak99 vs @milan_fan! Pucnjava počinje... @milan_fan je izvukao brži revolver i pobedio sa 12 HP preostalo! 🏆</span></div>`,
+  'roll': () => `<div class="cp-line"><span class="cp-user">novak99:</span> <span class="cp-msg">!roll @milan_fan</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">🎲 Bacam kockicu za @milan_fan... Rezultat: 78! (0-100)</span></div>`,
 
   // Informacije i alati
-  'vreme':         () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!vreme Beograd</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⛅ Vreme u Beogradu: 24°C | Vetar: 12 km/h | Vlažnost: 65% | Delimično oblačno.</span></div>`,
-  'info':          () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!info</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">🤖 Kickot Chat Bot v2.4 | Pomažem u moderaciji, zabavi i statistici tvog kanala.</span></div>`,
-  'cinjenica':     () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!cinjenica</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">💡 Činjenica: Prvi kompjuterski bag bila je stvarna buba (moljac) zaglavljena u releju 1947. godine!</span></div>`,
-  'followage':     () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!followage</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F472B6">💖 milan_fan prati ovaj kanal već 8 meseci, 12 dana i 4 sata!</span></div>`,
-  'uptime':        () => `<div class="cp-line"><span class="cp-user">new_viewer:</span> <span class="cp-msg">!uptime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ Stream traje: 2 sata, 47 minuta i 32 sekunde!</span></div>`,
+  'vreme': () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!vreme Beograd</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⛅ Vreme u Beogradu: 24°C | Vetar: 12 km/h | Vlažnost: 65% | Delimično oblačno.</span></div>`,
+  'info': () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!info</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">🤖 Kickot Chat Bot v2.4 | Pomažem u moderaciji, zabavi i statistici tvog kanala.</span></div>`,
+  'cinjenica': () => `<div class="cp-line"><span class="cp-user">chat_fan:</span> <span class="cp-msg">!cinjenica</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#FBBF24">💡 Činjenica: Prvi kompjuterski bag bila je stvarna buba (moljac) zaglavljena u releju 1947. godine!</span></div>`,
+  'followage': () => `<div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!followage</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#F472B6">💖 milan_fan prati ovaj kanal već 8 meseci, 12 dana i 4 sata!</span></div>`,
+  'uptime': () => `<div class="cp-line"><span class="cp-user">new_viewer:</span> <span class="cp-msg">!uptime</span></div><div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:#60A5FA">⏱️ Stream traje: 2 sata, 47 minuta i 32 sekunde!</span></div>`,
 };
 
 // Logika za prebacivanje kategorija komandi
@@ -426,7 +426,7 @@ document.querySelectorAll('.category-btn').forEach(btn => {
     document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const cat = btn.getAttribute('data-category');
-    
+
     // Sakri sve komande i prikaži samo iz odabrane kategorije
     document.querySelectorAll('.cmd-item').forEach(item => {
       if (item.getAttribute('data-cat') === cat) {
@@ -435,7 +435,7 @@ document.querySelectorAll('.category-btn').forEach(btn => {
         item.style.display = 'none';
       }
     });
-    
+
     // Klikni na prvu komandu u toj kategoriji da se osveži preview
     const firstVisible = document.querySelector(`.cmd-item[data-cat="${cat}"]`);
     if (firstVisible) {
@@ -453,10 +453,10 @@ document.querySelectorAll('.cmd-item').forEach(item => {
     const preview = document.getElementById('cmdPreviewContent');
     if (preview && commandPreviews[cmd]) {
       preview.innerHTML = commandPreviews[cmd]();
-      
+
       // Zvučni efekat na klik
       playSynthSound(600, 'sine', 0.15);
-      
+
       // Beli bljesak okvira za preview log tablu
       const playground = document.getElementById('mainPlayground');
       if (playground) {
@@ -577,14 +577,70 @@ let kickLoginUsername = '';
 let kickLoginVerificationCode = '';
 let kickLoginEmail = '';
 
-function openKickLogin() {
-  const loginForm = document.getElementById('loginForm');
-  const kickForm = document.getElementById('kickLoginForm');
-  const authTabs = document.getElementById('authTabs');
-  if (loginForm) loginForm.style.display = 'none';
-  if (kickForm) kickForm.style.display = 'flex';
-  if (authTabs) authTabs.style.display = 'none';
-  showKickLoginStep('input');
+// Pomoćne funkcije za PKCE (Code Challenge / Verifier)
+function generateRandomString(length) {
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  let text = '';
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+}
+
+async function sha256(plain) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return window.crypto.subtle.digest('SHA-256', data);
+}
+
+function base64urlencode(a) {
+  let str = "";
+  const bytes = new Uint8Array(a);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    str += String.fromCharCode(bytes[i]);
+  }
+  return btoa(str)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+async function generateCodeChallenge(v) {
+  const hashed = await sha256(v);
+  return base64urlencode(hashed);
+}
+
+function getKickRedirectUri() {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return `${window.location.origin}/auth/kick/callback/`;
+  }
+  return `${window.location.origin}/auth/kick/callback`;
+}
+
+async function openKickLogin() {
+  const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
+  const KICK_REDIRECT_URI = getKickRedirectUri();
+  const KICK_SCOPE = 'user:read';
+
+  const state = generateRandomString(16);
+  const codeVerifier = generateRandomString(64);
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+  localStorage.setItem('kick_oauth_state', state);
+  localStorage.setItem('kick_code_verifier', codeVerifier);
+
+  const authUrl = `https://id.kick.com/oauth/authorize?` + new URLSearchParams({
+    response_type: 'code',
+    client_id: KICK_CLIENT_ID,
+    redirect_uri: KICK_REDIRECT_URI,
+    scope: KICK_SCOPE,
+    state: state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256'
+  }).toString();
+
+  window.location.href = authUrl;
 }
 
 function cancelKickLogin() {
@@ -694,21 +750,21 @@ async function handleKickLoginNext() {
     // 1. Direktna REST pretraga po kick_channels JSONB sadržaju (username field)
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/user_profiles?select=id,display_name,email&kick_channels=cs.${encodeURIComponent(JSON.stringify([{username: cleanUsername}]))}`,
+        `${SUPABASE_URL}/rest/v1/user_profiles?select=id,display_name,email&kick_channels=cs.${encodeURIComponent(JSON.stringify([{ username: cleanUsername }]))}`,
         { headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` } }
       );
       if (res.ok) {
         const rows = await res.json();
         if (rows && rows.length > 0) ownerProfile = rows[0];
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // 2. RPC pretraga (ako je REST fallback bio neuspešan)
     if (!ownerProfile) {
       try {
         const { data: byRpc } = await sb.rpc('find_profile_by_kick_username', { kick_user: cleanUsername });
         if (byRpc && byRpc.length > 0) ownerProfile = byRpc[0];
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // 3. Pokušaj po chatroom_id sa Kick API-ja
@@ -720,7 +776,7 @@ async function handleKickLoginNext() {
           const { data: byId } = await sb.rpc('find_profile_by_kick_channel_id', { channel_id: channelId });
           if (byId && byId.length > 0) ownerProfile = byId[0];
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // 4. Poslednji fallback — po display_name (hvatamo slučaj kada je display_name = kick username)
@@ -999,7 +1055,7 @@ async function handleKickRegisterSubmit() {
 // ── Auth Error Mapper ─────────────────────────────────────
 function mapAuthError(error) {
   const code = (error.code || '').toLowerCase();
-  const msg  = (error.message || '').toLowerCase();
+  const msg = (error.message || '').toLowerCase();
 
   if (code === 'over_email_send_rate_limit' || error.status === 429 || msg.includes('rate limit')) {
     return t('auth.err.rate_limit');
@@ -1026,20 +1082,20 @@ async function handleLogin() {
   const password = document.getElementById('loginPassword').value;
   let valid = true;
 
-  if (!inputVal) { 
-    showFieldError('loginEmailErr', t('err.email.required')); 
-    valid = false; 
+  if (!inputVal) {
+    showFieldError('loginEmailErr', t('err.email.required'));
+    valid = false;
   } else if (inputVal.includes('@')) {
-    if (!validateEmail(inputVal)) { 
-      showFieldError('loginEmailErr', t('err.email.invalid')); 
-      valid = false; 
+    if (!validateEmail(inputVal)) {
+      showFieldError('loginEmailErr', t('err.email.invalid'));
+      valid = false;
     }
   } else {
     // Ako je korisničko ime (nema @), proveri format
     const cleanUser = inputVal.replace(/^@/, '').trim();
     if (!/^[a-zA-Z0-9_-]+$/.test(cleanUser)) {
-      showFieldError('loginEmailErr', 'Nevalidno korisničko ime.'); 
-      valid = false; 
+      showFieldError('loginEmailErr', 'Nevalidno korisničko ime.');
+      valid = false;
     }
   }
 
@@ -1047,8 +1103,8 @@ async function handleLogin() {
   if (!valid) return;
 
   // Ako sadrži @ koristi kao email, inače pretvori u sistemski email
-  const email = inputVal.includes('@') 
-    ? inputVal 
+  const email = inputVal.includes('@')
+    ? inputVal
     : `kick_user_${inputVal.replace(/^@/, '').trim().toLowerCase()}@kickot.com`;
 
   setLoading('login', true);
@@ -1099,10 +1155,10 @@ async function handleSignup() {
     }
 
     const user = signUpData.user;
-    
+
     // Proveri da li profil već postoji u user_profiles
     const { data: existingProfile } = await sb.from('user_profiles').select('id').eq('id', user.id).maybeSingle();
-    
+
     if (!existingProfile) {
       await sb.from('user_profiles').insert({
         id: user.id,
@@ -1160,8 +1216,8 @@ function togglePw(inputId, btn) {
   if (!input) return;
   const show = input.type === 'password';
   input.type = show ? 'text' : 'password';
-  btn.innerHTML = show 
-    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>` 
+  btn.innerHTML = show
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
     : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
 }
 
@@ -1185,7 +1241,7 @@ function onUserChange(user) {
     userMenu.classList.add('visible');
     const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
     userName.textContent = name;
-    
+
     const avatarVal = user.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
     if (avatarVal.startsWith('data:image') || avatarVal.startsWith('http')) {
       userAvatar.style.backgroundImage = `url("${avatarVal}")`;
@@ -1236,7 +1292,7 @@ function openSettingsModal() {
     showToast('error', currentLang === 'sr' ? 'Moraš biti prijavljen' : 'You must be logged in', '⚠️');
     return;
   }
-  
+
   // Fill in fields
   const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || 'User';
   const avatarVal = currentUser.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
@@ -1267,6 +1323,167 @@ function handleSettingsModalBackdropClick(e) {
   }
 }
 
+// ── Kick Channel Management & OAuth Add-Channel Flow ──────
+let currentChannels = [];
+
+function switchSettingsTab(tabName) {
+  const tabProfile = document.getElementById('setTabProfile');
+  const tabChannels = document.getElementById('setTabChannels');
+  const panelProfile = document.getElementById('settingsProfilePanel');
+  const panelChannels = document.getElementById('settingsChannelsPanel');
+
+  if (!tabProfile || !tabChannels || !panelProfile || !panelChannels) return;
+
+  tabProfile.classList.remove('active');
+  tabChannels.classList.remove('active');
+
+  panelProfile.style.display = 'none';
+  panelChannels.style.display = 'none';
+
+  if (tabName === 'profile') {
+    tabProfile.classList.add('active');
+    panelProfile.style.display = 'block';
+  } else if (tabName === 'channels') {
+    tabChannels.classList.add('active');
+    panelChannels.style.display = 'block';
+    cancelAddChannelVerification();
+    loadConnectedChannels().then(() => {
+      renderSettingsChannelList();
+    });
+  }
+}
+
+async function loadConnectedChannels() {
+  if (!currentUser) return;
+  try {
+    const { data, error } = await sb.from('user_profiles')
+      .select('kick_channels')
+      .eq('id', currentUser.id)
+      .maybeSingle();
+
+    if (data && data.kick_channels) {
+      currentChannels = data.kick_channels;
+    } else {
+      currentChannels = [];
+    }
+  } catch (e) {
+    console.error('Greška pri učitavanju kanala:', e);
+  }
+}
+
+function renderSettingsChannelList() {
+  const listEl = document.getElementById('settingsChannelList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+
+  if (currentChannels.length === 0) {
+    listEl.innerHTML = '<div style="padding:10px;font-size:0.85rem;color:var(--color-text-muted);text-align:center;">Nema povezanih kanala.</div>';
+    return;
+  }
+
+  currentChannels.forEach(ch => {
+    const item = document.createElement('div');
+    item.className = 'modal-channel-item';
+
+    const avatarHtml = ch.avatar
+      ? `<div class="modal-channel-avatar" style="background-image:url('${ch.avatar}');background-size:cover;background-position:center;"></div>`
+      : `<div class="modal-channel-avatar">${ch.username.charAt(0).toUpperCase()}</div>`;
+
+    const badgeHtml = ch.is_primary
+      ? `<span class="modal-ch-badge primary" style="background: rgba(83, 252, 24, 0.1); color: var(--color-green); border: 1px solid rgba(83, 252, 24, 0.2); font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Glavni</span>`
+      : `<button class="btn btn-secondary btn-sm" onclick="makeChannelPrimary('${ch.id}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;cursor:pointer;">Postavi za glavni</button>`;
+
+    item.innerHTML = `
+      <div class="modal-channel-info" style="display:flex;align-items:center;gap:8px;">
+        ${avatarHtml}
+        <div>
+          <div class="modal-channel-name" style="font-weight:600;font-size:0.88rem;color:var(--color-text);">${ch.username}</div>
+          <div style="font-size:0.7rem;color:var(--color-text-muted)">ID: ${ch.id}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        ${badgeHtml}
+        <button class="btn btn-secondary btn-sm" onclick="deleteConnectedChannel('${ch.id}')" style="padding:4px 8px;font-size:0.75rem;border-radius:4px;border-color:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;" title="Ukloni kanal">✕</button>
+      </div>
+    `;
+    listEl.appendChild(item);
+  });
+}
+
+async function makeChannelPrimary(channelId) {
+  if (!currentUser) return;
+  const updatedChannels = currentChannels.map(c => ({
+    ...c,
+    is_primary: c.id === channelId
+  }));
+
+  try {
+    const { error } = await sb.from('user_profiles')
+      .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+      .eq('id', currentUser.id);
+
+    if (error) throw error;
+    currentChannels = updatedChannels;
+    renderSettingsChannelList();
+    showToast('success', 'Glavni kanal je promenjen.', '✅');
+  } catch (err) {
+    showToast('error', 'Greška pri promeni glavnog kanala.', '❌');
+  }
+}
+
+async function deleteConnectedChannel(channelId) {
+  if (!currentUser) return;
+  if (!confirm('Da li ste sigurni da želite da uklonite ovaj kanal?')) return;
+
+  const updatedChannels = currentChannels.filter(c => c.id !== channelId);
+  if (currentChannels.find(c => c.id === channelId)?.is_primary && updatedChannels.length > 0) {
+    updatedChannels[0].is_primary = true;
+  }
+
+  try {
+    const { error } = await sb.from('user_profiles')
+      .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+      .eq('id', currentUser.id);
+
+    if (error) throw error;
+    currentChannels = updatedChannels;
+    renderSettingsChannelList();
+    showToast('success', 'Kanal je uspešno uklonjen.', '✅');
+  } catch (err) {
+    showToast('error', 'Greška pri uklanjanju kanala.', '❌');
+  }
+}
+
+// Pokreće Kick OAuth flow s intent-om za dodavanje kanala
+async function openKickLoginForChannel() {
+  if (!currentUser) return;
+  const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
+  const KICK_REDIRECT_URI = getKickRedirectUri();
+  const KICK_SCOPE = 'user:read';
+
+  const state = generateRandomString(16);
+  const codeVerifier = generateRandomString(64);
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+  // Sačuvamo PKCE i intent u sessionStorage
+  sessionStorage.setItem('kick_oauth_state', state);
+  sessionStorage.setItem('kick_code_verifier', codeVerifier);
+  sessionStorage.setItem('kick_oauth_intent', 'add_channel');
+  sessionStorage.setItem('kick_add_channel_uid', currentUser.id);
+
+  const authUrl = 'https://id.kick.com/oauth/authorize?' + new URLSearchParams({
+    response_type: 'code',
+    client_id: KICK_CLIENT_ID,
+    redirect_uri: KICK_REDIRECT_URI,
+    scope: KICK_SCOPE,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256'
+  }).toString();
+
+  window.location.href = authUrl;
+}
+
 function setSettingsAvatarPreview(urlOrEmoji) {
   const imgEl = document.getElementById('settingsAvatarPreviewImg');
   if (!imgEl) return;
@@ -1290,9 +1507,9 @@ function handleSettingsAvatarFileSelect(e) {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = function(evt) {
+  reader.onload = function (evt) {
     const img = new Image();
-    img.onload = function() {
+    img.onload = function () {
       const canvas = document.createElement('canvas');
       const maxDim = 128;
       let width = img.width;
@@ -1373,7 +1590,7 @@ async function handleSaveSettings() {
 
     showToast('success', currentLang === 'sr' ? 'Podešavanja uspešno sačuvana!' : 'Settings saved successfully!', '✅');
     closeSettingsModal();
-    
+
     const { data: { user } } = await sb.auth.getUser();
     if (user) onUserChange(user);
 
@@ -1417,21 +1634,35 @@ function removeToast(id) {
 }
 
 // ── Auth Listener ──────────────────────────────────────────
+let settingsChannelsPendingOpen = false;
+if (window.location.search.includes('settings=channels')) {
+  settingsChannelsPendingOpen = true;
+}
+
 sb.auth.onAuthStateChange((event, session) => {
   onUserChange(session?.user || null);
+
+  // Ako se vraćamo sa add_channel OAuth callbacka — otvori settings na Kick Kanali tabu
+  if (settingsChannelsPendingOpen && session?.user) {
+    settingsChannelsPendingOpen = false;
+    setTimeout(() => {
+      openSettingsModal();
+      setTimeout(() => switchSettingsTab('channels'), 150);
+    }, 400);
+  }
 });
 
 // ── Spotlight Effect ────────────────────────────────────────
 const cards = document.querySelectorAll('.feature-card, .pricing-card');
 cards.forEach(card => {
-    card.addEventListener('mousemove', e => {
-        const rect = card.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+  card.addEventListener('mousemove', e => {
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-        card.style.setProperty('--mouse-x', `${x}px`);
-        card.style.setProperty('--mouse-y', `${y}px`);
-    });
+    card.style.setProperty('--mouse-x', `${x}px`);
+    card.style.setProperty('--mouse-y', `${y}px`);
+  });
 });
 
 // ── Enter Key Bindings Helper ─────────────────────────────
@@ -1471,4 +1702,10 @@ setupEnterKeyBindings();
 if (window.location.search.includes('reset=true')) {
   openModal('login');
   showToast('info', currentLang === 'sr' ? 'Unesi novu lozinku' : 'Enter your new password', '🔑');
+} else if (window.location.search.includes('action=login')) {
+  openModal('login');
+} else if (window.location.search.includes('action=logout')) {
+  sb.auth.signOut().then(() => {
+    window.location.href = '../index.html';
+  });
 }

@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="sr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kickot — OAuth autorizacija</title>
+  <link rel="icon" href="/kickot/assets/favicon.ico" type="image/x-icon">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap"
+    rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #06040A;
+      font-family: 'Inter', sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    .glow-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.15;
+      animation: blobFloat 8s ease-in-out infinite alternate;
+    }
+
+    .blob-violet {
+      width: 500px;
+      height: 500px;
+      background: #7C3AED;
+      top: -100px;
+      left: -100px;
+    }
+
+    .blob-green {
+      width: 400px;
+      height: 400px;
+      background: #53FC18;
+      bottom: -80px;
+      right: -80px;
+      animation-delay: -4s;
+    }
+
+    @keyframes blobFloat {
+      0% {
+        transform: translate(0, 0) scale(1);
+      }
+
+      100% {
+        transform: translate(40px, 30px) scale(1.06);
+      }
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 48px 40px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+    }
+
+    .logo-wrap {
+      margin-bottom: 28px;
+    }
+
+    .logo-wrap img {
+      height: 52px;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(83, 252, 24, 0.15);
+      border-top-color: #53FC18;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+
+    p {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.5);
+      line-height: 1.5;
+    }
+
+    .status-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .status-msg {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.75);
+      margin-bottom: 8px;
+    }
+
+    .status-sub {
+      font-size: 0.82rem;
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    .btn-retry {
+      display: none;
+      margin-top: 20px;
+      padding: 10px 24px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      color: #fff;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      text-decoration: none;
+    }
+
+    .btn-retry:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="glow-bg">
+    <div class="blob blob-violet"></div>
+    <div class="blob blob-green"></div>
+  </div>
+
+  <div class="card" id="card">
+    <div class="logo-wrap">
+      <img src="/Website/kickot/assets/logo.png" alt="Kickot Logo" onerror="this.style.display='none'">
+    </div>
+
+    <div id="loadingState">
+      <div class="spinner"></div>
+      <h1>Autorizacija u toku...</h1>
+      <p>Razmenjujemo Kick autorizacioni kod za pristupni token. Molimo sačekaj.</p>
+    </div>
+
+    <div id="errorState" style="display:none;">
+      <div class="status-icon" id="errorIcon">❌</div>
+      <h1 class="status-msg" id="errorTitle">Greška pri autorizaciji</h1>
+      <p class="status-sub" id="errorDetail">Pokušaj ponovo.</p>
+      <a href="/Website/kickot/index.html" class="btn-retry" id="retryBtn">← Nazad na prijavu</a>
+    </div>
+
+    <div id="successState" style="display:none;">
+      <div class="status-icon" id="successIcon">✅</div>
+      <h1 class="status-msg">Uspešna prijava!</h1>
+      <p class="status-sub">Preusmerjavanje na dashboard...</p>
+    </div>
+  </div>
+
+  <!-- Supabase SDK (za add_channel intent) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <script>
+    (async function kickOAuthCallback() {
+      const baseRedirectPath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/Website' : '';
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const state = params.get('state');
+      const error = params.get('error');
+
+      function showError(title, detail) {
+        document.getElementById('loadingState').style.display = 'none';
+        const errState = document.getElementById('errorState');
+        errState.style.display = 'block';
+        document.getElementById('errorIcon').style.display = 'block';
+        document.getElementById('errorTitle').textContent = title || 'Greška pri autorizaciji';
+        document.getElementById('errorDetail').textContent = detail || 'Pokušaj ponovo.';
+        document.getElementById('retryBtn').style.display = 'inline-block';
+      }
+
+      if (error) {
+        showError('Kick odbio autorizaciju', `Razlog: ${error}`);
+        return;
+      }
+
+      const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      if (!isLocalhost && (!state || state !== savedState)) {
+        showError('Nevalidan state parametar', 'State parametar se ne podudara. Moguća CSRF prevara.');
+        return;
+      }
+
+      if (!code) {
+        showError('Nedostaje autorizacioni kod', 'Kick nije vratio code parametar. Pokušaj ponovo.');
+        return;
+      }
+
+      const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
+      const intent = sessionStorage.getItem('kick_oauth_intent') || 'login';
+      const addChannelUid = sessionStorage.getItem('kick_add_channel_uid') || '';
+      const redirectUri = (() => {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          return `${window.location.origin}/auth/kick/callback/`;
+        }
+        return `${window.location.origin}/auth/kick/callback`;
+      })();
+      const kickApiBase = (() => {
+        const fromGlobal = (window.KICK_API_BASE || '').trim();
+        if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          return 'https://kickbot-ihzb.onrender.com';
+        }
+        return `${window.location.origin}`;
+      })();
+
+      try {
+        // Razmena koda za token
+        const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: redirectUri
+          }).toString()
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
+          showError('Greška pri razmeni tokena', err.detail || err.error || 'Bot server nije dostupan.');
+          return;
+        }
+
+        const tokenData = await res.json();
+
+        if (!tokenData.access_token) {
+          showError('Token nije dobijen', 'Kick server nije vratio access_token.');
+          return;
+        }
+
+        // Očisti OAuth privremene vrednosti
+        sessionStorage.removeItem('kick_oauth_state');
+        sessionStorage.removeItem('kick_code_verifier');
+        sessionStorage.removeItem('kick_oauth_intent');
+        sessionStorage.removeItem('kick_add_channel_uid');
+        localStorage.removeItem('kick_oauth_state');
+        localStorage.removeItem('kick_code_verifier');
+
+        // ─── INTENT: add_channel ───────────────────────────────────────────────
+        if (intent === 'add_channel' && addChannelUid) {
+          document.querySelector('#loadingState h1').textContent = 'Dodavanje kanala...';
+          document.querySelector('#loadingState p').textContent = 'Preuzimamo podatke o kanalu i ažuriramo tvoj profil.';
+
+          // Dohvati Kick korisnika putem bota koji prosleđuje access_token
+          const userRes = await fetch(`${kickApiBase}/api/kick/me`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+          });
+
+          let kickUser = null;
+          if (userRes.ok) {
+            kickUser = await userRes.json();
+          }
+
+          if (!kickUser || (!kickUser.id && !kickUser.chatroom_id)) {
+            showError('Kick podaci nisu dostupni', 'Nije moguće preuzeti podatke kanala. Proveri da bot server podržava /api/kick/me.');
+            return;
+          }
+
+          // Inicijalizuj Supabase
+          const SUPABASE_URL = 'https://snmxvkbkqpcrptavfgco.supabase.co';
+          const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNubXh2a2JrcXBjcnB0YXZmZ2NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4NjUxMDksImV4cCI6MjA1MjQ0MTEwOX0.QJyJfYbPAHt3jxqiCJRjSOnGE5vF8shR3PikfpLRLbs';
+          const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+          // Dohvati postojeće kanale korisnika
+          const { data: profile } = await sb.from('user_profiles')
+            .select('kick_channels')
+            .eq('id', addChannelUid)
+            .maybeSingle();
+
+          const existingChannels = profile?.kick_channels || [];
+          const channelId = String(kickUser.chatroom_id || kickUser.id);
+          const channelSlug = kickUser.slug || kickUser.username || channelId;
+
+          // Provjeri duplikat
+          if (existingChannels.some(c => c.id === channelId)) {
+            document.getElementById('loadingState').style.display = 'none';
+            const succState = document.getElementById('successState');
+            succState.style.display = 'block';
+            document.getElementById('successIcon').style.display = 'block';
+            document.getElementById('successIcon').textContent = 'ℹ️';
+            document.querySelector('#successState h1').textContent = 'Kanal već postoji';
+            document.querySelector('#successState p').textContent = `@${channelSlug} je već dodat na tvoj profil.`;
+            setTimeout(() => { window.location.href = `${baseRedirectPath}/kickot/index.html?settings=channels`; }, 1800);
+            return;
+          }
+
+          const newChannel = {
+            id: channelId,
+            username: channelSlug,
+            avatar: kickUser.avatar || kickUser.profile_pic || null,
+            is_primary: existingChannels.length === 0
+          };
+
+          const updatedChannels = [...existingChannels, newChannel];
+
+          const { error: dbErr } = await sb.from('user_profiles')
+            .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+            .eq('id', addChannelUid);
+
+          if (dbErr) {
+            showError('Greška pri čuvanju kanala', dbErr.message || 'Baza podataka nije dostupna.');
+            return;
+          }
+
+          // Uspeh — prikaži i vrati na settings
+          document.getElementById('loadingState').style.display = 'none';
+          const succState = document.getElementById('successState');
+          succState.style.display = 'block';
+          document.getElementById('successIcon').style.display = 'block';
+          document.getElementById('successIcon').textContent = '💚';
+          document.querySelector('#successState h1').textContent = 'Kanal dodat!';
+          document.querySelector('#successState p').textContent = `@${channelSlug} je uspešno dodat na tvoj profil.`;
+          setTimeout(() => { window.location.href = `${baseRedirectPath}/kickot/index.html?settings=channels`; }, 1500);
+          return;
+        }
+
+        // ─── INTENT: login (standardni tok) ───────────────────────────────────
+        sessionStorage.setItem('kick_access_token', tokenData.access_token);
+        sessionStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
+        sessionStorage.setItem('kick_expires_in', String(tokenData.expires_in || 3600));
+        sessionStorage.setItem('kick_token_ts', String(Date.now()));
+        sessionStorage.setItem('kick_oauth_scope', tokenData.scope || '');
+
+        document.getElementById('loadingState').style.display = 'none';
+        const succState = document.getElementById('successState');
+        succState.style.display = 'block';
+        document.getElementById('successIcon').style.display = 'block';
+
+        setTimeout(() => {
+          window.location.href = `${baseRedirectPath}/kickot/dashboard.html?kick_oauth=1`;
+        }, 900);
+
+      } catch (fetchErr) {
+        showError(
+          'Nije moguće kontaktirati bot server',
+          'Proveri da li je bot.js pokrenut na portu 3000. ' + fetchErr.message
+        );
+      }
+    })();
+  </script>
+</body>
+
+</html>

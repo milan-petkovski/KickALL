@@ -685,7 +685,7 @@ function pokreniAutoAnnounceTajmer(chatroomId) {
 // ─── UPRAVLJANJE KANALIMA ──────────────────────────────────────────────────────
 async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
     utils.log('INFO', `Pokrećem rad na kanalu: @${channelUsername} (ID: ${chatroomId})...`);
-    
+
     // Inicijalizacija stanja kanala
     const channelState = state.getChannelState(chatroomId);
     channelState.channelUsername = channelUsername;
@@ -755,7 +755,7 @@ function azurirajKonfiguracijuKanala(channelState, dbConfig) {
 
     channelState.STREAM_START_PIN_MESSAGE = dbConfig.stream_pin_msg || '';
     channelState.welcome_message = dbConfig.welcome_message || '';
-    
+
     channelState.feature_leaderboard = dbConfig.feature_leaderboard ?? true;
     channelState.feature_watchtime = dbConfig.feature_watchtime ?? true;
     channelState.feature_games = dbConfig.feature_games ?? true;
@@ -765,7 +765,7 @@ function azurirajKonfiguracijuKanala(channelState, dbConfig) {
 
     channelState.botActive = dbConfig.bot_active || false;
     channelState.autoAnnounces = Array.isArray(dbConfig.auto_announces) ? dbConfig.auto_announces : [];
-    
+
     channelState.announce_interval_mins = dbConfig.announce_interval_mins ?? 15;
     channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 30;
     channelState.announce_time_enabled = dbConfig.announce_time_enabled ?? true;
@@ -803,12 +803,47 @@ process.on('unhandledRejection', (reason, promise) => {
     utils.log('ERR', `Neobrađeno obećanje (unhandledRejection): ${msg}`);
 });
 
+const ALLOWED_KICK_REDIRECT_URIS = new Set([
+    'https://kickall.netlify.app/auth/kick/callback',
+    'https://kickall.netlify.app/auth/kick/callback/',
+    'https://kickall.milanwebportal.com/auth/kick/callback',
+    'https://kickall.milanwebportal.com/auth/kick/callback/',
+    'http://localhost:5500/auth/kick/callback',
+    'http://localhost:5500/auth/kick/callback/'
+]);
+
+function normalizeKickRedirectUri(uri) {
+    if (!uri || typeof uri !== 'string') return null;
+
+    try {
+        const parsed = new URL(uri);
+        const cleanPath = parsed.pathname.replace(/\/+$/, '') || '/';
+        return `${parsed.origin}${cleanPath}`;
+    } catch {
+        return null;
+    }
+}
+
+function resolveKickRedirectUri(candidate) {
+    const normalizedCandidate = normalizeKickRedirectUri(candidate);
+    if (normalizedCandidate && ALLOWED_KICK_REDIRECT_URIS.has(normalizedCandidate)) {
+        return candidate;
+    }
+
+    const normalizedEnv = normalizeKickRedirectUri(process.env.KICK_REDIRECT_URI);
+    if (normalizedEnv && ALLOWED_KICK_REDIRECT_URIS.has(normalizedEnv)) {
+        return process.env.KICK_REDIRECT_URI;
+    }
+
+    return 'http://localhost:5500/auth/kick/callback/';
+}
+
 // ─── HTTP SERVER (Uptime / Render Service fallback) ───────────────────────────
 const PORT = process.env.PORT || 3000;
 http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
     if (req.method === 'OPTIONS') {
         res.writeHead(200);
@@ -818,6 +853,191 @@ http.createServer(async (req, res) => {
 
     try {
         const parsedUrl = new URL(req.url, 'http://localhost');
+
+        // ─── Kick OAuth2 Callback ─────────────────────────────────────────────
+        if (parsedUrl.pathname === '/auth/kick/callback') {
+            const code = parsedUrl.searchParams.get('code');
+            const redirectUri = resolveKickRedirectUri(parsedUrl.searchParams.get('redirect_uri'));
+            if (!code) {
+                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Greška: nedostaje OAuth code parametar.');
+                return;
+            }
+
+            try {
+                const tokenRes = await fetch('https://id.kick.com/oauth/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        grant_type: 'authorization_code',
+                        client_id: process.env.KICK_CLIENT_ID,
+                        client_secret: process.env.KICK_CLIENT_SECRET,
+                        redirect_uri: redirectUri,
+                        code: code,
+                        code_verifier: parsedUrl.searchParams.get('code_verifier') || '' // Ako se zove direktno
+                    }).toString()
+                });
+
+                if (!tokenRes.ok) {
+                    const errText = await tokenRes.text();
+                    utils.log('ERR', `Kick OAuth token greška: ${errText}`);
+                    res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    res.end('Greška pri razmeni koda za token.');
+                    return;
+                }
+
+                const tokenData = await tokenRes.json();
+                const accessToken = tokenData.access_token;
+                const tokenType = tokenData.token_type || 'Bearer';
+                const expiresIn = tokenData.expires_in || 3600;
+
+                utils.log('INFO', 'Kick OAuth2: Uspešno dobijen access_token.');
+
+                // Bezbedno preusmeri korisnika na dashboard stranicu
+                const dashboardUrl = `/Website/kickot/dashboard.html#kick_token=${encodeURIComponent(accessToken)}&token_type=${encodeURIComponent(tokenType)}&expires_in=${expiresIn}`;
+                res.writeHead(302, { 'Location': dashboardUrl });
+                res.end();
+            } catch (tokenErr) {
+                utils.log('ERR', `Kick OAuth grešk pri token razmeni: ${tokenErr.message}`);
+                res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+                res.end('Interna greška pri OAuth autorizaciji.');
+            }
+            return;
+        }
+
+        // ─── Kick OAuth2 Token Exchange API (za Live Server / 5500) ──────────
+        if (parsedUrl.pathname === '/api/kick/exchange' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk.toString(); });
+            req.on('end', async () => {
+                try {
+                    const params = new URLSearchParams(body);
+                    const code = params.get('code');
+                    const codeVerifier = params.get('code_verifier') || '';
+                    const requestedRedirectUri = params.get('redirect_uri');
+                    const normalizedRequestedRedirectUri = normalizeKickRedirectUri(requestedRedirectUri);
+                    const redirectUri = resolveKickRedirectUri(requestedRedirectUri);
+                    if (!code) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Missing code' }));
+                        return;
+                    }
+
+                    if (requestedRedirectUri && !normalizedRequestedRedirectUri) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Invalid redirect_uri format' }));
+                        return;
+                    }
+
+                    if (normalizedRequestedRedirectUri && !ALLOWED_KICK_REDIRECT_URIS.has(normalizedRequestedRedirectUri)) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'redirect_uri is not allowed' }));
+                        return;
+                    }
+
+                    const tokenRes = await fetch('https://id.kick.com/oauth/token', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({
+                            grant_type: 'authorization_code',
+                            client_id: process.env.KICK_CLIENT_ID,
+                            client_secret: process.env.KICK_CLIENT_SECRET,
+                            redirect_uri: redirectUri,
+                            code: code,
+                            code_verifier: codeVerifier
+                        }).toString()
+                    });
+
+                    if (!tokenRes.ok) {
+                        const errText = await tokenRes.text();
+                        res.writeHead(502, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Token exchange failed', detail: errText }));
+                        return;
+                    }
+
+                    const tokenData = await tokenRes.json();
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({
+                        access_token: tokenData.access_token,
+                        token_type: tokenData.token_type || 'Bearer',
+                        expires_in: tokenData.expires_in || 3600,
+                        scope: tokenData.scope || ''
+                    }));
+                } catch (err) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
+                }
+            });
+            return;
+        }
+
+        if (parsedUrl.pathname === '/api/kick/me' && req.method === 'GET') {
+            const authHeader = req.headers['authorization'];
+            if (!authHeader) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing authorization header' }));
+                return;
+            }
+
+            try {
+                let username = '';
+                let userId = '';
+                let avatar = '';
+
+                let kickUserRes = await fetch('https://api.kick.com/public/v1/users', {
+                    headers: { 'Authorization': authHeader }
+                });
+
+                if (kickUserRes.ok) {
+                    const kickData = await kickUserRes.json();
+                    const kickUser = Array.isArray(kickData?.data) ? kickData.data[0] : kickData?.data || kickData;
+                    username = kickUser?.username || kickUser?.name || '';
+                    userId = kickUser?.user_id || kickUser?.id || '';
+                    avatar = kickUser?.profile_picture || kickUser?.profile_pic || '';
+                } else {
+                    let altRes = await fetch('https://id.kick.com/oauth/userinfo', {
+                        headers: { 'Authorization': authHeader }
+                    });
+                    if (altRes.ok) {
+                        const altData = await altRes.json();
+                        username = altData?.preferred_username || altData?.name || altData?.sub || '';
+                        userId = altData?.sub || '';
+                        avatar = altData?.picture || '';
+                    }
+                }
+
+                if (!username) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Could not retrieve user info from Kick OAuth' }));
+                    return;
+                }
+
+                const channelRes = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${username}`);
+                let chatroomId = userId;
+                let slug = username;
+                if (channelRes.ok) {
+                    const channelData = await channelRes.json();
+                    chatroomId = channelData?.chatroom?.id || chatroomId;
+                    slug = channelData?.slug || slug;
+                    avatar = channelData?.user?.profile_pic || avatar;
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    id: userId,
+                    username: username,
+                    slug: slug,
+                    avatar: avatar,
+                    profile_pic: avatar,
+                    chatroom_id: chatroomId
+                }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
+            }
+            return;
+        }
+
         if (parsedUrl.pathname === '/api/avatar') {
             const username = parsedUrl.searchParams.get('username');
             if (!username) {
@@ -909,7 +1129,7 @@ async function start() {
                 table: 'bot_config'
             }, async (payload) => {
                 const { eventType, new: newRow, old: oldRow } = payload;
-                
+
                 if (eventType === 'DELETE') {
                     const chatroomId = String(oldRow.channel_id);
                     if (state.channels[chatroomId]) {

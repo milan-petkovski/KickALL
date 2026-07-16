@@ -24,6 +24,7 @@
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(83, 252, 24, 0.2);
         }
+
         .btn-kick-login:active {
             transform: translateY(0);
         }
@@ -65,9 +66,7 @@
 
                 <!-- Guest Nav -->
                 <div class="auth-nav-btns" id="guestNav">
-                    <button class="btn btn-outline" onclick="openModal('login')" data-i18n="nav.login">Prijavi
-                        se</button>
-                    <button class="btn btn-primary" onclick="openModal('signup')" data-i18n="nav.signup">Registruj
+                    <button class="btn btn-primary" onclick="openModal('login')" data-i18n="nav.login">Prijavi
                         se</button>
                 </div>
 
@@ -123,28 +122,49 @@
             <div class="container hero-container">
                 <div class="hero-content">
                     <div class="hero-eyebrow">
-                        <span class="badge badge-kick">⚡ Kick Platform</span>
-                        <span class="badge badge-live" data-i18n="hero.live">Aktivan · U produkciji</span>
+                        <span class="badge badge-kick">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"
+                                style="display: inline-block; vertical-align: -1px; margin-right: 5px;">
+                                <path
+                                    d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
+                            </svg>
+                            <span>Kick Platforma</span>
+                        </span>
+                        <span class="badge badge-live">
+                            <span class="live-status-dot"></span>
+                            <span data-i18n="hero.live">Aktivan</span>
+                        </span>
                     </div>
                     <h1 class="hero-title">
-                        <span class="gradient-text">Kickot</span><br />
-                        <span data-i18n="hero.title">Bot za Kick koji radi dok ti odmaraš</span>
+                        <span class="kickbot-title-styled gradient-text">Kick<span class="b-anchor"><span
+                                    class="elevated-b">b</span></span>ot</span>
+                        <span class="hero-title-rest">
+                            <span class="lang-sr">za <span class="text-green-flat">KICK</span> koji radi dok ti
+                                strimuješ</span>
+                            <span class="lang-en">for <span class="text-green-flat">KICK</span> that works while you
+                                stream</span>
+                        </span>
                     </h1>
                     <p class="hero-description" data-i18n="hero.subtitle">
                         Moćan chat bot za Kick platformu sa prilagođenim komandama, automatskom moderacijom, watchtime
                         sistemom, mini-igrama i leaderboard-om. Na srpskom i engleskom.
                     </p>
                     <div class="hero-actions">
-                        <button class="btn btn-primary btn-large" onclick="openModal('signup')">
-                            <!-- Emojiji se povlače iz prevoda, izbacujemo inline SVG koji se duplirao -->
+                        <button class="btn btn-primary btn-large" onclick="openModal('login')"
+                            style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path
+                                    d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
+                            </svg>
                             <span data-i18n="hero.cta.primary">Počni besplatno</span>
                         </button>
                         <a href="#features" class="btn btn-secondary btn-large" data-i18n="hero.cta.secondary">Vidi
                             funkcionalnosti</a>
                     </div>
-                    <p class="hero-note" style="margin-top: 20px;">
+                    <p class="hero-note"
+                        style="margin-top: 20px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--color-text-muted);">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-right: 6px;">
+                            style="width: 16px; height: 16px; flex-shrink: 0;">
                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                         </svg>
                         <span data-i18n="hero.note">Besplatan plan dostupan. Bez kreditne kartice.</span>
@@ -158,10 +178,10 @@
                             <span class="dot red pulse-dot"></span>
                             <span class="status-text font-bold text-green"
                                 style="font-size: 0.82rem; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 0.05em;">
-                                <span class="lang-sr">Streamer • UŽIVO</span>
+                                <span class="lang-sr">Strimer • UŽIVO</span>
                                 <span class="lang-en">Streamer • LIVE</span>
                             </span>
-                            <span class="window-title" style="margin-left: auto;">KICKot LIVE</span>
+                            <span class="window-title" style="margin-left: auto;">KICKOT</span>
                         </div>
                         <div class="card-body dashboard-layout">
                             <div class="db-row">
@@ -217,19 +237,19 @@
                                         <span class="lang-sr">NOVI PRATILAC!</span>
                                         <span class="lang-en">NEW FOLLOWER!</span>
                                     </span>
-                                    <span class="db-alert-desc">milan_fan (Lojalan član)</span>
+                                    <span class="db-alert-desc">@milan je upravo zapratio kanal! Dobro Došao!</span>
                                 </div>
                             </div>
 
                             <!-- Mini Live Chat Mockup -->
                             <div class="db-mini-chat">
-                                <div class="db-chat-msg"><span class="chat-user">novak99</span>: !love @milan_fan</div>
+                                <div class="db-chat-msg"><span class="chat-user">Milan</span>: !love @kickot</div>
                                 <div class="db-chat-msg bot">
-                                    <span class="chat-user bot-tag">kickot</span>:
-                                    <span class="lang-sr">novak99 i milan_fan imaju <strong>87%</strong> kompatibilnost!
-                                        💕</span>
-                                    <span class="lang-en">novak99 and milan_fan have <strong>87%</strong> compatibility!
-                                        💕</span>
+                                    <span class="chat-user bot-tag">Kickot</span>:
+                                    <span class="lang-sr">❤️ Ljubavni Kalkulator: @milan + @kickot = 100% | Komentar:
+                                        Savršen par, čista hemija i večna ljubav! ❤️🔥</span>
+                                    <span class="lang-en">❤️ Love Calculator: @milan + @kickot = 100% | Comment: Perfect
+                                        match, pure chemistry and eternal love! ❤️🔥</span>
                                 </div>
                             </div>
                         </div>
@@ -426,8 +446,11 @@
                     <div class="cmd-preview" id="mainPlayground">
                         <div class="cp-header" data-i18n="cmd.preview">// Preview — live chat simulacija</div>
                         <div id="cmdPreviewContent" class="cp-messages-container">
-                            <div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!top watchtime</span></div>
-                            <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen (36h) 3. milan_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>
+                            <div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!top
+                                    watchtime</span></div>
+                            <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg"
+                                    style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen
+                                    (36h) 3. milan_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>
                         </div>
                     </div>
                 </div>
@@ -667,53 +690,31 @@
             <div class="modal-logo">
                 <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 38px;">
             </div>
-            
-            <!-- Auth Tabs -->
-            <div class="auth-tabs" id="authTabs">
-                <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Prijavi se</button>
-                <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Registruj se</button>
-            </div>
 
             <!-- LOGIN FORM -->
-            <div id="loginForm" class="auth-form">
-                <div class="form-alert form-alert-error" id="loginError"></div>
+            <div id="loginForm" class="auth-form"
+                style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 0;">
+                <div class="form-alert form-alert-error" id="loginError" style="width: 100%;"></div>
 
-                <button class="btn-kick-login" onclick="openKickLogin()">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display: inline-block; vertical-align: middle;"><path d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z"/></svg>
+                <p
+                    style="text-align: center; margin-bottom: 24px; color: var(--color-text-muted); font-size: 0.95rem; line-height: 1.5;">
+                    Prijavi se preko svog Kick naloga da započneš.
+                </p>
+
+                <button class="btn-kick-login" onclick="openKickLogin()"
+                    style="width: 100%; max-width: 320px; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 16px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                        <path
+                            d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
+                    </svg>
                     <span>Prijavi se preko Kicka</span>
                 </button>
-                
-                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 4px 0; opacity: 0.5;">
-                    <div style="height: 1px; background: var(--border-subtle); flex: 1;"></div>
-                    <span style="font-size: 0.8rem; font-family: 'Space Grotesk', sans-serif;">ILI</span>
-                    <div style="height: 1px; background: var(--border-subtle); flex: 1;"></div>
-                </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="loginEmail">Email ili Kick korisničko ime</label>
-                    <input type="text" id="loginEmail" class="form-input" placeholder="npr. ime@email.com ili milan-567" />
-                    <span class="field-error" id="loginEmailErr"></span>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="loginPassword">Lozinka</label>
-                    <div class="form-input-wrapper">
-                        <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" />
-                        <button type="button" class="pw-toggle" onclick="togglePw('loginPassword', this)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </button>
-                    </div>
-                    <span class="field-error" id="loginPasswordErr"></span>
-                </div>
-
-                <button class="auth-submit" id="loginBtn" onclick="handleLogin()">
-                    <span class="auth-spinner"></span>
-                    <span class="btn-text">Prijavi se</span>
-                </button>
-
-                <div style="text-align: center; margin-top: 8px;">
-                    <a href="#" onclick="switchTab('forgot')" style="font-size: 0.85rem; color: var(--color-violet); text-decoration: none;">Zaboravio si lozinku?</a>
-                </div>
+                <p style="text-align: center; font-size: 0.85rem; color: var(--color-text-muted);">
+                    Nemaš Kick nalog? <a href="https://kick.com" target="_blank" rel="noopener"
+                        style="color: #53fc18; text-decoration: none; font-weight: 600; transition: color 0.2s;">Napravi
+                        nalog na Kick-u</a>
+                </p>
             </div>
 
             <!-- KICK LOGIN FORM -->
@@ -743,7 +744,11 @@
                     <div class="form-input-wrapper">
                         <input type="password" id="signupPassword" class="form-input" placeholder="••••••••" />
                         <button type="button" class="pw-toggle" onclick="togglePw('signupPassword', this)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
                         </button>
                     </div>
                     <span class="field-error" id="signupPasswordErr"></span>
@@ -776,7 +781,9 @@
                 </button>
 
                 <div style="text-align: center; margin-top: 8px;">
-                    <a href="#" onclick="switchTab('login')" style="font-size: 0.85rem; color: var(--color-violet); text-decoration: none;">← Nazad na prijavu</a>
+                    <a href="#" onclick="switchTab('login')"
+                        style="font-size: 0.85rem; color: var(--color-violet); text-decoration: none;">← Nazad na
+                        prijavu</a>
                 </div>
             </div>
         </div>
@@ -784,15 +791,13 @@
 
     <!-- ══════════════ SETTINGS MODAL ══════════════ -->
     <div class="modal-backdrop" id="settingsModal" onclick="handleSettingsModalBackdropClick(event)">
-        <div class="modal-box modal-sm"
-            style="max-width: 440px; padding: 25px; background: var(--bg-card, #0a0813); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 16px; position: relative;">
+        <div class="auth-modal" style="max-width: 440px; padding: 32px; display: flex; flex-direction: column; gap: 15px;">
             <div class="modal-head"
-                style="margin-bottom: 15px; border-bottom: none; padding-bottom: 0; display: flex; justify-content: space-between; align-items: center;">
+                style="margin-bottom: 15px; border-bottom: none; padding-bottom: 0; display: flex; justify-content: space-between; align-items: center; position: relative;">
                 <h3
                     style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0;">
                     Podešavanja Naloga</h3>
-                <button class="modal-close" onclick="closeSettingsModal()"
-                    style="background: none; border: none; color: rgba(255, 255, 255, 0.4); font-size: 1.1rem; cursor: pointer;">✕</button>
+                <button class="modal-close" onclick="closeSettingsModal()" aria-label="Zatvori">✕</button>
             </div>
 
             <!-- Tab Selectors -->
@@ -877,25 +882,21 @@
 
                 <!-- PANEL 2: UPRAVLJANJE KANALIMA -->
                 <div id="settingsChannelsPanel" style="display: none;">
-                    <div class="form-group"
-                        style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-                        <label
-                            style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); text-transform: uppercase;">Dodaj
-                            Kick kanal</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="text" id="settingsNewChannelInput" class="form-control"
-                                placeholder="npr. milan-567" style="flex: 1;" />
-                            <button class="btn btn-primary btn-sm" onclick="addNewChannel()" id="settingsAddChannelBtn"
-                                style="white-space: nowrap; background: var(--color-violet, #8B5CF6); border: none; color: #fff; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer;">Dodaj</button>
-                        </div>
-                        <div class="ch-error-msg" id="settingsAddChannelError"
-                            style="color: #f87171; font-size: 0.8rem; margin-top: 4px; display: none;"></div>
+                    <div class="form-group" style="margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px;">
+                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); text-transform: uppercase;">Dodaj Kick kanal</label>
+                        <p style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; margin: 0;">
+                            Prijavi se sa još jednim Kick nalogom da dodaš taj kanal na ovaj profil.
+                        </p>
+                        <button class="btn btn-primary" onclick="openKickLoginForChannel()" id="settingsAddChannelBtn" style="gap: 10px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
+                                <path d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z"/>
+                            </svg>
+                            Prijavi se sa Kickom i dodaj kanal
+                        </button>
                     </div>
 
-                    <div style="max-height: 240px; overflow-y: auto; margin-top: 15px;">
-                        <label
-                            style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">Povezani
-                            kanali</label>
+                    <div style="max-height: 240px; overflow-y: auto; margin-top: 5px;">
+                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">Povezani kanali</label>
                         <div id="settingsChannelList" style="display: flex; flex-direction: column; gap: 8px;">
                             <!-- Populated dynamically -->
                         </div>
@@ -906,15 +907,15 @@
 
             <!-- Footer Action Buttons (in one single row, side-by-side) -->
             <div class="modal-foot"
-                style="border-top: none; padding-top: 15px; margin-top: 15px; padding-bottom: 0; display: flex; gap: 8px; width: 100%;">
-                <button class="auth-submit" onclick="closeSettingsModal()"
-                    style="flex: 1; margin: 0; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: var(--color-text); display: flex; justify-content: center; align-items: center; border-radius: 8px; padding: 10px; cursor: pointer; font-weight: 600;">
-                    <span class="btn-text">Otkaži</span>
+                style="border-top: none; padding-top: 15px; margin-top: 15px; padding-bottom: 0; display: flex; gap: 12px; width: 100%;">
+                <button class="btn btn-secondary" onclick="closeSettingsModal()"
+                    style="flex: 1; margin: 0; justify-content: center; height: 46px;">
+                    Otkaži
                 </button>
-                <button class="auth-submit" id="settingsSaveBtn" onclick="handleSaveSettings()"
-                    style="flex: 1; margin: 0; display: flex; justify-content: center; align-items: center; background: var(--color-violet, #8B5CF6); color: #fff; border: none; border-radius: 8px; padding: 10px; cursor: pointer; font-weight: 600;">
+                <button class="btn btn-primary" id="settingsSaveBtn" onclick="handleSaveSettings()"
+                    style="flex: 1; margin: 0; justify-content: center; height: 46px;">
                     <span class="auth-spinner" id="settingsSpinner"></span>
-                    <span class="btn-text">Sačuvaj</span>
+                    Sačuvaj
                 </button>
             </div>
         </div>

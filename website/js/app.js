@@ -8,19 +8,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------
     // 1. Jezički Switcher (SR / EN)
     // -----------------------------------------------------------------
-    const langSwitcherBtn = document.getElementById('langSwitcherBtn');
+    const btnSr = document.getElementById('btn-sr');
+    const btnEn = document.getElementById('btn-en');
     const body = document.body;
 
     // Učitaj sačuvani jezik ili postavi podrazumevani (SR)
     const savedLang = localStorage.getItem('kickall_lang') || 'sr';
     setLanguage(savedLang);
 
-    if (langSwitcherBtn) {
-        langSwitcherBtn.addEventListener('click', () => {
-            const currentLang = body.classList.contains('lang-sr') ? 'sr' : 'en';
-            const newLang = currentLang === 'sr' ? 'en' : 'sr';
-            setLanguage(newLang);
-            triggerFlashEffect(langSwitcherBtn);
+    if (btnSr && btnEn) {
+        btnSr.addEventListener('click', () => {
+            setLanguage('sr');
+            playSynthSound(450, 'sine', 0.1);
+        });
+        btnEn.addEventListener('click', () => {
+            setLanguage('en');
             playSynthSound(450, 'sine', 0.1);
         });
     }
@@ -30,10 +32,14 @@ document.addEventListener('DOMContentLoaded', () => {
             body.classList.remove('lang-sr');
             body.classList.add('lang-en');
             localStorage.setItem('kickall_lang', 'en');
+            if (btnEn) btnEn.classList.add('active');
+            if (btnSr) btnSr.classList.remove('active');
         } else {
             body.classList.remove('lang-en');
             body.classList.add('lang-sr');
             localStorage.setItem('kickall_lang', 'sr');
+            if (btnSr) btnSr.classList.add('active');
+            if (btnEn) btnEn.classList.remove('active');
         }
     }
 
@@ -841,6 +847,107 @@ document.addEventListener('DOMContentLoaded', () => {
             }).catch(err => {
                 console.error("Greška pri kopiranju emaila: ", err);
             });
+        });
+    }
+
+    // ── Supabase Auth Session Check & UI Dynamic Update ──────
+    function checkAuthSession() {
+        const tokenKey = 'sb-rcukparptzzyssqdmydt-auth-token';
+        const rawToken = localStorage.getItem(tokenKey);
+        
+        const navBtnLogin = document.getElementById('navBtnLogin');
+        const navBtnPrimary = document.getElementById('navBtnPrimary');
+        const heroBtnPrimary = document.getElementById('heroBtnPrimary');
+        const userMenu = document.getElementById('userMenu');
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+
+        if (rawToken) {
+            try {
+                const tokenData = JSON.parse(rawToken);
+                if (tokenData && tokenData.expires_at && tokenData.expires_at * 1000 > Date.now()) {
+                    const user = tokenData.user;
+                    const displayName = user?.user_metadata?.display_name || user?.email || 'Profil';
+                    
+                    // User is logged in! Update UI
+                    if (navBtnLogin) {
+                        navBtnLogin.style.display = 'none'; // Hide login button
+                    }
+                    if (navBtnPrimary) {
+                        navBtnPrimary.style.display = 'none'; // Hide "Pokreni kickot" button
+                    }
+
+                    if (userMenu) {
+                        userMenu.style.display = 'block';
+                        
+                        // Set avatar
+                        const avatarUrl = user?.user_metadata?.avatar_url;
+                        if (userAvatar) {
+                            if (avatarUrl) {
+                                userAvatar.src = avatarUrl;
+                                userAvatar.style.display = 'block';
+                                const existingFallback = userMenu.querySelector('.user-avatar-fallback');
+                                if (existingFallback) existingFallback.remove();
+                            } else {
+                                userAvatar.src = '';
+                                userAvatar.style.display = 'none';
+                                let fallbackAvatar = userMenu.querySelector('.user-avatar-fallback');
+                                if (!fallbackAvatar) {
+                                    fallbackAvatar = document.createElement('div');
+                                    fallbackAvatar.className = 'user-avatar user-avatar-fallback';
+                                    fallbackAvatar.textContent = displayName.charAt(0).toUpperCase();
+                                    userAvatar.parentNode.insertBefore(fallbackAvatar, userAvatar);
+                                } else {
+                                    fallbackAvatar.textContent = displayName.charAt(0).toUpperCase();
+                                }
+                            }
+                        }
+
+                        // Set name
+                        if (userName) {
+                            userName.textContent = displayName;
+                        }
+                    }
+
+                    if (heroBtnPrimary) {
+                        heroBtnPrimary.href = 'kickot/index.html';
+                        heroBtnPrimary.innerHTML = `
+                            <span class="lang-sr">Idi na Profil →</span>
+                            <span class="lang-en">Go to Profile →</span>
+                        `;
+                    }
+                    return;
+                }
+            } catch (e) {
+                console.error("Error parsing auth token: ", e);
+            }
+        }
+
+        // Default state if not logged in
+        if (navBtnLogin) {
+            navBtnLogin.style.display = 'inline-flex';
+        }
+        if (navBtnPrimary) {
+            navBtnPrimary.style.display = 'none'; // No "Pokreni kickot" button per user request
+        }
+        if (userMenu) {
+            userMenu.style.display = 'none';
+        }
+    }
+
+    checkAuthSession();
+
+    // Toggle menu
+    const userMenu = document.getElementById('userMenu');
+    const userMenuTrigger = document.getElementById('userMenuTrigger');
+    if (userMenuTrigger && userMenu) {
+        userMenuTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userMenu.classList.toggle('open');
+        });
+        
+        document.addEventListener('click', () => {
+            userMenu.classList.remove('open');
         });
     }
 });
