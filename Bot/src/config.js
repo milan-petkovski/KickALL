@@ -1,7 +1,5 @@
 require('dotenv').config();
 
-const CHATROOM_ID      = process.env.CHATROOM_ID;
-const CHANNEL_USERNAME = process.env.CHANNEL_USERNAME;
 const BEARER_TOKEN     = process.env.BEARER_TOKEN;
 const BOT_COOKIE       = process.env.BOT_COOKIE;
 const BOT_USERNAME     = process.env.BOT_USERNAME || "kickot_bot";
@@ -15,8 +13,6 @@ const KORISTI_GIST     = !!(GIST_ID && GITHUB_TOKEN);
 
 module.exports = {
     // Kredencijali i API detalji
-    CHATROOM_ID,
-    CHANNEL_USERNAME,
     BEARER_TOKEN,
     BOT_COOKIE,
     BOT_USERNAME,

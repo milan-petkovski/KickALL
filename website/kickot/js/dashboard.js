@@ -359,6 +359,15 @@ async function initApp() {
   }
 
   populateMonthSelector();
+
+  // Proveri da li treba otvoriti settings modal na tabu za kanale
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('settings') === 'channels') {
+    openSettingsModal('channels');
+    // Ukloni parametre iz URL-a
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
+  }
 }
 
 // ── User Profile ──────────────────────────────────────────
@@ -744,11 +753,7 @@ async function resolveChatroomId(username) {
 let _addChannelPending = null; // { resolved, verificationCode }
 
 function showAddChannelModal() {
-  _addChannelPending = null;
-  const titleEl = document.getElementById('addChannelModalTitle');
-  if (titleEl) titleEl.textContent = 'Dodaj Kick kanal';
-  renderAddChannelStep1();
-  openModal('addChannelModal');
+  openSettingsModal('channels');
 }
 
 function renderAddChannelStep1(errorMsg = '') {
@@ -1772,6 +1777,40 @@ async function loadBotConfig() {
     localAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
     renderAnnounceList();
 
+    // Load moderation settings
+    const modSettings = data.moderation_settings || {};
+    document.getElementById('cfgModCapsEnabled').checked = modSettings.caps_enabled ?? false;
+    document.getElementById('cfgModCapsPct').value = modSettings.caps_pct ?? 70;
+    document.getElementById('lblModCapsPct').textContent = (modSettings.caps_pct ?? 70) + '%';
+    document.getElementById('cfgModCapsMinLen').value = modSettings.caps_min_len ?? 5;
+    
+    document.getElementById('cfgModLinksEnabled').checked = modSettings.links_enabled ?? false;
+    document.getElementById('cfgModLinksWhitelist').value = modSettings.links_whitelist || '';
+    document.getElementById('cfgModLinksPermitEnabled').checked = modSettings.links_permit_enabled ?? true;
+    
+    document.getElementById('cfgModEmotesEnabled').checked = modSettings.emotes_enabled ?? false;
+    document.getElementById('cfgModEmotesMax').value = modSettings.emotes_max ?? 5;
+    
+    document.getElementById('cfgModSymbolsEnabled').checked = modSettings.symbols_enabled ?? false;
+    document.getElementById('cfgModSymbolsPct').value = modSettings.symbols_pct ?? 60;
+    document.getElementById('lblModSymbolsPct').textContent = (modSettings.symbols_pct ?? 60) + '%';
+    document.getElementById('cfgModSymbolsMinLen').value = modSettings.symbols_min_len ?? 5;
+    
+    document.getElementById('cfgModWordsEnabled').checked = modSettings.words_enabled ?? false;
+    document.getElementById('cfgModWordsList').value = modSettings.words_list || '';
+    
+    document.getElementById('cfgModSpamEnabled').checked = modSettings.spam_enabled ?? false;
+    document.getElementById('cfgModSpamMaxDuplicates').value = modSettings.spam_max_duplicates ?? 2;
+    
+    document.getElementById('cfgModActionType').value = modSettings.action_type || 'delete';
+    document.getElementById('cfgModTimeoutDuration').value = modSettings.timeout_duration_secs ?? 600;
+    
+    const exemptRoles = modSettings.exempt_roles || ['moderator'];
+    document.getElementById('cfgModExemptVip').checked = exemptRoles.includes('vip');
+    document.getElementById('cfgModExemptSub').checked = exemptRoles.includes('subscriber');
+
+    toggleModerationPanelState();
+
     // Update bot status
     updateBotStatusUI(data.bot_active || false);
     document.getElementById('botActiveToggle').checked = data.bot_active || false;
@@ -1782,6 +1821,31 @@ async function loadBotConfig() {
     document.getElementById('cfgAnnounceThreshold').value = 30;
     document.getElementById('cfgAnnounceTimeEnabled').checked = true;
     document.getElementById('cfgAnnounceMsgEnabled').checked = true;
+
+    // Reset moderation settings
+    document.getElementById('cfgModCapsEnabled').checked = false;
+    document.getElementById('cfgModCapsPct').value = 70;
+    document.getElementById('lblModCapsPct').textContent = '70%';
+    document.getElementById('cfgModCapsMinLen').value = 5;
+    document.getElementById('cfgModLinksEnabled').checked = false;
+    document.getElementById('cfgModLinksWhitelist').value = '';
+    document.getElementById('cfgModLinksPermitEnabled').checked = true;
+    document.getElementById('cfgModEmotesEnabled').checked = false;
+    document.getElementById('cfgModEmotesMax').value = 5;
+    document.getElementById('cfgModSymbolsEnabled').checked = false;
+    document.getElementById('cfgModSymbolsPct').value = 60;
+    document.getElementById('lblModSymbolsPct').textContent = '60%';
+    document.getElementById('cfgModSymbolsMinLen').value = 5;
+    document.getElementById('cfgModWordsEnabled').checked = false;
+    document.getElementById('cfgModWordsList').value = '';
+    document.getElementById('cfgModSpamEnabled').checked = false;
+    document.getElementById('cfgModSpamMaxDuplicates').value = 2;
+    document.getElementById('cfgModActionType').value = 'delete';
+    document.getElementById('cfgModTimeoutDuration').value = 600;
+    document.getElementById('cfgModExemptVip').checked = false;
+    document.getElementById('cfgModExemptSub').checked = false;
+
+    toggleModerationPanelState();
   }
   configLoaded = true;
   updateOverviewModulesUI();
@@ -1834,6 +1898,89 @@ async function saveBotConfig() {
 
   if (error) { showToast('error', 'Greška pri čuvanju config-a', '❌'); console.error(error); return; }
   showToast('success', 'Bot config sačuvan!', '✅');
+  notifyBotToReload();
+  updateOverviewModulesUI();
+}
+
+function toggleModerationPanelState() {
+  const container = document.getElementById('modSettingsContainer');
+  const mainToggle = document.getElementById('cfgModeration');
+  if (mainToggle && container) {
+    container.style.display = mainToggle.checked ? 'flex' : 'none';
+  }
+}
+
+function getBotApiBase() {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3000';
+  }
+  return window.location.origin;
+}
+
+function notifyBotToReload() {
+  if (!activeChannel) return;
+  fetch(`${getBotApiBase()}/api/kick/reload?chatroom_id=${activeChannel.id}`).catch(() => {});
+}
+
+async function saveModerationSettings() {
+  if (!activeChannel) { showToast('error', 'Nema izabranog kanala', '❌'); return; }
+
+  const featureModeration = document.getElementById('cfgModeration').checked;
+
+  const moderationSettings = {
+    caps_enabled: document.getElementById('cfgModCapsEnabled').checked,
+    caps_pct: parseInt(document.getElementById('cfgModCapsPct').value) || 70,
+    caps_min_len: parseInt(document.getElementById('cfgModCapsMinLen').value) || 5,
+    
+    links_enabled: document.getElementById('cfgModLinksEnabled').checked,
+    links_whitelist: document.getElementById('cfgModLinksWhitelist').value,
+    links_permit_enabled: document.getElementById('cfgModLinksPermitEnabled').checked,
+    
+    emotes_enabled: document.getElementById('cfgModEmotesEnabled').checked,
+    emotes_max: parseInt(document.getElementById('cfgModEmotesMax').value) || 5,
+    
+    symbols_enabled: document.getElementById('cfgModSymbolsEnabled').checked,
+    symbols_pct: parseInt(document.getElementById('cfgModSymbolsPct').value) || 60,
+    symbols_min_len: parseInt(document.getElementById('cfgModSymbolsMinLen').value) || 5,
+    
+    words_enabled: document.getElementById('cfgModWordsEnabled').checked,
+    words_list: document.getElementById('cfgModWordsList').value,
+    
+    spam_enabled: document.getElementById('cfgModSpamEnabled').checked,
+    spam_max_duplicates: parseInt(document.getElementById('cfgModSpamMaxDuplicates').value) || 2,
+    
+    action_type: document.getElementById('cfgModActionType').value || 'delete',
+    timeout_duration_secs: parseInt(document.getElementById('cfgModTimeoutDuration').value) || 600,
+    exempt_roles: [
+      'moderator',
+      document.getElementById('cfgModExemptVip').checked ? 'vip' : null,
+      document.getElementById('cfgModExemptSub').checked ? 'subscriber' : null
+    ].filter(Boolean)
+  };
+
+  const btn = document.getElementById('btnSaveModeration');
+  if (btn) btn.disabled = true;
+
+  const { error } = await sb.from('bot_config')
+    .upsert({
+      user_id: getChannelOwnerId(),
+      channel_id: activeChannel.id,
+      channel_name: activeChannel.username,
+      feature_moderation: featureModeration,
+      moderation_settings: moderationSettings,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'channel_id' });
+
+  if (btn) btn.disabled = false;
+
+  if (error) { 
+    showToast('error', 'Greška pri čuvanju podešavanja moderacije', '❌'); 
+    console.error(error); 
+    return; 
+  }
+
+  showToast('success', 'Podešavanja moderacije sačuvana!', '✅');
+  notifyBotToReload();
   updateOverviewModulesUI();
 }
 
@@ -1957,6 +2104,7 @@ async function toggleBotActive() {
     updateBotStatusUI(!active);
   } else {
     showToast(active ? 'success' : 'info', `Bot ${active ? 'pokrenut' : 'zaustavljen'}`, active ? '🟢' : '⭕');
+    notifyBotToReload();
   }
 }
 
@@ -2218,6 +2366,7 @@ async function saveCommand() {
   }
 
   showToast('success', editingCmdId ? 'Komanda uspešno izmenjena' : 'Komanda uspešno kreirana!', '⚡');
+  notifyBotToReload();
   closeModal('cmdModal');
   await loadCommands();
 }
@@ -2228,6 +2377,7 @@ async function toggleCommand(id, currentEnabled) {
     .eq('id', id);
   if (error) { showToast('error', 'Greška', '❌'); return; }
   showToast('info', !currentEnabled ? 'Komanda uključena' : 'Komanda isključena', !currentEnabled ? '✅' : '⏸');
+  notifyBotToReload();
   await loadCommands();
 }
 
@@ -2236,6 +2386,7 @@ function deleteCommandConfirm(id, cmd) {
     const { error } = await sb.from('custom_commands').delete().eq('id', id);
     if (error) { showToast('error', 'Greška pri brisanju', '❌'); return; }
     showToast('success', `${cmd} je obrisana`, '🗑');
+    notifyBotToReload();
     await loadCommands();
   };
   document.getElementById('confirmMsg').textContent = `Da li sigurno želiš da obrišeš komandu ${cmd}? Ovo se ne može poništiti.`;
@@ -2329,6 +2480,7 @@ function switchPanel(panelId) {
   if (panelId === 'autoresponse' && !configLoaded) loadBotConfig();
   if (panelId === 'announces' && !configLoaded) loadBotConfig();
   if (panelId === 'config' && !configLoaded) loadBotConfig();
+  if (panelId === 'moderation' && !configLoaded) loadBotConfig();
 
   // Close mobile sidebar
   if (window.innerWidth < 768) {
@@ -2541,8 +2693,11 @@ document.head.appendChild(style);
 // ── Settings Modal Functions ──────────────────────────────
 let settingsUploadedAvatarBase64 = null;
 
-function openSettingsModal() {
-  toggleUserMenu(); // Close user menu popup
+function openSettingsModal(activeTab = 'profile') {
+  const userMenuSm = document.getElementById('userMenuSm');
+  if (userMenuSm) {
+    userMenuSm.classList.remove('open');
+  }
   const modal = document.getElementById('settingsModal');
   if (!modal) return;
 
@@ -2565,6 +2720,7 @@ function openSettingsModal() {
     settingsUploadedAvatarBase64 = null;
 
     modal.classList.add('open');
+    switchSettingsTab(activeTab);
   });
 }
 
@@ -2798,7 +2954,7 @@ async function addNewManager() {
   if (!input || !errEl) return;
   
   errEl.style.display = 'none';
-  const username = input.value.trim().toLowerCase();
+  const username = input.value.trim();
   
   if (!username) {
     errEl.textContent = 'Unesi Kick korisničko ime.';
@@ -2810,23 +2966,23 @@ async function addNewManager() {
   if (btn) btn.disabled = true;
 
   try {
-    const { data: profileUser, error: profileErr } = await sb.from('user_profiles')
-      .select('id, display_name')
-      .eq('display_name', username)
-      .maybeSingle();
-
-    if (profileErr || !profileUser) {
-      errEl.textContent = 'Ovaj korisnik nema kreiran nalog na našem sajtu.';
+    // 1. Proveri da li korisnik uopšte postoji na Kick platformi
+    const resolved = await resolveChatroomId(username);
+    if (!resolved) {
+      errEl.textContent = `Korisnik @${username} ne postoji na Kick platformi.`;
       errEl.style.display = 'block';
       if (btn) btn.disabled = false;
       return;
     }
 
-    // Dobavi naše korisničko ime iz sopstvenog profila
+    const kickUsernameResolved = resolved.username; // Pravilno napisano ime sa Kick-a (npr. Milan)
+    const kickUsernameLC = kickUsernameResolved.toLowerCase();
+
+    // 2. Dobavi naše korisničko ime iz sopstvenog profila da sprečimo dodavanje samog sebe
     const { data: myProfile } = await sb.from('user_profiles').select('display_name').eq('id', currentUser.id).maybeSingle();
     const myName = myProfile?.display_name || '';
 
-    if (username === myName.toLowerCase()) {
+    if (kickUsernameLC === myName.toLowerCase()) {
       errEl.textContent = 'Ne možeš dodati samog sebe kao menadžera.';
       errEl.style.display = 'block';
       if (btn) btn.disabled = false;
@@ -2835,14 +2991,21 @@ async function addNewManager() {
 
     if (!activeChannel.managers) activeChannel.managers = [];
     
-    if (activeChannel.managers.map(m => m.toLowerCase()).includes(username)) {
+    if (activeChannel.managers.map(m => m.toLowerCase()).includes(kickUsernameLC)) {
       errEl.textContent = 'Korisnik je već menadžer ovog kanala.';
       errEl.style.display = 'block';
       if (btn) btn.disabled = false;
       return;
     }
 
-    activeChannel.managers.push(username);
+    // 3. Proveri da li korisnik ima kreiran nalog na našem sajtu
+    const { data: profileUser, error: profileErr } = await sb.from('user_profiles')
+      .select('id, display_name')
+      .ilike('display_name', kickUsernameLC)
+      .maybeSingle();
+
+    // Dodajemo menadžera sa njegovim pravim imenom sa Kick-a
+    activeChannel.managers.push(kickUsernameResolved);
 
     const updatedChannels = currentChannels.map(c => {
       if (c.id === activeChannel.id) {
@@ -2859,7 +3022,13 @@ async function addNewManager() {
 
     currentChannels = updatedChannels;
     input.value = '';
-    showToast('success', `Korisnik @${username} je dodat kao menadžer!`, '✅');
+
+    if (!profileUser) {
+      showToast('success', `Korisnik @${kickUsernameResolved} je dodat! Nalog na sajtu će mu biti aktiviran čim se prvi put prijavi preko Kick OAuth-a.`, '✅');
+    } else {
+      showToast('success', `Korisnik @${kickUsernameResolved} je uspešno dodat kao menadžer!`, '✅');
+    }
+    
     renderSettingsManagersList();
 
   } catch (err) {
@@ -3111,6 +3280,76 @@ function startLiveActivityFeed() {
       Čekam prve aktivnosti...
     </div>
   `;
+}
+
+// ── Kick OAuth Helperi za dodavanje kanala ─────────────────────────────────
+function generateRandomString(length) {
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  let text = '';
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+}
+
+async function sha256(plain) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return window.crypto.subtle.digest('SHA-256', data);
+}
+
+function base64urlencode(a) {
+  let str = "";
+  const bytes = new Uint8Array(a);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    str += String.fromCharCode(bytes[i]);
+  }
+  return btoa(str)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+async function generateCodeChallenge(v) {
+  const hashed = await sha256(v);
+  return base64urlencode(hashed);
+}
+
+function getKickRedirectUri() {
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return `${window.location.origin}/auth/kick/callback`;
+  }
+  return `${window.location.origin}/auth/kick/callback`;
+}
+
+async function openKickLoginForChannel() {
+  if (!currentUser) return;
+  const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
+  const KICK_REDIRECT_URI = getKickRedirectUri();
+  const KICK_SCOPE = 'user:read';
+
+  const state = generateRandomString(16);
+  const codeVerifier = generateRandomString(64);
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+  sessionStorage.setItem('kick_oauth_state', state);
+  sessionStorage.setItem('kick_code_verifier', codeVerifier);
+  sessionStorage.setItem('kick_oauth_intent', 'add_channel');
+  sessionStorage.setItem('kick_add_channel_uid', currentUser.id);
+  sessionStorage.setItem('kick_oauth_source', 'dashboard');
+
+  const authUrl = 'https://id.kick.com/oauth/authorize?' + new URLSearchParams({
+    response_type: 'code',
+    client_id: KICK_CLIENT_ID,
+    redirect_uri: KICK_REDIRECT_URI,
+    scope: KICK_SCOPE,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256'
+  }).toString();
+
+  window.location.href = authUrl;
 }
 
 initAuth();

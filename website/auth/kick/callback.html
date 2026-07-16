@@ -235,9 +235,11 @@
       const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
       const intent = sessionStorage.getItem('kick_oauth_intent') || 'login';
       const addChannelUid = sessionStorage.getItem('kick_add_channel_uid') || '';
+      const oauthSource = sessionStorage.getItem('kick_oauth_source') || 'index';
+      const targetPage = oauthSource === 'dashboard' ? 'dashboard.html' : 'index.html';
       const redirectUri = (() => {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          return `${window.location.origin}/auth/kick/callback/`;
+          return `${window.location.origin}/auth/kick/callback`;
         }
         return `${window.location.origin}/auth/kick/callback`;
       })();
@@ -280,6 +282,7 @@
         sessionStorage.removeItem('kick_code_verifier');
         sessionStorage.removeItem('kick_oauth_intent');
         sessionStorage.removeItem('kick_add_channel_uid');
+        sessionStorage.removeItem('kick_oauth_source');
         localStorage.removeItem('kick_oauth_state');
         localStorage.removeItem('kick_code_verifier');
 
@@ -305,8 +308,8 @@
           }
 
           // Inicijalizuj Supabase
-          const SUPABASE_URL = 'https://snmxvkbkqpcrptavfgco.supabase.co';
-          const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNubXh2a2JrcXBjcnB0YXZmZ2NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4NjUxMDksImV4cCI6MjA1MjQ0MTEwOX0.QJyJfYbPAHt3jxqiCJRjSOnGE5vF8shR3PikfpLRLbs';
+          const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
+          const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRmeWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
           const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
           // Dohvati postojeće kanale korisnika
@@ -328,7 +331,7 @@
             document.getElementById('successIcon').textContent = 'ℹ️';
             document.querySelector('#successState h1').textContent = 'Kanal već postoji';
             document.querySelector('#successState p').textContent = `@${channelSlug} je već dodat na tvoj profil.`;
-            setTimeout(() => { window.location.href = `${baseRedirectPath}/kickot/index.html?settings=channels`; }, 1800);
+            setTimeout(() => { window.location.href = `${baseRedirectPath}/kickot/${targetPage}?settings=channels`; }, 1800);
             return;
           }
 
@@ -358,7 +361,7 @@
           document.getElementById('successIcon').textContent = '💚';
           document.querySelector('#successState h1').textContent = 'Kanal dodat!';
           document.querySelector('#successState p').textContent = `@${channelSlug} je uspešno dodat na tvoj profil.`;
-          setTimeout(() => { window.location.href = `${baseRedirectPath}/kickot/index.html?settings=channels`; }, 1500);
+          setTimeout(() => { window.location.href = `${baseRedirectPath}/kickot/${targetPage}?settings=channels`; }, 1500);
           return;
         }
 

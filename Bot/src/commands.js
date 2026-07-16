@@ -438,13 +438,14 @@ function handlePrihvatiBrak(chatroomId, receiver) {
                 const [u1, u2] = [cleanSender.toLowerCase(), cleanTarget.toLowerCase()].sort();
                 const { error } = await supabase
                     .from('marriages')
-                    .insert([{
+                    .upsert([{
                         channel_id: chatroomId,
                         user1: u1,
                         user2: u2,
                         user1_display: cleanSender,
-                        user2_display: cleanTarget
-                    }]);
+                        user2_display: cleanTarget,
+                        married_at: new Date().toISOString()
+                    }], { onConflict: 'channel_id,user1,user2' });
                 if (error) throw error;
                 log('INFO', `[${channelState.channelUsername || chatroomId}] Uspješno upisan brak u Supabase za par: ${u1} i ${u2}`);
             } catch (err) {
@@ -1095,6 +1096,35 @@ async function handleOsvezi(chatroomId, sender, isAuthorized) {
     }
 }
 
+function handlePermit(chatroomId, sender, targetRaw, senderObj) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const userKey = sender.toLowerCase();
+    const isStreamer = userKey === channelState.channelUsername.toLowerCase();
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || [];
+    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+
+    if (!isMod) {
+        posaljiPoruku(chatroomId, `❌ @${sender}, samo moderatori mogu dati dozvolu za linkove.`);
+        return;
+    }
+
+    const target = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
+    if (!target) {
+        posaljiPoruku(chatroomId, `⚠️ Unesi korisničko ime. Primer: !permit @korisnik`);
+        return;
+    }
+
+    if (!channelState.permits) {
+        channelState.permits = new Map();
+    }
+
+    channelState.permits.set(target.toLowerCase(), Date.now());
+    posaljiPoruku(chatroomId, `✅ Korisniku @${target} je dozvoljeno da pošalje jedan link u narednih 60 sekundi.`);
+}
+
 module.exports = {
     handleIq,
     handleSamar,
@@ -1116,5 +1146,6 @@ module.exports = {
     handleInfo,
     handleVreme,
     handleBotMentions,
-    handleOsvezi
+    handleOsvezi,
+    handlePermit
 };

@@ -143,9 +143,38 @@ async function odpinujPoruku(chatroomId) {
     }
 }
 
+async function obrisiPoruku(chatroomId, messageId) {
+    if (!chatroomId || !messageId) return;
+    const channelState = state.getChannelState(chatroomId);
+    const channelName = channelState ? channelState.channelUsername : chatroomId;
+    
+    try {
+        const response = await fetch(`https://kick.com/api/v2/chatrooms/${chatroomId}/messages/${messageId}`, {
+            method: 'DELETE',
+            headers: {
+                'accept':        'application/json',
+                'authorization': config.BEARER_TOKEN,
+                'content-type':  'application/json',
+                'cookie':        config.BOT_COOKIE,
+                'user-agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36'
+            }
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            log('ERR', `[${channelName}] Neuspešno brisanje poruke ${messageId}: HTTP ${response.status} - ${errorText}`);
+        } else {
+            log('INFO', `[${channelName}] Poruka ${messageId} uspešno obrisana sa lajva.`);
+        }
+    } catch (err) {
+        log('ERR', `[${channelName}] Greška pri brisanju poruke ${messageId}: ${err.message}`);
+    }
+}
+
 module.exports = {
     posaljiPoruku,
     posaljiIPinujPoruku,
     pinujPoruku,
-    odpinujPoruku
+    odpinujPoruku,
+    obrisiPoruku
 };

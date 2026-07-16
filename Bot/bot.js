@@ -11,6 +11,7 @@ const spam = require('./src/spam');
 const commands = require('./src/commands');
 const messenger = require('./src/messenger');
 const watchtime = require('./src/watchtime');
+const moderation = require('./src/moderation');
 
 function ukloniSrpskeDijakritike(str) {
     if (!str) return '';
@@ -165,6 +166,12 @@ function povezi() {
                 return;
             }
 
+            // Automatska moderacija četa
+            const messageId = chatData.id || chatData.messageId || null;
+            if (moderation.proveriModeraciju(chatroomId, username, poruka, messageId, chatData.sender)) {
+                return;
+            }
+
             // Anti-spam filter (izuzimamo strimera)
             if (userKey !== channelState.channelUsername.toLowerCase() && spam.spamFilter(chatroomId, username, poruka)) return;
 
@@ -302,6 +309,13 @@ function povezi() {
                 if (channelState.feature_games === false) return;
                 if (utils.proveraKulauna(chatroomId, '!rulet', username)) return;
                 commands.handleRulet(chatroomId, username);
+                return;
+            }
+
+            if (porukaNormalized.startsWith('!permit') || porukaNormalized.startsWith('!dozvoli')) {
+                const isPermit = porukaNormalized.startsWith('!permit');
+                const target = isPermit ? porukaSredjena.slice(7).trim() : porukaSredjena.slice(8).trim();
+                commands.handlePermit(chatroomId, username, target, chatData.sender);
                 return;
             }
 
@@ -770,6 +784,7 @@ function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 30;
     channelState.announce_time_enabled = dbConfig.announce_time_enabled ?? true;
     channelState.announce_msg_enabled = dbConfig.announce_msg_enabled ?? true;
+    channelState.moderationSettings = dbConfig.moderation_settings || {};
 }
 
 // ─── SHUTDOWN HANDLER ─────────────────────────────────────────────────────────
@@ -809,7 +824,8 @@ const ALLOWED_KICK_REDIRECT_URIS = new Set([
     'https://kickall.milanwebportal.com/auth/kick/callback',
     'https://kickall.milanwebportal.com/auth/kick/callback/',
     'http://localhost:5500/auth/kick/callback',
-    'http://localhost:5500/auth/kick/callback/'
+    'http://localhost:5500/auth/kick/callback/',
+    'http://localhost:5500/auth/kick/callback.html'
 ]);
 
 function normalizeKickRedirectUri(uri) {
@@ -835,7 +851,7 @@ function resolveKickRedirectUri(candidate) {
         return process.env.KICK_REDIRECT_URI;
     }
 
-    return 'http://localhost:5500/auth/kick/callback/';
+    return 'http://localhost:5500/auth/kick/callback';
 }
 
 // ─── HTTP SERVER (Uptime / Render Service fallback) ───────────────────────────
@@ -1061,6 +1077,27 @@ http.createServer(async (req, res) => {
                 res.end(JSON.stringify({ avatar: null, bio: '', chatroom_id: null, slug: username, error: `Kick API returned status ${apiRes.status}` }));
                 return;
             }
+        }
+        if (parsedUrl.pathname === '/api/kick/reload') {
+            const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
+            if (!chatroomId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing chatroom_id parameter' }));
+                return;
+            }
+
+            try {
+                await database.ucitajCustomKomande(chatroomId);
+                await database.ucitajBotConfig(chatroomId);
+                
+                utils.log('INFO', `[${chatroomId}] Bot konfiguracija i komande uspešno reloadovani preko API poziva.`);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'Reloaded successfully' }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to reload', detail: err.message }));
+            }
+            return;
         }
     } catch (err) {
         console.error('Error handling HTTP request in bot.js:', err);

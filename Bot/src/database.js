@@ -601,6 +601,7 @@ async function ucitajBotConfig(chatroomId) {
             channelState.announce_message_threshold = data.announce_message_threshold ?? 30;
             channelState.announce_time_enabled = data.announce_time_enabled ?? true;
             channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
+            channelState.moderationSettings = data.moderation_settings || {};
 
             if (data.channel_name && data.channel_name !== channelState.channelUsername) {
                 channelState.channelUsername = data.channel_name;

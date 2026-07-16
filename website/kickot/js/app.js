@@ -536,7 +536,7 @@ function openModal(tab = 'login') {
   if (modal) {
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
-    switchTab(tab);
+    switchTab('login');
   }
 }
 
@@ -613,7 +613,7 @@ async function generateCodeChallenge(v) {
 
 function getKickRedirectUri() {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.origin}/auth/kick/callback/`;
+    return `${window.location.origin}/auth/kick/callback`;
   }
   return `${window.location.origin}/auth/kick/callback`;
 }

@@ -27,6 +27,10 @@ function getChannelState(chatroomId) {
             weatherCache: {},
             lastSpamPenalty: {},
             welcomedUsers: new Set(),
+            warningsCount: new Map(),
+            permits: new Map(),
+            duplicateTracker: new Map(),
+            moderationSettings: {},
 
             // Watchtime Trackers
             watchtimeDirty: false,

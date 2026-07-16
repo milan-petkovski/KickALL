@@ -268,7 +268,7 @@ function handleTopWatchtime(chatroomId, numRaw) {
         .map((x, idx) => `${idx + 1}. @${x.display_name} (${formatWatchtime(x.minutes)})`)
         .join(', ');
 
-    posaljiPoruku(`⏱️ Top ${limit} Watchtime: ${lista}`);
+    posaljiPoruku(chatroomId, `⏱️ Top ${limit} Watchtime: ${lista}`);
 }
 
 module.exports = {
