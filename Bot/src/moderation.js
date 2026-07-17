@@ -169,6 +169,24 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
         }
     }
     
+    // ── 7. MAX LENGTH PROTECTION ─────────────────────────────────────────────
+    if (!triggerReason && settings.max_len_enabled) {
+        const maxLength = settings.max_len_limit || 300;
+        if (content.length > maxLength) {
+            triggerReason = 'Predugačka poruka';
+        }
+    }
+    
+    // ── 8. MASS MENTIONS PROTECTION ──────────────────────────────────────────
+    if (!triggerReason && settings.mentions_enabled) {
+        const maxMentions = settings.mentions_limit || 3;
+        const mentionMatches = content.match(/@\w+/g);
+        const mentionCount = mentionMatches ? mentionMatches.length : 0;
+        if (mentionCount > maxMentions) {
+            triggerReason = 'Previše tagovanja';
+        }
+    }
+
     if (triggerReason) {
         kazniKorisnika(chatroomId, username, messageId, triggerReason, settings);
         return true;

@@ -250,7 +250,9 @@
       const kickApiBase = (() => {
         const fromGlobal = (window.KICK_API_BASE || '').trim();
         if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        if (window.location.hostname.endsWith('netlify.app') || 
+            window.location.hostname === 'localhost' || 
+            window.location.hostname === '127.0.0.1') {
           return 'https://kickbot-ihzb.onrender.com';
         }
         return `${window.location.origin}`;

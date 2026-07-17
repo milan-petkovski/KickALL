@@ -398,7 +398,7 @@
                   </svg>
                   Uživo aktivnost bota
                 </h3>
-                <span class="status-dot status-off" style="background:red; box-shadow:0 0 8px red; width:6px; height:6px;"></span>
+                <span id="botLiveFeedDot" class="status-dot status-off" style="background:red; box-shadow:0 0 8px red; width:6px; height:6px;"></span>
               </div>
               
               <!-- Feed Container -->
@@ -1377,14 +1377,7 @@
               </h1>
               <p class="panel-desc">Konfiguriši poruke koje bot automatski periodično šalje tokom tvog strima.</p>
             </div>
-            <button class="btn btn-primary" onclick="saveBotConfig()" id="saveAnnouncesConfigBtn">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 21H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                <polyline points="17 21 17 13 7 13 7 21" />
-                <polyline points="7 3 7 8 15 8" />
-              </svg>
-              Sačuvaj
-            </button>
+
           </div>
 
           <div class="config-grid">
@@ -1472,17 +1465,7 @@
               </div>
             </div>
             
-            <!-- Premium Save Row -->
-            <div style="grid-column: span 2; display: flex; justify-content: flex-end; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle); margin-top: 1rem; width: 100%;">
-              <button class="btn btn-primary" onclick="saveBotConfig()" id="saveAnnouncesConfigBtnBottom" style="padding: 12px 28px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2); border-radius: var(--radius-md);">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path d="M19 21H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                  <polyline points="17 21 17 13 7 13 7 21" />
-                  <polyline points="7 3 7 8 15 8" />
-                </svg>
-                Sačuvaj podešavanja
-              </button>
-            </div>
+
           </div>
         </section>
 
@@ -1665,26 +1648,19 @@
                   </label>
                 </div>
                 <!-- Moderation -->
-                <div class="toggle-item" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); opacity: 0.55; cursor: not-allowed;" title="Ovaj modul trenutno nije dostupan">
+                <div class="toggle-item" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
                   <div class="toggle-info">
                     <div class="toggle-name" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: #EF4444;">
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                       </svg>
                       Moderacija
-                      <span style="font-size: 0.7rem; background: rgba(239, 68, 68, 0.12); color: #EF4444; padding: 1px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px;">
-                        Uskoro 
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                        </svg>
-                    </span>
                     </div>
                     <div class="toggle-desc" style="font-size: 0.8rem; color: var(--text-muted);">Napredna moderacija četa sa automatskim spam filterima</div>
                   </div>
-                  <label class="toggle-switch" style="pointer-events: none;">
-                    <input type="checkbox" id="cfgModeration" disabled>
-                    <span class="toggle-track" style="background: rgba(255,255,255,0.05);"></span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="cfgModeration">
+                    <span class="toggle-track"></span>
                   </label>
                 </div>
               </div>
@@ -1713,58 +1689,52 @@
                 </div>
               </div>
             </div>
-
-            <!-- Premium Save Row -->
-            <div style="grid-column: span 2; display: flex; justify-content: flex-end; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle); margin-top: 1rem; width: 100%;">
-              <button class="btn btn-primary" onclick="saveBotConfig()" id="saveConfigBtnBottom" style="padding: 12px 28px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.2); border-radius: var(--radius-md);">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path d="M19 21H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                  <polyline points="17 21 17 13 7 13 7 21" />
-                  <polyline points="7 3 7 8 15 8" />
-                </svg>
-                Sačuvaj podešavanja
-              </button>
-            </div>
           </div>
         </section>
 
         <!-- ══ MODERACIJA ══ -->
-        <section id="panel-moderation" class="panel" style="font-family: 'Space Grotesk', sans-serif; color: #fff;">
-          <div style="padding: 30px; max-width: 1200px; margin: 0 auto;">
-            <!-- Header Section -->
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 20px;">
-              <div>
-                <h2 style="font-size: 1.8rem; font-weight: 700; display: flex; align-items: center; gap: 10px; margin: 0;">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <section id="panel-moderation" class="panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: rgba(239, 68, 68, 0.1); color: #EF4444;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                   </svg>
-                  Automatska Moderacija Četa
-                </h2>
-                <p style="color: var(--text-muted); font-size: 0.9rem; margin: 5px 0 0 0;">
-                  Uključi pametne filtere za čišćenje spama, linkova i zabranjenih reči sa četa.
-                </p>
-              </div>
+                </div>
+                <span>Automatska Moderacija Četa</span>
+              </h1>
+              <p class="panel-desc">Uključi pametne filtere za čišćenje spama, linkova i zabranjenih reči iz četa.</p>
+            </div>
+          </div>
 
-              <!-- Main Toggle -->
-              <div style="display: flex; align-items: center; gap: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 10px 18px; border-radius: 12px;">
-                <span style="font-size: 0.95rem; font-weight: 600;">Status moderacije:</span>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="cfgModeration" onchange="toggleModerationPanelState()">
-                  <span class="toggle-track"></span>
-                </label>
+          <div class="config-grid">
+            <!-- Warning notice when moderation is disabled -->
+            <div id="modDisabledNotice" class="config-section" style="display: none; align-items: center; gap: 1.25rem; border-color: rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.03); padding: 24px; border-radius: var(--radius-lg);">
+              <div style="color: #EF4444; background: rgba(239, 68, 68, 0.08); padding: 12px; border-radius: 50%; display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; flex-shrink: 0; border: 1px solid rgba(239, 68, 68, 0.15);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.03 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </div>
+              <div>
+                <h4 style="margin: 0 0 6px 0; color: #fff; font-weight: 700; font-size: 1.05rem;">Modul Moderacije je isključen</h4>
+                <p style="margin: 0; color: var(--text-muted); font-size: 0.875rem; line-height: 1.5;">
+                  Automatska moderacija četa trenutno nije aktivna za ovaj kanal. Modul možete uključiti u <a href="#" onclick="switchPanel('config'); return false;" style="color: var(--app-primary); font-weight: 700; text-decoration: underline; transition: color 0.2s;">Bot Config</a> sekciji pod "Uključeni moduli".
+                </p>
               </div>
             </div>
 
-            <!-- Main Config Grid (Hidden when moderation is disabled) -->
-            <div id="modSettingsContainer" style="display: flex; flex-direction: column; gap: 24px;">
+            <div id="modSettingsContainer" style="display: flex; flex-direction: column; gap: 1.5rem;">
               
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
                 
                 <!-- Caps Protection Card -->
-                <div style="background: rgba(15, 11, 30, 0.5); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="display: flex; gap: 12px;">
-                      <div style="color: var(--kick-green); background: rgba(83, 252, 24, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(83, 252, 24, 0.15);">
+                      <div style="color: var(--kick-green); background: rgba(83, 252, 24, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(83, 252, 24, 0.15); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <polyline points="4 7 4 4 20 4 20 7" />
                           <line x1="9" y1="20" x2="15" y2="20" />
@@ -1772,7 +1742,7 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 600;">Velika slova (Caps)</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Velika slova (Caps)</h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Limitira prekomerno korišćenje velikih slova.</span>
                       </div>
                     </div>
@@ -1781,33 +1751,33 @@
                       <span class="toggle-track"></span>
                     </label>
                   </div>
-                  <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div>
-                      <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 6px; color: var(--text-muted);">
-                        <span>Maksimalno velikih slova (%):</span>
-                        <span id="lblModCapsPct" style="color: #fff; font-weight: 600;">70%</span>
+                  <div class="config-fields">
+                    <div class="config-field">
+                      <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;">
+                        <span class="config-label" style="color: var(--text-secondary);">Maksimalno velikih slova (%):</span>
+                        <span id="lblModCapsPct" style="color: var(--kick-green); font-weight: 700;">70%</span>
                       </div>
                       <input type="range" id="cfgModCapsPct" min="10" max="100" value="70" style="width: 100%; accent-color: var(--app-primary);" oninput="document.getElementById('lblModCapsPct').textContent = this.value + '%'">
                     </div>
-                    <div>
-                      <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Minimalna dužina poruke:</label>
-                      <input type="number" id="cfgModCapsMinLen" min="1" value="5" class="form-control" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); color: #fff; border-radius: 8px; padding: 8px; width: 100%;">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Minimalna dužina poruke:</label>
+                      <input type="number" id="cfgModCapsMinLen" min="1" value="5" class="form-input">
                     </div>
                   </div>
                 </div>
 
                 <!-- Link Protection Card -->
-                <div style="background: rgba(15, 11, 30, 0.5); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="display: flex; gap: 12px;">
-                      <div style="color: var(--app-primary); background: rgba(99, 102, 241, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.15);">
+                      <div style="color: var(--app-primary); background: rgba(99, 102, 241, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.15); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
                           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 600;">Zaštita od linkova</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od linkova</h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Sprečava deljenje linkova u četu.</span>
                       </div>
                     </div>
@@ -1816,10 +1786,10 @@
                       <span class="toggle-track"></span>
                     </label>
                   </div>
-                  <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div>
-                      <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Bela lista domena (razdvojeno zarezom):</label>
-                      <input type="text" id="cfgModLinksWhitelist" placeholder="youtube.com, twitter.com" class="form-control" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); color: #fff; border-radius: 8px; padding: 8px; width: 100%;">
+                  <div class="config-fields">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Bela lista domena (razdvojeno zarezom):</label>
+                      <input type="text" id="cfgModLinksWhitelist" placeholder="youtube.com, twitter.com" class="form-input">
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                       <input type="checkbox" id="cfgModLinksPermitEnabled" checked style="accent-color: var(--app-primary);">
@@ -1829,10 +1799,10 @@
                 </div>
 
                 <!-- Emote Protection Card -->
-                <div style="background: rgba(15, 11, 30, 0.5); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="display: flex; gap: 12px;">
-                      <div style="color: #F59E0B; background: rgba(245, 158, 11, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.15);">
+                      <div style="color: #F59E0B; background: rgba(245, 158, 11, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <circle cx="12" cy="12" r="10" />
                           <path d="M8 14s1.5 2 4 2 4-2 4-2" />
@@ -1841,8 +1811,8 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 600;">Zaštita od emotikona</h4>
-                        <span style="color: var(--text-muted); font-size: 0.75rem;">Limitira maksimalan broj emotikona u jednoj poruci.</span>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od emotikona</h4>
+                        <span style="color: var(--text-muted); font-size: 0.75rem;">Limitira maks emotikona po poruci.</span>
                       </div>
                     </div>
                     <label class="toggle-switch">
@@ -1850,22 +1820,24 @@
                       <span class="toggle-track"></span>
                     </label>
                   </div>
-                  <div>
-                    <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Maksimalno emotikona po poruci:</label>
-                    <input type="number" id="cfgModEmotesMax" min="1" value="5" class="form-control" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); color: #fff; border-radius: 8px; padding: 8px; width: 100%;">
+                  <div class="config-fields">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Maksimalno emotikona po poruci:</label>
+                      <input type="number" id="cfgModEmotesMax" min="1" value="5" class="form-input">
+                    </div>
                   </div>
                 </div>
 
                 <!-- Symbol Protection Card -->
-                <div style="background: rgba(15, 11, 30, 0.5); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="display: flex; gap: 12px;">
-                      <div style="color: #EC4899; background: rgba(236, 72, 153, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(236, 72, 153, 0.15);">
-                        <span style="font-weight: bold; font-size: 14px; line-height: 1;">#&@</span>
+                      <div style="color: #EC4899; background: rgba(236, 72, 153, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(236, 72, 153, 0.15); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; font-weight: bold; font-size: 13px;">
+                        #&@
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 600;">Zaštita od simbola</h4>
-                        <span style="color: var(--text-muted); font-size: 0.75rem;">Sprečava prekomernu upotrebu simbola ($#%!).</span>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od simbola</h4>
+                        <span style="color: var(--text-muted); font-size: 0.75rem;">Sprečava prekomernu upotrebu simbola.</span>
                       </div>
                     </div>
                     <label class="toggle-switch">
@@ -1873,26 +1845,26 @@
                       <span class="toggle-track"></span>
                     </label>
                   </div>
-                  <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div>
-                      <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 6px; color: var(--text-muted);">
-                        <span>Maksimalno simbola (%):</span>
-                        <span id="lblModSymbolsPct" style="color: #fff; font-weight: 600;">60%</span>
+                  <div class="config-fields">
+                    <div class="config-field">
+                      <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 2px;">
+                        <span class="config-label" style="color: var(--text-secondary);">Maksimalno simbola (%):</span>
+                        <span id="lblModSymbolsPct" style="color: #EC4899; font-weight: 700;">60%</span>
                       </div>
                       <input type="range" id="cfgModSymbolsPct" min="10" max="100" value="60" style="width: 100%; accent-color: var(--app-primary);" oninput="document.getElementById('lblModSymbolsPct').textContent = this.value + '%'">
                     </div>
-                    <div>
-                      <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Minimalna dužina poruke:</label>
-                      <input type="number" id="cfgModSymbolsMinLen" min="1" value="5" class="form-control" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); color: #fff; border-radius: 8px; padding: 8px; width: 100%;">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Minimalna dužina poruke:</label>
+                      <input type="number" id="cfgModSymbolsMinLen" min="1" value="5" class="form-input">
                     </div>
                   </div>
                 </div>
 
                 <!-- Bad Words Protection Card -->
-                <div style="background: rgba(15, 11, 30, 0.5); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px; grid-column: span 1;">
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="display: flex; gap: 12px;">
-                      <div style="color: #EF4444; background: rgba(239, 68, 68, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.15);">
+                      <div style="color: #EF4444; background: rgba(239, 68, 68, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.15); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                           <line x1="9" y1="9" x2="15" y2="15" />
@@ -1900,8 +1872,8 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 600;">Zabranjene reči</h4>
-                        <span style="color: var(--text-muted); font-size: 0.75rem;">Automatski cenzuriše neprikladne reči.</span>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zabranjene reči</h4>
+                        <span style="color: var(--text-muted); font-size: 0.75rem;">Cenzuriše neprikladne reči u četu.</span>
                       </div>
                     </div>
                     <label class="toggle-switch">
@@ -1909,24 +1881,26 @@
                       <span class="toggle-track"></span>
                     </label>
                   </div>
-                  <div>
-                    <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Zabranjene reči (razdvojene zarezom):</label>
-                    <textarea id="cfgModWordsList" rows="3" placeholder="word1, word2, rec3" class="form-control" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); color: #fff; border-radius: 8px; padding: 8px; width: 100%; resize: vertical; font-family: inherit; font-size: 0.85rem;"></textarea>
+                  <div class="config-fields">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Zabranjene reči (razdvojene zarezom):</label>
+                      <textarea id="cfgModWordsList" rows="3" placeholder="word1, word2, rec3" class="form-input" style="resize: vertical; font-family: inherit; font-size: 0.85rem; height: 86px;"></textarea>
+                    </div>
                   </div>
                 </div>
 
                 <!-- Spam Protection Card -->
-                <div style="background: rgba(15, 11, 30, 0.5); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div style="display: flex; gap: 12px;">
-                      <div style="color: #3B82F6; background: rgba(59, 130, 246, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.15);">
+                      <div style="color: #3B82F6; background: rgba(59, 130, 246, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.15); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <polyline points="23 4 23 10 17 10" />
                           <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 600;">Zaštita od dupliranog spama</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od dupliranog spama</h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Blokira brzo ponavljanje istih poruka.</span>
                       </div>
                     </div>
@@ -1935,85 +1909,142 @@
                       <span class="toggle-track"></span>
                     </label>
                   </div>
-                  <div>
-                    <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Maksimalno ponavljanja iste poruke:</label>
-                    <input type="number" id="cfgModSpamMaxDuplicates" min="1" value="2" class="form-control" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); color: #fff; border-radius: 8px; padding: 8px; width: 100%;">
+                  <div class="config-fields">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Maksimalno ponavljanja iste poruke:</label>
+                      <input type="number" id="cfgModSpamMaxDuplicates" min="1" value="2" class="form-input">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Max Length Protection Card -->
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="display: flex; gap: 12px;">
+                      <div style="color: #8B5CF6; background: rgba(139, 92, 246, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(139, 92, 246, 0.15); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <line x1="4" y1="9" x2="20" y2="9" />
+                          <line x1="4" y1="15" x2="20" y2="15" />
+                          <line x1="10" y1="3" x2="8" y2="21" />
+                          <line x1="16" y1="3" x2="14" y2="21" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od predugih poruka</h4>
+                        <span style="color: var(--text-muted); font-size: 0.75rem;">Sprečava slanje prevelikih poruka.</span>
+                      </div>
+                    </div>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgModMaxLenEnabled">
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div class="config-fields">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Maksimalno karaktera po poruci:</label>
+                      <input type="number" id="cfgModMaxLenLimit" min="10" max="2000" value="300" class="form-input">
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Mass Mentions Protection Card -->
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="display: flex; gap: 12px;">
+                      <div style="color: #06B6D4; background: rgba(6, 182, 212, 0.05); padding: 8px; border-radius: 8px; border: 1px solid rgba(6, 182, 212, 0.15); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="4" />
+                          <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od masovnih tagova</h4>
+                        <span style="color: var(--text-muted); font-size: 0.75rem;">Sprečava masovno pominjanje korisnika.</span>
+                      </div>
+                    </div>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgModMentionsEnabled">
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div class="config-fields">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Maksimalno tagova po poruci:</label>
+                      <input type="number" id="cfgModMentionsLimit" min="1" max="50" value="3" class="form-input">
+                    </div>
                   </div>
                 </div>
 
               </div>
 
               <!-- Penalties and Exemptions Row -->
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
                 
                 <!-- Penalties -->
-                <div style="background: rgba(15, 11, 30, 0.5); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
-                  <h4 style="margin: 0; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
+                  <h4 style="margin: 0; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; color: var(--text-primary);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                       <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
                       <line x1="12" y1="8" x2="12" y2="12" />
                       <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
-                    Kaznene mere (Penalties)
+                    Kaznene mere
                   </h4>
-                  <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <div>
-                      <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Akcija kod prekršaja:</label>
-                      <select id="cfgModActionType" style="background: rgba(15, 11, 30, 0.9); border: 1px solid var(--border-subtle); color: #fff; border-radius: 8px; padding: 8px; width: 100%; font-family: inherit; font-size: 0.85rem;">
+                  <div class="config-fields">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Akcija kod prekršaja:</label>
+                      <select id="cfgModActionType" class="form-input">
                         <option value="delete">Samo obriši poruku (Delete)</option>
                         <option value="warn">Upozori korisnika (Warn - 3 warninga do timeout-a)</option>
                         <option value="timeout">Privremeno udalji sa strima (Timeout)</option>
                       </select>
                     </div>
-                    <div>
-                      <label style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 6px;">Trajanje privremenog udaljavanja (u sekundama):</label>
-                      <input type="number" id="cfgModTimeoutDuration" min="5" value="600" class="form-control" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); color: #fff; border-radius: 8px; padding: 8px; width: 100%;">
+                    <div class="config-field">
+                      <label class="config-label" style="color: var(--text-secondary);">Trajanje privremenog udaljavanja (u sekundama):</label>
+                      <input type="number" id="cfgModTimeoutDuration" min="5" value="600" class="form-input">
                     </div>
                   </div>
                 </div>
 
                 <!-- Exemptions -->
-                <div style="background: rgba(15, 11, 30, 0.5); border: 1px solid var(--border-subtle); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
-                  <h4 style="margin: 0; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <div class="config-section" style="display: flex; flex-direction: column; gap: 16px;">
+                  <h4 style="margin: 0; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; color: var(--text-primary);">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                       <circle cx="9" cy="7" r="4" />
                       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                       <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
-                    Izuzeti korisnici (Exemptions)
+                    Izuzeti korisnici
                   </h4>
-                  <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 5px;">
-                    <span style="font-size: 0.8rem; color: var(--text-muted);">Izaberi ko je potpuno izuzet iz svih filtera automatske moderacije:</span>
-                    <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 5px;">
+                  <div class="config-fields" style="margin-top: 5px;">
+                    <span class="config-hint">Izaberi ko je potpuno izuzet iz svih filtera automatske moderacije:</span>
+                    <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="cfgModExemptMod" checked disabled style="accent-color: var(--app-primary);">
                         <label style="font-size: 0.85rem; color: var(--text-muted); cursor: not-allowed; user-select: none;">Moderatori (Uvek izuzeti)</label>
                       </div>
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="cfgModExemptVip" style="accent-color: var(--app-primary);">
-                        <label for="cfgModExemptVip" style="font-size: 0.85rem; color: var(--text-muted); cursor: pointer; user-select: none;">VIP korisnici</label>
+                        <label for="cfgModExemptVip" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">VIP korisnici</label>
                       </div>
                       <div style="display: flex; align-items: center; gap: 8px;">
                         <input type="checkbox" id="cfgModExemptSub" style="accent-color: var(--app-primary);">
-                        <label for="cfgModExemptSub" style="font-size: 0.85rem; color: var(--text-muted); cursor: pointer; user-select: none;">Pretplatnici (Subscribers)</label>
+                        <label for="cfgModExemptSub" style="font-size: 0.85rem; color: var(--text-secondary); cursor: pointer; user-select: none;">Pretplatnici (Subscribers)</label>
                       </div>
                     </div>
                   </div>
                 </div>
-
               </div>
 
-              <!-- Action Bar -->
-              <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-                <button id="btnSaveModeration" onclick="saveModerationSettings()" class="btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 12px 24px; font-weight: 600; border-radius: 12px; border: none; cursor: pointer; transition: all 0.2s;">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M19 21H5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                  Sačuvaj podešavanja moderacije
-                </button>
+              <!-- Red alert banner at the bottom -->
+              <div style="border: 1px solid rgba(239, 68, 68, 0.22); background: rgba(239, 68, 68, 0.03); color: #EF4444; display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--radius-md); font-size: 0.85rem; margin-top: 0.5rem; width: 100%; font-family: inherit;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink: 0;">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="16" x2="12" y2="12" />
+                  <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <span>Ukoliko želiš da uključiš/isključiš ili podesiš ove opcije, poseti tab <a href="#" onclick="switchPanel('config'); return false;" style="color: #EF4444; font-weight: 700; text-decoration: underline; transition: opacity 0.2s;">Bot Config</a>.</span>
               </div>
 
             </div>

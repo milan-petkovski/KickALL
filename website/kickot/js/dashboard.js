@@ -152,7 +152,9 @@ async function initAuth() {
       const kickApiBase = (() => {
         const fromGlobal = (window.KICK_API_BASE || '').trim();
         if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        if (window.location.hostname.endsWith('netlify.app') || 
+            window.location.hostname === 'localhost' || 
+            window.location.hostname === '127.0.0.1') {
           return 'https://kickbot-ihzb.onrender.com';
         }
         return `${window.location.origin}`;
@@ -509,7 +511,14 @@ async function initApp() {
   // Load initial panel
   if (activeChannel) {
     loadAllData();
-    let lastPanel = localStorage.getItem('active-dashboard-panel') || 'overview';
+    let lastPanel = 'overview';
+    const sessionActive = sessionStorage.getItem('dashboard-session-active');
+    if (sessionActive) {
+      lastPanel = localStorage.getItem('active-dashboard-panel') || 'overview';
+    } else {
+      sessionStorage.setItem('dashboard-session-active', 'true');
+      localStorage.setItem('active-dashboard-panel', 'overview');
+    }
     if (lastPanel === 'no-channel') {
       lastPanel = 'overview';
     }
@@ -529,6 +538,8 @@ async function initApp() {
     const cleanUrl = window.location.pathname;
     window.history.replaceState({}, '', cleanUrl);
   }
+
+  setupAutosave();
 }
 
 // ── User Profile ──────────────────────────────────────────
@@ -694,6 +705,7 @@ async function fetchKickAvatar(username) {
 function setActiveChannel(ch) {
   activeChannel = ch;
   document.getElementById('channelNameDisplay').textContent = ch.username;
+  updateLiveStatusUI(false); // Resetuj na offline po defaultu kako ne bi flešovalo prethodno stanje
 
   const avatarEl = document.getElementById('channelAvatar');
   if (avatarEl) {
@@ -1966,6 +1978,12 @@ async function loadBotConfig() {
     document.getElementById('cfgModSpamEnabled').checked = modSettings.spam_enabled ?? false;
     document.getElementById('cfgModSpamMaxDuplicates').value = modSettings.spam_max_duplicates ?? 2;
     
+    document.getElementById('cfgModMaxLenEnabled').checked = modSettings.max_len_enabled ?? false;
+    document.getElementById('cfgModMaxLenLimit').value = modSettings.max_len_limit ?? 300;
+    
+    document.getElementById('cfgModMentionsEnabled').checked = modSettings.mentions_enabled ?? false;
+    document.getElementById('cfgModMentionsLimit').value = modSettings.mentions_limit ?? 3;
+    
     document.getElementById('cfgModActionType').value = modSettings.action_type || 'delete';
     document.getElementById('cfgModTimeoutDuration').value = modSettings.timeout_duration_secs ?? 600;
     
@@ -2004,6 +2022,10 @@ async function loadBotConfig() {
     document.getElementById('cfgModWordsList').value = '';
     document.getElementById('cfgModSpamEnabled').checked = false;
     document.getElementById('cfgModSpamMaxDuplicates').value = 2;
+    document.getElementById('cfgModMaxLenEnabled').checked = false;
+    document.getElementById('cfgModMaxLenLimit').value = 300;
+    document.getElementById('cfgModMentionsEnabled').checked = false;
+    document.getElementById('cfgModMentionsLimit').value = 3;
     document.getElementById('cfgModActionType').value = 'delete';
     document.getElementById('cfgModTimeoutDuration').value = 600;
     document.getElementById('cfgModExemptVip').checked = false;
@@ -2015,7 +2037,7 @@ async function loadBotConfig() {
   updateOverviewModulesUI();
 }
 
-async function saveBotConfig() {
+async function saveBotConfig(silent = false) {
   if (!activeChannel) { showToast('error', 'Nema izabranog kanala', '❌'); return; }
 
   const config = {
@@ -2047,37 +2069,55 @@ async function saveBotConfig() {
   const btnConfigBottom = document.getElementById('saveConfigBtnBottom');
   const btnAnnounces = document.getElementById('saveAnnouncesConfigBtn');
   const btnAnnouncesBottom = document.getElementById('saveAnnouncesConfigBtnBottom');
-  if (btnConfig) setLoading('saveConfigBtn', true);
-  if (btnConfigBottom) setLoading('saveConfigBtnBottom', true);
-  if (btnAnnounces) setLoading('saveAnnouncesConfigBtn', true);
-  if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', true);
+  
+  if (!silent) {
+    if (btnConfig) setLoading('saveConfigBtn', true);
+    if (btnConfigBottom) setLoading('saveConfigBtnBottom', true);
+    if (btnAnnounces) setLoading('saveAnnouncesConfigBtn', true);
+    if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', true);
+  }
 
   const { error } = await sb.from('bot_config')
     .upsert(config, { onConflict: 'channel_id' });
 
-  if (btnConfig) setLoading('saveConfigBtn', false);
-  if (btnConfigBottom) setLoading('saveConfigBtnBottom', false);
-  if (btnAnnounces) setLoading('saveAnnouncesConfigBtn', false);
-  if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', false);
+  if (!silent) {
+    if (btnConfig) setLoading('saveConfigBtn', false);
+    if (btnConfigBottom) setLoading('saveConfigBtnBottom', false);
+    if (btnAnnounces) setLoading('saveAnnouncesConfigBtn', false);
+    if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', false);
+  }
 
-  if (error) { showToast('error', 'Greška pri čuvanju config-a', '❌'); console.error(error); return; }
-  showToast('success', 'Bot config sačuvan!', '✅');
+  if (error) { 
+    showToast('error', 'Greška pri čuvanju config-a', '❌'); 
+    console.error(error); 
+    return; 
+  }
+  
+  if (!silent) {
+    showToast('success', 'Bot config sačuvan!', '✅');
+  }
   notifyBotToReload();
   updateOverviewModulesUI();
 }
 
 function toggleModerationPanelState() {
   const container = document.getElementById('modSettingsContainer');
+  const notice = document.getElementById('modDisabledNotice');
   const mainToggle = document.getElementById('cfgModeration');
-  if (mainToggle && container) {
-    container.style.display = mainToggle.checked ? 'flex' : 'none';
+  if (mainToggle) {
+    const active = mainToggle.checked;
+    if (container) container.style.display = active ? 'flex' : 'none';
+    if (notice) notice.style.display = active ? 'none' : 'flex';
   }
 }
 
 function getBotApiBase() {
   const fromGlobal = (window.KICK_API_BASE || '').trim();
   if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  // Ako je pokrenuto na Netlify ili lokalno, koristi Render backend
+  if (window.location.hostname.endsWith('netlify.app') || 
+      window.location.hostname === 'localhost' || 
+      window.location.hostname === '127.0.0.1') {
     return 'https://kickbot-ihzb.onrender.com';
   }
   return window.location.origin;
@@ -2088,7 +2128,7 @@ function notifyBotToReload() {
   fetch(`${getBotApiBase()}/api/kick/reload?chatroom_id=${activeChannel.id}`).catch(() => {});
 }
 
-async function saveModerationSettings() {
+async function saveModerationSettings(silent = false) {
   if (!activeChannel) { showToast('error', 'Nema izabranog kanala', '❌'); return; }
 
   const featureModeration = document.getElementById('cfgModeration').checked;
@@ -2115,6 +2155,12 @@ async function saveModerationSettings() {
     spam_enabled: document.getElementById('cfgModSpamEnabled').checked,
     spam_max_duplicates: parseInt(document.getElementById('cfgModSpamMaxDuplicates').value) || 2,
     
+    max_len_enabled: document.getElementById('cfgModMaxLenEnabled').checked,
+    max_len_limit: parseInt(document.getElementById('cfgModMaxLenLimit').value) || 300,
+    
+    mentions_enabled: document.getElementById('cfgModMentionsEnabled').checked,
+    mentions_limit: parseInt(document.getElementById('cfgModMentionsLimit').value) || 3,
+    
     action_type: document.getElementById('cfgModActionType').value || 'delete',
     timeout_duration_secs: parseInt(document.getElementById('cfgModTimeoutDuration').value) || 600,
     exempt_roles: [
@@ -2125,7 +2171,7 @@ async function saveModerationSettings() {
   };
 
   const btn = document.getElementById('btnSaveModeration');
-  if (btn) btn.disabled = true;
+  if (!silent && btn) btn.disabled = true;
 
   const { error } = await sb.from('bot_config')
     .upsert({
@@ -2137,7 +2183,7 @@ async function saveModerationSettings() {
       updated_at: new Date().toISOString()
     }, { onConflict: 'channel_id' });
 
-  if (btn) btn.disabled = false;
+  if (!silent && btn) btn.disabled = false;
 
   if (error) { 
     showToast('error', 'Greška pri čuvanju podešavanja moderacije', '❌'); 
@@ -2145,7 +2191,9 @@ async function saveModerationSettings() {
     return; 
   }
 
-  showToast('success', 'Podešavanja moderacije sačuvana!', '✅');
+  if (!silent) {
+    showToast('success', 'Podešavanja moderacije sačuvana!', '✅');
+  }
   notifyBotToReload();
   updateOverviewModulesUI();
 }
@@ -2187,13 +2235,13 @@ function addAnnounceMessage() {
   localAnnounces.push(msg);
   input.value = '';
   renderAnnounceList();
-  showToast('info', 'Poruka dodata u listu (klikni "Sačuvaj" gore da primeniš izmene)', '📝');
+  saveBotConfig(true); // Instant tihi autosave u bazu
 }
 
 function deleteAnnounceMessage(i) {
   localAnnounces.splice(i, 1);
   renderAnnounceList();
-  showToast('info', 'Poruka uklonjena (klikni "Sačuvaj" gore da primeniš izmene)', '🗑');
+  saveBotConfig(true); // Instant tihi autosave u bazu
 }
 
 async function loadBotStatus() {
@@ -2207,13 +2255,9 @@ async function loadBotStatus() {
 }
 
 function updateBotStatusUI(active) {
-  const dot = document.getElementById('statusDot');
-  const text = document.getElementById('statusText');
   const label = document.getElementById('botToggleLabel');
   const toggle = document.getElementById('botActiveToggle');
 
-  if (dot) { dot.className = `status-dot ${active ? 'status-on' : 'status-off'}`; }
-  if (text) { text.textContent = active ? 'Online' : 'Offline'; }
   if (label) { label.textContent = `Bot: ${active ? 'ON' : 'OFF'}`; label.style.color = active ? 'var(--kick-green)' : 'var(--text-muted)'; }
   if (toggle && toggle.checked !== active) { toggle.checked = active; }
 
@@ -2267,6 +2311,35 @@ function testBotConnection() {
   });
 }
 
+function addLocalLog(type, message) {
+  const feed = document.getElementById('botLiveFeed');
+  if (!feed) return;
+
+  const vreme = new Date().toLocaleTimeString('sr-RS', { hour12: false });
+  let badgeColor = 'var(--text-muted)';
+  if (type === 'ERR') badgeColor = '#EF4444';
+  else if (type === 'WARN') badgeColor = '#F59E0B';
+  else if (type === 'INFO') badgeColor = '#3B82F6';
+  else if (type === 'BOT') badgeColor = 'var(--kick-green)';
+  else if (type === 'CHAT') badgeColor = '#10B981';
+
+  // Obriši praznu poruku ako postoji
+  if (feed.innerText.includes('Čekam prve aktivnosti...')) {
+    feed.innerHTML = '';
+  }
+
+  const logDiv = document.createElement('div');
+  logDiv.className = 'log-item';
+  logDiv.style = 'display: flex; gap: 8px; align-items: flex-start; text-align: left; font-family: monospace; font-size: 0.78rem; padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.02); line-height: 1.4; width: 100%; box-sizing: border-box;';
+  logDiv.innerHTML = `
+    <span style="color: var(--text-muted); flex-shrink: 0;">[${vreme}]</span>
+    <span style="color: ${badgeColor}; font-weight: bold; flex-shrink: 0;">[${type}]</span>
+    <span style="color: #E2E8F0; word-break: break-all; flex-grow: 1;">${escapeHtml(message)}</span>
+  `;
+  feed.appendChild(logDiv);
+  feed.scrollTop = feed.scrollHeight;
+}
+
 async function toggleBotActive() {
   if (!activeChannel) return;
   const active = document.getElementById('botActiveToggle').checked;
@@ -2287,6 +2360,7 @@ async function toggleBotActive() {
     updateBotStatusUI(!active);
   } else {
     showToast(active ? 'success' : 'info', `Bot ${active ? 'pokrenut' : 'zaustavljen'}`, active ? '🟢' : '⭕');
+    addLocalLog('INFO', active ? 'Korisnik je pokrenuo bota' : 'Korisnik je zaustavio bota');
     notifyBotToReload();
   }
 }
@@ -2373,7 +2447,8 @@ function updateLiveStatusUI(isLive) {
     statusDot.className = isLive ? 'status-dot status-on' : 'status-dot status-off';
   }
   if (statusText) {
-    statusText.textContent = isLive ? 'Online' : 'Offline';
+    statusText.textContent = isLive ? 'Live' : 'Offline';
+    statusText.style.color = isLive ? 'var(--kick-green)' : 'var(--text-muted)';
   }
 }
 
@@ -2714,6 +2789,8 @@ function toggleUserMenu() {
   document.getElementById('userMenuSm').classList.toggle('open');
 }
 async function handleSignOut() {
+  localStorage.removeItem('active-dashboard-panel');
+  sessionStorage.removeItem('dashboard-session-active');
   await sb.auth.signOut();
   window.location.href = 'index.html';
 }
@@ -3276,6 +3353,77 @@ async function removeChannelManager(username) {
   }
 }
 
+async function makeChannelPrimary(channelId) {
+  const updatedChannels = currentChannels.map(c => ({
+    ...c,
+    is_primary: c.id === channelId
+  }));
+
+  const { error } = await sb.from('user_profiles')
+    .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+    .eq('id', currentUser.id);
+
+  if (error) {
+    showToast('error', 'Greška pri postavljanju glavnog kanala.', '❌');
+    return;
+  }
+
+  currentChannels = updatedChannels;
+  const primary = currentChannels.find(c => c.is_primary);
+  if (primary) {
+    setActiveChannel(primary);
+  }
+
+  renderChannelList();
+  renderSettingsChannelList();
+  showToast('success', 'Glavni kanal je ažuriran!', '✅');
+}
+
+async function deleteConnectedChannel(channelId) {
+  const channelToDelete = currentChannels.find(c => c.id === channelId);
+  if (!channelToDelete) return;
+
+  const confirmCallback = async () => {
+    let updatedChannels = currentChannels.filter(c => c.id !== channelId);
+
+    // If we deleted the primary channel, assign a new primary
+    if (channelToDelete.is_primary && updatedChannels.length > 0) {
+      updatedChannels[0].is_primary = true;
+    }
+
+    const { error } = await sb.from('user_profiles')
+      .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+      .eq('id', currentUser.id);
+
+    if (error) {
+      showToast('error', 'Greška pri uklanjanju kanala.', '❌');
+      return;
+    }
+
+    currentChannels = updatedChannels;
+
+    if (activeChannel?.id === channelId) {
+      if (currentChannels.length > 0) {
+        setActiveChannel(currentChannels.find(c => c.is_primary) || currentChannels[0]);
+      } else {
+        activeChannel = null;
+        const nameDisplay = document.getElementById('channelNameDisplay');
+        if (nameDisplay) nameDisplay.textContent = 'Nema kanala';
+        const topbarDisplay = document.getElementById('topbarChannel');
+        if (topbarDisplay) topbarDisplay.textContent = '—';
+      }
+    }
+
+    renderChannelList();
+    renderSettingsChannelList();
+    showToast('success', 'Kanal je uspešno uklonjen.', '🗑️');
+  };
+
+  document.getElementById('confirmMsg').textContent = `Da li ste sigurni da želite da uklonite kanal @${channelToDelete.username}? Ovo se ne može poništiti.`;
+  document.getElementById('confirmDeleteBtn').onclick = () => { closeModal('confirmModal'); confirmCallback(); };
+  openModal('confirmModal');
+}
+
 function renderSettingsChannelList() {
   const listEl = document.getElementById('settingsChannelList');
   if (!listEl) return;
@@ -3377,76 +3525,6 @@ async function addNewChannel() {
   showToast('success', `Kanal @${newCh.username} je dodat!`, '✅');
 }
 
-async function makeChannelPrimary(channelId) {
-  const updatedChannels = currentChannels.map(c => ({
-    ...c,
-    is_primary: c.id === channelId
-  }));
-
-  const { error } = await sb.from('user_profiles')
-    .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
-    .eq('id', currentUser.id);
-
-  if (error) {
-    showToast('error', 'Greška pri postavljanju glavnog kanala.', '❌');
-    return;
-  }
-
-  currentChannels = updatedChannels;
-  const primary = currentChannels.find(c => c.is_primary);
-  if (primary) {
-    setActiveChannel(primary);
-  }
-
-  renderChannelList();
-  renderSettingsChannelList();
-  showToast('success', 'Glavni kanal je ažuriran!', '✅');
-}
-
-async function deleteConnectedChannel(channelId) {
-  const channelToDelete = currentChannels.find(c => c.id === channelId);
-  if (!channelToDelete) return;
-
-  confirmCallback = async () => {
-    let updatedChannels = currentChannels.filter(c => c.id !== channelId);
-
-    // If we deleted the primary channel, assign a new primary
-    if (channelToDelete.is_primary && updatedChannels.length > 0) {
-      updatedChannels[0].is_primary = true;
-    }
-
-    const { error } = await sb.from('user_profiles')
-      .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
-      .eq('id', currentUser.id);
-
-    if (error) {
-      showToast('error', 'Greška pri uklanjanju kanala.', '❌');
-      return;
-    }
-
-    currentChannels = updatedChannels;
-
-    if (activeChannel?.id === channelId) {
-      if (currentChannels.length > 0) {
-        setActiveChannel(currentChannels.find(c => c.is_primary) || currentChannels[0]);
-      } else {
-        activeChannel = null;
-        const nameDisplay = document.getElementById('channelNameDisplay');
-        if (nameDisplay) nameDisplay.textContent = 'Nema kanala';
-        const topbarDisplay = document.getElementById('topbarChannel');
-        if (topbarDisplay) topbarDisplay.textContent = '—';
-      }
-    }
-
-    renderChannelList();
-    renderSettingsChannelList();
-    showToast('success', 'Kanal je uspešno uklonjen.', '🗑️');
-  };
-
-  document.getElementById('confirmMsg').textContent = `Da li ste sigurni da želite da uklonite kanal @${channelToDelete.username}? Ovo se ne može poništiti.`;
-  document.getElementById('confirmDeleteBtn').onclick = () => { closeModal('confirmModal'); confirmCallback(); };
-  openModal('confirmModal');
-}
 
 function updateOverviewModulesUI() {
   const lbActive = document.getElementById('cfgLeaderboard')?.checked ?? true;
@@ -3493,7 +3571,12 @@ function startLiveActivityFeed() {
 
     try {
       const res = await fetch(`${getBotApiBase()}/api/kick/logs?chatroom_id=${activeChannel.id}`);
+      const dot = document.getElementById('botLiveFeedDot');
       if (res.ok) {
+        if (dot) {
+          dot.style.background = 'var(--kick-green)';
+          dot.style.boxShadow = '0 0 8px var(--kick-green)';
+        }
         const logs = await res.json();
         if (logs.length === 0) {
           feed.innerHTML = `
@@ -3513,19 +3596,39 @@ function startLiveActivityFeed() {
           else if (log.type === 'BOT') badgeColor = 'var(--kick-green)';
           else if (log.type === 'CHAT') badgeColor = '#10B981';
 
+          // Očisti poruku od prefiksa kanala (npr. [KickotBot] ili [Milan_567])
+          let cleanMessage = log.message || '';
+          if (activeChannel) {
+            const prefixRegex = new RegExp(`^\\[${activeChannel.username}\\]\\s*`, 'i');
+            cleanMessage = cleanMessage.replace(prefixRegex, '');
+            const atPrefixRegex = new RegExp(`^\\[@${activeChannel.username}\\]\\s*`, 'i');
+            cleanMessage = cleanMessage.replace(atPrefixRegex, '');
+          }
+
           return `
-            <div class="log-item" style="font-family: monospace; font-size: 0.78rem; padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.02); line-height: 1.4; white-space: pre-wrap; word-break: break-all; text-align: left;">
-              <span style="color: var(--text-muted); font-size: 0.7rem;">[${log.timestamp}]</span>
-              <span style="color: ${badgeColor}; font-weight: bold;">[${log.type}]</span>
-              <span style="color: #E2E8F0;">${escapeHtml(log.message)}</span>
+            <div class="log-item" style="display: flex; gap: 8px; align-items: flex-start; text-align: left; font-family: monospace; font-size: 0.78rem; padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.02); line-height: 1.4; width: 100%; box-sizing: border-box;">
+              <span style="color: var(--text-muted); flex-shrink: 0;">[${log.timestamp}]</span>
+              <span style="color: ${badgeColor}; font-weight: bold; flex-shrink: 0;">[${log.type}]</span>
+              <span style="color: #E2E8F0; word-break: break-all; flex-grow: 1;">${escapeHtml(cleanMessage)}</span>
             </div>
           `;
         }).join('');
 
         // Skroluj na dno da uvek prikazuje najnovije logove
         feed.scrollTop = feed.scrollHeight;
+      } else {
+        if (dot) {
+          dot.style.background = 'red';
+          dot.style.boxShadow = '0 0 8px red';
+        }
       }
-    } catch (_) {}
+    } catch (_) {
+      const dot = document.getElementById('botLiveFeedDot');
+      if (dot) {
+        dot.style.background = 'red';
+        dot.style.boxShadow = '0 0 8px red';
+      }
+    }
   }
 
   // Povuci odmah, pa na svake 3 sekunde
@@ -3601,6 +3704,76 @@ async function openKickLoginForChannel() {
   }).toString();
 
   window.location.href = authUrl;
+}
+
+let autosaveConfigDebounce = null;
+let autosaveModDebounce = null;
+
+function triggerAutosaveConfig() {
+  if (!configLoaded) return;
+  if (autosaveConfigDebounce) clearTimeout(autosaveConfigDebounce);
+  autosaveConfigDebounce = setTimeout(() => {
+    saveBotConfig(true);
+  }, 1000); // 1 sekunda debounce za stabilnost
+}
+
+function triggerAutosaveMod() {
+  if (!configLoaded) return;
+  if (autosaveModDebounce) clearTimeout(autosaveModDebounce);
+  autosaveModDebounce = setTimeout(() => {
+    saveModerationSettings(true);
+  }, 1000); // 1 sekunda debounce za stabilnost
+}
+
+function setupAutosave() {
+  // 1. Inputs koji okidaju saveBotConfig
+  const configInputIds = [
+    'cfgPrefix', 'cfgLanguage', 'cfgCooldown', 'cfgLeaderboard', 'cfgWatchtime',
+    'cfgGames', 'cfgLove', 'cfgModeration', 'cfgAutoresponse', 'cfgSpamThreshold',
+    'cfgSpamWindow', 'cfgPinMsg', 'cfgWelcomeMsg', 'cfgAnnounceInterval',
+    'cfgAnnounceThreshold', 'cfgAnnounceTimeEnabled', 'cfgAnnounceMsgEnabled'
+  ];
+
+  configInputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        // Instant vizuelni feedback za module
+        if (el.type === 'checkbox') {
+          updateOverviewModulesUI();
+          if (id === 'cfgModeration') {
+            toggleModerationPanelState();
+          }
+        }
+        triggerAutosaveConfig();
+      });
+      el.addEventListener('change', triggerAutosaveConfig);
+    }
+  });
+
+  // 2. Inputs koji okidaju saveModerationSettings
+  const modInputIds = [
+    'cfgModCapsEnabled', 'cfgModCapsPct', 'cfgModCapsMinLen',
+    'cfgModLinksEnabled', 'cfgModLinksWhitelist', 'cfgModLinksPermitEnabled',
+    'cfgModEmotesEnabled', 'cfgModEmotesMax',
+    'cfgModSymbolsEnabled', 'cfgModSymbolsPct', 'cfgModSymbolsMinLen',
+    'cfgModWordsEnabled', 'cfgModWordsList',
+    'cfgModSpamEnabled', 'cfgModSpamMaxDuplicates',
+    'cfgModMaxLenEnabled', 'cfgModMaxLenLimit',
+    'cfgModMentionsEnabled', 'cfgModMentionsLimit',
+    'cfgModActionType', 'cfgModTimeoutDuration',
+    'cfgModExemptVip', 'cfgModExemptSub'
+  ];
+
+  modInputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        triggerAutosaveMod();
+      });
+      el.addEventListener('change', triggerAutosaveMod);
+    }
+  });
 }
 
 initAuth();

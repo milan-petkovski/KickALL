@@ -13,6 +13,27 @@ const messenger = require('./src/messenger');
 const watchtime = require('./src/watchtime');
 const moderation = require('./src/moderation');
 
+let botUsernameResolved = config.BOT_USERNAME;
+
+async function detectBotUsername() {
+    if (!config.BEARER_TOKEN) return;
+    try {
+        const authHeader = config.BEARER_TOKEN.startsWith('Bearer ') ? config.BEARER_TOKEN : `Bearer ${config.BEARER_TOKEN}`;
+        const response = await fetch('https://id.kick.com/public/v1/users/me', {
+            headers: { 'Authorization': authHeader }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.username) {
+                botUsernameResolved = data.username;
+                utils.log('INFO', `Detektovano korisničko ime bota preko API-ja: @${botUsernameResolved}`);
+            }
+        }
+    } catch (err) {
+        utils.log('WARN', `Greška pri detekciji korisničkog ime bota: ${err.message}`);
+    }
+}
+
 function ukloniSrpskeDijakritike(str) {
     if (!str) return '';
     return str
@@ -48,6 +69,7 @@ function pronadjiCustomKomandu(channelState, cmdImeRaw) {
 }
 
 async function obradiCustomKomandu(chatroomId, username, porukaNormalized, channelState) {
+    if (channelState.feature_autoresponse === false) return false;
     if (!porukaNormalized.startsWith(channelState.PREFIX || '!')) return false;
 
     const cmdImeRaw = porukaNormalized.slice((channelState.PREFIX || '!').length).trim();
@@ -167,13 +189,13 @@ function povezi() {
             const isBotMsg = chatData.sender.is_bot || false;
 
             // Logujemo samo poruke drugih korisnika
-            if (username.toLowerCase() !== config.BOT_USERNAME.toLowerCase()) {
+            if (username.toLowerCase() !== botUsernameResolved.toLowerCase()) {
                 utils.log('CHAT', `[@${channelState.channelUsername || chatroomId}] ${username}: ${poruka}`);
             }
 
             // Preskačemo sopstvene poruke i poznate botove
             const userKey = username.toLowerCase();
-            if (isBotMsg || userKey === config.BOT_USERNAME.toLowerCase() || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs') {
+            if (isBotMsg || userKey === botUsernameResolved.toLowerCase() || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs') {
                 return;
             }
 
@@ -217,19 +239,20 @@ function povezi() {
                 watchtime.registrujAktivnogGledaoca(chatroomId, username);
             }
 
-            // Normalizujemo poruku da uvek interno počinje sa '!' radi kompatibilnosti sa ugrađenim komandama
-            let normalizovanaPoruka = porukaSredjena;
-            if (startsWithPrefix && prefix !== '!') {
-                normalizovanaPoruka = '!' + porukaSredjena.slice(prefix.length);
+            // Ako poruka ne počinje sa ispravnim prefiksom, proveravamo samo mentove, a sve ostale komande preskačemo
+            const porukaLowerOriginal = porukaSredjena.toLowerCase();
+            if (!startsWithPrefix) {
+                if (channelState.feature_autoresponse !== false && porukaLowerOriginal.includes('@' + botUsernameResolved.toLowerCase())) {
+                    const ment = commands.handleBotMentions(chatroomId, username, porukaLowerOriginal);
+                    if (ment) return;
+                }
+                return;
             }
+
+            // Normalizujemo poruku da uvek interno počinje sa '!' radi kompatibilnosti sa ugrađenim komandama
+            let normalizovanaPoruka = '!' + porukaSredjena.slice(prefix.length);
             const porukaLower = normalizovanaPoruka.toLowerCase();
             const porukaNormalized = ukloniSrpskeDijakritike(porukaLower);
-
-            // Komunikacija sa botom (@bot_username)
-            if (channelState.feature_autoresponse !== false && !startsWithPrefix && porukaLower.includes('@' + config.BOT_USERNAME.toLowerCase())) {
-                const ment = commands.handleBotMentions(chatroomId, username, porukaLower);
-                if (ment) return;
-            }
 
             // Auto-announce brojač po broju poruka
             if (channelState.isStreamLive && channelState.announce_msg_enabled) {
@@ -263,6 +286,7 @@ function povezi() {
             }
 
             if (porukaNormalized === '!igra') {
+                if (channelState.feature_games === false) return;
                 if (utils.proveraKulauna(chatroomId, '!igra', username)) return;
                 commands.handleIgra(chatroomId);
                 return;
@@ -1165,7 +1189,7 @@ http.createServer(async (req, res) => {
                     }
 
                     // Izvrši slanje sinhrono da vidimo da li uspeva
-                    await messenger.izvrsiSlanje(chatroomId, '🤖 Kickot Bot: Veza je uspešno testirana! 🟢');
+                    await messenger.izvrsiSlanje(chatroomId, '🤖 Veza je uspešno testirana! 🟢');
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true, message: 'Test message sent' }));
@@ -1231,6 +1255,7 @@ setInterval(() => {
 // ─── START ────────────────────────────────────────────────────────────────────
 async function start() {
     utils.log('INFO', '🤖 Multi-channel Kick bot se pokreće...');
+    await detectBotUsername();
 
     if (database.KORISTI_SUPABASE && database.supabase) {
         // 1. Učitaj sve kanale koji imaju aktivnog bota
