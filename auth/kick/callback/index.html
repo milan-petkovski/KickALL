@@ -3,6 +3,17 @@
 
 <head>
   <meta charset="UTF-8" />
+  <script>
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const error = params.get('error');
+      if (code || error) {
+        const baseRedirectPath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/Website' : '';
+        window.location.replace(`${baseRedirectPath}/kickot/dashboard.html` + window.location.search);
+      }
+    })();
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kickot — OAuth autorizacija</title>
   <link rel="icon" href="/Website/kickot/assets/favicon.ico" type="image/x-icon">

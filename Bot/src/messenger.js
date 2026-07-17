@@ -33,7 +33,9 @@ async function processQueue(chatroomId) {
 }
 
 async function izvrsiSlanje(chatroomId, tekst) {
-    const response = await fetch(`https://kick.com/api/v2/messages/send/${chatroomId}`, {
+    const channelState = state.getChannelState(chatroomId);
+    const sendRoomId = (channelState && channelState.realChatroomId) ? channelState.realChatroomId : chatroomId;
+    const response = await fetch(`https://kick.com/api/v2/messages/send/${sendRoomId}`, {
         method: 'POST',
         headers: {
             'accept':        'application/json',
@@ -50,7 +52,6 @@ async function izvrsiSlanje(chatroomId, tekst) {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    const channelState = state.getChannelState(chatroomId);
     log('BOT', `[${(channelState && channelState.channelUsername) || chatroomId}] ${tekst}`);
 
     try {
@@ -147,9 +148,10 @@ async function obrisiPoruku(chatroomId, messageId) {
     if (!chatroomId || !messageId) return;
     const channelState = state.getChannelState(chatroomId);
     const channelName = channelState ? channelState.channelUsername : chatroomId;
+    const sendRoomId = (channelState && channelState.realChatroomId) ? channelState.realChatroomId : chatroomId;
     
     try {
-        const response = await fetch(`https://kick.com/api/v2/chatrooms/${chatroomId}/messages/${messageId}`, {
+        const response = await fetch(`https://kick.com/api/v2/chatrooms/${sendRoomId}/messages/${messageId}`, {
             method: 'DELETE',
             headers: {
                 'accept':        'application/json',
@@ -176,5 +178,6 @@ module.exports = {
     posaljiIPinujPoruku,
     pinujPoruku,
     odpinujPoruku,
-    obrisiPoruku
+    obrisiPoruku,
+    izvrsiSlanje
 };

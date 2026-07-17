@@ -116,27 +116,188 @@ let commandsLimit = parseInt(localStorage.getItem('cmd-items-per-page')) || 10;
 // ═══════════════════════════════════════════════════════════
 async function initAuth() {
   try {
-    // ── Proveri da li dolazimo sa Kick OAuth callbacka ────────────────
     const urlParams = new URLSearchParams(window.location.search);
-    const isKickOAuth = urlParams.get('kick_oauth') === '1';
+    const code = urlParams.get('code');
+    const oauthError = urlParams.get('error');
+
+    if (oauthError) {
+      document.getElementById('authGateMsg').textContent = 'Kick odbio autorizaciju...';
+      showToast('error', `Kick odbio autorizaciju: ${oauthError}`, '❌');
+      setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+      return;
+    }
+
+    if (code) {
+      document.getElementById('authGateMsg').textContent = 'Autorizacija u toku...';
+      
+      const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
+      const stateParam = urlParams.get('state');
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      
+      if (!isLocalhost && (!stateParam || stateParam !== savedState)) {
+        document.getElementById('authGateMsg').textContent = 'Nevalidan state parametar...';
+        showToast('error', 'State parametar se ne podudara.', '❌');
+        setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+        return;
+      }
+
+      const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
+      const redirectUri = (() => {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          return `${window.location.origin}/auth/kick/callback/`;
+        }
+        return `${window.location.origin}/auth/kick/callback`;
+      })();
+
+      const kickApiBase = (() => {
+        const fromGlobal = (window.KICK_API_BASE || '').trim();
+        if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          return 'https://kickbot-ihzb.onrender.com';
+        }
+        return `${window.location.origin}`;
+      })();
+
+      try {
+        const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: redirectUri
+          }).toString()
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
+          document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
+          showToast('error', err.detail || err.error || 'Server nedostupan', '❌');
+          setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+          return;
+        }
+
+        const tokenData = await res.json();
+        if (!tokenData.access_token) {
+          document.getElementById('authGateMsg').textContent = 'Token nije primljen...';
+          showToast('error', 'Nije primljen access_token', '❌');
+          setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+          return;
+        }
+
+        sessionStorage.setItem('kick_access_token', tokenData.access_token);
+        
+        const intent = sessionStorage.getItem('kick_oauth_intent') || 'login';
+        const addChannelUid = sessionStorage.getItem('kick_add_channel_uid') || '';
+
+        sessionStorage.removeItem('kick_oauth_state');
+        sessionStorage.removeItem('kick_code_verifier');
+        sessionStorage.removeItem('kick_oauth_intent');
+        sessionStorage.removeItem('kick_add_channel_uid');
+        sessionStorage.removeItem('kick_oauth_source');
+        localStorage.removeItem('kick_oauth_state');
+        localStorage.removeItem('kick_code_verifier');
+
+        if (intent === 'add_channel' && addChannelUid) {
+          document.getElementById('authGateMsg').textContent = 'Dodavanje kanala...';
+
+          const { data: { session } } = await sb.auth.getSession();
+          if (session) {
+            currentUser = session.user;
+          } else {
+            currentUser = { id: addChannelUid };
+          }
+
+          const userRes = await fetch(`${kickApiBase}/api/kick/me`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+          });
+
+          let kickUser = null;
+          if (userRes.ok) {
+            kickUser = await userRes.json();
+          }
+
+          if (!kickUser || (!kickUser.id && !kickUser.chatroom_id)) {
+            document.getElementById('authGateMsg').textContent = 'Greška: podaci kanala nedostupni...';
+            showToast('error', 'Nije moguće preuzeti podatke kanala sa Kick platforme.', '❌');
+            setTimeout(() => { window.location.href = 'dashboard.html?settings=channels'; }, 3000);
+            return;
+          }
+
+          const { data: profile } = await sb.from('user_profiles')
+            .select('kick_channels')
+            .eq('id', addChannelUid)
+            .maybeSingle();
+
+          const existingChannels = profile?.kick_channels || [];
+          const channelId = String(kickUser.chatroom_id || kickUser.id);
+          const channelSlug = kickUser.slug || kickUser.username || channelId;
+
+          if (existingChannels.some(c => c.id === channelId)) {
+            showToast('info', `@${channelSlug} je već dodat na tvoj profil.`, 'ℹ️');
+            const cleanUrl = window.location.pathname + '?settings=channels';
+            window.history.replaceState({}, '', cleanUrl);
+            await initApp();
+            return;
+          }
+
+          const newChannel = {
+            id: channelId,
+            username: channelSlug,
+            avatar: kickUser.avatar || kickUser.profile_pic || null,
+            is_primary: existingChannels.length === 0,
+            kick_access_token: tokenData.access_token
+          };
+
+          const updatedChannels = [...existingChannels, newChannel];
+
+          const { error: dbErr } = await sb.from('user_profiles')
+            .update({ kick_channels: updatedChannels, updated_at: new Date().toISOString() })
+            .eq('id', addChannelUid);
+
+          if (dbErr) {
+            document.getElementById('authGateMsg').textContent = 'Greška pri čuvanju u bazu...';
+            showToast('error', dbErr.message, '❌');
+            setTimeout(() => { window.location.href = 'dashboard.html?settings=channels'; }, 3000);
+            return;
+          }
+
+          showToast('success', `Kanal @${channelSlug} uspešno dodat!`, '✅');
+          const cleanUrl = window.location.pathname + '?settings=channels';
+          window.history.replaceState({}, '', cleanUrl);
+          await initApp();
+          return;
+        }
+
+        await handleKickOAuthSession(tokenData.access_token);
+        return;
+      } catch (err) {
+        document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
+        showToast('error', err.message, '❌');
+        setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+        return;
+      }
+    }
+
+    // ── Standardna provera tokena ──────────────────────────────────────
     const kickAccessToken = sessionStorage.getItem('kick_access_token');
+    const urlParamsOAuth = urlParams.get('kick_oauth') === '1';
 
-    if (isKickOAuth && kickAccessToken) {
+    if (urlParamsOAuth && kickAccessToken) {
       document.getElementById('authGateMsg').textContent = 'Učitavamo tvoj Kick profil...';
-
       try {
         await handleKickOAuthSession(kickAccessToken);
         return;
       } catch (kickErr) {
         console.warn('Kick OAuth sesija nije uspela, proveravamo standardnu sesiju:', kickErr);
-        // Pad-through na standardnu proveru sesije
       }
     }
 
     // ── Standardna Supabase sesija ─────────────────────────────────────
     const { data: { session } } = await sb.auth.getSession();
     if (!session) {
-      document.getElementById('authGateMsg').textContent = 'Preusmerjavanje na prijavu...';
+      document.getElementById('authGateMsg').textContent = 'Preusmeravanje na prijavu...';
       setTimeout(() => { window.location.href = 'index.html?login=1'; }, 1200);
       return;
     }
@@ -445,7 +606,7 @@ async function loadUserProfile() {
 async function fetchKickAvatar(username) {
   // 1. Pokušaj preko lokalnog bot API servera (koristi got-scraping, radi 100% bez Cloudflare blokade)
   try {
-    const localRes = await fetch(`http://localhost:3000/api/avatar?username=${username}`);
+    const localRes = await fetch(`${getBotApiBase()}/api/avatar?username=${username}`);
     if (localRes.ok) {
       const localData = await localRes.json();
       if (localData?.avatar) {
@@ -622,7 +783,10 @@ function renderChannelList() {
       div.innerHTML = `
         ${avatarHtml}
         <span class="ch-name" style="display: flex; align-items: center; gap: 4px;">
-          ${ch.username} <span style="font-size: 0.75rem;" title="Menadžer kanala">🛠️</span>
+          ${ch.username} 
+          <svg style="width: 13px; height: 13px; fill: none; stroke: #a78bfa; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; display: inline-block;" viewBox="0 0 24 24" title="Menadžer kanala">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+          </svg>
         </span>
         ${activeChannel?.id === ch.id ? '<span class="ch-check">✓</span>' : ''}
       `;
@@ -691,7 +855,7 @@ async function resolveChatroomId(username) {
 
   // 1. Pokušavamo preko lokalnog bota
   try {
-    const localRes = await fetch(`http://localhost:3000/api/avatar?username=${username}`);
+    const localRes = await fetch(`${getBotApiBase()}/api/avatar?username=${username}`);
     if (localRes.ok) {
       const localData = await localRes.json();
       if (localData && localData.chatroom_id) {
@@ -1911,8 +2075,10 @@ function toggleModerationPanelState() {
 }
 
 function getBotApiBase() {
+  const fromGlobal = (window.KICK_API_BASE || '').trim();
+  if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:3000';
+    return 'https://kickbot-ihzb.onrender.com';
   }
   return window.location.origin;
 }
@@ -2074,14 +2240,31 @@ function toggleBotActiveFromCtrl() {
 }
 
 function testBotConnection() {
-  showToast('info', 'Testiram vezu sa Kick serverima...', '🔄');
-  setTimeout(() => {
-    if (activeChannel) {
-      showToast('success', `Uspostavljena veza sa @${activeChannel.username}!`, '✅');
+  if (!activeChannel) {
+    showToast('error', 'Nije izabran nijedan kanal za testiranje.', '❌');
+    return;
+  }
+
+  showToast('info', 'Testiram vezu i šaljem ping u chat...', '🔄');
+
+  const kickApiBase = getBotApiBase();
+
+  fetch(`${kickApiBase}/api/kick/test-ping`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ chatroom_id: activeChannel.id }).toString()
+  })
+  .then(async (res) => {
+    if (res.ok) {
+      showToast('success', `Uspešno testirano! Ping poruka poslata u @${activeChannel.username} chat.`, '✅');
     } else {
-      showToast('error', 'Nije izabran nijedan kanal za testiranje.', '❌');
+      const err = await res.json().catch(() => ({ error: 'Greška na serveru' }));
+      showToast('error', `Greška pri slanju pinga: ${err.detail || err.error || 'Neuspešan HTTP zahtev'}`, '❌');
     }
-  }, 1200);
+  })
+  .catch((err) => {
+    showToast('error', `Nije moguće kontaktirati bot server: ${err.message}`, '❌');
+  });
 }
 
 async function toggleBotActive() {
@@ -2126,6 +2309,19 @@ async function loadChannelLiveStatus() {
 
 async function fetchKickLiveStatus() {
   if (!activeChannel) return;
+
+  // 1. Pokušaj preko našeg lokalnog bot servera (zaobilazi CORS i Cloudflare)
+  try {
+    const kickApiBase = getBotApiBase();
+
+    const localRes = await fetch(`${kickApiBase}/api/kick/channel?username=${activeChannel.username}`);
+    if (localRes.ok) {
+      const data = await localRes.json();
+      const isLive = data?.livestream !== null && data?.livestream !== undefined;
+      updateLiveStatusUI(isLive);
+      return;
+    }
+  } catch (_) {}
 
   const apiUrl = `https://kick.com/api/v2/channels/${activeChannel.username}`;
   const cacheBust = `&_t=${Date.now()}`;
@@ -2937,7 +3133,7 @@ function renderSettingsManagersList() {
 
     item.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;">
-        <div style="width:24px;height:24px;border-radius:50%;background:var(--app-gradient);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;">
+        <div class="manager-avatar" data-username="${m}" style="width:24px;height:24px;border-radius:50%;background:var(--app-gradient);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;background-size:cover;background-position:center;">
           ${m.charAt(0).toUpperCase()}
         </div>
         <span style="font-weight:600;font-size:0.85rem;">${escapeHtml(m)}</span>
@@ -2945,6 +3141,17 @@ function renderSettingsManagersList() {
       <button class="btn btn-sm btn-danger" onclick="removeChannelManager('${escapeHtml(m)}')" style="padding: 2px 8px; font-size: 0.75rem;">Ukloni</button>
     `;
     listEl.appendChild(item);
+
+    // Dohvati profilnu sliku menadžera u pozadini
+    fetchKickAvatar(m).then(avatarUrl => {
+      if (avatarUrl) {
+        const avatarEl = item.querySelector(`.manager-avatar[data-username="${m}"]`);
+        if (avatarEl) {
+          avatarEl.style.backgroundImage = `url("${avatarUrl}")`;
+          avatarEl.textContent = '';
+        }
+      }
+    }).catch(() => {});
   });
 }
 
@@ -3275,11 +3482,55 @@ function startLiveActivityFeed() {
     liveFeedInterval = null;
   }
 
-  feed.innerHTML = `
-    <div style="color: var(--text-muted); text-align: center; padding-top: 60px; font-style: italic; font-size: 0.85rem;">
-      Čekam prve aktivnosti...
-    </div>
-  `;
+  // Omogući autoscroll po defaultu i podešavanje visine za skrolovanje
+  feed.style.overflowY = 'auto';
+  feed.style.display = 'flex';
+  feed.style.flexDirection = 'column';
+  feed.style.gap = '2px';
+
+  async function fetchLogs() {
+    if (!activeChannel) return;
+
+    try {
+      const res = await fetch(`${getBotApiBase()}/api/kick/logs?chatroom_id=${activeChannel.id}`);
+      if (res.ok) {
+        const logs = await res.json();
+        if (logs.length === 0) {
+          feed.innerHTML = `
+            <div style="color: var(--text-muted); text-align: center; padding-top: 60px; font-style: italic; font-size: 0.85rem;">
+              Čekam prve aktivnosti...
+            </div>
+          `;
+          return;
+        }
+
+        // Renderuj logove
+        feed.innerHTML = logs.map(log => {
+          let badgeColor = 'var(--text-muted)';
+          if (log.type === 'ERR') badgeColor = '#EF4444';
+          else if (log.type === 'WARN') badgeColor = '#F59E0B';
+          else if (log.type === 'INFO') badgeColor = '#3B82F6';
+          else if (log.type === 'BOT') badgeColor = 'var(--kick-green)';
+          else if (log.type === 'CHAT') badgeColor = '#10B981';
+
+          return `
+            <div class="log-item" style="font-family: monospace; font-size: 0.78rem; padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.02); line-height: 1.4; white-space: pre-wrap; word-break: break-all; text-align: left;">
+              <span style="color: var(--text-muted); font-size: 0.7rem;">[${log.timestamp}]</span>
+              <span style="color: ${badgeColor}; font-weight: bold;">[${log.type}]</span>
+              <span style="color: #E2E8F0;">${escapeHtml(log.message)}</span>
+            </div>
+          `;
+        }).join('');
+
+        // Skroluj na dno da uvek prikazuje najnovije logove
+        feed.scrollTop = feed.scrollHeight;
+      }
+    } catch (_) {}
+  }
+
+  // Povuci odmah, pa na svake 3 sekunde
+  fetchLogs();
+  liveFeedInterval = setInterval(fetchLogs, 3000);
 }
 
 // ── Kick OAuth Helperi za dodavanje kanala ─────────────────────────────────
@@ -3318,7 +3569,7 @@ async function generateCodeChallenge(v) {
 
 function getKickRedirectUri() {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.origin}/auth/kick/callback`;
+    return `${window.location.origin}/auth/kick/callback/`;
   }
   return `${window.location.origin}/auth/kick/callback`;
 }

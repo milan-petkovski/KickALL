@@ -9,6 +9,15 @@ function log(tip, poruka) {
     const boje = { BOT: '\x1b[36m', CHAT: '\x1b[32m', INFO: '\x1b[33m', ERR: '\x1b[31m', WARN: '\x1b[35m' };
     const boja = boje[tip] || '\x1b[37m';
     console.log(`\x1b[90m[${vreme}]\x1b[0m ${boja}[${tip}]\x1b[0m ${poruka}`);
+
+    // Baferuj logove u state za prikaz na dashboard-u
+    try {
+        state.globalLogs = state.globalLogs || [];
+        state.globalLogs.push({ timestamp: vreme, type: tip, message: poruka });
+        if (state.globalLogs.length > 50) {
+            state.globalLogs.shift();
+        }
+    } catch (_) {}
 }
 
 /**

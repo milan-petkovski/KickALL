@@ -99,9 +99,11 @@ function povezi() {
         state.isConnected = true;
 
         for (const chatroomId of Object.keys(state.channels)) {
+            const channelState = state.channels[chatroomId];
+            const subId = channelState.realChatroomId || chatroomId;
             state.ws.send(JSON.stringify({
                 event: 'pusher:subscribe',
-                data: { channel: `chatrooms.${chatroomId}.v2` }
+                data: { channel: `chatrooms.${subId}.v2` }
             }));
         }
 
@@ -144,7 +146,16 @@ function povezi() {
             // Ekstrakcija chatroom ID-ja iz koverte Pusher kanala
             const match = response.channel.match(/^chatrooms\.(\d+)\.v2$/);
             if (!match) return;
-            const chatroomId = match[1];
+            const pusherChatroomId = match[1];
+
+            // Nađimo odgovarajući interni chatroomId (baza/state ključ)
+            let chatroomId = Object.keys(state.channels).find(k => {
+                const cs = state.channels[k];
+                return cs.realChatroomId === pusherChatroomId || k === pusherChatroomId;
+            });
+            if (!chatroomId) {
+                chatroomId = pusherChatroomId;
+            }
 
             const channelState = state.getChannelState(chatroomId);
             if (!channelState || !channelState.botActive) {
@@ -704,6 +715,22 @@ async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
     const channelState = state.getChannelState(chatroomId);
     channelState.channelUsername = channelUsername;
 
+    // Dohvatamo pravi chatroom ID sa Kick API-ja za pretplatu na WS i slanje poruka
+    let realChatroomId = chatroomId;
+    try {
+        const res = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data?.chatroom?.id) {
+                realChatroomId = String(data.chatroom.id);
+                utils.log('INFO', `[${channelUsername}] Nađen pravi chatroom ID: ${realChatroomId} (baza: ${chatroomId})`);
+            }
+        }
+    } catch (e) {
+        utils.log('ERR', `[${channelUsername}] Greška pri pronalaženju pravog chatroom ID-ja: ${e.message}`);
+    }
+    channelState.realChatroomId = realChatroomId;
+
     // Primenjujemo konfiguraciju iz baze
     azurirajKonfiguracijuKanala(channelState, dbConfig);
 
@@ -717,7 +744,7 @@ async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
     if (state.isConnected && state.ws && state.ws.readyState === WebSocket.OPEN) {
         state.ws.send(JSON.stringify({
             event: 'pusher:subscribe',
-            data: { channel: `chatrooms.${chatroomId}.v2` }
+            data: { channel: `chatrooms.${channelState.realChatroomId || chatroomId}.v2` }
         }));
     }
 
@@ -747,9 +774,10 @@ async function zaustaviKanal(chatroomId) {
 
     // Otkazivanje pretplate sa četa
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+        const subId = channelState.realChatroomId || chatroomId;
         state.ws.send(JSON.stringify({
             event: 'pusher:unsubscribe',
-            data: { channel: `chatrooms.${chatroomId}.v2` }
+            data: { channel: `chatrooms.${subId}.v2` }
         }));
     }
 
@@ -1078,6 +1106,77 @@ http.createServer(async (req, res) => {
                 return;
             }
         }
+
+        if (parsedUrl.pathname === '/api/kick/channel') {
+            const username = parsedUrl.searchParams.get('username');
+            if (!username) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing username parameter' }));
+                return;
+            }
+
+            try {
+                const apiRes = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${username}`);
+                if (apiRes.ok) {
+                    const data = await apiRes.json();
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(data));
+                } else {
+                    res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: `Kick API returned status ${apiRes.status}` }));
+                }
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+            return;
+        }
+
+        if (parsedUrl.pathname === '/api/kick/logs' && req.method === 'GET') {
+            const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
+            const channelState = chatroomId ? state.getChannelState(chatroomId) : null;
+            const channelUsername = channelState ? channelState.channelUsername : null;
+
+            let filteredLogs = state.globalLogs || [];
+            if (channelUsername) {
+                const lowerUsername = channelUsername.toLowerCase();
+                filteredLogs = filteredLogs.filter(l => 
+                    (l.message && l.message.toLowerCase().includes(`[${lowerUsername}]`)) ||
+                    (l.message && l.message.toLowerCase().includes(`@${lowerUsername}`))
+                );
+            }
+
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(filteredLogs));
+            return;
+        }
+
+        if (parsedUrl.pathname === '/api/kick/test-ping' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk.toString(); });
+            req.on('end', async () => {
+                try {
+                    const params = new URLSearchParams(body);
+                    const chatroomId = params.get('chatroom_id');
+                    if (!chatroomId) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Missing chatroom_id parameter' }));
+                        return;
+                    }
+
+                    // Izvrši slanje sinhrono da vidimo da li uspeva
+                    await messenger.izvrsiSlanje(chatroomId, '🤖 Kickot Bot: Veza je uspešno testirana! 🟢');
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, message: 'Test message sent' }));
+                } catch (err) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Failed to send message', detail: err.message }));
+                }
+            });
+            return;
+        }
+
         if (parsedUrl.pathname === '/api/kick/reload') {
             const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
             if (!chatroomId) {

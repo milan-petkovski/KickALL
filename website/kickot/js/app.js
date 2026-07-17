@@ -613,7 +613,7 @@ async function generateCodeChallenge(v) {
 
 function getKickRedirectUri() {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.origin}/auth/kick/callback`;
+    return `${window.location.origin}/auth/kick/callback/`;
   }
   return `${window.location.origin}/auth/kick/callback`;
 }
@@ -890,7 +890,7 @@ async function handleKickLoginSubmit() {
 async function fetchKickChannelData(username) {
   // 1. Pokušaj preko lokalnog bot API servera
   try {
-    const localRes = await fetch(`http://localhost:3000/api/avatar?username=${username}`);
+    const localRes = await fetch(`https://kickbot-ihzb.onrender.com/api/avatar?username=${username}`);
     if (localRes.ok) {
       const d = await localRes.json();
       if (d && d.bio !== undefined) {
