@@ -883,23 +883,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Set avatar
                         const avatarUrl = user?.user_metadata?.avatar_url;
                         if (userAvatar) {
-                            if (avatarUrl) {
-                                userAvatar.src = avatarUrl;
-                                userAvatar.style.display = 'block';
-                                const existingFallback = userMenu.querySelector('.user-avatar-fallback');
-                                if (existingFallback) existingFallback.remove();
+                            if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:image'))) {
+                                userAvatar.style.backgroundImage = `url("${avatarUrl}")`;
+                                userAvatar.style.backgroundSize = 'cover';
+                                userAvatar.style.backgroundPosition = 'center';
+                                userAvatar.textContent = '';
                             } else {
-                                userAvatar.src = '';
-                                userAvatar.style.display = 'none';
-                                let fallbackAvatar = userMenu.querySelector('.user-avatar-fallback');
-                                if (!fallbackAvatar) {
-                                    fallbackAvatar = document.createElement('div');
-                                    fallbackAvatar.className = 'user-avatar user-avatar-fallback';
-                                    fallbackAvatar.textContent = displayName.charAt(0).toUpperCase();
-                                    userAvatar.parentNode.insertBefore(fallbackAvatar, userAvatar);
-                                } else {
-                                    fallbackAvatar.textContent = displayName.charAt(0).toUpperCase();
-                                }
+                                userAvatar.style.backgroundImage = 'none';
+                                userAvatar.textContent = displayName.charAt(0).toUpperCase();
                             }
                         }
 
@@ -910,11 +901,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     if (heroBtnPrimary) {
-                        heroBtnPrimary.href = 'kickot/index.html';
-                        heroBtnPrimary.innerHTML = `
-                            <span class="lang-sr">Idi na Profil →</span>
-                            <span class="lang-en">Go to Profile →</span>
+                        heroBtnPrimary.href = 'dashboard.html';
+                    }
+                    const heroBtnPrimaryText = document.getElementById('heroBtnPrimaryText');
+                    if (heroBtnPrimaryText) {
+                        heroBtnPrimaryText.innerHTML = `
+                            <span class="lang-sr">Idi na Dashboard</span>
+                            <span class="lang-en">Go to Dashboard</span>
                         `;
+                    }
+                    const kickotCard = document.querySelector('.module-card.card-active');
+                    if (kickotCard) {
+                        kickotCard.href = 'kickot/dashboard.html';
                     }
                     return;
                 }
@@ -933,9 +931,114 @@ document.addEventListener('DOMContentLoaded', () => {
         if (userMenu) {
             userMenu.style.display = 'none';
         }
+        if (heroBtnPrimary) {
+            heroBtnPrimary.href = 'kickot/index.html';
+        }
+        const heroBtnPrimaryText = document.getElementById('heroBtnPrimaryText');
+        if (heroBtnPrimaryText) {
+            heroBtnPrimaryText.innerHTML = `
+                <span class="lang-sr">Počni besplatno</span>
+                <span class="lang-en">Get started free</span>
+            `;
+        }
+        const kickotCard = document.querySelector('.module-card.card-active');
+        if (kickotCard) {
+            kickotCard.href = 'kickot/index.html';
+        }
+    }
+
+    async function sha256(plain) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(plain);
+        return window.crypto.subtle.digest('SHA-256', data);
+    }
+
+    function base64urlencode(a) {
+        let str = "";
+        const bytes = new Uint8Array(a);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+            str += String.fromCharCode(bytes[i]);
+        }
+        return btoa(str)
+            .replace(/\+/g, "-")
+            .replace(/\//g, "_")
+            .replace(/=+$/, "");
+    }
+
+    function generateRandomString(length) {
+        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+        let text = '';
+        for (let i = 0; i < length; i++) {
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
+    }
+
+    function getKickRedirectUri() {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return `${window.location.origin}/auth/kick/callback/`;
+        }
+        return `${window.location.origin}/auth/kick/callback`;
+    }
+
+    async function generateCodeChallenge(v) {
+        const hashed = await sha256(v);
+        return base64urlencode(hashed);
+    }
+
+    async function openKickLogin() {
+        const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
+        const KICK_REDIRECT_URI = getKickRedirectUri();
+        const KICK_SCOPE = 'user:read';
+
+        const state = generateRandomString(16);
+        const codeVerifier = generateRandomString(64);
+        const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+        localStorage.setItem('kick_oauth_state', state);
+        localStorage.setItem('kick_code_verifier', codeVerifier);
+        sessionStorage.setItem('from_kickall', 'true');
+
+        const authUrl = `https://id.kick.com/oauth/authorize?` + new URLSearchParams({
+            response_type: 'code',
+            client_id: KICK_CLIENT_ID,
+            redirect_uri: KICK_REDIRECT_URI,
+            scope: KICK_SCOPE,
+            state: state,
+            code_challenge: codeChallenge,
+            code_challenge_method: 'S256'
+        }).toString();
+
+        window.location.href = authUrl;
+    }
+
+    if (navBtnLogin) {
+        navBtnLogin.addEventListener('click', (e) => {
+            e.preventDefault();
+            openKickLogin();
+        });
     }
 
     checkAuthSession();
+
+    // Auto-select tab and scroll if tab param is present in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlTab = urlParams.get('tab');
+    if (urlTab) {
+        setTimeout(() => {
+            switchTab(urlTab);
+            const playgroundSection = document.getElementById('playground');
+            if (playgroundSection) {
+                playgroundSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            if (mainPlayground) {
+                setTimeout(() => {
+                    triggerFlashEffect(mainPlayground);
+                }, 600);
+            }
+        }, 300);
+    }
 
     // Toggle menu
     const userMenu = document.getElementById('userMenu');

@@ -290,6 +290,13 @@ function setLang(lang) {
     if (text) el.placeholder = text;
   });
 
+  // Ako je korisnik ulogovan, prilagodi i hero dugme jeziku
+  const heroPrimaryBtn = document.getElementById('heroPrimaryBtn');
+  const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
+  if (heroPrimaryBtn && heroPrimaryBtnText && currentUser) {
+    heroPrimaryBtnText.textContent = lang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard';
+  }
+
   document.getElementById('btn-sr').classList.toggle('active', lang === 'sr');
   document.getElementById('btn-en').classList.toggle('active', lang === 'en');
 
@@ -877,7 +884,8 @@ async function handleKickLoginSubmit() {
       closeModal();
       onUserChange(data.user);
       setTimeout(() => {
-        window.location.href = 'dashboard.html';
+        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
+        window.location.href = fromKickAll ? '../dashboard.html' : 'dashboard.html';
       }, 800);
     }
   } catch (err) {
@@ -1116,6 +1124,10 @@ async function handleLogin() {
       showToast('success', t('auth.login.success'), '👋');
       closeModal();
       onUserChange(data.user);
+      setTimeout(() => {
+        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
+        window.location.href = fromKickAll ? '../dashboard.html' : 'dashboard.html';
+      }, 800);
     }
   } catch (err) {
     showFormAlert('loginError', t('auth.err.generic'));
@@ -1177,6 +1189,10 @@ async function handleSignup() {
       showToast('success', t('auth.signup.success'), '🎉');
       closeModal();
       onUserChange(user);
+      setTimeout(() => {
+        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
+        window.location.href = fromKickAll ? '../dashboard.html' : 'dashboard.html';
+      }, 800);
     }
 
   } catch (err) {
@@ -1252,9 +1268,27 @@ function onUserChange(user) {
       userAvatar.style.backgroundImage = 'none';
       userAvatar.textContent = avatarVal;
     }
+
+    // Dynamic hero button update
+    const heroPrimaryBtn = document.getElementById('heroPrimaryBtn');
+    const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
+    if (heroPrimaryBtn && heroPrimaryBtnText) {
+      heroPrimaryBtn.onclick = () => { window.location.href = 'dashboard.html'; };
+      heroPrimaryBtnText.textContent = currentLang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard';
+      heroPrimaryBtnText.removeAttribute('data-i18n');
+    }
   } else {
     guestNav.style.display = 'flex';
     userMenu.classList.remove('visible');
+
+    // Reset hero button update
+    const heroPrimaryBtn = document.getElementById('heroPrimaryBtn');
+    const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
+    if (heroPrimaryBtn && heroPrimaryBtnText) {
+      heroPrimaryBtn.onclick = () => { openModal('login'); };
+      heroPrimaryBtnText.setAttribute('data-i18n', 'hero.cta.primary');
+      heroPrimaryBtnText.textContent = currentLang === 'sr' ? 'Počni besplatno' : 'Get started free';
+    }
   }
 }
 
@@ -1642,6 +1676,15 @@ if (window.location.search.includes('settings=channels')) {
 sb.auth.onAuthStateChange((event, session) => {
   onUserChange(session?.user || null);
 
+  if (session?.user) {
+    const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
+    if (fromKickAll) {
+      sessionStorage.removeItem('from_kickall');
+      window.location.href = '../dashboard.html';
+      return;
+    }
+  }
+
   // Ako se vraćamo sa add_channel OAuth callbacka — otvori settings na Kick Kanali tabu
   if (settingsChannelsPendingOpen && session?.user) {
     settingsChannelsPendingOpen = false;
@@ -1697,6 +1740,12 @@ function setupEnterKeyBindings() {
 // ── Init ──────────────────────────────────────────────────
 setLang(currentLang);
 setupEnterKeyBindings();
+
+if (window.location.search.includes('from=kickall')) {
+  sessionStorage.setItem('from_kickall', 'true');
+} else if (!window.location.search.includes('action=login') && !window.location.search.includes('action=logout')) {
+  sessionStorage.removeItem('from_kickall');
+}
 
 // Check for password reset redirect
 if (window.location.search.includes('reset=true')) {

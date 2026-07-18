@@ -531,7 +531,7 @@ async function ucitajCustomKomande(chatroomId) {
         log('INFO', `[${channelUsername}] Učitavam custom komande sa Supabase...`);
         const { data, error } = await supabase
             .from('custom_commands')
-            .select('command, response, cooldown_ms, enabled')
+            .select('command, response, cooldown_ms, enabled, min_rank, is_default')
             .eq('channel_id', chatroomId)
             .eq('enabled', true);
 
@@ -545,7 +545,9 @@ async function ucitajCustomKomande(chatroomId) {
                     if (alias) {
                         channelState.customCommands[alias] = {
                             response: row.response,
-                            cooldown_ms: row.cooldown_ms || 5000
+                            cooldown_ms: row.cooldown_ms || 5000,
+                            min_rank: row.min_rank || 'everyone',
+                            is_default: row.is_default || false
                         };
                     }
                 });

@@ -34,9 +34,15 @@
 
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
+      <div class="sidebar-header" style="gap: 12px; justify-content: flex-start;">
+        <a href="../dashboard.html" class="back-to-router-btn" title="Nazad na ruter (KickAll)" style="flex-shrink: 0;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </a>
         <a href="index.html" class="sidebar-logo">
-          <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 38px;">
+          <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 30px;">
         </a>
       </div>
 
@@ -457,6 +463,7 @@
                 <tr>
                   <th>Komanda</th>
                   <th>Odgovor</th>
+                  <th>Dozvola</th>
                   <th>Cooldown</th>
                   <th>Korišćeno</th>
                   <th>Status</th>
@@ -933,196 +940,26 @@
                 </div>
                 <span>Ugrađene bot komande</span>
               </h1>
-              <p class="panel-desc">Sve ugrađene podrazumevane komande koje bot podržava</p>
+              <p class="panel-desc">Sve ugrađene podrazumevane komande koje bot podržava. Klikni na olovku da promeniš cooldown ili dozvolu ranka.</p>
             </div>
           </div>
 
-          <div class="config-grid" style="grid-template-columns: 1fr;">
-            <!-- Kako rade -->
-            <div class="info-banner" style="margin-bottom: 20px;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M12 16v-4M12 8h.01" />
+          <div class="table-toolbar" style="margin-bottom: 1.5rem;">
+            <div class="search-wrap">
+              <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
               </svg>
-              <span>Ugrađene komande reaguju odmah na komandu u chatu. Neke komande prihvataju opcione ili obavezne
-                parametre (npr. tagovanje korisnika ili grad).</span>
+              <input type="text" class="search-input" placeholder="Pretraži ugrađene komande..."
+                oninput="filterBuiltinCommands(this.value)" id="builtinCmdSearchInput" />
             </div>
+            <div class="table-meta" id="builtinCmdTableMeta">0 ugrađenih komandi</div>
+          </div>
 
-            <!-- Kategorija 1: Statistika i rangiranje -->
-            <div class="config-section" style="margin-bottom: 30px;">
-              <h3 class="config-section-title"
-                style="color: var(--app-primary); display: flex; align-items: center; gap: 8px; font-size: 1.15rem; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="20" x2="18" y2="10" />
-                  <line x1="12" y1="20" x2="12" y2="4" />
-                  <line x1="6" y1="20" x2="6" y2="14" />
-                </svg>
-                Statistika i rangiranje
-              </h3>
-              <div class="builtin-grid"
-                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 15px;">
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !top watchtime [broj]</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Prikazuje listu
-                    gledalaca sa najvećim brojem sati. Podrazumevano prikazuje top 5, a podržava i 10 ili 15.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !top chat [broj]</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Prikazuje listu
-                    najaktivnijih ljudi u četu. Radi nezavisno od watchtime liste.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !watchtime</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Prikazuje vreme
-                    gledanja samo za korisnika koji je upisao komandu.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !chat</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Prikazuje broj
-                    poslatih poruka samo za tog korisnika.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !me</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Brza komanda koja
-                    korisniku odjednom prikazuje i njegov watchtime i chat statistiku.</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Kategorija 2: Zabava i interakcija -->
-            <div class="config-section" style="margin-bottom: 30px;">
-              <h3 class="config-section-title"
-                style="color: #EC4899; display: flex; align-items: center; gap: 8px; font-size: 1.15rem; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z" />
-                  <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-                  <line x1="9" y1="9" x2="9.01" y2="9" />
-                  <line x1="15" y1="9" x2="15.01" y2="9" />
-                </svg>
-                Zabava i interakcija
-              </h3>
-              <div class="builtin-grid"
-                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 15px;">
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: #EC4899; font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !iq [ili !iq @korisnik]</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Meri nasumičan IQ
-                    pošiljaocu ili tagovanoj osobi.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: #EC4899; font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !samar @korisnik</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Šamara izabranog
-                    korisnika uz zabavan tekst.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: #EC4899; font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !duel @korisnik [ili @k1 @k2]</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Pokreće simulaciju
-                    borbe između pošiljaoca i mete, ili između dva tagovana čitera.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: #EC4899; font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !roll @korisnik</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Izvlači nasumičan broj
-                    za tagovanu osobu.</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Kategorija 3: Informacije i alati -->
-            <div class="config-section" style="margin-bottom: 30px;">
-              <h3 class="config-section-title"
-                style="color: #3B82F6; display: flex; align-items: center; gap: 8px; font-size: 1.15rem; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="16" x2="12" y2="12" />
-                  <line x1="12" y1="8" x2="12.01" y2="8" />
-                </svg>
-                Informacije i alati
-              </h3>
-              <div class="builtin-grid"
-                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 15px;">
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: #3B82F6; font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !vreme [grad]</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Prikazuje trenutne
-                    vremenske podatke za traženi grad.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: #3B82F6; font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !info</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Prikazuje osnovne
-                    informacije o botu.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: #3B82F6; font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !cinjenica</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Ispisuje nasumičnu
-                    zanimljivu činjenicu.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: #3B82F6; font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !followage</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Pokazuje koliko dugo
-                    korisnik prati strimera.</div>
-                </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: #3B82F6; font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !uptime</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">Prikazuje koliko dugo
-                    traje trenutni strim uživo.</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Premium Crvena Napomena -->
-            <div class="info-banner"
-              style="margin-top: 2.5rem; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.15); border-left: 4px solid #EF4444; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; width: 100%;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5"
-                style="flex-shrink: 0; display: block;">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 16v-4M12 8h.01"></path>
-              </svg>
-              <span style="font-size: 0.85rem; color: #EF4444; line-height: 1.2; display: inline-block;">
-                Ukoliko želiš da uključiš/isključiš ili podesiš ove ugrađene komande, poseti tab <a href="#"
-                  onclick="switchPanel('config'); return false;"
-                  style="color: #EF4444; font-weight: 700; text-decoration: underline;">Bot Config</a>.
-              </span>
-            </div>
+          <div class="builtin-commands-grid" id="builtinCommandsGrid"
+            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; margin-top: 15px;">
+            <!-- Dinamički učitano -->
           </div>
         </section>
 
@@ -2191,6 +2028,19 @@
             <span style="position: absolute; right: 12px; font-size: 0.75rem; color: var(--text-muted); font-weight: bold; pointer-events: none;">ms</span>
           </div>
           <span class="config-hint" id="cooldownSecondsLabel">5 sekundi čekanja</span>
+        </div>
+
+        <!-- Permission Rank -->
+        <div class="form-group">
+          <label class="form-label" style="font-size: 0.85rem;">Ko može koristiti komandu (Dozvola)</label>
+          <select class="select-input" id="cmdMinRank" style="margin-top: 6px; width: 100%; height: 42px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: var(--text-main); border-radius: 8px; padding: 0 12px;">
+            <option value="everyone">Svi (Everyone)</option>
+            <option value="subscriber">Subovi (Subscriber)</option>
+            <option value="vip">VIP (Vip)</option>
+            <option value="og">OG (Og)</option>
+            <option value="moderator">Moderatori (Moderator)</option>
+            <option value="broadcaster">Strimer (Broadcaster)</option>
+          </select>
         </div>
 
         <!-- Status -->

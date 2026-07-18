@@ -2442,3 +2442,25 @@ input[type="number"]::-webkit-inner-spin-button {
   appearance: none;
   margin: 0;
 }
+
+/* Back to Router Button */
+.back-to-router-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  transition: var(--transition-base);
+  cursor: pointer;
+}
+
+.back-to-router-btn:hover {
+  background: var(--app-primary-dim);
+  color: var(--kick-green) !important;
+  border-color: var(--kick-green) !important;
+  box-shadow: 0 0 12px rgba(83, 252, 24, 0.2);
+  transform: scale(1.05);
+}

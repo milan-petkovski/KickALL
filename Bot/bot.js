@@ -51,6 +51,110 @@ function ukloniSrpskeDijakritike(str) {
 
 const CUSTOM_COMMAND_REFRESH_THROTTLE_MS = 5000;
 
+const RANK_LEVELS = {
+    'everyone': 0,
+    'subscriber': 1,
+    'vip': 2,
+    'og': 3,
+    'moderator': 4,
+    'broadcaster': 5
+};
+
+const RANK_LABELS_SR = {
+    'everyone': 'Svi',
+    'subscriber': 'Subovi',
+    'vip': 'VIP',
+    'og': 'OG',
+    'moderator': 'Moderatori',
+    'broadcaster': 'Strimer'
+};
+
+const defaultBuiltinRanks = {
+    'vreme': 'everyone',
+    'vrijeme': 'everyone',
+    'uptime': 'everyone',
+    'igra': 'everyone',
+    'watchtime': 'everyone',
+    'topwatchtime': 'everyone',
+    'topwatch': 'everyone',
+    'duel': 'everyone',
+    'roll': 'everyone',
+    'iq': 'everyone',
+    'samar': 'everyone',
+    'rulet': 'everyone',
+    'permit': 'moderator',
+    'dozvoli': 'moderator',
+    'info': 'everyone',
+    'love': 'everyone',
+    'posaljiljubav': 'everyone',
+    'odbijljubav': 'everyone',
+    'mrzim': 'everyone',
+    'cooldown': 'everyone',
+    'coldown': 'everyone',
+    'prihvati': 'everyone',
+    'da': 'everyone',
+    'pristajem': 'everyone',
+    'odbij': 'everyone',
+    'ne': 'everyone',
+    'odbijam': 'everyone',
+    'vencaj': 'everyone',
+    'razvod': 'everyone',
+    'brakovi': 'everyone',
+    'brak': 'everyone',
+    'vencani': 'everyone',
+    'top': 'everyone',
+    'leaderboard': 'everyone',
+    'aktivnost': 'everyone',
+    'stats': 'everyone',
+    'points': 'everyone',
+    'poeni': 'everyone',
+    'resetleaderboard': 'broadcaster',
+    'osvezi': 'broadcaster',
+    'pin': 'moderator',
+    'unpin': 'moderator',
+    'setlive': 'broadcaster',
+    'setgame': 'broadcaster'
+};
+
+function getUserRankLevel(username, senderObj, channelUsername) {
+    const userKey = username.toLowerCase();
+    if (userKey === channelUsername.toLowerCase() || userKey === 'milan_567') return 5; // Streamer / Creator
+
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || [];
+
+    if (badges.some(b => b.type === 'broadcaster')) return 5;
+    if (badges.some(b => b.type === 'moderator')) return 4;
+    if (badges.some(b => b.type === 'og')) return 3;
+    if (badges.some(b => b.type === 'vip')) return 2;
+    if (badges.some(b => b.type === 'subscriber' || b.type === 'sub')) return 1;
+
+    return 0; // Svi (everyone)
+}
+
+function proveriDozvoluKomande(chatroomId, username, cmdIme, channelState, senderObj, podrazumevaniRank = 'everyone') {
+    const pronadjena = pronadjiCustomKomandu(channelState, cmdIme);
+    
+    let isEnabled = true;
+    let requiredRank = podrazumevaniRank;
+    
+    if (pronadjena) {
+        isEnabled = pronadjena.cmd.enabled !== false;
+        requiredRank = pronadjena.cmd.min_rank || podrazumevaniRank;
+    }
+    
+    if (!isEnabled) {
+        return { dozvoljeno: false, razlog: 'disabled' };
+    }
+    
+    const userRank = getUserRankLevel(username, senderObj, channelState.channelUsername);
+    if (userRank < RANK_LEVELS[requiredRank]) {
+        return { dozvoljeno: false, razlog: 'rank', requiredRank };
+    }
+    
+    return { dozvoljeno: true };
+}
+
 function pronadjiCustomKomandu(channelState, cmdImeRaw) {
     if (!channelState.customCommands) return null;
 
@@ -68,7 +172,7 @@ function pronadjiCustomKomandu(channelState, cmdImeRaw) {
     return { key: foundKey, cmd: channelState.customCommands[foundKey] };
 }
 
-async function obradiCustomKomandu(chatroomId, username, porukaNormalized, channelState) {
+async function obradiCustomKomandu(chatroomId, username, porukaNormalized, channelState, senderObj) {
     if (channelState.feature_autoresponse === false) return false;
     if (!porukaNormalized.startsWith(channelState.PREFIX || '!')) return false;
 
@@ -87,6 +191,15 @@ async function obradiCustomKomandu(chatroomId, username, porukaNormalized, chann
     if (!pronadjena) return false;
 
     const { key: cmdIme, cmd: customCmd } = pronadjena;
+
+    // Rank proveru za custom komandu
+    const requiredRank = customCmd.min_rank || 'everyone';
+    const userRank = getUserRankLevel(username, senderObj, channelState.channelUsername);
+    if (userRank < RANK_LEVELS[requiredRank]) {
+        messenger.posaljiPoruku(chatroomId, `❌ @${username}, ova komanda je rezervisana za ulogu: ${RANK_LABELS_SR[requiredRank] || requiredRank}.`);
+        return true; // Konzumirano ali blokirano
+    }
+
     if (utils.proveraKulauna(chatroomId, 'custom_' + cmdIme, username, customCmd.cooldown_ms)) return true;
 
     // Inkrementiraj uses_count u bazi
@@ -253,6 +366,19 @@ function povezi() {
             let normalizovanaPoruka = '!' + porukaSredjena.slice(prefix.length);
             const porukaLower = normalizovanaPoruka.toLowerCase();
             const porukaNormalized = ukloniSrpskeDijakritike(porukaLower);
+
+            // Ekstrakcija i provera dozvole za ugrađene komande
+            const cmdName = normalizovanaPoruka.slice(1).split(/\s+/)[0].toLowerCase();
+            if (defaultBuiltinRanks[cmdName] !== undefined) {
+                const podrazumevaniRank = defaultBuiltinRanks[cmdName];
+                const provera = proveriDozvoluKomande(chatroomId, username, cmdName, channelState, chatData.sender, podrazumevaniRank);
+                if (!provera.dozvoljeno) {
+                    if (provera.razlog === 'rank') {
+                        messenger.posaljiPoruku(chatroomId, `❌ @${username}, ova komanda je rezervisana za ulogu: ${RANK_LABELS_SR[provera.requiredRank] || provera.requiredRank}.`);
+                    }
+                    return;
+                }
+            }
 
             // Auto-announce brojač po broju poruka
             if (channelState.isStreamLive && channelState.announce_msg_enabled) {
@@ -596,7 +722,7 @@ function povezi() {
             }
 
             // Custom komande iz baze podataka
-            if (await obradiCustomKomandu(chatroomId, username, porukaNormalized, channelState)) {
+            if (await obradiCustomKomandu(chatroomId, username, porukaNormalized, channelState, chatData.sender)) {
                 return;
             }
 

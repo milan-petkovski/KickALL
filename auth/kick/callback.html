@@ -10,7 +10,9 @@
       const error = params.get('error');
       if (code || error) {
         const baseRedirectPath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/Website' : '';
-        window.location.replace(`${baseRedirectPath}/kickot/dashboard.html` + window.location.search);
+        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
+        const targetPage = fromKickAll ? 'dashboard.html' : 'kickot/dashboard.html';
+        window.location.replace(`${baseRedirectPath}/${targetPage}` + window.location.search);
       }
     })();
   </script>
@@ -297,7 +299,9 @@
         localStorage.removeItem('kick_code_verifier');
 
         // Preusmeri odmah na dashboard bez prikazivanja success ekrana i čekanja
-        window.location.href = `${baseRedirectPath}/kickot/dashboard.html?kick_oauth=1`;
+        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
+        const targetPage = fromKickAll ? 'dashboard.html' : 'kickot/dashboard.html';
+        window.location.href = `${baseRedirectPath}/${targetPage}?kick_oauth=1`;
 
       } catch (fetchErr) {
         showError(

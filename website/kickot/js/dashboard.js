@@ -1131,6 +1131,46 @@ async function refreshAllData() {
 
 // ── Commands ──────────────────────────────────────────────
 // ── Commands ──────────────────────────────────────────────
+const defaultBuiltinCommands = [
+  { id: 'builtin-iq', command: 'iq, iq @user', response: 'Prikazuje inteligenciju (IQ) korisnika ili ciljanog člana chata.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'iq' },
+  { id: 'builtin-samar', command: 'samar @user', response: 'Šalje zabavan šamar odabranom korisniku sa nasumičnim predmetom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'samar' },
+  { id: 'builtin-roll', command: 'roll @user', response: 'Pokreće roll dvoboj (kockice 1-100) protiv tagovanog protivnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'roll' },
+  { id: 'builtin-duel', command: 'duel @user', response: 'Izazovi drugog člana na pravi ruski rulet dvoboj.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'duel' },
+  { id: 'builtin-rulet', command: 'rulet @user', response: 'Igraj ruski rulet sa botom — rizikuj timeout od 10 minuta.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rulet' },
+  { id: 'builtin-love', command: 'love @user, love @user @user', response: 'Izračunaj ljubavnu kompatibilnost sa drugim korisnikom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'love' },
+  { id: 'builtin-marry', command: 'vencaj @user', response: 'Pošalji bračnu ponudu drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vencaj' },
+  { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje koliko vremena je strim online.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'uptime' },
+  { id: 'builtin-vreme', command: 'vreme [grad]', response: 'Prikazuje trenutnu vremensku prognozu za uneti grad.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vreme' },
+  { id: 'builtin-info', command: 'info', response: 'Prikazuje osnovne informacije o botu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'info' },
+  { id: 'builtin-permit', command: 'permit @user', response: 'Dozvoljava korisniku slanje jednog linka.', cooldown_ms: 5000, min_rank: 'moderator', enabled: true, is_default: true, uses_count: 0, db_match_key: 'permit' },
+  { id: 'builtin-osvezi', command: 'osvezi', response: 'Osvežava sve podatke iz baze podataka.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'osvezi' },
+  { id: 'builtin-topwatchtime', command: 'top watchtime [broj]', response: 'Prikazuje top listu gledalaca po vremenu gledanja.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top watchtime' },
+  { id: 'builtin-topchat', command: 'top chat [broj]', response: 'Prikazuje top listu najaktivnijih korisnika u četu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top chat' },
+  { id: 'builtin-watchtime', command: 'watchtime', response: 'Prikazuje vreme gledanja korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'watchtime' },
+  { id: 'builtin-chat', command: 'chat', response: 'Prikazuje broj poslatih poruka korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'chat' },
+  { id: 'builtin-me', command: 'me', response: 'Prikazuje tvoju ličnu chat i watchtime statistiku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'me' },
+  { id: 'builtin-cinjenica', command: 'cinjenica', response: 'Ispisuje nasumičnu zanimljivu činjenicu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'cinjenica' },
+  { id: 'builtin-followage', command: 'followage', response: 'Pokazuje koliko dugo pratiš strimera.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'followage' }
+];
+
+const RANK_LABELS = {
+  'everyone': 'Svi',
+  'subscriber': 'Subovi',
+  'vip': 'VIP',
+  'og': 'OG',
+  'moderator': 'Moderatori',
+  'broadcaster': 'Strimer'
+};
+
+const RANK_COLORS = {
+  'everyone': 'rgba(255, 255, 255, 0.4)',
+  'subscriber': '#8B5CF6',
+  'vip': '#3B82F6',
+  'og': '#F59E0B',
+  'moderator': '#10B981',
+  'broadcaster': '#EF4444'
+};
+
 async function loadCommands() {
   if (!activeChannel) return;
 
@@ -1141,26 +1181,54 @@ async function loadCommands() {
     .order('created_at', { ascending: false });
 
   if (error) { console.error('Commands:', error); return; }
-  allCommands = data || [];
+  const dbData = data || [];
+
+  const dbCustom = dbData.filter(c => !c.is_default);
+  const dbDefaults = dbData.filter(c => c.is_default);
+
+  const mergedBuiltins = defaultBuiltinCommands.map(builtin => {
+    const dbVer = dbDefaults.find(d => {
+      const dbNames = d.command.split(',').map(n => n.trim().toLowerCase());
+      const builtinMatchKey = builtin.db_match_key.toLowerCase();
+      // Match if database command starts with or matches db_match_key
+      return dbNames.some(name => name === builtinMatchKey || name.startsWith(builtinMatchKey));
+    });
+    if (dbVer) {
+      return {
+        ...builtin,
+        id: dbVer.id,
+        cooldown_ms: dbVer.cooldown_ms,
+        min_rank: dbVer.min_rank,
+        enabled: dbVer.enabled,
+        uses_count: dbVer.uses_count,
+        db_exists: true
+      };
+    }
+    return builtin;
+  });
+
+  allCommands = [...dbCustom, ...mergedBuiltins];
   renderMiniCommands(allCommands);
+  const customOnlyCount = allCommands.filter(c => !c.is_default).length;
   const cmdCountEl = document.getElementById('cmdCount');
-  if (cmdCountEl) cmdCountEl.textContent = allCommands.length;
+  if (cmdCountEl) cmdCountEl.textContent = customOnlyCount;
   const statCmdCountEl = document.getElementById('statCmdCount');
-  if (statCmdCountEl) statCmdCountEl.textContent = allCommands.length;
+  if (statCmdCountEl) statCmdCountEl.textContent = customOnlyCount;
 
   renderUnifiedCommands();
+  renderBuiltinCommandsGrid();
 }
 
 function renderUnifiedCommands(customCmds = null) {
   const tbody = document.getElementById('commandsBody');
   if (!tbody) return;
 
-  let rows = customCmds || allCommands;
+  let rows = customCmds || allCommands.filter(c => !c.is_default);
 
   updateCmdTableMeta(rows.length);
 
   if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Nema komandi za prikaz.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="table-empty">Nema komandi za prikaz.</td></tr>';
     const prevBtn = document.getElementById('cmdPrevPageBtn');
     const nextBtn = document.getElementById('cmdNextPageBtn');
     const pageInfo = document.getElementById('cmdPageInfo');
@@ -1190,10 +1258,8 @@ function renderUnifiedCommands(customCmds = null) {
   if (nextBtn) nextBtn.disabled = commandsPage === totalPages;
 
   tbody.innerHTML = pageRows.map(cmd => {
-    // Više aliasa prikazujemo kao zasebne bedževe
     const cmdBadges = cmd.command.split(',').map(c => `<span class="td-cmd">!${escapeHtml(c.trim())}</span>`).join(' ');
 
-    // Akcije i prebacivanje statusa
     let actionsHtml = '';
     let statusHtml = `
       <span class="status-pill ${cmd.enabled ? 'status-active' : 'status-inactive'}">
@@ -1210,24 +1276,37 @@ function renderUnifiedCommands(customCmds = null) {
 
     const deleteIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>`;
 
+    // Onemogući brisanje sistemskih komandi
+    const deleteBtnHtml = cmd.is_default
+      ? `<button class="action-btn" disabled style="opacity: 0.25; cursor: not-allowed;" title="Sistemska komanda se ne može obrisati">${deleteIcon}</button>`
+      : `<button class="action-btn danger" onclick="deleteCommandConfirm('${cmd.id}', '!${escapeHtml(cmd.command)}')" title="Obriši">${deleteIcon}</button>`;
+
     actionsHtml = `
       <div class="actions-cell">
-        <button class="action-btn" onclick="toggleCommand('${cmd.id}', ${cmd.enabled})" title="${cmd.enabled ? 'Isključi' : 'Uključi'}">
+        <button class="action-btn" onclick="toggleCommand('${cmd.id}', ${cmd.enabled}, ${!!cmd.is_default})" title="${cmd.enabled ? 'Isključi' : 'Uključi'}">
           ${toggleIcon}
         </button>
         <button class="action-btn" onclick="editCommand('${cmd.id}')" title="Izmeni">
           ${editIcon}
         </button>
-        <button class="action-btn danger" onclick="deleteCommandConfirm('${cmd.id}', '!${escapeHtml(cmd.command)}')" title="Obriši">
-          ${deleteIcon}
-        </button>
+        ${deleteBtnHtml}
       </div>
     `;
+
+    const rKey = cmd.min_rank || 'everyone';
+    const rankLabel = RANK_LABELS[rKey] || 'Svi';
+    const rankColor = RANK_COLORS[rKey] || 'var(--text-muted)';
+    const rankBadgeHtml = `<span style="background: rgba(255,255,255,0.03); border: 1px solid ${rankColor}33; color: ${rankColor}; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${rankLabel}</span>`;
+
+    const displayResponse = cmd.is_default
+      ? `<span style="color:var(--text-muted); font-style:italic;" title="${escapeHtml(cmd.response)}">${escapeHtml(cmd.response)}</span>`
+      : `<span class="td-response" title="${escapeHtml(cmd.response)}">${escapeHtml(cmd.response)}</span>`;
 
     return `
       <tr>
         <td><div class="cmd-badge-list">${cmdBadges}</div></td>
-        <td><span class="td-response" title="${escapeHtml(cmd.response)}">${escapeHtml(cmd.response)}</span></td>
+        <td>${displayResponse}</td>
+        <td>${rankBadgeHtml}</td>
         <td class="td-num">${(cmd.cooldown_ms / 1000).toFixed(0)}s</td>
         <td class="td-num">${cmd.uses_count ?? 0}</td>
         <td>${statusHtml}</td>
@@ -1278,7 +1357,8 @@ function renderMiniCommands(cmds) {
 function filterCommands(query) {
   commandsPage = 1;
   const q = query.toLowerCase();
-  const filtered = allCommands.filter(c =>
+  const customOnly = allCommands.filter(c => !c.is_default);
+  const filtered = customOnly.filter(c =>
     c.command.toLowerCase().includes(q) ||
     c.response.toLowerCase().includes(q)
   );
@@ -1287,6 +1367,63 @@ function filterCommands(query) {
 
 function updateCmdTableMeta(n) {
   document.getElementById('cmdTableMeta').textContent = `${n} prilagođenih komandi`;
+}
+
+function renderBuiltinCommandsGrid(filteredList = null) {
+  const grid = document.getElementById('builtinCommandsGrid');
+  const meta = document.getElementById('builtinCmdTableMeta');
+  if (!grid) return;
+
+  const builtins = filteredList || allCommands.filter(c => c.is_default);
+  if (meta) meta.textContent = `${builtins.length} ugrađenih komandi`;
+
+  if (builtins.length === 0) {
+    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 2rem;">Nema pronađenih ugrađenih komandi.</div>';
+    return;
+  }
+
+  grid.innerHTML = builtins.map(cmd => {
+    const rKey = cmd.min_rank || 'everyone';
+    const rankLabel = RANK_LABELS[rKey] || 'Svi';
+    const rankColor = RANK_COLORS[rKey] || 'var(--text-muted)';
+    const dotColor = cmd.enabled ? 'var(--kick-green)' : '#EF4444';
+
+    return `
+      <div class="builtin-card" style="position: relative; background: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+        <button class="action-btn" onclick="editCommand('${cmd.id}')" style="position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); color: var(--text-main); cursor: pointer; transition: all var(--transition-fast); z-index: 2; flex-shrink: 0;" onmouseover="this.style.background='var(--app-primary-dim)'; this.style.color='var(--app-primary)'; this.style.borderColor='var(--app-primary-dim)';" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.color='var(--text-main)'; this.style.borderColor='var(--border-subtle)';">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        </button>
+        
+        <div class="builtin-cmd" style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; padding-right: 40px; word-break: break-word; line-height: 1.3;">
+          !${escapeHtml(cmd.command)}
+          <span class="status-dot" style="width: 6px; height: 6px; border-radius: 50%; display: inline-block; background: ${dotColor}; flex-shrink: 0;"></span>
+        </div>
+        
+        <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; flex-grow: 1; margin-top: 4px;">
+          ${escapeHtml(cmd.response)}
+        </div>
+        
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap;">
+          <span style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); color: var(--text-muted); font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 500;">
+            Cooldown: ${(cmd.cooldown_ms / 1000).toFixed(0)}s
+          </span>
+          <span style="background: rgba(255,255,255,0.02); border: 1px solid ${rankColor}33; color: ${rankColor}; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+            ${rankLabel}
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterBuiltinCommands(query) {
+  const q = query.toLowerCase();
+  const builtinsOnly = allCommands.filter(c => c.is_default);
+  const filtered = builtinsOnly.filter(c =>
+    c.command.toLowerCase().includes(q) ||
+    c.response.toLowerCase().includes(q)
+  );
+  renderBuiltinCommandsGrid(filtered);
 }
 
 // ── Leaderboard ───────────────────────────────────────────
@@ -2480,8 +2617,15 @@ function openNewCmdModal() {
   editingCmdId = null;
   document.getElementById('cmdModalTitle').textContent = 'Nova komanda';
   document.getElementById('cmdName').value = '';
+  document.getElementById('cmdName').disabled = false;
   document.getElementById('cmdResponse').value = '';
+  document.getElementById('cmdResponse').disabled = false;
+  
+  const responseGroup = document.getElementById('cmdResponse').closest('.form-group');
+  if (responseGroup) responseGroup.style.display = 'block';
+
   document.getElementById('cmdCooldown').value = '5000';
+  document.getElementById('cmdMinRank').value = 'everyone';
   document.getElementById('cmdEnabled').checked = true;
   document.getElementById('cmdCharCount').textContent = '0';
   document.getElementById('cmdModalError').style.display = 'none';
@@ -2497,10 +2641,22 @@ function editCommand(id) {
   if (!cmd) return;
 
   editingCmdId = id;
-  document.getElementById('cmdModalTitle').textContent = 'Izmeni komandu';
+  const isBuiltin = id.startsWith('builtin-') || !!cmd.is_default;
+  document.getElementById('cmdModalTitle').textContent = isBuiltin ? 'Izmeni sistemsku komandu' : 'Izmeni komandu';
   document.getElementById('cmdName').value = cmd.command;
+  document.getElementById('cmdName').disabled = isBuiltin;
   document.getElementById('cmdResponse').value = cmd.response;
+  document.getElementById('cmdResponse').disabled = isBuiltin;
+
+  const responseGroup = document.getElementById('cmdResponse').closest('.form-group');
+  if (isBuiltin) {
+    if (responseGroup) responseGroup.style.display = 'none';
+  } else {
+    if (responseGroup) responseGroup.style.display = 'block';
+  }
+
   document.getElementById('cmdCooldown').value = cmd.cooldown_ms;
+  document.getElementById('cmdMinRank').value = cmd.min_rank || 'everyone';
   document.getElementById('cmdEnabled').checked = cmd.enabled;
   document.getElementById('cmdCharCount').textContent = cmd.response.length;
   document.getElementById('cmdModalError').style.display = 'none';
@@ -2564,14 +2720,16 @@ async function saveCommand() {
   const response = document.getElementById('cmdResponse').value.trim();
   const cooldown = parseInt(document.getElementById('cmdCooldown').value) || 5000;
   const enabled = document.getElementById('cmdEnabled').checked;
+  const minRank = document.getElementById('cmdMinRank').value;
   const errEl = document.getElementById('cmdModalError');
   errEl.style.display = 'none';
 
-  if (!rawCommand) { errEl.textContent = 'Unesi naziv komande.'; errEl.style.display = 'block'; return; }
-  if (!response) { errEl.textContent = 'Unesi odgovor bota.'; errEl.style.display = 'block'; return; }
-  if (response.length > 500) { errEl.textContent = 'Odgovor ne sme biti duži od 500 karaktera.'; errEl.style.display = 'block'; return; }
+  const isBuiltin = editingCmdId && (editingCmdId.startsWith('builtin-') || allCommands.find(c => c.id === editingCmdId)?.is_default);
 
-  // Normalizacija: razbijamo po zarezu, čistimo uzvičnike i space, i spajamo nazad
+  if (!rawCommand) { errEl.textContent = 'Unesi naziv komande.'; errEl.style.display = 'block'; return; }
+  if (!isBuiltin && !response) { errEl.textContent = 'Unesi odgovor bota.'; errEl.style.display = 'block'; return; }
+  if (!isBuiltin && response.length > 500) { errEl.textContent = 'Odgovor ne sme biti duži od 500 karaktera.'; errEl.style.display = 'block'; return; }
+
   const enteredAliases = rawCommand.split(',')
     .map(c => c.trim().replace(/^!/, '').toLowerCase())
     .filter(Boolean);
@@ -2582,8 +2740,6 @@ async function saveCommand() {
   }
 
   const command = enteredAliases.join(', ');
-
-
 
   // Check duplicate za svaki uneti alias sa drugim custom komandama
   const otherCmds = allCommands.filter(c => c.id !== editingCmdId);
@@ -2612,18 +2768,20 @@ async function saveCommand() {
     command,
     response,
     cooldown_ms: cooldown,
+    min_rank: minRank,
     enabled,
     updated_at: new Date().toISOString(),
   };
 
+  const existsInDb = editingCmdId && !editingCmdId.startsWith('builtin-');
+
   let error;
-  if (editingCmdId) {
+  if (existsInDb) {
     ({ error } = await sb.from('custom_commands').update(payload).eq('id', editingCmdId));
   } else {
-    // Nova komanda dobija is_default = false
     ({ error } = await sb.from('custom_commands').insert({
       ...payload,
-      is_default: false,
+      is_default: !!isBuiltin,
       created_at: new Date().toISOString()
     }));
   }
@@ -2642,11 +2800,33 @@ async function saveCommand() {
   await loadCommands();
 }
 
-async function toggleCommand(id, currentEnabled) {
-  const { error } = await sb.from('custom_commands')
-    .update({ enabled: !currentEnabled, updated_at: new Date().toISOString() })
-    .eq('id', id);
-  if (error) { showToast('error', 'Greška', '❌'); return; }
+async function toggleCommand(id, currentEnabled, isDefault) {
+  if (id.startsWith('builtin-')) {
+    const cmdObj = allCommands.find(c => c.id === id);
+    if (!cmdObj) return;
+
+    const payload = {
+      user_id: getChannelOwnerId(),
+      channel_id: activeChannel.id,
+      command: cmdObj.command,
+      response: cmdObj.response,
+      cooldown_ms: cmdObj.cooldown_ms,
+      min_rank: cmdObj.min_rank || 'everyone',
+      enabled: !currentEnabled,
+      is_default: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await sb.from('custom_commands').insert(payload);
+    if (error) { showToast('error', 'Greška pri čuvanju ugrađene komande', '❌'); console.error(error); return; }
+  } else {
+    const { error } = await sb.from('custom_commands')
+      .update({ enabled: !currentEnabled, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) { showToast('error', 'Greška', '❌'); return; }
+  }
+
   showToast('info', !currentEnabled ? 'Komanda uključena' : 'Komanda isključena', !currentEnabled ? '✅' : '⏸');
   notifyBotToReload();
   await loadCommands();
@@ -2752,6 +2932,7 @@ function switchPanel(panelId) {
   if (panelId === 'announces' && !configLoaded) loadBotConfig();
   if (panelId === 'config' && !configLoaded) loadBotConfig();
   if (panelId === 'moderation' && !configLoaded) loadBotConfig();
+  if (panelId === 'games') renderBuiltinCommandsGrid();
 
   // Close mobile sidebar
   if (window.innerWidth < 768) {
