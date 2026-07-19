@@ -62,6 +62,8 @@ function getChannelState(chatroomId) {
             feature_love: true,
             feature_moderation: false,
             feature_autoresponse: true,
+            feature_songrequest: false,
+            songrequest_settings: {},
 
             announce_interval_mins: 15,
             announce_message_threshold: 30,

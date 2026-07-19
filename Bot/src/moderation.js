@@ -35,6 +35,8 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
     if (isSub && exemptRoles.includes('subscriber')) return false;
     
     let triggerReason = null;
+    let filterAction = null;
+    let filterTimeout = null;
     
     // ── 1. CAPS PROTECTION ──────────────────────────────────────────────────
     if (settings.caps_enabled) {
@@ -47,6 +49,8 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
             const capsPct = (capsChars.length / alphaChars.length) * 100;
             if (capsPct >= pct) {
                 triggerReason = 'Previše velikih slova (Caps)';
+                filterAction = settings.caps_action_type;
+                filterTimeout = settings.caps_timeout_duration_secs;
             }
         }
     }
@@ -93,6 +97,8 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
                 
                 if (!allowedAll) {
                     triggerReason = 'Linkovi nisu dozvoljeni';
+                    filterAction = settings.links_action_type;
+                    filterTimeout = settings.links_timeout_duration_secs;
                 }
             }
         }
@@ -105,6 +111,8 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
         const emoteCount = emoteMatches ? emoteMatches.length : 0;
         if (emoteCount > maxEmotes) {
             triggerReason = 'Previše emotikona';
+            filterAction = settings.emotes_action_type;
+            filterTimeout = settings.emotes_timeout_duration_secs;
         }
     }
     
@@ -120,6 +128,8 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
             const symbolsPct = (symbolsChars.length / totalChars) * 100;
             if (symbolsPct >= pct) {
                 triggerReason = 'Previše simbola';
+                filterAction = settings.symbols_action_type;
+                filterTimeout = settings.symbols_timeout_duration_secs;
             }
         }
     }
@@ -145,6 +155,8 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
             
             if (hasBadWord) {
                 triggerReason = 'Zabranjene reči';
+                filterAction = settings.words_action_type;
+                filterTimeout = settings.words_timeout_duration_secs;
             }
         }
     }
@@ -166,6 +178,8 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
         
         if (tracker.length > maxDuplicates) {
             triggerReason = 'Ponavljanje iste poruke (Spam)';
+            filterAction = settings.spam_action_type;
+            filterTimeout = settings.spam_timeout_duration_secs;
         }
     }
     
@@ -174,6 +188,8 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
         const maxLength = settings.max_len_limit || 300;
         if (content.length > maxLength) {
             triggerReason = 'Predugačka poruka';
+            filterAction = settings.max_len_action_type;
+            filterTimeout = settings.max_len_timeout_duration_secs;
         }
     }
     
@@ -184,18 +200,22 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
         const mentionCount = mentionMatches ? mentionMatches.length : 0;
         if (mentionCount > maxMentions) {
             triggerReason = 'Previše tagovanja';
+            filterAction = settings.mentions_action_type;
+            filterTimeout = settings.mentions_timeout_duration_secs;
         }
     }
 
     if (triggerReason) {
-        kazniKorisnika(chatroomId, username, messageId, triggerReason, settings);
+        const finalAction = filterAction || settings.action_type || 'delete';
+        const finalTimeout = (filterTimeout !== null && filterTimeout !== undefined && filterTimeout !== '') ? parseInt(filterTimeout) : (settings.timeout_duration_secs || 600);
+        kazniKorisnika(chatroomId, username, messageId, triggerReason, finalAction, finalTimeout);
         return true;
     }
     
     return false;
 }
 
-function kazniKorisnika(chatroomId, username, messageId, reason, settings) {
+function kazniKorisnika(chatroomId, username, messageId, reason, actionType, timeoutDuration) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
     
@@ -204,15 +224,15 @@ function kazniKorisnika(chatroomId, username, messageId, reason, settings) {
         obrisiPoruku(chatroomId, messageId);
     }
     
-    const actionType = settings.action_type || 'delete';
-    const timeoutDuration = settings.timeout_duration_secs || 600;
+    const act = actionType || 'delete';
+    const duration = timeoutDuration !== undefined ? timeoutDuration : 600;
     const userKey = username.toLowerCase();
     
-    if (actionType === 'timeout') {
-        posaljiPoruku(chatroomId, `/timeout ${username} ${timeoutDuration} Automatska moderacija: ${reason}`);
+    if (act === 'timeout') {
+        posaljiPoruku(chatroomId, `/timeout ${username} ${duration} Automatska moderacija: ${reason}`);
         posaljiPoruku(chatroomId, `@${username} je privremeno udaljen iz čata (Kazna: ${reason}).`);
-        log('MOD', `[${channelState.channelUsername || chatroomId}] Timeout ${username} for ${timeoutDuration}s. Reason: ${reason}`);
-    } else if (actionType === 'warn') {
+        log('MOD', `[${channelState.channelUsername || chatroomId}] Timeout ${username} for ${duration}s. Reason: ${reason}`);
+    } else if (act === 'warn') {
         if (!channelState.warningsCount) {
             channelState.warningsCount = new Map();
         }
@@ -220,7 +240,7 @@ function kazniKorisnika(chatroomId, username, messageId, reason, settings) {
         channelState.warningsCount.set(userKey, warnCount);
         
         if (warnCount >= 3) {
-            posaljiPoruku(chatroomId, `/timeout ${username} ${timeoutDuration} Previše upozorenja`);
+            posaljiPoruku(chatroomId, `/timeout ${username} ${duration} Previše upozorenja`);
             posaljiPoruku(chatroomId, `@${username} je privremeno udaljen zbog uzastopnih prekršaja pravila čata.`);
             channelState.warningsCount.set(userKey, 0); // reset
             log('MOD', `[${channelState.channelUsername || chatroomId}] Timeout ${username} due to 3 warnings.`);

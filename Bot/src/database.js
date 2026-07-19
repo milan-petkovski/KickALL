@@ -594,6 +594,8 @@ async function ucitajBotConfig(chatroomId) {
             channelState.feature_love = data.feature_love ?? true;
             channelState.feature_moderation = data.feature_moderation ?? false;
             channelState.feature_autoresponse = data.feature_autoresponse ?? true;
+            channelState.feature_songrequest = data.feature_songrequest ?? false;
+            channelState.songrequest_settings = data.songrequest_settings || {};
             channelState.welcome_message = data.welcome_message || '';
             
             channelState.botActive = data.bot_active || false;
@@ -636,9 +638,33 @@ async function ucitajSveAktivneKanale() {
     }
 }
 
+async function sacuvajSongQueue(chatroomId, queue) {
+    try {
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+        
+        if (!channelState.songrequest_settings) channelState.songrequest_settings = {};
+        channelState.songrequest_settings.queue = queue;
+
+        if (KORISTI_SUPABASE) {
+            const { error } = await supabase
+                .from('bot_config')
+                .update({
+                    songrequest_settings: channelState.songrequest_settings
+                })
+                .eq('channel_id', chatroomId);
+
+            if (error) throw error;
+        }
+    } catch (err) {
+        log('ERR', `Greška pri čuvanju song request reda za ${chatroomId}: ${err.message}`);
+    }
+}
+
 module.exports = {
     supabase,
     KORISTI_SUPABASE,
+    sacuvajSongQueue,
     ucitajLeaderboard,
     ucitajLjubav,
     sacuvajLjubav,

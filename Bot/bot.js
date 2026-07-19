@@ -293,7 +293,7 @@ function povezi() {
             }
 
             const channelState = state.getChannelState(chatroomId);
-            if (!channelState || !channelState.botActive) {
+            if (!channelState || !channelState.botActive || channelState.isModerator === false) {
                 return;
             }
 
@@ -477,6 +477,14 @@ function povezi() {
                 const isPermit = porukaNormalized.startsWith('!permit');
                 const target = isPermit ? porukaSredjena.slice(7).trim() : porukaSredjena.slice(8).trim();
                 commands.handlePermit(chatroomId, username, target, chatData.sender);
+                return;
+            }
+
+            if (porukaNormalized.startsWith('!pesma ')) {
+                if (channelState.feature_songrequest === false) return;
+                const songQuery = porukaSredjena.slice(7).trim();
+                if (utils.proveraKulauna(chatroomId, '!pesma', username)) return;
+                commands.handlePesma(chatroomId, username, songQuery, chatData.sender);
                 return;
             }
 
@@ -778,6 +786,16 @@ async function proveriDaLiJeLive(chatroomId) {
             const data = await res.json();
             const liveState = !!data.livestream;
 
+            const isModOrOwner = (data.role === 'moderator' || data.role === 'creator' || data.role === 'broadcaster' || channelUsername.toLowerCase() === botUsernameResolved.toLowerCase());
+            if (channelState.isModerator !== isModOrOwner) {
+                channelState.isModerator = isModOrOwner;
+                if (!isModOrOwner) {
+                    utils.log('WARN', `[${channelUsername}] Bot više nije moderator na kanalu! Rad bota je privremeno obustavljen.`);
+                } else {
+                    utils.log('INFO', `[${channelUsername}] Bot je moderator na kanalu. Rad bota je dozvoljen.`);
+                }
+            }
+
             if (database.KORISTI_SUPABASE && database.supabase) {
                 try {
                     await database.supabase
@@ -822,7 +840,7 @@ async function proveriDaLiSuLiveSvi() {
 // ─── AUTO ANNOUNCE ───────────────────────────────────────────────────────────
 function triggerAutoAnnounce(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
-    if (!channelState) return;
+    if (!channelState || channelState.isModerator === false) return;
 
     const poruke = channelState.autoAnnounces || [];
     if (poruke.length === 0) return;
@@ -954,7 +972,8 @@ function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     channelState.feature_love = dbConfig.feature_love ?? true;
     channelState.feature_moderation = dbConfig.feature_moderation ?? false;
     channelState.feature_autoresponse = dbConfig.feature_autoresponse ?? true;
-
+    channelState.feature_songrequest = dbConfig.feature_songrequest ?? false;
+    channelState.songrequest_settings = dbConfig.songrequest_settings || {};
     channelState.botActive = dbConfig.bot_active || false;
     channelState.autoAnnounces = Array.isArray(dbConfig.auto_announces) ? dbConfig.auto_announces : [];
 

@@ -26,6 +26,7 @@ let allWatchtime = [];   // cached watchtime rows
 let allMarriages = [];   // cached marriages
 let allLoveStatuses = [];  // cached love modifiers
 const avatarCache = {};
+let currentModFiltersSettings = {};
 
 async function getOrFetchAvatar(username, elementId) {
   if (!username) return;
@@ -1139,6 +1140,14 @@ const defaultBuiltinCommands = [
   { id: 'builtin-rulet', command: 'rulet @user', response: 'Igraj ruski rulet sa botom — rizikuj timeout od 10 minuta.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rulet' },
   { id: 'builtin-love', command: 'love @user, love @user @user', response: 'Izračunaj ljubavnu kompatibilnost sa drugim korisnikom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'love' },
   { id: 'builtin-marry', command: 'vencaj @user', response: 'Pošalji bračnu ponudu drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vencaj' },
+  { id: 'builtin-razvod', command: 'razvod @user', response: 'Razvedi se od trenutnog bračnog partnera.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'razvod' },
+  { id: 'builtin-brakovi', command: 'brakovi, brak, vencani', response: 'Prikazuje sve venčane parove na ovom kanalu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'brakovi' },
+  { id: 'builtin-posaljiljubav', command: 'posaljiljubav @user', response: 'Pošalji ljubavnu ponudu nekom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'posaljiljubav' },
+  { id: 'builtin-odbijljubav', command: 'odbijljubav @user', response: 'Odbij ljubavnu ponudu od nekog korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbijljubav' },
+  { id: 'builtin-mrzim', command: 'mrzim @user', response: 'Izračunaj procenat mržnje prema drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'mrzim' },
+  { id: 'builtin-prihvati', command: 'prihvati, da, pristajem', response: 'Prihvati bračnu ili ljubavnu ponudu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'prihvati' },
+  { id: 'builtin-odbij', command: 'odbij, ne, odbijam', response: 'Odbij bračnu ili ljubavnu ponudu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbij' },
+  { id: 'builtin-igra', command: 'igra', response: 'Prikazuje trenutnu igru na strimu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'igra' },
   { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje koliko vremena je strim online.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'uptime' },
   { id: 'builtin-vreme', command: 'vreme [grad]', response: 'Prikazuje trenutnu vremensku prognozu za uneti grad.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vreme' },
   { id: 'builtin-info', command: 'info', response: 'Prikazuje osnovne informacije o botu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'info' },
@@ -2079,6 +2088,43 @@ async function loadBotConfig() {
     document.getElementById('cfgSpamWindow').value = data.spam_window_ms ?? 15000;
     document.getElementById('cfgPinMsg').value = data.stream_pin_msg || '';
     document.getElementById('cfgWelcomeMsg').value = data.welcome_message || '';
+    document.getElementById('cfgCustomBotName').value = data.custom_bot_name || '';
+
+    // Load chat alerts settings
+    const alerts = data.alerts_settings || {};
+    document.getElementById('cfgAlertFollowEnabled').checked = alerts.follow_enabled ?? false;
+    document.getElementById('cfgAlertFollowMsg').value = alerts.follow_message || 'Thanks for the follow @$(name)!';
+    
+    document.getElementById('cfgAlertKicksEnabled').checked = alerts.kicks_enabled ?? false;
+    document.getElementById('cfgAlertKicksMsg').value = alerts.kicks_message || '@$(name) Thanks for the $(amount) KICKs!';
+    document.getElementById('cfgAlertKicksMin').value = alerts.kicks_min_amount ?? 0;
+    
+    document.getElementById('cfgAlertSubEnabled').checked = alerts.sub_enabled ?? false;
+    document.getElementById('cfgAlertSubMsg').value = alerts.sub_message || 'Thanks @$(name) for subscribing for $(months) months!';
+    
+    document.getElementById('cfgAlertResubEnabled').checked = alerts.resub_enabled ?? false;
+    document.getElementById('cfgAlertResubMsg').value = alerts.resub_message || 'Thanks @$(name) for subscribing for $(months) months!';
+    
+    document.getElementById('cfgAlertGiftsubEnabled').checked = alerts.giftsub_enabled ?? false;
+    document.getElementById('cfgAlertGiftsubMsg').value = alerts.giftsub_message || 'Thanks for the gift @$(name)!';
+    
+    document.getElementById('cfgAlertHostEnabled').checked = alerts.host_enabled ?? false;
+    document.getElementById('cfgAlertHostMsg').value = alerts.host_message || '@$(name) Thanks for raiding with $(viewers) viewers!';
+    document.getElementById('cfgAlertHostMin').value = alerts.host_min_viewers ?? 0;
+    
+    document.getElementById('cfgAlertWelcomeEnabled').checked = alerts.welcome_enabled ?? false;
+    document.getElementById('cfgAlertWelcomeMsg').value = data.welcome_message || '';
+
+    // Load song request settings
+    const songSettings = data.songrequest_settings || {};
+    document.getElementById('cfgSongRequestEnabled').checked = data.feature_songrequest ?? false;
+    document.getElementById('cfgSongRequestRank').value = songSettings.request_role || 'everyone';
+    document.getElementById('cfgSongRequestCost').value = songSettings.cost_points ?? 50;
+    document.getElementById('cfgSongRequestMaxDuration').value = songSettings.max_duration_seconds ?? 360;
+    
+    localSongQueue = Array.isArray(songSettings.queue) ? songSettings.queue : [];
+    renderSongQueue();
+    updatePlayerUI();
 
     // Load auto announce interval settings
     document.getElementById('cfgAnnounceInterval').value = data.announce_interval_mins ?? 15;
@@ -2092,6 +2138,24 @@ async function loadBotConfig() {
 
     // Load moderation settings
     const modSettings = data.moderation_settings || {};
+    currentModFiltersSettings = {
+      caps_action_type: modSettings.caps_action_type || '',
+      caps_timeout_duration_secs: modSettings.caps_timeout_duration_secs || '',
+      links_action_type: modSettings.links_action_type || '',
+      links_timeout_duration_secs: modSettings.links_timeout_duration_secs || '',
+      emotes_action_type: modSettings.emotes_action_type || '',
+      emotes_timeout_duration_secs: modSettings.emotes_timeout_duration_secs || '',
+      symbols_action_type: modSettings.symbols_action_type || '',
+      symbols_timeout_duration_secs: modSettings.symbols_timeout_duration_secs || '',
+      words_action_type: modSettings.words_action_type || '',
+      words_timeout_duration_secs: modSettings.words_timeout_duration_secs || '',
+      spam_action_type: modSettings.spam_action_type || '',
+      spam_timeout_duration_secs: modSettings.spam_timeout_duration_secs || '',
+      max_len_action_type: modSettings.max_len_action_type || '',
+      max_len_timeout_duration_secs: modSettings.max_len_timeout_duration_secs || '',
+      mentions_action_type: modSettings.mentions_action_type || '',
+      mentions_timeout_duration_secs: modSettings.mentions_timeout_duration_secs || ''
+    };
     document.getElementById('cfgModCapsEnabled').checked = modSettings.caps_enabled ?? false;
     document.getElementById('cfgModCapsPct').value = modSettings.caps_pct ?? 70;
     document.getElementById('lblModCapsPct').textContent = (modSettings.caps_pct ?? 70) + '%';
@@ -2141,7 +2205,33 @@ async function loadBotConfig() {
     document.getElementById('cfgAnnounceTimeEnabled').checked = true;
     document.getElementById('cfgAnnounceMsgEnabled').checked = true;
 
+    // Reset chat alerts settings
+    document.getElementById('cfgAlertFollowEnabled').checked = false;
+    document.getElementById('cfgAlertFollowMsg').value = 'Thanks for the follow @$(name)!';
+    document.getElementById('cfgAlertKicksEnabled').checked = false;
+    document.getElementById('cfgAlertKicksMsg').value = '@$(name) Thanks for the $(amount) KICKs!';
+    document.getElementById('cfgAlertKicksMin').value = 0;
+    document.getElementById('cfgAlertSubEnabled').checked = false;
+    document.getElementById('cfgAlertSubMsg').value = 'Thanks @$(name) for subscribing for $(months) months!';
+    document.getElementById('cfgAlertResubEnabled').checked = false;
+    document.getElementById('cfgAlertResubMsg').value = 'Thanks @$(name) for subscribing for $(months) months!';
+    document.getElementById('cfgAlertGiftsubEnabled').checked = false;
+    document.getElementById('cfgAlertGiftsubMsg').value = 'Thanks for the gift @$(name)!';
+    document.getElementById('cfgAlertHostEnabled').checked = false;
+    document.getElementById('cfgAlertHostMsg').value = '@$(name) Thanks for raiding with $(viewers) viewers!';
+    document.getElementById('cfgAlertHostMin').value = 0;
+    document.getElementById('cfgAlertWelcomeEnabled').checked = false;
+    document.getElementById('cfgAlertWelcomeMsg').value = '';
+    document.getElementById('cfgCustomBotName').value = '';
+
+    // Reset song request settings
+    document.getElementById('cfgSongRequestEnabled').checked = false;
+    document.getElementById('cfgSongRequestRank').value = 'everyone';
+    document.getElementById('cfgSongRequestCost').value = 50;
+    document.getElementById('cfgSongRequestMaxDuration').value = 360;
+
     // Reset moderation settings
+    currentModFiltersSettings = {};
     document.getElementById('cfgModCapsEnabled').checked = false;
     document.getElementById('cfgModCapsPct').value = 70;
     document.getElementById('lblModCapsPct').textContent = '70%';
@@ -2193,7 +2283,38 @@ async function saveBotConfig(silent = false) {
     spam_threshold: parseInt(document.getElementById('cfgSpamThreshold').value) || 3,
     spam_window_ms: parseInt(document.getElementById('cfgSpamWindow').value) || 15000,
     stream_pin_msg: document.getElementById('cfgPinMsg').value || null,
-    welcome_message: document.getElementById('cfgWelcomeMsg').value || null,
+    welcome_message: document.getElementById('cfgAlertWelcomeMsg')?.value || document.getElementById('cfgWelcomeMsg')?.value || null,
+    custom_bot_name: document.getElementById('cfgCustomBotName').value.trim() || null,
+    alerts_settings: {
+      follow_enabled: document.getElementById('cfgAlertFollowEnabled').checked,
+      follow_message: document.getElementById('cfgAlertFollowMsg').value || 'Thanks for the follow @$(name)!',
+      
+      kicks_enabled: document.getElementById('cfgAlertKicksEnabled').checked,
+      kicks_message: document.getElementById('cfgAlertKicksMsg').value || '@$(name) Thanks for the $(amount) KICKs!',
+      kicks_min_amount: parseInt(document.getElementById('cfgAlertKicksMin').value) || 0,
+      
+      sub_enabled: document.getElementById('cfgAlertSubEnabled').checked,
+      sub_message: document.getElementById('cfgAlertSubMsg').value || 'Thanks @$(name) for subscribing for $(months) months!',
+      
+      resub_enabled: document.getElementById('cfgAlertResubEnabled').checked,
+      resub_message: document.getElementById('cfgAlertResubMsg').value || 'Thanks @$(name) for subscribing for $(months) months!',
+      
+      giftsub_enabled: document.getElementById('cfgAlertGiftsubEnabled').checked,
+      giftsub_message: document.getElementById('cfgAlertGiftsubMsg').value || 'Thanks for the gift @$(name)!',
+      
+      host_enabled: document.getElementById('cfgAlertHostEnabled').checked,
+      host_message: document.getElementById('cfgAlertHostMsg').value || '@$(name) Thanks for raiding with $(viewers) viewers!',
+      host_min_viewers: parseInt(document.getElementById('cfgAlertHostMin').value) || 0,
+      
+      welcome_enabled: document.getElementById('cfgAlertWelcomeEnabled').checked
+    },
+    feature_songrequest: document.getElementById('cfgSongRequestEnabled').checked,
+    songrequest_settings: {
+      request_role: document.getElementById('cfgSongRequestRank').value,
+      cost_points: parseInt(document.getElementById('cfgSongRequestCost').value) || 50,
+      max_duration_seconds: parseInt(document.getElementById('cfgSongRequestMaxDuration').value) || 360,
+      queue: localSongQueue
+    },
     auto_announces: localAnnounces,
     announce_interval_mins: parseInt(document.getElementById('cfgAnnounceInterval').value) || 15,
     announce_message_threshold: parseInt(document.getElementById('cfgAnnounceThreshold').value) || 30,
@@ -2274,29 +2395,45 @@ async function saveModerationSettings(silent = false) {
     caps_enabled: document.getElementById('cfgModCapsEnabled').checked,
     caps_pct: parseInt(document.getElementById('cfgModCapsPct').value) || 70,
     caps_min_len: parseInt(document.getElementById('cfgModCapsMinLen').value) || 5,
+    caps_action_type: currentModFiltersSettings.caps_action_type || '',
+    caps_timeout_duration_secs: currentModFiltersSettings.caps_timeout_duration_secs ? parseInt(currentModFiltersSettings.caps_timeout_duration_secs) : null,
     
     links_enabled: document.getElementById('cfgModLinksEnabled').checked,
     links_whitelist: document.getElementById('cfgModLinksWhitelist').value,
     links_permit_enabled: document.getElementById('cfgModLinksPermitEnabled').checked,
+    links_action_type: currentModFiltersSettings.links_action_type || '',
+    links_timeout_duration_secs: currentModFiltersSettings.links_timeout_duration_secs ? parseInt(currentModFiltersSettings.links_timeout_duration_secs) : null,
     
     emotes_enabled: document.getElementById('cfgModEmotesEnabled').checked,
     emotes_max: parseInt(document.getElementById('cfgModEmotesMax').value) || 5,
+    emotes_action_type: currentModFiltersSettings.emotes_action_type || '',
+    emotes_timeout_duration_secs: currentModFiltersSettings.emotes_timeout_duration_secs ? parseInt(currentModFiltersSettings.emotes_timeout_duration_secs) : null,
     
     symbols_enabled: document.getElementById('cfgModSymbolsEnabled').checked,
     symbols_pct: parseInt(document.getElementById('cfgModSymbolsPct').value) || 60,
     symbols_min_len: parseInt(document.getElementById('cfgModSymbolsMinLen').value) || 5,
+    symbols_action_type: currentModFiltersSettings.symbols_action_type || '',
+    symbols_timeout_duration_secs: currentModFiltersSettings.symbols_timeout_duration_secs ? parseInt(currentModFiltersSettings.symbols_timeout_duration_secs) : null,
     
     words_enabled: document.getElementById('cfgModWordsEnabled').checked,
     words_list: document.getElementById('cfgModWordsList').value,
+    words_action_type: currentModFiltersSettings.words_action_type || '',
+    words_timeout_duration_secs: currentModFiltersSettings.words_timeout_duration_secs ? parseInt(currentModFiltersSettings.words_timeout_duration_secs) : null,
     
     spam_enabled: document.getElementById('cfgModSpamEnabled').checked,
     spam_max_duplicates: parseInt(document.getElementById('cfgModSpamMaxDuplicates').value) || 2,
+    spam_action_type: currentModFiltersSettings.spam_action_type || '',
+    spam_timeout_duration_secs: currentModFiltersSettings.spam_timeout_duration_secs ? parseInt(currentModFiltersSettings.spam_timeout_duration_secs) : null,
     
     max_len_enabled: document.getElementById('cfgModMaxLenEnabled').checked,
     max_len_limit: parseInt(document.getElementById('cfgModMaxLenLimit').value) || 300,
+    max_len_action_type: currentModFiltersSettings.max_len_action_type || '',
+    max_len_timeout_duration_secs: currentModFiltersSettings.max_len_timeout_duration_secs ? parseInt(currentModFiltersSettings.max_len_timeout_duration_secs) : null,
     
     mentions_enabled: document.getElementById('cfgModMentionsEnabled').checked,
     mentions_limit: parseInt(document.getElementById('cfgModMentionsLimit').value) || 3,
+    mentions_action_type: currentModFiltersSettings.mentions_action_type || '',
+    mentions_timeout_duration_secs: currentModFiltersSettings.mentions_timeout_duration_secs ? parseInt(currentModFiltersSettings.mentions_timeout_duration_secs) : null,
     
     action_type: document.getElementById('cfgModActionType').value || 'delete',
     timeout_duration_secs: parseInt(document.getElementById('cfgModTimeoutDuration').value) || 600,
@@ -2333,6 +2470,46 @@ async function saveModerationSettings(silent = false) {
   }
   notifyBotToReload();
   updateOverviewModulesUI();
+}
+
+function openModFilterPenaltyModal(filterKey, filterName) {
+  document.getElementById('modFilterKey').value = filterKey;
+  document.getElementById('modFilterPenaltyTitle').textContent = `Kazna za: ${filterName}`;
+  
+  const actionVal = currentModFiltersSettings[`${filterKey}_action_type`] || '';
+  const timeoutVal = currentModFiltersSettings[`${filterKey}_timeout_duration_secs`] || '';
+  
+  document.getElementById('modFilterActionType').value = actionVal;
+  document.getElementById('modFilterTimeoutDuration').value = timeoutVal;
+  
+  openModal('modFilterPenaltyModal');
+}
+
+function saveModFilterPenalty() {
+  const filterKey = document.getElementById('modFilterKey').value;
+  if (!filterKey) return;
+  
+  const actionVal = document.getElementById('modFilterActionType').value;
+  const timeoutVal = document.getElementById('modFilterTimeoutDuration').value;
+  
+  currentModFiltersSettings[`${filterKey}_action_type`] = actionVal;
+  currentModFiltersSettings[`${filterKey}_timeout_duration_secs`] = timeoutVal ? parseInt(timeoutVal) : '';
+  
+  closeModal('modFilterPenaltyModal');
+  showToast('success', 'Pojedinačna kazna privremeno podešena. Kliknite "Sačuvaj podešavanja" na dnu stranice da je trajno sačuvate.', '⚡');
+}
+
+function applyGlobalPenaltyToAll() {
+  const globalAction = document.getElementById('cfgModActionType').value || 'delete';
+  const globalTimeout = parseInt(document.getElementById('cfgModTimeoutDuration').value) || 600;
+  
+  const keys = ['caps', 'links', 'emotes', 'symbols', 'words', 'spam', 'max_len', 'mentions'];
+  keys.forEach(k => {
+    currentModFiltersSettings[`${k}_action_type`] = globalAction;
+    currentModFiltersSettings[`${k}_timeout_duration_secs`] = globalTimeout;
+  });
+  
+  showToast('info', 'Globalne kazne primenjene na sve pojedinačne filtere. Kliknite "Sačuvaj podešavanja" da sačuvate.', '🔄');
 }
 
 function renderAnnounceList() {
@@ -2473,8 +2650,11 @@ function addLocalLog(type, message) {
     <span style="color: ${badgeColor}; font-weight: bold; flex-shrink: 0;">[${type}]</span>
     <span style="color: #E2E8F0; word-break: break-all; flex-grow: 1;">${escapeHtml(message)}</span>
   `;
+  const wasAtBottom = (feed.scrollHeight - feed.clientHeight - feed.scrollTop) < 50;
   feed.appendChild(logDiv);
-  feed.scrollTop = feed.scrollHeight;
+  if (wasAtBottom) {
+    feed.scrollTop = feed.scrollHeight;
+  }
 }
 
 async function toggleBotActive() {
@@ -2867,6 +3047,7 @@ const PANEL_NAMES = {
   watchtime: 'Watchtime',
   marriages: 'Ljubav i brakovi',
   minigames: 'Mini igre',
+  songs: 'Song Request',
   autoresponse: 'Bot interakcija',
   announces: 'Automatske poruke',
   config: 'Bot Config',
@@ -2932,6 +3113,7 @@ function switchPanel(panelId) {
   if (panelId === 'announces' && !configLoaded) loadBotConfig();
   if (panelId === 'config' && !configLoaded) loadBotConfig();
   if (panelId === 'moderation' && !configLoaded) loadBotConfig();
+  if (panelId === 'songs' && !configLoaded) loadBotConfig();
   if (panelId === 'games') renderBuiltinCommandsGrid();
 
   // Close mobile sidebar
@@ -2994,7 +3176,7 @@ function handleModalBg(e, id) {
 
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['cmdModal', 'addChannelModal', 'confirmModal'].forEach(id => {
+    ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'modFilterPenaltyModal', 'docsModal'].forEach(id => {
       document.getElementById(id)?.classList.remove('open');
     });
     document.body.style.overflow = '';
@@ -3711,7 +3893,10 @@ function updateOverviewModulesUI() {
   const lbActive = document.getElementById('cfgLeaderboard')?.checked ?? true;
   const wtActive = document.getElementById('cfgWatchtime')?.checked ?? true;
   const gmActive = document.getElementById('cfgGames')?.checked ?? true;
+  const lvActive = document.getElementById('cfgLove')?.checked ?? true;
   const irActive = document.getElementById('cfgAutoresponse')?.checked ?? true;
+  const mdActive = document.getElementById('cfgModeration')?.checked ?? false;
+  const srActive = document.getElementById('cfgSongRequestEnabled')?.checked ?? false;
   
   const setStatus = (id, active, name) => {
     const el = document.getElementById(id);
@@ -3720,7 +3905,6 @@ function updateOverviewModulesUI() {
         ? `${name} ✔` 
         : `${name} ❌`;
       el.style.color = active ? '#10B981' : 'var(--text-muted)';
-      el.style.textDecoration = active ? 'none' : 'line-through';
       el.style.opacity = active ? '1' : '0.65';
     }
   };
@@ -3728,7 +3912,75 @@ function updateOverviewModulesUI() {
   setStatus('ovStatusLeaderboard', lbActive, 'Leaderboard');
   setStatus('ovStatusWatchtime', wtActive, 'Watchtime');
   setStatus('ovStatusGames', gmActive, 'Mini igre');
+  setStatus('ovStatusLove', lvActive, 'Ljubav');
   setStatus('ovStatusInteraction', irActive, 'Interakcija');
+  setStatus('ovStatusModeration', mdActive, 'Moderacija');
+  setStatus('ovStatusSongRequest', srActive, 'Song Request');
+
+  // Toggle overlays for disabled panels
+  toggleModuleOverlay('panel-leaderboard', lbActive);
+  toggleModuleOverlay('panel-minigames', gmActive);
+  toggleModuleOverlay('panel-marriages', lvActive);
+  toggleModuleOverlay('panel-autoresponse', irActive);
+  toggleModuleOverlay('panel-moderation', mdActive);
+  toggleModuleOverlay('panel-songs', srActive);
+}
+
+function toggleModuleOverlay(panelId, active) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  
+  // Ensure relative positioning on the section
+  panel.style.position = 'relative';
+  
+  // Look for existing overlay
+  const existingOverlay = panel.querySelector('.module-disabled-overlay');
+  
+  if (active) {
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+    panel.style.overflow = '';
+    panel.style.height = '';
+  } else {
+    panel.style.overflow = 'hidden';
+    panel.style.height = 'calc(100vh - 120px)'; // Center overlay and prevent scrolling
+    if (!existingOverlay) {
+      const overlay = document.createElement('div');
+      overlay.className = 'module-disabled-overlay';
+      overlay.style = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #0a0614;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        border-radius: var(--radius-lg);
+        padding: 40px;
+        text-align: center;
+        box-sizing: border-box;
+      `;
+      overlay.innerHTML = `
+        <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+        <h2 style="font-family: var(--font-heading); font-size: 1.5rem; font-weight: 700; color: #fff; margin: 0 0 10px 0;">Modul nije aktiviran</h2>
+        <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; max-width: 400px; margin: 0 0 24px 0;">
+          Ovaj modul je trenutno isključen. Da biste pristupili podacima i koristili ove opcije, aktivirajte ga u podešavanjima bota.
+        </p>
+        <button class="btn btn-primary" onclick="switchPanel('config')" style="padding: 10px 24px; font-weight: 600; cursor: pointer;">Aktiviraj u Bot Config</button>
+      `;
+      panel.appendChild(overlay);
+    }
+  }
 }
 
 let liveFeedInterval = null;
@@ -3768,6 +4020,8 @@ function startLiveActivityFeed() {
           return;
         }
 
+        const wasAtBottom = (feed.scrollHeight - feed.clientHeight - feed.scrollTop) < 50;
+
         // Renderuj logove
         feed.innerHTML = logs.map(log => {
           let badgeColor = 'var(--text-muted)';
@@ -3795,8 +4049,10 @@ function startLiveActivityFeed() {
           `;
         }).join('');
 
-        // Skroluj na dno da uvek prikazuje najnovije logove
-        feed.scrollTop = feed.scrollHeight;
+        // Skroluj na dno da uvek prikazuje najnovije logove ako je bio na dnu
+        if (wasAtBottom) {
+          feed.scrollTop = feed.scrollHeight;
+        }
       } else {
         if (dot) {
           dot.style.background = 'red';
@@ -3912,7 +4168,15 @@ function setupAutosave() {
     'cfgPrefix', 'cfgLanguage', 'cfgCooldown', 'cfgLeaderboard', 'cfgWatchtime',
     'cfgGames', 'cfgLove', 'cfgModeration', 'cfgAutoresponse', 'cfgSpamThreshold',
     'cfgSpamWindow', 'cfgPinMsg', 'cfgWelcomeMsg', 'cfgAnnounceInterval',
-    'cfgAnnounceThreshold', 'cfgAnnounceTimeEnabled', 'cfgAnnounceMsgEnabled'
+    'cfgAnnounceThreshold', 'cfgAnnounceTimeEnabled', 'cfgAnnounceMsgEnabled',
+    'cfgAlertFollowEnabled', 'cfgAlertFollowMsg',
+    'cfgAlertKicksEnabled', 'cfgAlertKicksMsg', 'cfgAlertKicksMin',
+    'cfgAlertSubEnabled', 'cfgAlertSubMsg',
+    'cfgAlertResubEnabled', 'cfgAlertResubMsg',
+    'cfgAlertGiftsubEnabled', 'cfgAlertGiftsubMsg',
+    'cfgAlertHostEnabled', 'cfgAlertHostMsg', 'cfgAlertHostMin',
+    'cfgAlertWelcomeEnabled', 'cfgAlertWelcomeMsg', 'cfgCustomBotName',
+    'cfgSongRequestEnabled', 'cfgSongRequestRank', 'cfgSongRequestCost', 'cfgSongRequestMaxDuration'
   ];
 
   configInputIds.forEach(id => {
@@ -3956,5 +4220,452 @@ function setupAutosave() {
     }
   });
 }
+
+// ── Notification Center ────────────────────────────────────────────────────
+let readNotifs = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+let notifications = [
+  { id: 1, title: 'Bot uspešno pokrenut', desc: 'KickotBot je uspešno povezan na Vaš kanal i spreman je za rad.', time: 'Pre 5 minuta', type: 'info', read: false },
+  { id: 2, title: 'Moderator status proveren', desc: 'Uspešno verifikovan moderator status na kanalu. Svi moduli su aktivni.', time: 'Pre 10 minuta', type: 'success', read: false },
+  { id: 3, title: 'Upozorenje o moderatorskoj ulozi', desc: 'Ukoliko bot izgubi moderatorsku ulogu na kanalu, poruke i moderacija će automatski biti obustavljeni.', time: 'Pre 1 sat', type: 'warning', read: false }
+];
+notifications.forEach(n => {
+  if (readNotifs.includes(n.id)) n.read = true;
+});
+
+let changelogs = [
+  { version: 'v1.2.0', date: '19. jul 2026', title: 'Individualne kazne & Uređivanje', details: 'Omogućeno zasebno podešavanje kazni za svaki filter moderacije, i dodate olovkice za direktno uređivanje svih ugrađenih mini igara i bračnih komandi.' },
+  { version: 'v1.1.5', date: '19. jul 2026', title: 'Centar za obaveštenja', details: 'Kreirano zvonce u zaglavlju sa notifikacijama o radu bota i changelog-om promena.' },
+  { version: 'v1.1.0', date: '19. jul 2026', title: 'Pametno skrolovanje logova', details: 'Fiksiran scroll bug u dashboard feed-u. Skrolovanje na dno se vrši samo ukoliko ste već čitali najnovije logove.' }
+];
+
+let activeNotifTab = 'obaveštenja';
+
+function toggleNotifCenter() {
+  const popover = document.getElementById('notifPopover');
+  if (!popover) return;
+  const isHidden = popover.style.display === 'none';
+  popover.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) {
+    renderNotifContent();
+  }
+}
+
+// Close popover when clicking outside
+document.addEventListener('click', (e) => {
+  const popover = document.getElementById('notifPopover');
+  const btn = document.getElementById('notifBellBtn');
+  if (!popover || !btn) return;
+  if (btn.contains(e.target)) return;
+  if (!document.body.contains(e.target)) return; // Prevents closing when clicked item is detached during re-render
+  if (popover.contains(e.target)) return;
+  popover.style.display = 'none';
+});
+
+function switchNotifTab(tab) {
+  activeNotifTab = tab;
+  
+  const tabOb = document.getElementById('notifTabObaveštenja');
+  const tabCh = document.getElementById('notifTabChangelog');
+  
+  if (!tabOb || !tabCh) return;
+  
+  if (tab === 'obaveštenja') {
+    tabOb.style.color = '#fff';
+    tabOb.style.background = 'rgba(255,255,255,0.05)';
+    tabCh.style.color = 'var(--text-muted)';
+    tabCh.style.background = 'none';
+  } else {
+    tabCh.style.color = '#fff';
+    tabCh.style.background = 'rgba(255,255,255,0.05)';
+    tabOb.style.color = 'var(--text-muted)';
+    tabOb.style.background = 'none';
+  }
+  
+  renderNotifContent();
+}
+
+function renderNotifContent() {
+  const list = document.getElementById('notifContentList');
+  if (!list) return;
+  
+  if (activeNotifTab === 'obaveštenja') {
+    if (notifications.length === 0) {
+      list.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 24px; font-size: 0.82rem; font-style: italic;">Nema novih obaveštenja.</div>';
+      return;
+    }
+    
+    list.innerHTML = notifications.map(n => {
+      let color = '#3B82F6';
+      if (n.type === 'success') color = '#10B981';
+      if (n.type === 'warning') color = '#F59E0B';
+      
+      const opacityStyle = n.read ? 'opacity: 0.6;' : '';
+      const borderStyle = n.read ? '1px solid rgba(255,255,255,0.02)' : '1px solid rgba(139, 92, 246, 0.15)';
+      const bgStyle = n.read ? 'transparent' : 'rgba(255,255,255,0.02)';
+      
+      return `
+        <div onclick="markNotifAsRead(${n.id})" style="padding: 10px; border-radius: var(--radius-md); background: ${bgStyle}; border: ${borderStyle}; transition: all 0.2s; cursor: pointer; ${opacityStyle}">
+          <div style="display: flex; gap: 8px; align-items: flex-start; text-align: left;">
+            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${color}; margin-top: 5px; flex-shrink: 0; box-shadow: 0 0 6px ${color};"></span>
+            <div style="flex-grow: 1;">
+              <div style="font-size: 0.82rem; font-weight: 700; color: #fff; line-height: 1.3;">${escapeHtml(n.title)}</div>
+              <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4;">${escapeHtml(n.desc)}</div>
+              <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 5px;">${n.time}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } else {
+    // Changelog tab
+    list.innerHTML = changelogs.map(c => `
+      <div style="padding: 10px; border-radius: var(--radius-md); background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-size: 0.72rem; font-weight: 700; color: var(--app-primary); background: var(--app-primary-dim); padding: 2px 6px; border-radius: 4px;">${c.version}</span>
+          <span style="font-size: 0.65rem; color: var(--text-muted);">${c.date}</span>
+        </div>
+        <div style="font-size: 0.8rem; font-weight: 700; color: #fff; margin-bottom: 3px; text-align: left;">${escapeHtml(c.title)}</div>
+        <div style="font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4; text-align: left;">${escapeHtml(c.details)}</div>
+      </div>
+    `).join('');
+  }
+}
+
+function markAllNotifsAsRead() {
+  notifications.forEach(n => n.read = true);
+  
+  // Persist to localStorage
+  const readIds = notifications.map(n => n.id);
+  localStorage.setItem('read_notif_ids', JSON.stringify(readIds));
+
+  const badge = document.getElementById('notifBadge');
+  if (badge) {
+    badge.style.display = 'none';
+  }
+  renderNotifContent();
+  showToast('success', 'Sva obaveštenja označena kao pročitana.', '✔');
+}
+
+function markNotifAsRead(id) {
+  const notif = notifications.find(n => n.id === id);
+  if (notif && !notif.read) {
+    notif.read = true;
+    
+    // Persist to localStorage
+    let readIds = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+    if (!readIds.includes(id)) {
+      readIds.push(id);
+      localStorage.setItem('read_notif_ids', JSON.stringify(readIds));
+    }
+    
+    // Check if any unread left
+    const hasUnread = notifications.some(n => !n.read);
+    if (!hasUnread) {
+      const badge = document.getElementById('notifBadge');
+      if (badge) {
+        badge.style.display = 'none';
+      }
+    }
+    
+    renderNotifContent();
+  }
+}
+
+function openFeedbackModal() {
+  openModal('feedbackModal');
+}
+
+function openDocsModal() {
+  openModal('docsModal');
+}
+
+function submitFeedback() {
+  const type = document.getElementById('feedbackType')?.value;
+  const title = document.getElementById('feedbackTitle')?.value.trim();
+  const text = document.getElementById('feedbackText')?.value.trim();
+  
+  if (!title || !text) {
+    showToast('error', 'Molimo popunite sva polja pre slanja.', '⚠️');
+    return;
+  }
+  
+  showToast('success', 'Hvala na povratnim informacijama! Milan će to pregledati što pre.', '✅');
+  
+  // Clear fields
+  const titleInput = document.getElementById('feedbackTitle');
+  const textInput = document.getElementById('feedbackText');
+  if (titleInput) titleInput.value = '';
+  if (textInput) textInput.value = '';
+  
+  closeModal('feedbackModal');
+}
+
+// ── Song Request & Music Player Logic ──────────────────────────────────────
+let localSongQueue = [
+  { title: 'Milanče Radosavljević - Dao bih ovo malo života', requester: 'Strimer (Milan_567)', duration: 215 },
+  { title: 'Jašar Ahmedovski - Jednoj ženi za sećanje', requester: 'Gledalac (Marko_99)', duration: 250 },
+  { title: 'Šaban Šaulić - Žal', requester: 'Moderator (Zoki)', duration: 310 }
+];
+let currentSongIndex = 0;
+let isPlaying = false;
+let playbackInterval = null;
+let currentTimeSeconds = 0;
+let playerVolume = 80;
+
+function formatDuration(secs) {
+  const m = Math.floor(secs / 60);
+  const s = String(secs % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function renderSongQueue() {
+  const queueList = document.getElementById('songQueueList');
+  const queueCount = document.getElementById('queueCount');
+  if (!queueList) return;
+
+  queueCount.textContent = `${localSongQueue.length} pesama`;
+
+  if (localSongQueue.length === 0) {
+    queueList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px; font-size: 0.8rem; font-style: italic;">Red za puštanje je prazan.</div>';
+    return;
+  }
+
+  queueList.innerHTML = localSongQueue.map((song, index) => {
+    const isActive = index === currentSongIndex;
+    const activeBg = isActive ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255,255,255,0.01)';
+    const activeBorder = isActive ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid var(--border-subtle)';
+    const activeText = isActive ? 'var(--app-primary)' : '#fff';
+    
+    return `
+      <div style="background: ${activeBg}; border: ${activeBorder}; padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+        <div style="flex-grow: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+          <div style="font-size: 0.82rem; font-weight: 700; color: ${activeText}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(song.title)}</div>
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Zatražio: ${escapeHtml(song.requester)} • ${formatDuration(song.duration)}</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          ${isActive && isPlaying ? '<span style="font-size: 0.75rem; color: var(--kick-green); font-weight: 600; display: flex; align-items: center; gap: 4px;"><span class="status-dot" style="background: var(--kick-green); width:6px; height:6px; box-shadow:0 0 6px var(--kick-green);"></span> Svira</span>' : ''}
+          <button class="btn btn-sm btn-text" onclick="removeSong(${index})" style="color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Ukloni pesmu">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function updatePlayerUI() {
+  const playerTitle = document.getElementById('playerTitle');
+  const playerRequester = document.getElementById('playerRequester');
+  const playerProgress = document.getElementById('playerProgress');
+  const playerCurrentTime = document.getElementById('playerCurrentTime');
+  const playerTotalTime = document.getElementById('playerTotalTime');
+  const playerDisk = document.getElementById('playerDisk');
+  const playIcon = document.getElementById('playIcon');
+
+  if (!playerTitle) return;
+
+  const currentSong = localSongQueue[currentSongIndex];
+  if (!currentSong) {
+    playerTitle.textContent = 'Nema pesama u redu';
+    playerRequester.textContent = 'Zatražite pesmu ispod';
+    if (playerProgress) playerProgress.style.width = '0%';
+    if (playerCurrentTime) playerCurrentTime.textContent = '0:00';
+    if (playerTotalTime) playerTotalTime.textContent = '0:00';
+    if (playerDisk) playerDisk.style.animationPlayState = 'paused';
+    if (playIcon) {
+      playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3" />';
+    }
+    return;
+  }
+
+  playerTitle.textContent = currentSong.title;
+  playerRequester.textContent = `Zatražio: ${currentSong.requester}`;
+  if (playerTotalTime) playerTotalTime.textContent = formatDuration(currentSong.duration);
+  if (playerCurrentTime) playerCurrentTime.textContent = formatDuration(currentTimeSeconds);
+  if (playerProgress) {
+    const pct = (currentTimeSeconds / currentSong.duration) * 100;
+    playerProgress.style.width = `${pct}%`;
+  }
+
+  if (playerDisk) {
+    playerDisk.style.animationPlayState = isPlaying ? 'running' : 'paused';
+  }
+
+  if (playIcon) {
+    if (isPlaying) {
+      playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />';
+    } else {
+      playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3" />';
+    }
+  }
+}
+
+function togglePlayback() {
+  if (localSongQueue.length === 0) {
+    showToast('info', 'Dodajte najpre neku pesmu u red.', 'ℹ️');
+    return;
+  }
+
+  isPlaying = !isPlaying;
+  
+  if (isPlaying) {
+    playbackInterval = setInterval(() => {
+      const currentSong = localSongQueue[currentSongIndex];
+      if (!currentSong) {
+        clearInterval(playbackInterval);
+        isPlaying = false;
+        updatePlayerUI();
+        return;
+      }
+
+      currentTimeSeconds++;
+      if (currentTimeSeconds >= currentSong.duration) {
+        skipSong();
+      } else {
+        updatePlayerUI();
+      }
+    }, 1000);
+  } else {
+    if (playbackInterval) {
+      clearInterval(playbackInterval);
+    }
+  }
+  
+  updatePlayerUI();
+  renderSongQueue();
+}
+
+function skipSong() {
+  if (playbackInterval) {
+    clearInterval(playbackInterval);
+  }
+
+  currentTimeSeconds = 0;
+  
+  if (localSongQueue.length > 0) {
+    // Remove current song from queue (played)
+    localSongQueue.splice(currentSongIndex, 1);
+    
+    // Wrap around or keep index within bounds
+    if (currentSongIndex >= localSongQueue.length) {
+      currentSongIndex = 0;
+    }
+  }
+
+  // Persist queue change
+  saveBotConfig(true);
+
+  if (localSongQueue.length === 0) {
+    isPlaying = false;
+    showToast('info', 'Završeno puštanje svih pesama.', '🎵');
+  } else {
+    if (isPlaying) {
+      // Re-trigger interval for next song
+      isPlaying = false;
+      togglePlayback();
+      return;
+    }
+  }
+
+  updatePlayerUI();
+  renderSongQueue();
+}
+
+function requestSong() {
+  const input = document.getElementById('songRequestInput');
+  if (!input) return;
+
+  const value = input.value.trim();
+  if (!value) {
+    showToast('error', 'Molimo unesite YouTube link ili naziv pesme.', '⚠️');
+    return;
+  }
+
+  // Create mock requested song
+  let newSongTitle = value;
+  if (value.startsWith('http://') || value.startsWith('https://')) {
+    newSongTitle = 'YouTube Muzika - ' + value.split('v=')[1]?.substring(0, 8) || 'Pesma iz linka';
+  }
+
+  const duration = Math.floor(Math.random() * (300 - 120 + 1)) + 120; // 2 to 5 minutes random
+  
+  const requester = activeChannel ? `Broadcaster (${activeChannel.username})` : 'Strimer';
+  
+  localSongQueue.push({
+    title: newSongTitle,
+    requester: requester,
+    duration: duration
+  });
+
+  // Save to DB
+  saveBotConfig(true);
+
+  input.value = '';
+  showToast('success', 'Pesma uspešno dodata u red za puštanje!', '✅');
+
+  renderSongQueue();
+  updatePlayerUI();
+}
+
+function removeSong(index) {
+  const isActive = index === currentSongIndex;
+  
+  localSongQueue.splice(index, 1);
+
+  if (isActive) {
+    if (playbackInterval) {
+      clearInterval(playbackInterval);
+    }
+    currentTimeSeconds = 0;
+    isPlaying = false;
+  } else if (index < currentSongIndex) {
+    currentSongIndex--;
+  }
+
+  // Save to DB
+  saveBotConfig(true);
+
+  if (localSongQueue.length === 0) {
+    isPlaying = false;
+  } else if (currentSongIndex >= localSongQueue.length) {
+    currentSongIndex = 0;
+  }
+
+  showToast('success', 'Pesma je uklonjena iz reda.', '🗑️');
+  renderSongQueue();
+  updatePlayerUI();
+}
+
+function updateVolume(val) {
+  playerVolume = val;
+  // Simulated volume adjust
+}
+
+function seekPlayer(event) {
+  const currentSong = localSongQueue[currentSongIndex];
+  if (!currentSong) return;
+
+  const progressBar = event.currentTarget;
+  const rect = progressBar.getBoundingClientRect();
+  const clickX = event.clientX - rect.left;
+  const width = rect.width;
+  const pct = clickX / width;
+  
+  currentTimeSeconds = Math.floor(pct * currentSong.duration);
+  updatePlayerUI();
+}
+
+// Initial rendering of notification content on page load
+window.addEventListener('DOMContentLoaded', () => {
+  // Hide notification badge if there are no unread notifications on start
+  const hasUnread = notifications.some(n => !n.read);
+  const badge = document.getElementById('notifBadge');
+  if (badge) {
+    badge.style.display = hasUnread ? 'block' : 'none';
+  }
+  renderNotifContent();
+  renderSongQueue();
+  updatePlayerUI();
+});
 
 initAuth();

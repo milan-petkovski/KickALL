@@ -34,15 +34,24 @@
 
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header" style="gap: 12px; justify-content: flex-start;">
+      <div class="sidebar-header" style="display: flex; align-items: center; gap: 12px; justify-content: flex-start;">
         <a href="../dashboard.html" class="back-to-router-btn" title="Nazad na ruter (KickAll)" style="flex-shrink: 0;">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </a>
-        <a href="index.html" class="sidebar-logo">
-          <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 30px;">
+        <a href="index.html" class="sidebar-logo" style="display: flex; align-items: center;">
+          <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 42px;">
+        </a>
+        <a href="https://paypal.me/milanwebportal" target="_blank" title="Kupi mi kafu" style="margin-left: auto; color: #8B5A2B; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: rgba(139, 90, 43, 0.08); border: 1px solid rgba(139, 90, 43, 0.2); transition: all 0.2s;" onmouseover="this.style.background='rgba(139, 90, 43, 0.15)'" onmouseout="this.style.background='rgba(139, 90, 43, 0.08)'">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 8h1a4 4 0 1 1 0 8h-1"></path>
+            <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path>
+            <line x1="6" y1="2" x2="6" y2="4"></line>
+            <line x1="10" y1="2" x2="10" y2="4"></line>
+            <line x1="14" y1="2" x2="14" y2="4"></line>
+          </svg>
         </a>
       </div>
 
@@ -148,6 +157,15 @@
           </svg>
           Mini igre
         </button>
+        <button class="nav-item" data-panel="songs" onclick="switchPanel('songs')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="18" cy="16" r="3" />
+          </svg>
+          Song Request
+        </button>
 
         <div class="nav-section-label">Upravljanje</div>
         <button class="nav-item" data-panel="config" onclick="switchPanel('config')">
@@ -163,6 +181,7 @@
           </svg>
           Moderacija
         </button>
+
       </nav>
 
       <div class="sidebar-footer">
@@ -173,6 +192,29 @@
             <div class="user-plan" id="sidebarPlan">Free</div>
           </div>
           <div class="user-menu-sm" id="userMenuSm">
+            <button onclick="openFeedbackModal()" class="dropdown-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span>Predloži komandu</span>
+            </button>
+            <button onclick="openFeedbackModal()" class="dropdown-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+              </svg>
+              <span>Pomoć</span>
+            </button>
+            <button onclick="openDocsModal()" class="dropdown-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
+              <span>Dokumentacija</span>
+            </button>
             <button onclick="openSettingsModal()" class="dropdown-item">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                 stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
@@ -222,6 +264,44 @@
               <span class="toggle-track"></span>
             </label>
           </div>
+          <!-- Notifications Bell -->
+          <div style="position: relative; display: inline-block;">
+            <button class="topbar-btn" onclick="toggleNotifCenter()" title="Obaveštenja" id="notifBellBtn" style="position: relative; cursor: pointer; display: flex; align-items: center; justify-content: center; background: transparent; border: none; color: inherit; padding: 8px; border-radius: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <!-- Unread Dot Badge -->
+              <span id="notifBadge" style="position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; background: #EF4444; border-radius: 50%; box-shadow: 0 0 6px #EF4444; border: 1.5px solid #06040a;"></span>
+            </button>
+            
+            <!-- Notifications Popover -->
+            <div id="notifPopover" style="display: none; position: absolute; top: 44px; right: 0; width: 320px; background: #0b0716; border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-lg); box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 1010; overflow: hidden; font-family: inherit;">
+              <!-- Popover Head -->
+              <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.15);">
+                <h4 style="margin: 0; font-size: 0.9rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  </svg>
+                  Obaveštenja
+                </h4>
+                <button onclick="markAllNotifsAsRead()" style="background: none; border: none; color: var(--app-primary); font-size: 0.75rem; font-weight: 600; cursor: pointer; padding: 2px;">Pročitaj sve</button>
+              </div>
+              
+              <!-- Popover Tabs -->
+              <div style="display: flex; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border-subtle); padding: 4px;">
+                <button id="notifTabObaveštenja" onclick="switchNotifTab('obaveštenja')" style="flex: 1; background: rgba(255,255,255,0.05); border: none; color: #fff; padding: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: 6px; transition: all 0.2s;">Obaveštenja</button>
+                <button id="notifTabChangelog" onclick="switchNotifTab('changelog')" style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; border-radius: 6px; transition: all 0.2s;">Changelog</button>
+              </div>
+              
+              <!-- Popover Content Area -->
+              <div id="notifContentList" style="max-height: 280px; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;">
+                <!-- Populated by JS -->
+              </div>
+            </div>
+          </div>
+
           <button class="topbar-btn" onclick="refreshAllData()" title="Osveži podatke">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <polyline points="23 4 23 10 17 10" />
@@ -374,15 +454,10 @@
                     <span id="ovStatusLeaderboard" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Leaderboard ✔</span>
                     <span id="ovStatusWatchtime" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Watchtime ✔</span>
                     <span id="ovStatusGames" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Mini igre ✔</span>
+                    <span id="ovStatusLove" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Ljubav ✔</span>
                     <span id="ovStatusInteraction" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Interakcija ✔</span>
-                    <span style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; color: #10B981; display: inline-block; font-weight: 600;">Spam ✔</span>
-                    <span style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; color: var(--text-muted); display: inline-flex; align-items: center; gap: 6px; font-weight: 600;">
-                      Moderacija 
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                      </svg>
-                    </span>
+                    <span id="ovStatusModeration" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Moderacija ✔</span>
+                    <span id="ovStatusSongRequest" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Song Request ✔</span>
                   </div>
                 </div>
               </div>
@@ -572,6 +647,19 @@
           </div>
 
           <div class="lb-podium" id="lbPodium">
+          </div>
+
+          <!-- Leaderboard Info Banner -->
+          <div class="info-banner"
+            style="margin-bottom: 1.5rem; background: rgba(139, 92, 246, 0.03); border: 1px solid rgba(139, 92, 246, 0.15); border-left: 4px solid var(--app-primary); padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; width: 100%;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5" style="flex-shrink: 0;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+              Leaderboard se vodi na <strong>mesečnom nivou</strong> i automatski se arhivira na kraju svakog meseca. Strimeri mogu ručno resetovati tabelu u bilo kom trenutku kucanjem komande <strong>!resetleaderboard</strong> direktno u četu.
+            </span>
           </div>
 
           <div class="table-toolbar">
@@ -1182,6 +1270,134 @@
               </div>
             </div>
 
+            <!-- Chat Alerts Section -->
+            <div class="config-section" style="grid-column: span 2; margin-top: 2rem; display: flex; flex-direction: column; gap: 20px;">
+              <h3 class="config-section-title" style="display: flex; align-items: center; gap: 8px; margin: 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--app-primary);">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                Čat alertovi (Obaveštenja o događajima u četu)
+              </h3>
+              
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem;">
+                
+                <!-- Follow Alert -->
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); padding: 15px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #fff; font-size: 0.9rem;">Follow Alert</strong>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgAlertFollowEnabled">
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div>
+                    <label class="config-label" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Poruka u četu:</label>
+                    <input type="text" id="cfgAlertFollowMsg" class="form-input" style="width: 100%; font-size: 0.82rem;" placeholder="Thanks for the follow @$(name)!">
+                  </div>
+                </div>
+
+                <!-- KICKs Alert -->
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); padding: 15px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #fff; font-size: 0.9rem;">KICKs Alert</strong>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgAlertKicksEnabled">
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div>
+                    <label class="config-label" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Poruka u četu:</label>
+                    <input type="text" id="cfgAlertKicksMsg" class="form-input" style="width: 100%; font-size: 0.82rem;" placeholder="@$(name) Thanks for the $(amount) KICKs!">
+                  </div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Minimalan iznos:</span>
+                    <input type="number" id="cfgAlertKicksMin" class="form-input" style="width: 70px; padding: 4px 8px; font-size: 0.8rem; text-align: center;" min="0" value="0">
+                  </div>
+                </div>
+
+                <!-- Subscription Alert -->
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); padding: 15px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #fff; font-size: 0.9rem;">Subscription Alert</strong>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgAlertSubEnabled">
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div>
+                    <label class="config-label" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Poruka u četu:</label>
+                    <input type="text" id="cfgAlertSubMsg" class="form-input" style="width: 100%; font-size: 0.82rem;" placeholder="Thanks @$(name) for subscribing for $(months) months!">
+                  </div>
+                </div>
+
+                <!-- Re-subscription Alert -->
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); padding: 15px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #fff; font-size: 0.9rem;">Re-subscription Alert</strong>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgAlertResubEnabled">
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div>
+                    <label class="config-label" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Poruka u četu:</label>
+                    <input type="text" id="cfgAlertResubMsg" class="form-input" style="width: 100%; font-size: 0.82rem;" placeholder="Thanks @$(name) for subscribing for $(months) months!">
+                  </div>
+                </div>
+
+                <!-- Gifted Subscription Alert -->
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); padding: 15px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #fff; font-size: 0.9rem;">Gifted Subscription Alert</strong>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgAlertGiftsubEnabled">
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div>
+                    <label class="config-label" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Poruka u četu:</label>
+                    <input type="text" id="cfgAlertGiftsubMsg" class="form-input" style="width: 100%; font-size: 0.82rem;" placeholder="Thanks for the gift @$(name)!">
+                  </div>
+                </div>
+
+                <!-- Host Alert -->
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); padding: 15px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #fff; font-size: 0.9rem;">Host / Raid Alert</strong>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgAlertHostEnabled">
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div>
+                    <label class="config-label" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Poruka u četu:</label>
+                    <input type="text" id="cfgAlertHostMsg" class="form-input" style="width: 100%; font-size: 0.82rem;" placeholder="@$(name) Thanks for raiding with $(viewers) viewers!">
+                  </div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px;">
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">Minimalan broj gledalaca:</span>
+                    <input type="number" id="cfgAlertHostMin" class="form-input" style="width: 70px; padding: 4px 8px; font-size: 0.8rem; text-align: center;" min="0" value="0">
+                  </div>
+                </div>
+
+                <!-- Welcome Alert -->
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); padding: 15px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="color: #fff; font-size: 0.9rem;">Welcome Alert</strong>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgAlertWelcomeEnabled">
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                  <div>
+                    <label class="config-label" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: block;">Pozdrav za prve ulaske (1 dnevno max):</label>
+                    <input type="text" id="cfgAlertWelcomeMsg" class="form-input" style="width: 100%; font-size: 0.82rem;" placeholder="Dobrodošao @$(name) na strim!">
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
             <div class="info-banner"
               style="margin-top: 2.5rem; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.15); border-left: 4px solid #EF4444; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; width: 100%;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5"
@@ -1500,6 +1716,24 @@
                     <span class="toggle-track"></span>
                   </label>
                 </div>
+                <!-- Song Request -->
+                <div class="toggle-item" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);">
+                  <div class="toggle-info">
+                    <div class="toggle-name" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--app-primary);">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                      </svg>
+                      Song Request
+                    </div>
+                    <div class="toggle-desc" style="font-size: 0.8rem; color: var(--text-muted);">Puštanje pesama i muzičke želje gledalaca u četu preko komande.</div>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="cfgSongRequestEnabled">
+                    <span class="toggle-track"></span>
+                  </label>
+                </div>
               </div>
             </div>
 
@@ -1523,6 +1757,49 @@
                   <label class="config-label" style="font-weight: 600; margin-bottom: 6px;">Vremenski prozor provere (ms)</label>
                   <input type="number" class="form-input" id="cfgSpamWindow" value="15000" min="1000" max="120000" />
                   <span class="config-hint">Maksimalan vremenski prozor u kom se proverava ponavljanje (npr. <code>15000ms = 15 sekundi</code>).</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Custom Bot Account -->
+            <div class="config-section" style="padding: 24px; grid-column: span 2;">
+              <h3 class="config-section-title" style="display: flex; align-items: center; gap: 8px; font-size: 1.1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 20px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--app-primary);">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                Custom nalog za bota (Sopstveno ime bota)
+              </h3>
+              <div style="display: flex; flex-direction: column; gap: 16px;">
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0; line-height: 1.5;">
+                  Bot će slati poruke sa nalogom koji je prijavljen na striming platformi u trenutku autorizacije. Tokom celog procesa, držite Kickot prijavljenim sa vašim standardnim nalogom strimera.
+                </p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; align-items: start; margin-top: 5px;">
+                  <div class="config-field">
+                    <label class="config-label" style="font-weight: 600; margin-bottom: 6px;">Ime bota:</label>
+                    <input type="text" class="form-input" id="cfgCustomBotName" placeholder="@KickotBot" style="font-weight: 600;" />
+                    <span class="config-hint" style="margin-top: 4px;">Unesite željeno ime bot naloga. Podrazumevano ime je <code>@KickotBot</code>.</span>
+                  </div>
+                  
+                  <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--border-subtle); padding: 15px; border-radius: var(--radius-md); display: flex; flex-direction: column; gap: 8px;">
+                    <strong style="color: #fff; font-size: 0.9rem;">Izaberi nalog bota</strong>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Da li imate poseban nalog za bota?</span>
+                    <a href="#" onclick="openKickLoginForChannel(); return false;" style="color: var(--app-primary); font-weight: 600; font-size: 0.85rem; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
+                      Klikni ovde da povežeš
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+                    </a>
+                  </div>
+                </div>
+
+                <div class="info-banner" style="background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.15); border-left: 4px solid #F59E0B; padding: 12px 16px; border-radius: var(--radius-md); font-size: 0.82rem; color: #F59E0B; display: flex; flex-direction: column; gap: 6px; line-height: 1.5; margin-top: 10px; box-sizing: border-box; width: 100%;">
+                  <div style="font-weight: bold; display: flex; align-items: center; gap: 6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    Upozorenje: ova funkcija je u fazi testiranja i možete naići na određene probleme.
+                  </div>
+                  <div style="color: var(--text-muted); font-size: 0.78rem;">
+                    Potrebna vam je pomoć? Kontaktirajte nas na <a href="mailto:contact@milanwebportal.com" style="color: var(--app-primary); text-decoration: underline;">contact@milanwebportal.com</a>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1579,7 +1856,15 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Velika slova (Caps)</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                          <span>Velika slova (Caps)</span>
+                          <button type="button" class="btn-text" onclick="openModFilterPenaltyModal('caps', 'Velika slova (Caps)')" title="Podesi kaznu za Caps" style="color: var(--text-muted); padding: 2px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                          </button>
+                        </h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Limitira prekomerno korišćenje velikih slova.</span>
                       </div>
                     </div>
@@ -1614,7 +1899,15 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od linkova</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                          <span>Zaštita od linkova</span>
+                          <button type="button" class="btn-text" onclick="openModFilterPenaltyModal('links', 'Zaštita od linkova')" title="Podesi kaznu za Linkove" style="color: var(--text-muted); padding: 2px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                          </button>
+                        </h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Sprečava deljenje linkova u četu.</span>
                       </div>
                     </div>
@@ -1648,7 +1941,15 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od emotikona</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                          <span>Zaštita od emotikona</span>
+                          <button type="button" class="btn-text" onclick="openModFilterPenaltyModal('emotes', 'Zaštita od emotikona')" title="Podesi kaznu za Emotikone" style="color: var(--text-muted); padding: 2px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                          </button>
+                        </h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Limitira maks emotikona po poruci.</span>
                       </div>
                     </div>
@@ -1673,7 +1974,15 @@
                         #&@
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od simbola</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                          <span>Zaštita od simbola</span>
+                          <button type="button" class="btn-text" onclick="openModFilterPenaltyModal('symbols', 'Zaštita od simbola')" title="Podesi kaznu za Simbole" style="color: var(--text-muted); padding: 2px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                          </button>
+                        </h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Sprečava prekomernu upotrebu simbola.</span>
                       </div>
                     </div>
@@ -1709,7 +2018,15 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zabranjene reči</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                          <span>Zabranjene reči</span>
+                          <button type="button" class="btn-text" onclick="openModFilterPenaltyModal('words', 'Zabranjene reči')" title="Podesi kaznu za Zabranjene reči" style="color: var(--text-muted); padding: 2px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                          </button>
+                        </h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Cenzuriše neprikladne reči u četu.</span>
                       </div>
                     </div>
@@ -1737,7 +2054,15 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od dupliranog spama</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                          <span>Zaštita od dupliranog spama</span>
+                          <button type="button" class="btn-text" onclick="openModFilterPenaltyModal('spam', 'Zaštita od dupliranog spama')" title="Podesi kaznu za Spam" style="color: var(--text-muted); padding: 2px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                          </button>
+                        </h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Blokira brzo ponavljanje istih poruka.</span>
                       </div>
                     </div>
@@ -1767,7 +2092,15 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od predugih poruka</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                          <span>Zaštita od predugih poruka</span>
+                          <button type="button" class="btn-text" onclick="openModFilterPenaltyModal('max_len', 'Zaštita od predugih poruka')" title="Podesi kaznu za Duge poruke" style="color: var(--text-muted); padding: 2px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                          </button>
+                        </h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Sprečava slanje prevelikih poruka.</span>
                       </div>
                     </div>
@@ -1795,7 +2128,15 @@
                         </svg>
                       </div>
                       <div>
-                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">Zaštita od masovnih tagova</h4>
+                        <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+                          <span>Zaštita od masovnih tagova</span>
+                          <button type="button" class="btn-text" onclick="openModFilterPenaltyModal('mentions', 'Zaštita od masovnih tagova')" title="Podesi kaznu za Masovne tagove" style="color: var(--text-muted); padding: 2px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; border: none;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                              <path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                          </button>
+                        </h4>
                         <span style="color: var(--text-muted); font-size: 0.75rem;">Sprečava masovno pominjanje korisnika.</span>
                       </div>
                     </div>
@@ -1825,7 +2166,7 @@
                       <line x1="12" y1="8" x2="12" y2="12" />
                       <line x1="12" y1="16" x2="12.01" y2="16" />
                     </svg>
-                    Kaznene mere
+                    Globalne kaznene mere
                   </h4>
                   <div class="config-fields">
                     <div class="config-field">
@@ -1839,6 +2180,14 @@
                     <div class="config-field">
                       <label class="config-label" style="color: var(--text-secondary);">Trajanje privremenog udaljavanja (u sekundama):</label>
                       <input type="number" id="cfgModTimeoutDuration" min="5" value="600" class="form-input">
+                    </div>
+                    
+                    <div class="info-banner" style="background: rgba(245, 158, 11, 0.03); border: 1px solid rgba(245, 158, 11, 0.15); border-left: 4px solid #F59E0B; padding: 10px 14px; border-radius: var(--radius-md); font-size: 0.8rem; color: #F59E0B; margin-top: 10px; line-height: 1.4;">
+                      <strong>Napomena:</strong> Globalna podešavanja služe kao podrazumevana kazna za sve filtere. Klikom na dugme ispod, prepisaćete sve specifične kazne na pojedinačnim filterima ovim globalnim vrednostima.
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; margin-top: 12px;">
+                      <button type="button" class="btn btn-sm btn-outline" onclick="applyGlobalPenaltyToAll()" style="font-size: 0.8rem; padding: 6px 12px; border-radius: 6px; cursor: pointer;">Primeni na sve filtere</button>
                     </div>
                   </div>
                 </div>
@@ -1885,6 +2234,172 @@
               </div>
 
             </div>
+          </div>
+        </section>
+
+
+        <!-- ══ SONG REQUEST & MUSIC PLAYER ══ -->
+        <section id="panel-songs" class="panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--app-primary-dim); color: var(--app-primary);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </div>
+                <span>Song Request & Puštanje pesama</span>
+              </h1>
+              <p class="panel-desc">Upravljajte muzičkom željom gledalaca u realnom vremenu i puštajte muziku na svom strimu.</p>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+            
+            <!-- Left Column: Player & Add Song -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+              
+              <!-- Music Player Card -->
+              <div class="config-section" style="padding: 24px; display: flex; flex-direction: column; gap: 20px; align-items: center; text-align: center;">
+                <div style="width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, var(--app-primary), #000); border: 4px solid var(--border-subtle); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(0,0,0,0.4); position: relative; overflow: hidden; animation: spin 20s linear infinite; animation-play-state: paused;" id="playerDisk">
+                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 18V5l12-2v13" />
+                    <circle cx="6" cy="18" r="3" />
+                    <circle cx="18" cy="16" r="3" />
+                  </svg>
+                </div>
+                
+                <div>
+                  <h4 style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #fff;" id="playerTitle">Nema pesama u redu</h4>
+                  <p style="margin: 4px 0 0 0; font-size: 0.8rem; color: var(--text-muted);" id="playerRequester">Zatražite pesmu ispod</p>
+                </div>
+
+                <!-- Progress Bar -->
+                <div style="width: 100%; display: flex; flex-direction: column; gap: 6px;">
+                  <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; position: relative; cursor: pointer;" onclick="seekPlayer(event)">
+                    <div style="width: 0%; height: 100%; background: var(--app-primary); border-radius: 3px; transition: width 0.1s linear;" id="playerProgress"></div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                    <span id="playerCurrentTime">0:00</span>
+                    <span id="playerTotalTime">0:00</span>
+                  </div>
+                </div>
+
+                <!-- Controls -->
+                <div style="display: flex; align-items: center; gap: 20px;">
+                  <button class="btn btn-outline" style="border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="togglePlayback()" id="playBtn" title="Pusti / Pauziraj">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" id="playIcon">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  </button>
+                  <button class="btn btn-outline" style="border-radius: 50%; width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="skipSong()" title="Preskoči pesmu">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polygon points="5 4 15 12 5 20 5 4" />
+                      <line x1="19" y1="5" x2="19" y2="19" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- Volume -->
+                <div style="display: flex; align-items: center; gap: 10px; width: 100%; max-width: 200px; margin-top: 5px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.5">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                  </svg>
+                  <input type="range" min="0" max="100" value="80" style="flex-grow: 1; accent-color: var(--app-primary); height: 4px; cursor: pointer;" oninput="updateVolume(this.value)">
+                </div>
+
+              </div>
+
+              <!-- Request Form -->
+              <div class="config-section" style="padding: 24px;">
+                <h3 class="config-section-title" style="display: flex; align-items: center; gap: 6px; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 16px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Dodaj pesmu ručno (Strimer / Moderator)
+                </h3>
+                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                  <input type="text" id="songRequestInput" class="form-input" style="flex-grow: 1;" placeholder="Unesi YouTube link ili naziv pesme..." onkeydown="if(event.key === 'Enter') requestSong()">
+                  <button class="btn btn-primary" onclick="requestSong()" style="padding: 10px 20px;">Dodaj</button>
+                </div>
+                <span class="config-hint" style="line-height: 1.4; display: block;">
+                  Gledaoci šalju muzičke želje direktno u četu kucanjem komande: <code style="background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; color: var(--app-primary); font-weight: bold;">!pesma [naziv pesme ili link]</code>
+                </span>
+              </div>
+
+            </div>
+
+            <!-- Right Column: Queue & Settings -->
+            <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+              
+              <!-- Queue Card -->
+              <div class="config-section" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; flex-grow: 1;">
+                <h3 class="config-section-title" style="display: flex; align-items: center; justify-content: space-between; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 0;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--app-primary);">
+                      <line x1="8" y1="6" x2="21" y2="6" />
+                      <line x1="8" y1="12" x2="21" y2="12" />
+                      <line x1="8" y1="18" x2="21" y2="18" />
+                      <line x1="3" y1="6" x2="3.01" y2="6" />
+                      <line x1="3" y1="12" x2="3.01" y2="12" />
+                      <line x1="3" y1="18" x2="3.01" y2="18" />
+                    </svg>
+                    <span>Lista pesama u redu</span>
+                  </div>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);" id="queueCount">0 pesama</span>
+                </h3>
+                
+                <div style="max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px;" id="songQueueList">
+                  <!-- Dynamic playlist queue items loaded here -->
+                </div>
+              </div>
+
+              <!-- Settings Card -->
+              <div class="config-section" style="padding: 24px;">
+                <h3 class="config-section-title" style="display: flex; align-items: center; justify-content: space-between; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 16px;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--app-primary);">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                    <span>Song Request podešavanja</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="cfgSongRequestEnabled">
+                    <span class="toggle-track"></span>
+                  </label>
+                </h3>
+                
+                <div style="display: flex; flex-direction: column; gap: 14px;">
+                  <div class="config-field" style="margin-bottom: 0;">
+                    <label class="config-label" style="color: var(--text-secondary);">Ko može da zatraži pesmu:</label>
+                    <select id="cfgSongRequestRank" class="form-input">
+                      <option value="everyone">Svi (Gledaoci)</option>
+                      <option value="vip">VIP i viši rangovi</option>
+                      <option value="subscriber">Pretplatnici (Subs)</option>
+                      <option value="moderator">Samo Moderatori</option>
+                    </select>
+                  </div>
+                  
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div class="config-field" style="margin-bottom: 0;">
+                      <label class="config-label" style="color: var(--text-secondary);">Cena u poenima:</label>
+                      <input type="number" id="cfgSongRequestCost" class="form-input" min="0" value="50">
+                    </div>
+                    <div class="config-field" style="margin-bottom: 0;">
+                      <label class="config-label" style="color: var(--text-secondary);">Maks. trajanje (sek):</label>
+                      <input type="number" id="cfgSongRequestMaxDuration" class="form-input" min="30" value="360">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
           </div>
         </section>
 
@@ -2061,6 +2576,160 @@
       </div>
     </div>
   </div>
+
+  <!-- Moderation Filter Penalty Modal -->
+  <div class="modal-backdrop" id="modFilterPenaltyModal" onclick="handleModalBg(event, 'modFilterPenaltyModal')">
+    <div class="modal-box modal-sm" style="max-width: 420px; background: #0b0716; border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-lg); overflow: hidden;">
+      <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.15rem; font-family: var(--font-heading); font-weight: 700; color: #fff;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--app-primary);">
+            <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span id="modFilterPenaltyTitle">Podesi kaznu za filter</span>
+        </h3>
+        <button class="modal-close" onclick="closeModal('modFilterPenaltyModal')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 6px; transition: all 0.2s;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <input type="hidden" id="modFilterKey" value="" />
+        
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label class="form-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Akcija kod prekršaja:</label>
+          <select id="modFilterActionType" class="form-input" style="width: 100%;">
+            <option value="">Podrazumevano (Koristi globalno podešavanje)</option>
+            <option value="delete">Samo obriši poruku (Delete)</option>
+            <option value="warn">Upozori korisnika (Warn - 3 warninga do timeout-a)</option>
+            <option value="timeout">Privremeno udalji sa strima (Timeout)</option>
+          </select>
+        </div>
+        
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label class="form-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Trajanje privremenog udaljavanja (u sekundama):</label>
+          <input type="number" id="modFilterTimeoutDuration" min="5" placeholder="Npr. 600 (ostavi prazno za podrazumevano)" class="form-input" style="width: 100%;">
+          <span class="config-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Ostavite prazno ili 0 da koristi globalno trajanje.</span>
+        </div>
+      </div>
+      <div class="modal-foot" style="padding: 20px 24px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; margin-top: 0; background: rgba(0,0,0,0.15);">
+        <button class="btn btn-outline" onclick="closeModal('modFilterPenaltyModal')">Otkaži</button>
+        <button class="btn btn-primary" onclick="saveModFilterPenalty()" style="padding: 10px 24px;">Sačuvaj</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Feedback / Command Suggestion Modal -->
+  <div class="modal-backdrop" id="feedbackModal" onclick="handleModalBg(event, 'feedbackModal')">
+    <div class="modal-box modal-sm" style="max-width: 440px; background: #0b0716; border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-lg); overflow: hidden;">
+      <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.15rem; font-family: var(--font-heading); font-weight: 700; color: #fff;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span>Predloži komandu / Utisci</span>
+        </h3>
+        <button class="modal-close" onclick="closeModal('feedbackModal')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 6px; transition: all 0.2s;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <div class="info-banner" style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; background: rgba(139, 92, 246, 0.03); border: 1px solid rgba(139, 92, 246, 0.15); border-left: 4px solid var(--app-primary); padding: 12px; border-radius: var(--radius-md); font-size: 0.8rem; color: var(--text-secondary); line-height: 1.45; width: 100%; box-sizing: border-box;">
+          <div><strong>Kontakt email:</strong> <a href="mailto:contact@milanwebportal.com" style="color: var(--app-primary); font-weight: 600; text-decoration: underline;">contact@milanwebportal.com</a></div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">Pišite nam direktno ili ispunite formu ispod za brze predloge.</div>
+        </div>
+        
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label class="form-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Tip poruke:</label>
+          <select id="feedbackType" class="form-input" style="width: 100%;">
+            <option value="predlog">Predlog nove komande / opcije</option>
+            <option value="utisak">Utisci o radu bota</option>
+            <option value="prijavabuga">Prijava greške / baga</option>
+          </select>
+        </div>
+        
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label class="form-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Naslov:</label>
+          <input type="text" id="feedbackTitle" class="form-input" placeholder="Npr. !kolo sreće komanda" style="width: 100%;">
+        </div>
+        
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label class="form-label" style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); margin: 0;">Opis / Poruka:</label>
+          <textarea id="feedbackText" class="form-input" style="width: 100%; min-height: 100px; resize: vertical; font-family: inherit; padding: 10px;" placeholder="Opiši svoju ideju ili nam napiši utiske..."></textarea>
+        </div>
+      </div>
+      <div class="modal-foot" style="padding: 20px 24px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px; margin-top: 0; background: rgba(0,0,0,0.15);">
+        <button class="btn btn-outline" onclick="closeModal('feedbackModal')">Otkaži</button>
+        <button class="btn btn-primary" onclick="submitFeedback()" style="padding: 10px 24px;">Pošalji</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Documentation Modal -->
+  <div class="modal-backdrop" id="docsModal" onclick="handleModalBg(event, 'docsModal')">
+    <div class="modal-box" style="max-width: 680px; background: #0b0716; border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-lg); overflow: hidden;">
+      <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="display: flex; align-items: center; gap: 8px; margin: 0; font-size: 1.15rem; font-family: var(--font-heading); font-weight: 700; color: #fff;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          </svg>
+          <span>Dokumentacija & Uputstvo za Kickot</span>
+        </h3>
+        <button class="modal-close" onclick="closeModal('docsModal')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; border-radius: 6px; transition: all 0.2s;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 24px; max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; color: var(--text-secondary); line-height: 1.6; font-size: 0.9rem; text-align: left;">
+        
+        <div>
+          <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 1rem; font-weight: 700; border-left: 3px solid var(--app-primary); padding-left: 8px;">1. Kako pokrenuti bota</h4>
+          <p style="margin: 0 0 8px 0;">Da bi bot uopšte mogao da reaguje na chat poruke na Vašem kanalu, <strong>morate postaviti bota za moderatora na kanalu</strong>.</p>
+          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 6px; font-family: var(--font-mono); font-size: 0.8rem; color: var(--app-primary); margin-bottom: 8px;">
+            /mod kickot
+          </div>
+          <p style="margin: 0;">Ukoliko bot nije moderator ili strim nije pokrenut, bot se neće povezati na Vaš chat.</p>
+        </div>
+
+        <div>
+          <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 1rem; font-weight: 700; border-left: 3px solid var(--app-primary); padding-left: 8px;">2. Ugrađene komande i podešavanja</h4>
+          <p style="margin: 0 0 8px 0;">Sve ugrađene mini igre, brakove i zabavne komande možete prilagoditi u sekciji <strong>Ugrađene komande</strong> klikom na ikonicu olovke (edit) pored naslova svake komande:</p>
+          <ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px;">
+            <li>Podešavanje minimalnog ranga za korišćenje (Svi, VIP, Sub, Mod, Broadcaster).</li>
+            <li>Podešavanje cooldown-a u milisekundama.</li>
+            <li>Uključivanje i isključivanje same komande.</li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 1rem; font-weight: 700; border-left: 3px solid var(--app-primary); padding-left: 8px;">3. Automatska moderacija</h4>
+          <p style="margin: 0 0 8px 0;">Svaki filter moderacije (npr. Velika slova, Linkovi, Emotikoni, itd.) može se podesiti da ima sopstvenu kaznenu meru. Ako želite da prepišete sve filtere, upotrebite opciju <strong>Globalne kaznene mere</strong> u dnu stranice klikom na "Primeni na sve filtere".</p>
+        </div>
+
+        <div>
+          <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 1rem; font-weight: 700; border-left: 3px solid var(--app-primary); padding-left: 8px;">4. Leaderboard i poeni</h4>
+          <p style="margin: 0 0 8px 0;">Poeni na leaderboardu se skupljaju automatski gledanjem strima. Rang lista se automatski arhivira i resetuje svakog meseca. Kao strimer, možete resetovati tabelu u bilo kom trenutku upotrebom komande:</p>
+          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: 6px; font-family: var(--font-mono); font-size: 0.8rem; color: var(--app-primary);">
+            !resetleaderboard
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-foot" style="padding: 20px 24px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; margin-top: 0; background: rgba(0,0,0,0.15);">
+        <button class="btn btn-primary" onclick="closeModal('docsModal')" style="padding: 10px 24px;">Zatvori</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add Channel Modal -->
   <div class="modal-backdrop" id="addChannelModal" onclick="handleModalBg(event, 'addChannelModal')">
     <div class="modal-box">

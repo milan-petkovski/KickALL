@@ -101,7 +101,18 @@ function proveraKulauna(chatroomId, kljuc, username, customCooldownMs) {
     if (!channelState) return false;
     const sada   = Date.now();
     const zadnji = channelState.cooldowns[kljuc] || 0;
-    const limit = customCooldownMs !== undefined ? customCooldownMs : (channelState.COOLDOWN_MS !== undefined ? channelState.COOLDOWN_MS : config.COOLDOWN_MS);
+
+    let limit = customCooldownMs;
+    if (limit === undefined) {
+        const cmdIme = kljuc.startsWith('!') ? kljuc.slice(1).toLowerCase() : kljuc.toLowerCase();
+        if (channelState.customCommands && channelState.customCommands[cmdIme]) {
+            limit = channelState.customCommands[cmdIme].cooldown_ms;
+        }
+    }
+    if (limit === undefined) {
+        limit = channelState.COOLDOWN_MS !== undefined ? channelState.COOLDOWN_MS : config.COOLDOWN_MS;
+    }
+
     if (sada - zadnji < limit) {
         const preostalo = ((limit - (sada - zadnji)) / 1000).toFixed(1);
         log('WARN', `[${channelState.channelUsername || chatroomId}] [${username}] Komanda ${kljuc} na cooldown-u još ${preostalo}s`);

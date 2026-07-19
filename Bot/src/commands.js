@@ -1125,7 +1125,60 @@ function handlePermit(chatroomId, sender, targetRaw, senderObj) {
     posaljiPoruku(chatroomId, `✅ Korisniku @${target} je dozvoljeno da pošalje jedan link u narednih 60 sekundi.`);
 }
 
+async function handlePesma(chatroomId, sender, songName, senderObj) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    if (channelState.feature_songrequest === false) return;
+
+    const userKey = sender.toLowerCase();
+    const isStreamer = userKey === channelState.channelUsername.toLowerCase();
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || [];
+    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+    const isVip = badges.some(b => b.type === 'vip') || isMod;
+    const isSub = badges.some(b => b.type === 'subscriber') || isVip;
+
+    const reqRole = channelState.songrequest_settings?.request_role || 'everyone';
+    let hasAccess = true;
+    if (reqRole === 'moderator' && !isMod) hasAccess = false;
+    if (reqRole === 'vip' && !isVip) hasAccess = false;
+    if (reqRole === 'subscriber' && !isSub) hasAccess = false;
+
+    if (!hasAccess) {
+        posaljiPoruku(chatroomId, `❌ @${sender}, nemaš dozvolu da zatražiš pesmu (potreban rang: ${reqRole === 'everyone' ? 'svi' : reqRole}).`);
+        return;
+    }
+
+    if (!songName.trim()) {
+        posaljiPoruku(chatroomId, `⚠️ @${sender}, moraš uneti naziv pesme ili YouTube link. Primer: !pesma Jašar - Jednoj ženi za sećanje`);
+        return;
+    }
+
+    const duration = Math.floor(Math.random() * (300 - 120 + 1)) + 120; // 2 do 5 minuta nasumično
+    const queue = channelState.songrequest_settings.queue || [];
+    
+    // Provera da li je pesma već u redu
+    const exists = queue.some(s => s.title.toLowerCase() === songName.trim().toLowerCase());
+    if (exists) {
+        posaljiPoruku(chatroomId, `⚠️ @${sender}, ta pesma se već nalazi u redu za puštanje!`);
+        return;
+    }
+
+    queue.push({
+        title: songName.trim(),
+        requester: sender,
+        duration: duration
+    });
+
+    const database = require('./database');
+    await database.sacuvajSongQueue(chatroomId, queue);
+
+    posaljiPoruku(chatroomId, `🎵 @${sender}, pesma "${songName.trim()}" je uspešno dodata u red za puštanje! (Pozicija: #${queue.length})`);
+}
+
 module.exports = {
+    handlePesma,
     handleIq,
     handleSamar,
     handleRoll,
