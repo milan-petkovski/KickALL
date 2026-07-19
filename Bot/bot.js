@@ -786,15 +786,9 @@ async function proveriDaLiJeLive(chatroomId) {
             const data = await res.json();
             const liveState = !!data.livestream;
 
+            // Moderator check - uklonjeno da bi bot radio i bez moderator statusa
             const isModOrOwner = (data.role === 'moderator' || data.role === 'creator' || data.role === 'broadcaster' || channelUsername.toLowerCase() === botUsernameResolved.toLowerCase());
-            if (channelState.isModerator !== isModOrOwner) {
-                channelState.isModerator = isModOrOwner;
-                if (!isModOrOwner) {
-                    utils.log('WARN', `[${channelUsername}] Bot više nije moderator na kanalu! Rad bota je privremeno obustavljen.`);
-                } else {
-                    utils.log('INFO', `[${channelUsername}] Bot je moderator na kanalu. Rad bota je dozvoljen.`);
-                }
-            }
+            channelState.isModerator = true; // Uvek dozvoli bota da radi
 
             if (database.KORISTI_SUPABASE && database.supabase) {
                 try {
@@ -1364,6 +1358,30 @@ http.createServer(async (req, res) => {
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Failed to reload', detail: err.message }));
+            }
+            return;
+        }
+
+        if (parsedUrl.pathname === '/api/kick/check-moderator') {
+            const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
+            if (!chatroomId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing chatroom_id parameter' }));
+                return;
+            }
+
+            try {
+                await proveriDaLiJeLive(chatroomId);
+                const channelState = state.getChannelState(chatroomId);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ 
+                    success: true, 
+                    isModerator: channelState?.isModerator,
+                    botActive: channelState?.botActive 
+                }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to check moderator status', detail: err.message }));
             }
             return;
         }
