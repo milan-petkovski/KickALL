@@ -300,15 +300,17 @@ function povezi() {
             const poruka = chatData.content.trim();
             const username = chatData.sender.username;
             const isBotMsg = chatData.sender.is_bot || false;
+            const userKey = username.toLowerCase();
 
             // Preskačemo sopstvene poruke i poznate botove
-            const userKey = username.toLowerCase();
-            if (isBotMsg || userKey === botUsernameResolved.toLowerCase() || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs') {
+            if (isBotMsg || userKey === botUsernameResolved.toLowerCase() || userKey === 'kickotbot' || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs') {
                 return;
             }
 
             // Logujemo samo poruke drugih korisnika (ne botove)
-            utils.log('CHAT', `[@${channelState.channelUsername || chatroomId}] ${username}: ${poruka}`);
+            if (userKey !== botUsernameResolved.toLowerCase()) {
+                utils.log('CHAT', `[@${channelState.channelUsername || chatroomId}] ${username}: ${poruka}`);
+            }
 
             // Automatska moderacija četa
             const messageId = chatData.id || chatData.messageId || null;
@@ -796,8 +798,8 @@ async function proveriDaLiJeLive(chatroomId) {
                             id: chatroomId,
                             username: channelUsername,
                             is_active: liveState,
-                            created_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'username' });
                 } catch (dbErr) {
                     utils.log('ERR', `[${channelUsername}] Greška pri upisu statusa strima u bazu: ${dbErr.message}`);
                 }

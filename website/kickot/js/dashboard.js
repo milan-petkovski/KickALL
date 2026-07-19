@@ -404,7 +404,16 @@ async function handleKickOAuthSession(accessToken) {
   currentUser = user;
 
   // Kreiraj profil u user_profiles tabeli
-  const channelId = String(kickUserId || `kick_${kickUsername.toLowerCase()}`);
+  // Dohvati chatroom_id sa Kick API-ja umesto user_id
+  let channelId = kickUserId;
+  try {
+    const channelData = await fetchKickChannelData(kickUsername);
+    if (channelData && channelData.chatroom_id) {
+      channelId = String(channelData.chatroom_id);
+    }
+  } catch (e) {
+    channelId = String(kickUserId || `kick_${kickUsername.toLowerCase()}`);
+  }
   const { error: profileError } = await sb.from('user_profiles').upsert({
     id:           user.id,
     display_name: kickUsername,
@@ -451,7 +460,17 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
 
     const existingChannels = (profile?.kick_channels) || [];
     const usernameLC = kickUsername.toLowerCase();
-    const channelId  = String(kickUserId || `kick_${usernameLC}`);
+    
+    // Dohvati chatroom_id sa Kick API-ja umesto user_id
+    let channelId = kickUserId;
+    try {
+      const channelData = await fetchKickChannelData(kickUsername);
+      if (channelData && channelData.chatroom_id) {
+        channelId = String(channelData.chatroom_id);
+      }
+    } catch (e) {
+      channelId = String(kickUserId || `kick_${usernameLC}`);
+    }
 
     const idx = existingChannels.findIndex(ch => (ch.username || '').toLowerCase() === usernameLC);
     if (idx >= 0) {

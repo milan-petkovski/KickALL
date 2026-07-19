@@ -851,13 +851,43 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ── Supabase Auth Session Check & UI Dynamic Update ──────
+    const authModal = document.getElementById('authModal');
+    const navBtnLogin = document.getElementById('navBtnLogin');
+    const navBtnPrimary = document.getElementById('navBtnPrimary');
+    const heroBtnPrimary = document.getElementById('heroBtnPrimary');
+    const authModalClose = document.getElementById('authModalClose');
+    const authKickLoginBtn = document.getElementById('authKickLoginBtn');
+    const TOKEN_KEY = 'sb-rcukparptzzyssqdmydt-auth-token';
+
+    function isUserLoggedIn() {
+        const rawToken = localStorage.getItem(TOKEN_KEY);
+        if (!rawToken) return false;
+
+        try {
+            const tokenData = JSON.parse(rawToken);
+            return !!(tokenData && tokenData.expires_at && tokenData.expires_at * 1000 > Date.now());
+        } catch (e) {
+            console.error('Error parsing auth token: ', e);
+            return false;
+        }
+    }
+
+    function openAuthModal() {
+        if (authModal) {
+            authModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function closeAuthModal() {
+        if (authModal) {
+            authModal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+    }
+
     function checkAuthSession() {
-        const tokenKey = 'sb-rcukparptzzyssqdmydt-auth-token';
-        const rawToken = localStorage.getItem(tokenKey);
-        
-        const navBtnLogin = document.getElementById('navBtnLogin');
-        const navBtnPrimary = document.getElementById('navBtnPrimary');
-        const heroBtnPrimary = document.getElementById('heroBtnPrimary');
+        const rawToken = localStorage.getItem(TOKEN_KEY);
         const userMenu = document.getElementById('userMenu');
         const userAvatar = document.getElementById('userAvatar');
         const userName = document.getElementById('userName');
@@ -932,7 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
             userMenu.style.display = 'none';
         }
         if (heroBtnPrimary) {
-            heroBtnPrimary.href = 'kickot/index.html';
+            heroBtnPrimary.href = '#';
         }
         const heroBtnPrimaryText = document.getElementById('heroBtnPrimaryText');
         if (heroBtnPrimaryText) {
@@ -1014,16 +1044,51 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (navBtnLogin) {
-        navBtnLogin.addEventListener('click', (e) => {
-            e.preventDefault();
+        navBtnLogin.addEventListener('click', () => {
+            openAuthModal();
+        });
+    }
+
+    if (heroBtnPrimary) {
+        heroBtnPrimary.addEventListener('click', (e) => {
+            if (!isUserLoggedIn()) {
+                e.preventDefault();
+                openAuthModal();
+            }
+        });
+    }
+
+    if (authModalClose) {
+        authModalClose.addEventListener('click', closeAuthModal);
+    }
+
+    if (authModal) {
+        authModal.addEventListener('click', (e) => {
+            if (e.target === authModal) closeAuthModal();
+        });
+    }
+
+    if (authKickLoginBtn) {
+        authKickLoginBtn.addEventListener('click', () => {
             openKickLogin();
         });
     }
 
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeAuthModal();
+    });
+
     checkAuthSession();
 
-    // Auto-select tab and scroll if tab param is present in URL
     const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('action') === 'login') {
+        openAuthModal();
+        urlParams.delete('action');
+        const cleanUrl = `${window.location.pathname}${urlParams.toString() ? `?${urlParams.toString()}` : ''}${window.location.hash}`;
+        window.history.replaceState({}, '', cleanUrl);
+    }
+
+    // Auto-select tab and scroll if tab param is present in URL
     const urlTab = urlParams.get('tab');
     if (urlTab) {
         setTimeout(() => {

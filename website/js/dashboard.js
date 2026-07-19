@@ -3,6 +3,78 @@ const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+// ── Fetch Kick Channel Data ───────────────────────────────
+async function fetchKickChannelData(username) {
+  try {
+    const localRes = await fetch(`https://kickbot-ihzb.onrender.com/api/avatar?username=${username}`);
+    if (localRes.ok) {
+      const d = await localRes.json();
+      if (d && d.chatroom_id !== undefined) {
+        return { chatroom_id: d.chatroom_id || null, slug: d.slug || username, avatar: d.avatar || null };
+      }
+    }
+  } catch (_) { }
+
+  const apiUrl = `https://kick.com/api/v2/channels/${username}`;
+  const proxies = [
+    {
+      url: `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`,
+      parse: async (res) => {
+        const json = await res.json();
+        const data = json.contents ? JSON.parse(json.contents) : null;
+        return data ? {
+          chatroom_id: data.chatroom?.id || null,
+          slug: data.slug || username,
+          avatar: data.user?.profile_pic || null
+        } : null;
+      }
+    },
+    {
+      url: `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
+      parse: async (res) => {
+        const data = await res.json();
+        return data ? {
+          chatroom_id: data.chatroom?.id || null,
+          slug: data.slug || username,
+          avatar: data.user?.profile_pic || null
+        } : null;
+      }
+    }
+  ];
+
+  return new Promise((resolve) => {
+    let completed = 0;
+    let resolved = false;
+
+    proxies.forEach(proxy => {
+      fetch(proxy.url)
+        .then(async (res) => {
+          if (res.ok && !resolved) {
+            const result = await proxy.parse(res);
+            if (result && !resolved) {
+              resolved = true;
+              resolve(result);
+            }
+          }
+        })
+        .catch(() => { })
+        .finally(() => {
+          completed++;
+          if (completed === proxies.length && !resolved) {
+            resolve({ chatroom_id: null, slug: username, avatar: null });
+          }
+        });
+    });
+
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        resolve({ chatroom_id: null, slug: username, avatar: null });
+      }
+    }, 6000);
+  });
+}
+
 let currentUser = null;
 let currentLang = localStorage.getItem('kickall-lang') || localStorage.getItem('kickall_lang') || 'sr';
 
@@ -194,7 +266,16 @@ async function handleKickOAuthSession(accessToken) {
   currentUser = signUpData.user;
 
   // Upsert profile in user_profiles
-  const channelId = String(kickUserId || `kick_${kickUsername.toLowerCase()}`);
+  // Dohvati chatroom_id sa Kick API-ja umesto user_id
+  let channelId = kickUserId;
+  try {
+    const channelData = await fetchKickChannelData(kickUsername);
+    if (channelData && channelData.chatroom_id) {
+      channelId = String(channelData.chatroom_id);
+    }
+  } catch (e) {
+    channelId = String(kickUserId || `kick_${kickUsername.toLowerCase()}`);
+  }
   await sb.from('user_profiles').upsert({
     id: currentUser.id,
     display_name: kickUsername,
@@ -230,7 +311,17 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
       .maybeSingle();
 
     const existingChannels = profile?.kick_channels || [];
-    const channelId = String(kickUserId || `kick_${kickUsername.toLowerCase()}`);
+    
+    // Dohvati chatroom_id sa Kick API-ja umesto user_id
+    let channelId = kickUserId;
+    try {
+      const channelData = await fetchKickChannelData(kickUsername);
+      if (channelData && channelData.chatroom_id) {
+        channelId = String(channelData.chatroom_id);
+      }
+    } catch (e) {
+      channelId = String(kickUserId || `kick_${kickUsername.toLowerCase()}`);
+    }
 
     const alreadyExists = existingChannels.some(c => c.id === channelId);
     if (!alreadyExists) {
