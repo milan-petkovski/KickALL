@@ -1,7 +1,13 @@
 // ── Supabase Configuration ────────────────────────────────
 const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    persistSession: true,
+    storage: window.localStorage,
+    storageKey: 'kickbot-supabase-auth'
+  }
+});
 
 // ── Fetch Kick Channel Data ───────────────────────────────
 async function fetchKickChannelData(username) {
@@ -145,7 +151,7 @@ async function checkAuth() {
 
       const tokenData = await res.json();
       if (tokenData.access_token) {
-        sessionStorage.setItem('kick_access_token', tokenData.access_token);
+        localStorage.setItem('kick_access_token', tokenData.access_token);
         sessionStorage.removeItem('kick_oauth_state');
         sessionStorage.removeItem('kick_code_verifier');
         localStorage.removeItem('kick_oauth_state');
@@ -164,7 +170,7 @@ async function checkAuth() {
   }
 
   const isOAuthRedirect = urlParams.get('kick_oauth') === '1';
-  const kickAccessToken = sessionStorage.getItem('kick_access_token');
+  const kickAccessToken = localStorage.getItem('kick_access_token');
 
   if (isOAuthRedirect && kickAccessToken) {
     document.getElementById('authGateMsg').textContent = currentLang === 'sr' ? 'Povezujemo tvoj Kick nalog...' : 'Connecting your Kick account...';
@@ -238,7 +244,7 @@ async function handleKickOAuthSession(accessToken) {
   if (!signInError && signInData?.user) {
     currentUser = signInData.user;
     await upsertKickProfile(currentUser.id, kickUsername, kickAvatar, kickUserId, accessToken);
-    sessionStorage.removeItem('kick_access_token');
+    localStorage.removeItem('kick_access_token');
     cleanQueryParams();
     initDashboard(currentUser);
     return;
@@ -298,7 +304,7 @@ async function handleKickOAuthSession(accessToken) {
     password: oauthPassword
   });
 
-  sessionStorage.removeItem('kick_access_token');
+  localStorage.removeItem('kick_access_token');
   cleanQueryParams();
   initDashboard(currentUser);
 }
@@ -413,10 +419,83 @@ const btnLogout = document.getElementById('btnLogout');
 if (btnLogout) {
   btnLogout.addEventListener('click', () => {
     sb.auth.signOut().then(() => {
+      notifyGlobalLogout();
       window.location.href = 'index.html';
     });
   });
 }
+
+function notifyGlobalLogout() {
+  const domains = [
+    'https://kickall.netlify.app',
+    'https://kickall.milanwebportal.com',
+    'http://localhost:5500'
+  ];
+  
+  domains.forEach(domain => {
+    try {
+      const iframe = document.querySelector(`iframe[src*="${domain}"]`);
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'GLOBAL_LOGOUT' }, domain);
+      }
+    } catch (e) {
+      // Ignore cross-origin errors
+    }
+  });
+  
+  localStorage.setItem('kickbot_global_logout', Date.now().toString());
+  
+  // Notify bot server for global logout
+  const { data: { session } } = sb.auth.getSession();
+  if (session?.user?.id) {
+    fetch('https://kickbot-ihzb.onrender.com/api/global-logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: session.user.id })
+    }).catch(() => {});
+  }
+}
+
+window.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
+    sb.auth.signOut().then(() => {
+      window.location.reload();
+    });
+  }
+});
+
+setInterval(() => {
+  const logoutTime = localStorage.getItem('kickbot_global_logout');
+  if (logoutTime && Date.now() - parseInt(logoutTime) < 5000) {
+    const { data: { session } } = sb.auth.getSession();
+    if (session) {
+      sb.auth.signOut().then(() => {
+        window.location.reload();
+      });
+    }
+    localStorage.removeItem('kickbot_global_logout');
+  }
+}, 1000);
+
+async function checkServerLogoutStatus() {
+  const { data: { session } } = sb.auth.getSession();
+  if (session?.user?.id) {
+    try {
+      const res = await fetch(`https://kickbot-ihzb.onrender.com/api/check-logout?userId=${session.user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.shouldLogout) {
+          await sb.auth.signOut();
+          window.location.reload();
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+}
+
+checkServerLogoutStatus();
 
 // Set Initial Language
 setLang(currentLang);

@@ -7,7 +7,13 @@
 const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
 const { createClient } = window.supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    persistSession: true,
+    storage: window.localStorage,
+    storageKey: 'kickbot-supabase-auth'
+  }
+});
 
 // ── State ─────────────────────────────────────────────────
 let currentUser = null;
@@ -188,7 +194,7 @@ async function initAuth() {
           return;
         }
 
-        sessionStorage.setItem('kick_access_token', tokenData.access_token);
+        localStorage.setItem('kick_access_token', tokenData.access_token);
         
         const intent = sessionStorage.getItem('kick_oauth_intent') || 'login';
         const addChannelUid = sessionStorage.getItem('kick_add_channel_uid') || '';
@@ -284,7 +290,7 @@ async function initAuth() {
     }
 
     // ── Standardna provera tokena ──────────────────────────────────────
-    const kickAccessToken = sessionStorage.getItem('kick_access_token');
+    const kickAccessToken = localStorage.getItem('kick_access_token');
     const urlParamsOAuth = urlParams.get('kick_oauth') === '1';
 
     if (urlParamsOAuth && kickAccessToken) {
@@ -367,7 +373,7 @@ async function handleKickOAuthSession(accessToken) {
     // Postoji nalog — ažuriraj kick_channels i access_token
     currentUser = signInData.user;
     await upsertKickProfile(currentUser.id, kickUsername, kickAvatar, kickUserId, accessToken);
-    sessionStorage.removeItem('kick_access_token');
+    localStorage.removeItem('kick_access_token');
     // Ukloni kick_oauth param iz URL-a
     const cleanUrl = window.location.pathname;
     window.history.replaceState({}, '', cleanUrl);
@@ -3174,8 +3180,81 @@ async function handleSignOut() {
   localStorage.removeItem('active-dashboard-panel');
   sessionStorage.removeItem('dashboard-session-active');
   await sb.auth.signOut();
+  notifyGlobalLogout();
   window.location.href = 'index.html';
 }
+
+function notifyGlobalLogout() {
+  const domains = [
+    'https://kickall.netlify.app',
+    'https://kickall.milanwebportal.com',
+    'http://localhost:5500'
+  ];
+  
+  domains.forEach(domain => {
+    try {
+      const iframe = document.querySelector(`iframe[src*="${domain}"]`);
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'GLOBAL_LOGOUT' }, domain);
+      }
+    } catch (e) {
+      // Ignore cross-origin errors
+    }
+  });
+  
+  localStorage.setItem('kickbot_global_logout', Date.now().toString());
+  
+  // Notify bot server for global logout
+  const { data: { session } } = sb.auth.getSession();
+  if (session?.user?.id) {
+    fetch('https://kickbot-ihzb.onrender.com/api/global-logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: session.user.id })
+    }).catch(() => {});
+  }
+}
+
+window.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
+    sb.auth.signOut().then(() => {
+      window.location.reload();
+    });
+  }
+});
+
+setInterval(() => {
+  const logoutTime = localStorage.getItem('kickbot_global_logout');
+  if (logoutTime && Date.now() - parseInt(logoutTime) < 5000) {
+    const { data: { session } } = sb.auth.getSession();
+    if (session) {
+      sb.auth.signOut().then(() => {
+        window.location.reload();
+      });
+    }
+    localStorage.removeItem('kickbot_global_logout');
+  }
+}, 1000);
+
+async function checkServerLogoutStatus() {
+  const { data: { session } } = sb.auth.getSession();
+  if (session?.user?.id) {
+    try {
+      const res = await fetch(`https://kickbot-ihzb.onrender.com/api/check-logout?userId=${session.user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.shouldLogout) {
+          await sb.auth.signOut();
+          window.location.reload();
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+}
+
+checkServerLogoutStatus();
 function goToSettings() { showToast('info', 'Podešavanja dolaze uskoro', 'ℹ️'); }
 
 // ═══════════════════════════════════════════════════════════

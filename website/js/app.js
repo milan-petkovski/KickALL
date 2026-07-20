@@ -857,20 +857,117 @@ document.addEventListener('DOMContentLoaded', () => {
     const heroBtnPrimary = document.getElementById('heroBtnPrimary');
     const authModalClose = document.getElementById('authModalClose');
     const authKickLoginBtn = document.getElementById('authKickLoginBtn');
-    const TOKEN_KEY = 'sb-rcukparptzzyssqdmydt-auth-token';
 
-    function isUserLoggedIn() {
-        const rawToken = localStorage.getItem(TOKEN_KEY);
-        if (!rawToken) return false;
+    // Initialize Supabase with same config as other pages
+    const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+      auth: {
+        persistSession: true,
+        storage: window.localStorage,
+        storageKey: 'kickbot-supabase-auth'
+      }
+    });
 
+    async function isUserLoggedIn() {
+        const { data: { session } } = await sb.auth.getSession();
+        return !!session;
+    }
+
+// Rukovanje akcijom odjavljivanja
+if (window.location.search.includes('action=logout')) {
+    handleLogout();
+}
+
+async function handleLogout() {
+    try {
+        // Uzmi podatke pre nego što Supabase obriše sesiju
+        const { data } = await sb.auth.getSession();
+        const korisnikId = data?.session?.user?.id;
+
+        // Prosledi id u funkciju za odjavu
+        notifyGlobalLogout(korisnikId);
+
+        // Izloguj se iz baze
+        await sb.auth.signOut();
+    } catch (e) {
+        console.error(e);
+    } finally {
+        // Preusmeravanje koje sigurno osvežava stranicu i čisti URL parametre
+        window.location.href = 'index.html';
+    }
+}
+
+function notifyGlobalLogout(userId) {
+    const domains = [
+        'https://kickall.netlify.app',
+        'https://kickall.milanwebportal.com',
+        'http://localhost:5500'
+    ];
+    
+    domains.forEach(domain => {
         try {
-            const tokenData = JSON.parse(rawToken);
-            return !!(tokenData && tokenData.expires_at && tokenData.expires_at * 1000 > Date.now());
+            const iframe = document.querySelector(`iframe[src*="${domain}"]`);
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({ type: 'GLOBAL_LOGOUT' }, domain);
+            }
         } catch (e) {
-            console.error('Error parsing auth token: ', e);
-            return false;
+            // Ignoriši greške sa poreklom stranica
+        }
+    });
+    
+    localStorage.setItem('kickbot_global_logout', Date.now().toString());
+    
+    // Obavesti server koristeći prosleđeni id
+    if (userId) {
+        fetch('https://kickbot-ihzb.onrender.com/api/global-logout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: userId })
+        }).catch(() => {});
+    }
+}
+
+    window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
+            sb.auth.signOut().then(() => {
+                window.location.reload();
+            });
+        }
+    });
+
+    setInterval(() => {
+        const logoutTime = localStorage.getItem('kickbot_global_logout');
+        if (logoutTime && Date.now() - parseInt(logoutTime) < 5000) {
+            const { data: { session } } = sb.auth.getSession();
+            if (session) {
+                sb.auth.signOut().then(() => {
+                    window.location.reload();
+                });
+            }
+            localStorage.removeItem('kickbot_global_logout');
+        }
+    }, 1000);
+
+    async function checkServerLogoutStatus() {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session?.user?.id) {
+            try {
+                const res = await fetch(`https://kickbot-ihzb.onrender.com/api/check-logout?userId=${session.user.id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.shouldLogout) {
+                        await sb.auth.signOut();
+                        window.location.reload();
+                    }
+                }
+            } catch (e) {
+                // Ignoriši greške
+            }
         }
     }
+
+    checkServerLogoutStatus();
 
     function openAuthModal() {
         if (authModal) {
@@ -886,68 +983,61 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function checkAuthSession() {
-        const rawToken = localStorage.getItem(TOKEN_KEY);
+    async function checkAuthSession() {
+        const { data: { session } } = await sb.auth.getSession();
         const userMenu = document.getElementById('userMenu');
         const userAvatar = document.getElementById('userAvatar');
         const userName = document.getElementById('userName');
 
-        if (rawToken) {
-            try {
-                const tokenData = JSON.parse(rawToken);
-                if (tokenData && tokenData.expires_at && tokenData.expires_at * 1000 > Date.now()) {
-                    const user = tokenData.user;
-                    const displayName = user?.user_metadata?.display_name || user?.email || 'Profil';
-                    
-                    // User is logged in! Update UI
-                    if (navBtnLogin) {
-                        navBtnLogin.style.display = 'none'; // Hide login button
-                    }
-                    if (navBtnPrimary) {
-                        navBtnPrimary.style.display = 'none'; // Hide "Pokreni kickot" button
-                    }
+        if (session) {
+            const user = session.user;
+            const displayName = user?.user_metadata?.display_name || user?.email || 'Profil';
+            
+            // User is logged in! Update UI
+            if (navBtnLogin) {
+                navBtnLogin.style.display = 'none'; // Hide login button
+            }
+            if (navBtnPrimary) {
+                navBtnPrimary.style.display = 'none'; // Hide "Pokreni kickot" button
+            }
 
-                    if (userMenu) {
-                        userMenu.style.display = 'block';
-                        
-                        // Set avatar
-                        const avatarUrl = user?.user_metadata?.avatar_url;
-                        if (userAvatar) {
-                            if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:image'))) {
-                                userAvatar.style.backgroundImage = `url("${avatarUrl}")`;
-                                userAvatar.style.backgroundSize = 'cover';
-                                userAvatar.style.backgroundPosition = 'center';
-                                userAvatar.textContent = '';
-                            } else {
-                                userAvatar.style.backgroundImage = 'none';
-                                userAvatar.textContent = displayName.charAt(0).toUpperCase();
-                            }
-                        }
-
-                        // Set name
-                        if (userName) {
-                            userName.textContent = displayName;
-                        }
+            if (userMenu) {
+                userMenu.style.display = 'block';
+                
+                // Set avatar
+                const avatarUrl = user?.user_metadata?.avatar_url;
+                if (userAvatar) {
+                    if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:image'))) {
+                        userAvatar.style.backgroundImage = `url("${avatarUrl}")`;
+                        userAvatar.style.backgroundSize = 'cover';
+                        userAvatar.style.backgroundPosition = 'center';
+                        userAvatar.textContent = '';
+                    } else {
+                        userAvatar.style.backgroundImage = 'none';
+                        userAvatar.textContent = displayName.charAt(0).toUpperCase();
                     }
-
-                    if (heroBtnPrimary) {
-                        heroBtnPrimary.href = 'dashboard.html';
-                    }
-                    const heroBtnPrimaryText = document.getElementById('heroBtnPrimaryText');
-                    if (heroBtnPrimaryText) {
-                        heroBtnPrimaryText.innerHTML = `
-                            <span class="lang-sr">Idi na Dashboard</span>
-                            <span class="lang-en">Go to Dashboard</span>
-                        `;
-                    }
-                    const kickotCard = document.querySelector('.module-card.card-active');
-                    if (kickotCard) {
-                        kickotCard.href = 'kickot/dashboard.html';
-                    }
-                    return;
                 }
-            } catch (e) {
-                console.error("Error parsing auth token: ", e);
+
+                // Set name
+                if (userName) {
+                    userName.textContent = displayName;
+                }
+            }
+
+            if (heroBtnPrimary) {
+                heroBtnPrimary.href = 'dashboard.html';
+                const heroBtnPrimaryText = document.getElementById('heroBtnPrimaryText');
+                if (heroBtnPrimaryText) {
+                    heroBtnPrimaryText.innerHTML = `
+                        <span class="lang-sr">Idi na Dashboard</span>
+                        <span class="lang-en">Go to Dashboard</span>
+                    `;
+                }
+                const kickotCard = document.querySelector('.module-card.card-active');
+                if (kickotCard) {
+                    kickotCard.href = 'kickot/index.html';
+                }
+                return;
             }
         }
 
@@ -1050,8 +1140,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (heroBtnPrimary) {
-        heroBtnPrimary.addEventListener('click', (e) => {
-            if (!isUserLoggedIn()) {
+        heroBtnPrimary.addEventListener('click', async (e) => {
+            const loggedIn = await isUserLoggedIn();
+            if (!loggedIn) {
                 e.preventDefault();
                 openAuthModal();
             }

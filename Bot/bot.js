@@ -1042,7 +1042,7 @@ function resolveKickRedirectUri(candidate) {
         return process.env.KICK_REDIRECT_URI;
     }
 
-    return 'http://localhost:5500/auth/kick/callback';
+    return 'https://kickall.milanwebportal.com/auth/kick/callback';
 }
 
 // ─── HTTP SERVER (Uptime / Render Service fallback) ───────────────────────────
@@ -1253,21 +1253,81 @@ http.createServer(async (req, res) => {
                 return;
             }
 
-            const apiRes = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${username}`);
-            if (apiRes.ok) {
-                const data = await apiRes.json();
-                const avatar = data?.user?.profile_pic || null;
-                const bio = data?.user?.bio || '';
-                const chatroom_id = data?.chatroom?.id || null;
-                const slug = data?.slug || username;
+            try {
+                const channelRes = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${username}`);
+                let avatar = '';
+                let chatroomId = '';
+                let slug = username;
+
+                if (channelRes.ok) {
+                    const channelData = await channelRes.json();
+                    avatar = channelData?.user?.profile_pic || '';
+                    chatroomId = channelData?.chatroom?.id || '';
+                    slug = channelData?.slug || username;
+                }
+
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ avatar, bio, chatroom_id, slug }));
-                return;
-            } else {
-                res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ avatar: null, bio: '', chatroom_id: null, slug: username, error: `Kick API returned status ${apiRes.status}` }));
-                return;
+                res.end(JSON.stringify({
+                    username: username,
+                    slug: slug,
+                    avatar: avatar,
+                    chatroom_id: chatroomId
+                }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
             }
+            return;
+        }
+
+        // Global logout endpoint
+        if (parsedUrl.pathname === '/api/global-logout' && req.method === 'POST') {
+            try {
+                const body = await new Promise((resolve) => {
+                    let data = '';
+                    req.on('data', chunk => data += chunk);
+                    req.on('end', () => resolve(data));
+                });
+                const { userId } = JSON.parse(body || '{}');
+
+                // Store logout timestamp in a simple in-memory cache
+                // In production, this should use Redis or a database
+                if (!global.logoutCache) {
+                    global.logoutCache = new Map();
+                }
+                if (userId) {
+                    global.logoutCache.set(userId, Date.now());
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
+            }
+            return;
+        }
+
+        // Check logout status endpoint
+        if (parsedUrl.pathname === '/api/check-logout' && req.method === 'GET') {
+            try {
+                const userId = parsedUrl.searchParams.get('userId');
+                let shouldLogout = false;
+
+                if (global.logoutCache && userId) {
+                    const logoutTime = global.logoutCache.get(userId);
+                    if (logoutTime && Date.now() - logoutTime < 300000) { // 5 minutes
+                        shouldLogout = true;
+                    }
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ shouldLogout }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
+            }
+            return;
         }
 
         if (parsedUrl.pathname === '/api/kick/channel') {

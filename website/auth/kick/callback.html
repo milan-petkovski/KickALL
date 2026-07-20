@@ -10,9 +10,7 @@
       const error = params.get('error');
       if (code || error) {
         const baseRedirectPath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/Website' : '';
-        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
-        const targetPage = fromKickAll ? 'dashboard.html' : 'kickot/dashboard.html';
-        window.location.replace(`${baseRedirectPath}/${targetPage}` + window.location.search);
+        window.location.replace(`${baseRedirectPath}/dashboard.html` + window.location.search);
       }
     })();
   </script>
@@ -325,7 +323,13 @@
           // Inicijalizuj Supabase
           const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
           const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRmeWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
-          const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+          const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: {
+              persistSession: true,
+              storage: window.localStorage,
+              storageKey: 'kickbot-supabase-auth'
+            }
+          });
 
           // Dohvati postojeće kanale korisnika
           const { data: profile } = await sb.from('user_profiles')
@@ -381,11 +385,11 @@
         }
 
         // ─── INTENT: login (standardni tok) ───────────────────────────────────
-        sessionStorage.setItem('kick_access_token', tokenData.access_token);
-        sessionStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
-        sessionStorage.setItem('kick_expires_in', String(tokenData.expires_in || 3600));
-        sessionStorage.setItem('kick_token_ts', String(Date.now()));
-        sessionStorage.setItem('kick_oauth_scope', tokenData.scope || '');
+        localStorage.setItem('kick_access_token', tokenData.access_token);
+        localStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
+        localStorage.setItem('kick_expires_in', String(tokenData.expires_in || 3600));
+        localStorage.setItem('kick_token_ts', String(Date.now()));
+        localStorage.setItem('kick_oauth_scope', tokenData.scope || '');
 
         document.getElementById('loadingState').style.display = 'none';
         const succState = document.getElementById('successState');
@@ -393,9 +397,7 @@
         document.getElementById('successIcon').style.display = 'block';
 
         setTimeout(() => {
-          const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
-          const targetPage = fromKickAll ? 'dashboard.html' : 'kickot/dashboard.html';
-          window.location.href = `${baseRedirectPath}/${targetPage}?kick_oauth=1`;
+          window.location.href = `${baseRedirectPath}/dashboard.html?kick_oauth=1`;
         }, 900);
 
       } catch (fetchErr) {
