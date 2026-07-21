@@ -2847,7 +2847,17 @@ function editCommand(id) {
 
   editingCmdId = id;
   const isBuiltin = id.startsWith('builtin-') || !!cmd.is_default;
-  document.getElementById('cmdModalTitle').textContent = isBuiltin ? 'Izmeni sistemsku komandu' : 'Izmeni komandu';
+  if (cmd.is_default) {
+    document.getElementById('cmdModalTitle').textContent = 'Izmeni ugrađenu komandu';
+    document.getElementById('cmdName').disabled = true;
+    document.getElementById('cmdName').style.opacity = '0.5';
+    document.getElementById('cmdName').style.cursor = 'not-allowed';
+  } else {
+      document.getElementById('cmdModalTitle').textContent = 'Izmeni komandu';
+      document.getElementById('cmdName').disabled = false;
+      document.getElementById('cmdName').style.opacity = '1';
+      document.getElementById('cmdName').style.cursor = 'text';
+  }
   document.getElementById('cmdName').value = cmd.command;
   document.getElementById('cmdName').disabled = isBuiltin;
   document.getElementById('cmdResponse').value = cmd.response;

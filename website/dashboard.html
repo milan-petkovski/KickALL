@@ -4,18 +4,28 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KICKALL — Centralni Dashboard</title>
-  <meta name="description" content="Centralni ruter za KickAll ekosistem. Izaberi modul i upravljaj svojim strimom." />
-  
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <link rel="stylesheet" href="css/style.css" />
-  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
+  <title>KICKALL - Centralni Dashboard</title>
+  <meta name="description" content="Centralni dashboard za KickAll ekosistem. Izaberi modul, prati referral nagrade i upravljaj svojim strimom." />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#0B0816" />
 
+  <!-- Optimozacija mrežnih resursa i baze -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://rcukparptzzyssqdmydt.supabase.co" crossorigin />
+
+  <!-- Fontovi -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Favicon i Stilovi -->
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
+  <link rel="apple-touch-icon" href="assets/logo.png" />
+  <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
+
+  <!-- Supabase JS sa defer učitavanjem -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body class="lang-sr">
@@ -209,8 +219,179 @@
 
       </section>
 
+      <!-- Referral Section -->
+      <section class="referral-section">
+        <div class="referral-header">
+          <h2 class="referral-title">
+            <span class="lang-sr">🎁 Referral Program</span>
+            <span class="lang-en">🎁 Referral Program</span>
+          </h2>
+          <p class="referral-subtitle">
+            <span class="lang-sr">Pozovi prijatelje i zaradi 20% od njihove kupovine!</span>
+            <span class="lang-en">Invite friends and earn 20% of their purchase!</span>
+          </p>
+        </div>
+
+        <div class="referral-stats-grid">
+          <div class="referral-stat-card">
+            <div class="referral-stat-icon">👥</div>
+            <div class="referral-stat-value" id="totalReferrals">0</div>
+            <div class="referral-stat-label">
+              <span class="lang-sr">Ukupno referala</span>
+              <span class="lang-en">Total Referrals</span>
+            </div>
+          </div>
+          <div class="referral-stat-card">
+            <div class="referral-stat-icon">✅</div>
+            <div class="referral-stat-value" id="successfulReferrals">0</div>
+            <div class="referral-stat-label">
+              <span class="lang-sr">Uspešnih referala</span>
+              <span class="lang-en">Successful Referrals</span>
+            </div>
+          </div>
+          <div class="referral-stat-card">
+            <div class="referral-stat-icon">💰</div>
+            <div class="referral-stat-value" id="totalEarned">€0.00</div>
+            <div class="referral-stat-label">
+              <span class="lang-sr">Ukupno zaradjeno</span>
+              <span class="lang-en">Total Earned</span>
+            </div>
+          </div>
+          <div class="referral-stat-card">
+            <div class="referral-stat-icon">🎟️</div>
+            <div class="referral-stat-value" id="availableRewards">€0.00</div>
+            <div class="referral-stat-label">
+              <span class="lang-sr">Dostupne nagrade</span>
+              <span class="lang-en">Available Rewards</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="referral-link-box">
+          <div class="referral-link-label">
+            <span class="lang-sr">Tvoj referral kod:</span>
+            <span class="lang-en">Your referral code:</span>
+          </div>
+          <div class="referral-link-row">
+            <input type="text" id="referralCodeInput" readonly class="referral-link-input" value="LOADING...">
+            <button class="btn btn-primary referral-copy-btn" id="copyReferralBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span class="lang-sr">Kopiraj</span>
+              <span class="lang-en">Copy</span>
+            </button>
+          </div>
+          <div class="referral-link-full" id="referralLinkFull">
+            <span class="lang-sr">Referral link:</span>
+            <span class="lang-en">Referral link:</span>
+            <span id="referralLinkText">LOADING...</span>
+          </div>
+        </div>
+
+        <div class="referral-rewards-list">
+          <h3 class="referral-rewards-title">
+            <span class="lang-sr">🏆 Tvoje nagrade</span>
+            <span class="lang-en">🏆 Your Rewards</span>
+          </h3>
+          <div id="rewardsList" class="rewards-list-container">
+            <div class="no-rewards">
+              <span class="lang-sr">Još uvek nemaš nagrade. Pozovi prijatelje da započneš!</span>
+              <span class="lang-en">No rewards yet. Invite friends to get started!</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="referral-withdrawal-section">
+          <h3 class="referral-withdrawal-title">
+            <span class="lang-sr">💸 Zatraži isplatu</span>
+            <span class="lang-en">💸 Request Withdrawal</span>
+          </h3>
+          <button class="btn btn-primary withdrawal-btn" id="withdrawalBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            <span class="lang-sr">Zatraži isplatu</span>
+            <span class="lang-en">Request Withdrawal</span>
+          </button>
+        </div>
+      </section>
     </div>
   </main>
+
+  <!-- Withdrawal Modal -->
+  <div class="modal-backdrop" id="withdrawalModal">
+    <div class="modal-container withdrawal-modal">
+      <button class="modal-close-btn" id="closeWithdrawalModal">✕</button>
+      <h2 class="modal-title">
+        <span class="lang-sr">💸 Zatraži isplatu</span>
+        <span class="lang-en">💸 Request Withdrawal</span>
+      </h2>
+      <p class="modal-subtitle">
+        <span class="lang-sr">Dostupno za isplatu: <span id="modalAvailableBalance">€0.00</span></span>
+        <span class="lang-en">Available for withdrawal: <span id="modalAvailableBalance">€0.00</span></span>
+      </p>
+
+      <form id="withdrawalForm" class="withdrawal-form">
+        <div class="form-group">
+          <label class="form-label">
+            <span class="lang-sr">Iznos (€)</span>
+            <span class="lang-en">Amount (€)</span>
+          </label>
+          <div class="amount-presets">
+            <button type="button" class="amount-preset-btn" data-amount="5">€5</button>
+            <button type="button" class="amount-preset-btn" data-amount="10">€10</button>
+            <button type="button" class="amount-preset-btn" data-amount="20">€20</button>
+            <button type="button" class="amount-preset-btn" data-amount="50">€50</button>
+            <button type="button" class="amount-preset-btn" data-amount="100">€100</button>
+          </div>
+          <input type="number" id="withdrawalAmount" class="form-input" placeholder="Unesi iznos..." min="5" step="0.01" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <span class="lang-sr">Način plaćanja</span>
+            <span class="lang-en">Payment Method</span>
+          </label>
+          <select id="paymentMethod" class="form-select" required>
+            <option value="">Izaberi način plaćanja / Select payment method</option>
+            <option value="paypal">PayPal</option>
+            <option value="bank_transfer">Bank Transfer</option>
+            <option value="crypto">Crypto</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="paymentDetailsGroup">
+          <label class="form-label" id="paymentDetailsLabel">
+            <span class="lang-sr">PayPal Email</span>
+            <span class="lang-en">PayPal Email</span>
+          </label>
+          <input type="text" id="paymentDetails" class="form-input" placeholder="your@email.com" required>
+          <p class="form-hint" id="paymentDetailsHint">
+            <span class="lang-sr">Unesi svoj PayPal email adresu</span>
+            <span class="lang-en">Enter your PayPal email address</span>
+          </p>
+        </div>
+
+        <button type="submit" class="btn btn-primary withdrawal-submit-btn">
+          <span class="lang-sr">Pošalji zahtev</span>
+          <span class="lang-en">Submit Request</span>
+        </button>
+      </form>
+
+      <div class="withdrawal-info">
+        <p class="info-text">
+          <span class="lang-sr">⚠️ Zahtevi se obrađuju ručno. Obično traje 1-3 radna dana.</span>
+          <span class="lang-en">⚠️ Requests are processed manually. Usually takes 1-3 business days.</span>
+        </p>
+        <p class="info-text">
+          <span class="lang-sr">📌 Minimum za isplatu je €5</span>
+          <span class="lang-en">📌 Minimum withdrawal is €5</span>
+        </p>
+      </div>
+    </div>
+  </div>
 
   <!-- Interactive Modal for kickaj (Giveaway Wheel Simulator) -->
   <div class="modal-backdrop" id="modalKickaj">

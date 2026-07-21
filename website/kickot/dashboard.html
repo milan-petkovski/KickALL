@@ -5,14 +5,25 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kickot Dashboard</title>
-  <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
-  <meta name="description" content="Kickot bot control panel — upravljaj komandama, leaderboard-om i podešavanjima."/>
+  <meta name="description" content="Kickot bot control panel. Upravljaj komandama, leaderboard tabelom i podešavanjima bota." />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#0b0716" />
+
+  <!-- Optimizacija mrežnih veza sa bazom i CDN-om -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;700&display=swap"
-    rel="stylesheet" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://rcukparptzzyssqdmydt.supabase.co" crossorigin />
+
+  <!-- Fontovi -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <!-- Favicon i Stilovi -->
+  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
+  <link rel="apple-touch-icon" href="assets/logo.png" />
   <link rel="stylesheet" href="css/dashboard.css" />
+
+  <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -2250,7 +2261,7 @@
                     <circle cx="18" cy="16" r="3" />
                   </svg>
                 </div>
-                <span>Song Request & Puštanje pesama</span>
+                <span>Song Request</span>
               </h1>
               <p class="panel-desc">Upravljajte muzičkom željom gledalaca u realnom vremenu i puštajte muziku na svom strimu.</p>
             </div>
@@ -2263,7 +2274,7 @@
               
               <!-- Music Player Card -->
               <div class="config-section" style="padding: 24px; display: flex; flex-direction: column; gap: 20px; align-items: center; text-align: center;">
-                <div style="width: 140px; height: 140px; border-radius: 50%; background: linear-gradient(135deg, var(--app-primary), #000); border: 4px solid var(--border-subtle); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(0,0,0,0.4); position: relative; overflow: hidden; animation: spin 20s linear infinite; animation-play-state: paused;" id="playerDisk">
+                <div style="width: 140px; height: 140px; min-width: 140px; min-height: 140px; flex-shrink: 0; border-radius: 50%; background: linear-gradient(135deg, var(--app-primary), #000); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 25px rgba(0,0,0,0.4); position: relative; overflow: hidden; animation: spin 20s linear infinite; animation-play-state: paused;" id="playerDisk">
                   <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M9 18V5l12-2v13" />
                     <circle cx="6" cy="18" r="3" />
@@ -2518,21 +2529,21 @@
         
 
         <!-- Command Input -->
-        <div class="form-group">
-          <label class="form-label" style="font-size: 0.85rem;">Komanda i aliasi</label>
-          <div class="cmd-input-wrap" style="margin-top: 6px;">
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px;">
+          <label class="form-label" style="font-size: 0.85rem; margin: 0;">Komanda i aliasi</label>
+          <div class="cmd-input-wrap" style="display: flex; align-items: center; width: 100%;">
             <span class="cmd-prefix-badge" id="cmdPrefixBadge">!</span>
-            <input type="text" class="form-input" id="cmdName" placeholder="npr. instagram, insta, ig" oninput="updateModalPreview()" />
+            <input type="text" class="form-input" id="cmdName" placeholder="npr. instagram, insta, ig" oninput="updateModalPreview()" style="width: 100%;" />
           </div>
-          <span class="config-hint">Možeš uneti više aliasa odvojenih zarezom</span>
+          <span class="config-hint" style="margin: 0;">Možeš uneti više aliasa odvojenih zarezom</span>
         </div>
 
         <!-- Response -->
-        <div class="form-group">
-          <label class="form-label" style="font-size: 0.85rem;">Odgovor bota</label>
-          <textarea class="form-input form-textarea" id="cmdResponse" rows="4" style="margin-top: 6px;"
+        <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-top: 16px;">
+          <label class="form-label" style="font-size: 0.85rem; margin: 0;">Odgovor bota</label>
+          <textarea class="form-input form-textarea" id="cmdResponse" rows="4" style="width: 100%; resize: vertical; margin-top: 6px"
             placeholder="Bot će poslati ovaj tekst kada neko ukuca komandu..." oninput="updateModalPreview()"></textarea>
-          <div class="char-count" style="margin-top: 4px;"><span id="cmdCharCount">0</span>/500</div>
+          <div class="char-count" style="text-align: right; font-size: 0.75rem; color: var(--text-muted);"><span id="cmdCharCount">0</span>/500</div>
         </div>
 
         <!-- Cooldown -->

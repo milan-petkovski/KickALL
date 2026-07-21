@@ -235,6 +235,10 @@ async function handleKickOAuthSession(accessToken) {
   const kickEmail = `kick_user_${kickUsername.toLowerCase()}@kickot.com`;
   const oauthPassword = `kick_oauth_${kickUsername.toLowerCase()}_kickot_2026`;
 
+  // Get referral code from URL if present
+  const urlParams = new URLSearchParams(window.location.search);
+  const referralCode = urlParams.get('ref') || urlParams.get('referral');
+
   // Try login
   const { data: signInData, error: signInError } = await sb.auth.signInWithPassword({
     email: kickEmail,
@@ -244,6 +248,12 @@ async function handleKickOAuthSession(accessToken) {
   if (!signInError && signInData?.user) {
     currentUser = signInData.user;
     await upsertKickProfile(currentUser.id, kickUsername, kickAvatar, kickUserId, accessToken);
+    
+    // If logging in with referral code, process it
+    if (referralCode) {
+      await processReferralCode(currentUser.id, referralCode);
+    }
+    
     localStorage.removeItem('kick_access_token');
     cleanQueryParams();
     initDashboard(currentUser);
@@ -260,7 +270,8 @@ async function handleKickOAuthSession(accessToken) {
         display_name: kickUsername,
         avatar_url: kickAvatar,
         kick_username: kickUsername,
-        kick_user_id: kickUserId
+        kick_user_id: kickUserId,
+        referral_code: referralCode || null
       }
     }
   });
@@ -348,6 +359,239 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
   }
 }
 
+// Process referral code when user registers
+async function processReferralCode(userId, referralCode) {
+  try {
+    // Call the database function to create referral entry
+    const { error } = await sb.rpc('create_user_referral', {
+      p_user_id: userId,
+      p_referral_code: referralCode
+    });
+
+    if (error) {
+      console.error('Error processing referral code:', error);
+    } else {
+      console.log('Referral code processed successfully');
+      // Show notification to user
+      showReferralNotification();
+    }
+  } catch (err) {
+    console.error('Error in processReferralCode:', err);
+  }
+}
+
+// Ensure user has referral code (for existing users)
+async function ensureUserHasReferralCode(userId) {
+  try {
+    // Check if user already has referral stats
+    const { data: existingStats, error: checkError } = await sb
+      .from('referral_stats')
+      .select('referral_code')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (checkError && !checkError.message.includes('does not exist')) {
+      console.error('Error checking referral stats:', checkError);
+      return;
+    }
+
+    // If user doesn't have referral stats, create them
+    if (!existingStats) {
+      console.log('Creating referral stats for existing user:', userId);
+      const { error: createError } = await sb.rpc('create_user_referral', {
+        p_user_id: userId,
+        p_referral_code: null
+      });
+
+      if (createError) {
+        console.error('Error creating referral stats:', createError);
+      } else {
+        console.log('Referral stats created successfully for existing user');
+      }
+    }
+  } catch (err) {
+    console.error('Error in ensureUserHasReferralCode:', err);
+  }
+}
+
+// Show referral notification
+function showReferralNotification() {
+  const notification = document.createElement('div');
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, var(--color-green), #10B981);
+    color: #0E0E1D;
+    padding: 16px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    z-index: 10000;
+    box-shadow: 0 10px 40px rgba(83, 252, 24, 0.3);
+    animation: slideIn 0.5s ease-out;
+  `;
+  notification.innerHTML = currentLang === 'sr' 
+    ? '🎉 Referral kod primljen! Dobijaš bonus na prvu kupovinu!'
+    : '🎉 Referral code accepted! You get a bonus on your first purchase!';
+  
+  document.body.appendChild(notification);
+  
+  setTimeout(() => {
+    notification.style.animation = 'slideOut 0.5s ease-in forwards';
+    setTimeout(() => notification.remove(), 500);
+  }, 5000);
+}
+
+// Get user's referral code and stats
+async function getReferralStats(userId) {
+  try {
+    const { data, error } = await sb
+      .from('referral_stats')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+    
+    if (error) {
+      // Table might not exist yet, return default stats
+      if (error.code === '42P01' || error.message.includes('does not exist')) {
+        return {
+          total_referrals: 0,
+          successful_referrals: 0,
+          total_earned: 0,
+          total_withdrawn: 0,
+          available_balance: 0,
+          referral_code: null
+        };
+      }
+      throw error;
+    }
+    return data;
+  } catch (err) {
+    console.error('Error fetching referral stats:', err);
+    // Return default stats if table doesn't exist
+    return {
+      total_referrals: 0,
+      successful_referrals: 0,
+      total_earned: 0,
+      total_withdrawn: 0,
+      available_balance: 0,
+      referral_code: null
+    };
+  }
+}
+
+// Get user's referral rewards
+async function getReferralRewards(userId) {
+  try {
+    const { data, error } = await sb
+      .from('referral_rewards')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      // Table might not exist yet, return empty array
+      if (error.code === '42P01' || error.message.includes('does not exist')) {
+        return [];
+      }
+      throw error;
+    }
+    return data || [];
+  } catch (err) {
+    console.error('Error fetching referral rewards:', err);
+    // Return empty array if table doesn't exist
+    return [];
+  }
+}
+
+// Generate referral link
+function generateReferralLink(referralCode) {
+  const baseUrl = window.location.origin;
+  return `${baseUrl}/index.html?ref=${referralCode}`;
+}
+
+// Award referral reward when purchase is made
+async function awardReferralReward(referralCode, planPrice) {
+  try {
+    const { error } = await sb.rpc('award_referral_reward', {
+      p_referral_code: referralCode,
+      p_plan_price: planPrice
+    });
+    
+    if (error) {
+      console.error('Error awarding referral reward:', error);
+    } else {
+      console.log('Referral reward awarded successfully');
+    }
+  } catch (err) {
+    console.error('Error in awardReferralReward:', err);
+  }
+}
+
+// Function to be called when user makes a purchase
+// This should be integrated into your payment processing flow
+async function processPurchaseWithReferral(userId, planPrice, planName) {
+  try {
+    // Get user's referral code from their metadata
+    const { data: { user } } = await sb.auth.getUser();
+    if (!user) return;
+
+    // Check if user was referred
+    const { data: referralData } = await sb
+      .from('referrals')
+      .select('*')
+      .eq('referred_id', userId)
+      .single();
+
+    if (referralData && referralData.status === 'registered') {
+      // Award referral reward to the referrer
+      await awardReferralReward(referralData.referral_code, planPrice);
+      
+      console.log(`Referral reward awarded for ${planName} purchase`);
+    }
+
+    // Update user's plan in user_profiles
+    const { error: updateError } = await sb
+      .from('user_profiles')
+      .update({ 
+        plan: planName,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error('Error updating user plan:', updateError);
+    }
+
+  } catch (err) {
+    console.error('Error processing purchase with referral:', err);
+  }
+}
+
+// Get user's referral code from URL or storage
+function getUserReferralCode() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('ref') || urlParams.get('referral') || localStorage.getItem('user_referral_code');
+}
+
+// Store referral code for later use
+function storeReferralCode(code) {
+  if (code) {
+    localStorage.setItem('user_referral_code', code);
+  }
+}
+
+// Check if user has referral code in storage and apply it
+function checkAndApplyReferralCode() {
+  const storedCode = localStorage.getItem('user_referral_code');
+  if (storedCode && !getUserReferralCode()) {
+    // Apply stored referral code to current URL
+    const url = new URL(window.location);
+    url.searchParams.set('ref', storedCode);
+    window.history.replaceState({}, '', url);
+  }
+}
+
 function cleanQueryParams() {
   const cleanUrl = window.location.pathname;
   window.history.replaceState({}, '', cleanUrl);
@@ -383,6 +627,298 @@ function initDashboard(user) {
 
   playSound(800, 'sine', 0.15, 0.05);
   setTimeout(() => playSound(1000, 'sine', 0.2, 0.05), 80);
+
+  // Ensure user has referral code (for existing users)
+  ensureUserHasReferralCode(user.id);
+
+  // Load referral data
+  loadReferralData(user.id);
+}
+
+// Load referral data and update UI
+async function loadReferralData(userId) {
+  try {
+    // Load referral stats
+    const stats = await getReferralStats(userId);
+    if (stats) {
+      updateReferralStats(stats);
+    }
+
+    // Load referral rewards
+    const rewards = await getReferralRewards(userId);
+    updateRewardsList(rewards);
+
+    // Setup copy button
+    setupCopyButton();
+
+    // Setup withdrawal modal
+    setupWithdrawalModal();
+  } catch (err) {
+    console.error('Error loading referral data:', err);
+  }
+}
+
+// Update referral stats in UI
+function updateReferralStats(stats) {
+  const totalReferrals = document.getElementById('totalReferrals');
+  const successfulReferrals = document.getElementById('successfulReferrals');
+  const totalEarned = document.getElementById('totalEarned');
+  const availableRewards = document.getElementById('availableRewards');
+  const referralCodeInput = document.getElementById('referralCodeInput');
+  const referralLinkText = document.getElementById('referralLinkText');
+  const withdrawalBtn = document.getElementById('withdrawalBtn');
+
+  if (totalReferrals) totalReferrals.textContent = stats.total_referrals || 0;
+  if (successfulReferrals) successfulReferrals.textContent = stats.successful_referrals || 0;
+  if (totalEarned) totalEarned.textContent = `€${(stats.total_earned || 0).toFixed(2)}`;
+  
+  // Use available_balance from stats
+  const available = stats.available_balance || 0;
+  if (availableRewards) availableRewards.textContent = `€${available.toFixed(2)}`;
+
+  // Disable withdrawal button if balance is less than €5
+  if (withdrawalBtn) {
+    withdrawalBtn.disabled = available < 5;
+  }
+
+  // Set referral code and link
+  if (stats.referral_code) {
+    if (referralCodeInput) referralCodeInput.value = stats.referral_code;
+    
+    const referralLink = generateReferralLink(stats.referral_code);
+    if (referralLinkText) referralLinkText.textContent = referralLink;
+  }
+
+  // Store available balance for withdrawal modal
+  window.currentAvailableBalance = available;
+}
+
+// Update rewards list in UI
+function updateRewardsList(rewards) {
+  const rewardsList = document.getElementById('rewardsList');
+  if (!rewardsList) return;
+
+  if (!rewards || rewards.length === 0) {
+    rewardsList.innerHTML = `
+      <div class="no-rewards">
+        <span class="lang-sr">Još uvek nemaš nagrade. Pozovi prijatelje da započneš!</span>
+        <span class="lang-en">No rewards yet. Invite friends to get started!</span>
+      </div>
+    `;
+    return;
+  }
+
+  rewardsList.innerHTML = rewards.map(reward => `
+    <div class="reward-item">
+      <div class="reward-info">
+        <div class="reward-type">${reward.reward_description || getRewardTypeLabel(reward.reward_type)}</div>
+        <div class="reward-value">€${reward.reward_value.toFixed(2)}</div>
+      </div>
+      <div class="reward-status ${reward.status}">${getStatusLabel(reward.status)}</div>
+    </div>
+  `).join('');
+}
+
+function getRewardTypeLabel(type) {
+  const labels = {
+    credit: currentLang === 'sr' ? 'Kredit' : 'Credit',
+    free_month: currentLang === 'sr' ? 'Besplatni mesec' : 'Free Month',
+    discount: currentLang === 'sr' ? 'Popust' : 'Discount'
+  };
+  return labels[type] || type;
+}
+
+function getStatusLabel(status) {
+  const labels = {
+    available: currentLang === 'sr' ? 'Dostupno' : 'Available',
+    withdrawn: currentLang === 'sr' ? 'Isplaćeno' : 'Withdrawn',
+    expired: currentLang === 'sr' ? 'Isteklo' : 'Expired'
+  };
+  return labels[status] || status;
+}
+
+// Setup copy button functionality
+function setupCopyButton() {
+  const copyBtn = document.getElementById('copyReferralBtn');
+  const referralCodeInput = document.getElementById('referralCodeInput');
+  const referralLinkText = document.getElementById('referralLinkText');
+
+  if (!copyBtn || !referralCodeInput) return;
+
+  copyBtn.addEventListener('click', async () => {
+    const referralCode = referralCodeInput.value;
+    const referralLink = referralLinkText.textContent;
+
+    try {
+      // Copy both code and link
+      const textToCopy = `${currentLang === 'sr' ? 'Moj referral kod:' : 'My referral code:'} ${referralCode}\n${currentLang === 'sr' ? 'Referral link:' : 'Referral link:'} ${referralLink}`;
+      
+      await navigator.clipboard.writeText(textToCopy);
+      
+      // Show success feedback
+      const originalText = copyBtn.innerHTML;
+      copyBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span class="lang-sr">Kopirano!</span>
+        <span class="lang-en">Copied!</span>
+      `;
+      copyBtn.style.background = '#10B981';
+      
+      playSound(600, 'sine', 0.1, 0.05);
+      
+      setTimeout(() => {
+        copyBtn.innerHTML = originalText;
+        copyBtn.style.background = '';
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      // Fallback for older browsers
+      referralCodeInput.select();
+      document.execCommand('copy');
+    }
+  });
+}
+
+// Setup withdrawal modal functionality
+function setupWithdrawalModal() {
+  const withdrawalBtn = document.getElementById('withdrawalBtn');
+  const withdrawalModal = document.getElementById('withdrawalModal');
+  const closeWithdrawalModal = document.getElementById('closeWithdrawalModal');
+  const withdrawalForm = document.getElementById('withdrawalForm');
+  const paymentMethod = document.getElementById('paymentMethod');
+  const amountPresets = document.querySelectorAll('.amount-preset-btn');
+  const withdrawalAmount = document.getElementById('withdrawalAmount');
+
+  if (!withdrawalBtn || !withdrawalModal) return;
+
+  // Open modal
+  withdrawalBtn.addEventListener('click', () => {
+    const modalAvailableBalance = document.getElementById('modalAvailableBalance');
+    if (modalAvailableBalance) {
+      modalAvailableBalance.textContent = `€${(window.currentAvailableBalance || 0).toFixed(2)}`;
+    }
+    withdrawalModal.classList.add('open');
+  });
+
+  // Close modal
+  closeWithdrawalModal.addEventListener('click', () => {
+    withdrawalModal.classList.remove('open');
+    withdrawalForm.reset();
+  });
+
+  // Close on backdrop click
+  withdrawalModal.addEventListener('click', (e) => {
+    if (e.target === withdrawalModal) {
+      withdrawalModal.classList.remove('open');
+      withdrawalForm.reset();
+    }
+  });
+
+  // Amount preset buttons
+  amountPresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const amount = parseFloat(btn.dataset.amount);
+      if (amount <= window.currentAvailableBalance) {
+        withdrawalAmount.value = amount;
+        amountPresets.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    });
+  });
+
+  // Payment method change
+  paymentMethod.addEventListener('change', (e) => {
+    const method = e.target.value;
+    const label = document.getElementById('paymentDetailsLabel');
+    const hint = document.getElementById('paymentDetailsHint');
+    const input = document.getElementById('paymentDetails');
+
+    if (!label || !hint || !input) return;
+
+    switch(method) {
+      case 'paypal':
+        label.innerHTML = `<span class="lang-sr">PayPal Email</span><span class="lang-en">PayPal Email</span>`;
+        input.placeholder = 'your@email.com';
+        hint.innerHTML = `<span class="lang-sr">Unesi svoj PayPal email adresu</span><span class="lang-en">Enter your PayPal email address</span>`;
+        break;
+      case 'bank_transfer':
+        label.innerHTML = `<span class="lang-sr">Broj računa (IBAN)</span><span class="lang-en">Account Number (IBAN)</span>`;
+        input.placeholder = 'RS00 0000 0000 0000 0000 00';
+        hint.innerHTML = `<span class="lang-sr">Unesi svoj IBAN broj računa</span><span class="lang-en">Enter your IBAN account number</span>`;
+        break;
+      case 'crypto':
+        label.innerHTML = `<span class="lang-sr">Crypto Wallet Adresa</span><span class="lang-en">Crypto Wallet Address</span>`;
+        input.placeholder = '0x... or bc1...';
+        hint.innerHTML = `<span class="lang-sr">Unesi svoju crypto wallet adresu</span><span class="lang-en">Enter your crypto wallet address</span>`;
+        break;
+      default:
+        label.innerHTML = `<span class="lang-sr">PayPal Email</span><span class="lang-en">PayPal Email</span>`;
+        input.placeholder = 'your@email.com';
+        hint.innerHTML = `<span class="lang-sr">Unesi svoj PayPal email adresu</span><span class="lang-en">Enter your PayPal email address</span>`;
+    }
+  });
+
+  // Form submission
+  withdrawalForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const amount = parseFloat(withdrawalAmount.value);
+    const method = paymentMethod.value;
+    const details = document.getElementById('paymentDetails').value;
+
+    if (!amount || amount < 5) {
+      alert(currentLang === 'sr' ? 'Minimum iznos je €5' : 'Minimum amount is €5');
+      return;
+    }
+
+    if (amount > window.currentAvailableBalance) {
+      alert(currentLang === 'sr' ? 'Nedovoljno sredstava' : 'Insufficient funds');
+      return;
+    }
+
+    if (!method || !details) {
+      alert(currentLang === 'sr' ? 'Popuni sva polja' : 'Please fill all fields');
+      return;
+    }
+
+    try {
+      const { data: { user } } = await sb.auth.getUser();
+      if (!user) {
+        alert(currentLang === 'sr' ? 'Nisi prijavljen' : 'Not logged in');
+        return;
+      }
+
+      // Create withdrawal request
+      const { data: requestId, error } = await sb.rpc('create_withdrawal_request', {
+        p_user_id: user.id,
+        p_amount: amount,
+        p_payment_method: method,
+        p_payment_details: details
+      });
+
+      if (error) {
+        console.error('Withdrawal request error:', error);
+        alert(currentLang === 'sr' ? 'Greška prilikom slanja zahteva' : 'Error submitting request');
+        return;
+      }
+
+      // Success
+      alert(currentLang === 'sr' ? 'Zahtev poslat! Očekujte isplatu u roku 1-3 radna dana.' : 'Request sent! Expect payment within 1-3 business days.');
+      withdrawalModal.classList.remove('open');
+      withdrawalForm.reset();
+      
+      // Reload referral data
+      await loadReferralData(user.id);
+
+      playSound(800, 'sine', 0.15, 0.05);
+
+    } catch (err) {
+      console.error('Withdrawal error:', err);
+      alert(currentLang === 'sr' ? 'Greška prilikom slanja zahteva' : 'Error submitting request');
+    }
+  });
 }
 
 // ── Translation Engine ────────────────────────────────────
@@ -478,20 +1014,24 @@ setInterval(() => {
 }, 1000);
 
 async function checkServerLogoutStatus() {
-  const { data: { session } } = sb.auth.getSession();
-  if (session?.user?.id) {
-    try {
-      const res = await fetch(`https://kickbot-ihzb.onrender.com/api/check-logout?userId=${session.user.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.shouldLogout) {
-          await sb.auth.signOut();
-          window.location.reload();
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user?.id) {
+      try {
+        const res = await fetch(`https://kickbot-ihzb.onrender.com/api/check-logout?userId=${session.user.id}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.shouldLogout) {
+            await sb.auth.signOut();
+            window.location.reload();
+          }
         }
+      } catch (e) {
+        // Ignore errors
       }
-    } catch (e) {
-      // Ignore errors
     }
+  } catch (e) {
+    // Ignore errors if session check fails
   }
 }
 
