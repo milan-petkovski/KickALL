@@ -108,6 +108,7 @@ function formatPorukeCount(count) {
 let editingCmdId = null; // null = new, UUID = edit
 let confirmCallback = null;
 let realtimeSub = null;
+let realtimeMarriagesSub = null;
 let configLoaded = false;
 let localAnnounces = [];   // cached auto-announce messages
 let activeLeaderboardType = localStorage.getItem('active-leaderboard-tab') || 'combined'; // 'chatters', 'watchtime', 'combined'
@@ -118,6 +119,12 @@ let leaderboardPage = 1;
 let leaderboardLimit = parseInt(localStorage.getItem('lb-items-per-page')) || 15;
 let commandsPage = 1;
 let commandsLimit = parseInt(localStorage.getItem('cmd-items-per-page')) || 10;
+let loveStatusesPage = 1;
+let loveStatusesLimit = parseInt(localStorage.getItem('love-statuses-limit')) || 10;
+let loveStatusesQuery = '';
+let marriagesPage = 1;
+let marriagesLimit = parseInt(localStorage.getItem('marriages-limit')) || 10;
+let marriagesQuery = '';
 
 // ═══════════════════════════════════════════════════════════
 // AUTH GUARD
@@ -137,11 +144,11 @@ async function initAuth() {
 
     if (code) {
       document.getElementById('authGateMsg').textContent = 'Autorizacija u toku...';
-      
+
       const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
       const stateParam = urlParams.get('state');
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      
+
       if (!isLocalhost && (!stateParam || stateParam !== savedState)) {
         document.getElementById('authGateMsg').textContent = 'Nevalidan state parametar...';
         showToast('error', 'State parametar se ne podudara.', '❌');
@@ -160,9 +167,9 @@ async function initAuth() {
       const kickApiBase = (() => {
         const fromGlobal = (window.KICK_API_BASE || '').trim();
         if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-        if (window.location.hostname.endsWith('netlify.app') || 
-            window.location.hostname === 'localhost' || 
-            window.location.hostname === '127.0.0.1') {
+        if (window.location.hostname.endsWith('netlify.app') ||
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1') {
           return 'https://kickbot-ihzb.onrender.com';
         }
         return `${window.location.origin}`;
@@ -196,7 +203,7 @@ async function initAuth() {
         }
 
         localStorage.setItem('kick_access_token', tokenData.access_token);
-        
+
         const intent = sessionStorage.getItem('kick_oauth_intent') || 'login';
         const addChannelUid = sessionStorage.getItem('kick_add_channel_uid') || '';
 
@@ -330,17 +337,17 @@ async function handleKickOAuthSession(accessToken) {
   });
 
   let kickUsername = '';
-  let kickUserId   = '';
-  let kickAvatar   = '';
-  let kickBio      = '';
+  let kickUserId = '';
+  let kickAvatar = '';
+  let kickBio = '';
 
   if (kickUserRes.ok) {
     const kickData = await kickUserRes.json();
     const kickUser = Array.isArray(kickData?.data) ? kickData.data[0] : kickData?.data || kickData;
     kickUsername = kickUser?.username || kickUser?.name || '';
-    kickUserId   = kickUser?.user_id  || kickUser?.id   || '';
-    kickAvatar   = kickUser?.profile_picture || kickUser?.profile_pic || '';
-    kickBio      = kickUser?.bio || '';
+    kickUserId = kickUser?.user_id || kickUser?.id || '';
+    kickAvatar = kickUser?.profile_picture || kickUser?.profile_pic || '';
+    kickBio = kickUser?.bio || '';
   } else {
     console.warn('Kick users API nije vratio uspeh, pokušavamo alternativni endpoint...');
     // Alternativni endpoint
@@ -350,8 +357,8 @@ async function handleKickOAuthSession(accessToken) {
     if (altRes.ok) {
       const altData = await altRes.json();
       kickUsername = altData?.preferred_username || altData?.name || altData?.sub || '';
-      kickUserId   = altData?.sub || '';
-      kickAvatar   = altData?.picture || '';
+      kickUserId = altData?.sub || '';
+      kickAvatar = altData?.picture || '';
     }
   }
 
@@ -391,10 +398,10 @@ async function handleKickOAuthSession(accessToken) {
     password: password,
     options: {
       data: {
-        display_name:  kickUsername,
-        avatar_url:    kickAvatar,
+        display_name: kickUsername,
+        avatar_url: kickAvatar,
         kick_username: kickUsername,
-        kick_user_id:  kickUserId
+        kick_user_id: kickUserId
       }
     }
   });
@@ -422,14 +429,14 @@ async function handleKickOAuthSession(accessToken) {
     channelId = String(kickUserId || `kick_${kickUsername.toLowerCase()}`);
   }
   const { error: profileError } = await sb.from('user_profiles').upsert({
-    id:           user.id,
+    id: user.id,
     display_name: kickUsername,
-    email:        kickEmail,
-    plan:         'free',
+    email: kickEmail,
+    plan: 'free',
     kick_channels: [{
-      id:         channelId,
-      username:   kickUsername,
-      avatar:     kickAvatar || null,
+      id: channelId,
+      username: kickUsername,
+      avatar: kickAvatar || null,
       is_primary: true,
       kick_access_token: accessToken
     }],
@@ -467,7 +474,7 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
 
     const existingChannels = (profile?.kick_channels) || [];
     const usernameLC = kickUsername.toLowerCase();
-    
+
     // Dohvati chatroom_id sa Kick API-ja umesto user_id
     let channelId = kickUserId;
     try {
@@ -485,9 +492,9 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
       existingChannels[idx].kick_access_token = accessToken;
     } else {
       existingChannels.push({
-        id:         channelId,
-        username:   kickUsername,
-        avatar:     kickAvatar || null,
+        id: channelId,
+        username: kickUsername,
+        avatar: kickAvatar || null,
         is_primary: existingChannels.length === 0,
         kick_access_token: accessToken
       });
@@ -495,7 +502,7 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
 
     await sb.from('user_profiles').update({
       kick_channels: existingChannels,
-      updated_at:    new Date().toISOString()
+      updated_at: new Date().toISOString()
     }).eq('id', userId);
   } catch (err) {
     console.warn('Nije moguće ažurirati Kick profil:', err);
@@ -1169,34 +1176,46 @@ async function refreshAllData() {
 // ── Commands ──────────────────────────────────────────────
 // ── Commands ──────────────────────────────────────────────
 const defaultBuiltinCommands = [
-  { id: 'builtin-iq', command: 'iq, iq @user', response: 'Prikazuje inteligenciju (IQ) korisnika ili ciljanog člana chata.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'iq' },
-  { id: 'builtin-samar', command: 'samar @user', response: 'Šalje zabavan šamar odabranom korisniku sa nasumičnim predmetom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'samar' },
-  { id: 'builtin-roll', command: 'roll @user', response: 'Pokreće roll dvoboj (kockice 1-100) protiv tagovanog protivnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'roll' },
-  { id: 'builtin-duel', command: 'duel @user', response: 'Izazovi drugog člana na pravi ruski rulet dvoboj.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'duel' },
-  { id: 'builtin-rulet', command: 'rulet @user', response: 'Igraj ruski rulet sa botom — rizikuj timeout od 10 minuta.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rulet' },
-  { id: 'builtin-love', command: 'love @user, love @user @user', response: 'Izračunaj ljubavnu kompatibilnost sa drugim korisnikom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'love' },
-  { id: 'builtin-marry', command: 'vencaj @user', response: 'Pošalji bračnu ponudu drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vencaj' },
-  { id: 'builtin-razvod', command: 'razvod @user', response: 'Razvedi se od trenutnog bračnog partnera.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'razvod' },
-  { id: 'builtin-brakovi', command: 'brakovi, brak, vencani', response: 'Prikazuje sve venčane parove na ovom kanalu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'brakovi' },
-  { id: 'builtin-posaljiljubav', command: 'posaljiljubav @user', response: 'Pošalji ljubavnu ponudu nekom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'posaljiljubav' },
-  { id: 'builtin-odbijljubav', command: 'odbijljubav @user', response: 'Odbij ljubavnu ponudu od nekog korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbijljubav' },
-  { id: 'builtin-mrzim', command: 'mrzim @user', response: 'Izračunaj procenat mržnje prema drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'mrzim' },
-  { id: 'builtin-prihvati', command: 'prihvati, da, pristajem', response: 'Prihvati bračnu ili ljubavnu ponudu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'prihvati' },
-  { id: 'builtin-odbij', command: 'odbij, ne, odbijam', response: 'Odbij bračnu ili ljubavnu ponudu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbij' },
-  { id: 'builtin-igra', command: 'igra', response: 'Prikazuje trenutnu igru na strimu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'igra' },
-  { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje koliko vremena je strim online.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'uptime' },
-  { id: 'builtin-vreme', command: 'vreme [grad]', response: 'Prikazuje trenutnu vremensku prognozu za uneti grad.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vreme' },
-  { id: 'builtin-info', command: 'info', response: 'Prikazuje osnovne informacije o botu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'info' },
-  { id: 'builtin-permit', command: 'permit @user', response: 'Dozvoljava korisniku slanje jednog linka.', cooldown_ms: 5000, min_rank: 'moderator', enabled: true, is_default: true, uses_count: 0, db_match_key: 'permit' },
-  { id: 'builtin-osvezi', command: 'osvezi', response: 'Osvežava sve podatke iz baze podataka.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'osvezi' },
-  { id: 'builtin-topwatchtime', command: 'top watchtime [broj]', response: 'Prikazuje top listu gledalaca po vremenu gledanja.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top watchtime' },
-  { id: 'builtin-topchat', command: 'top chat [broj]', response: 'Prikazuje top listu najaktivnijih korisnika u četu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top chat' },
-  { id: 'builtin-watchtime', command: 'watchtime', response: 'Prikazuje vreme gledanja korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'watchtime' },
-  { id: 'builtin-chat', command: 'chat', response: 'Prikazuje broj poslatih poruka korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'chat' },
-  { id: 'builtin-me', command: 'me', response: 'Prikazuje tvoju ličnu chat i watchtime statistiku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'me' },
-  { id: 'builtin-cinjenica', command: 'cinjenica', response: 'Ispisuje nasumičnu zanimljivu činjenicu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'cinjenica' },
-  { id: 'builtin-followage', command: 'followage', response: 'Pokazuje koliko dugo pratiš strimera.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'followage' }
+  { id: 'builtin-iq', command: 'iq, iq @user', response: 'Prikazuje inteligenciju (IQ) korisnika ili ciljanog člana chata.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'iq', category: 'Zabava' },
+  { id: 'builtin-samar', command: 'samar @user', response: 'Šalje zabavan šamar odabranom korisniku sa nasumičnim predmetom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'samar', category: 'Zabava' },
+  { id: 'builtin-roll', command: 'roll @user', response: 'Pokreće roll dvoboj (kockice 1-100) protiv tagovanog protivnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'roll', category: 'Zabava' },
+  { id: 'builtin-duel', command: 'duel @user', response: 'Izazovi drugog člana na pravi ruski rulet dvoboj.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'duel', category: 'Zabava' },
+  { id: 'builtin-rulet', command: 'rulet @user', response: 'Igraj ruski rulet sa botom — rizikuj timeout od 10 minuta.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rulet', category: 'Zabava' },
+  { id: 'builtin-love', command: 'love @user, love @user @user', response: 'Izračunaj ljubavnu kompatibilnost sa drugim korisnikom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'love', category: 'Ljubav & Brak' },
+  { id: 'builtin-marry', command: 'vencaj @user', response: 'Pošalji bračnu ponudu drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vencaj', category: 'Ljubav & Brak' },
+  { id: 'builtin-razvod', command: 'razvod @user', response: 'Razvedi se od trenutnog bračnog partnera.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'razvod', category: 'Ljubav & Brak' },
+  { id: 'builtin-brakovi', command: 'brakovi, brak, vencani', response: 'Prikazuje sve venčane parove na ovom kanalu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'brakovi', category: 'Ljubav & Brak' },
+  { id: 'builtin-posaljiljubav', command: 'posaljiljubav @user', response: 'Pošalji ljubavnu ponudu nekom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'posaljiljubav', category: 'Ljubav & Brak' },
+  { id: 'builtin-odbijljubav', command: 'odbijljubav @user', response: 'Odbij ljubavnu ponudu od nekog korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbijljubav', category: 'Ljubav & Brak' },
+  { id: 'builtin-mrzim', command: 'mrzim @user', response: 'Izračunaj procenat mržnje prema drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'mrzim', category: 'Ljubav & Brak' },
+  { id: 'builtin-prihvati', command: 'prihvati, da, pristajem', response: 'Prihvati bračnu ili ljubavnu ponudu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'prihvati', category: 'Ljubav & Brak' },
+  { id: 'builtin-odbij', command: 'odbij, ne, odbijam', response: 'Odbij bračnu ili ljubavnu ponudu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbij', category: 'Ljubav & Brak' },
+  { id: 'builtin-igra', command: 'igra', response: 'Prikazuje trenutnu igru na strimu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'igra', category: 'Strim Info' },
+  { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje koliko vremena je strim online.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'uptime', category: 'Strim Info' },
+  { id: 'builtin-vreme', command: 'vreme [grad]', response: 'Prikazuje trenutnu vremensku prognozu za uneti grad.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vreme', category: 'Strim Info' },
+  { id: 'builtin-info', command: 'info', response: 'Prikazuje osnovne informacije o botu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'info', category: 'Strim Info' },
+  { id: 'builtin-permit', command: 'permit @user', response: 'Dozvoljava korisniku slanje jednog linka.', cooldown_ms: 5000, min_rank: 'moderator', enabled: true, is_default: true, uses_count: 0, db_match_key: 'permit', category: 'Moderacija' },
+  { id: 'builtin-osvezi', command: 'osvezi', response: 'Osvežava sve podatke iz baze podataka.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'osvezi', category: 'Moderacija' },
+  { id: 'builtin-topwatchtime', command: 'top watchtime [broj]', response: 'Prikazuje top listu gledalaca po vremenu gledanja.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top watchtime', category: 'Statistika' },
+  { id: 'builtin-topchat', command: 'top chat [broj]', response: 'Prikazuje top listu najaktivnijih korisnika u četu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top chat', category: 'Statistika' },
+  { id: 'builtin-watchtime', command: 'watchtime', response: 'Prikazuje vreme gledanja korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'watchtime', category: 'Statistika' },
+  { id: 'builtin-chat', command: 'chat', response: 'Prikazuje broj poslatih poruka korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'chat', category: 'Statistika' },
+  { id: 'builtin-me', command: 'me', response: 'Prikazuje tvoju ličnu chat i watchtime statistiku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'me', category: 'Statistika' },
+  { id: 'builtin-cinjenica', command: 'cinjenica', response: 'Ispisuje nasumičnu zanimljivu činjenicu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'cinjenica', category: 'Zabava' },
+  { id: 'builtin-followage', command: 'followage', response: 'Pokazuje koliko dugo pratiš strimera.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'followage', category: 'Statistika' }
 ];
+
+let activeBuiltinCategory = 'all';
+
+function filterBuiltinCategory(cat, btnEl) {
+  activeBuiltinCategory = cat;
+
+  const tabs = document.querySelectorAll('#builtinCategoryTabs .btn-category');
+  tabs.forEach(t => t.classList.remove('active'));
+  if (btnEl) btnEl.classList.add('active');
+
+  renderBuiltinCommandsGrid();
+}
 
 const RANK_LABELS = {
   'everyone': 'Svi',
@@ -1208,13 +1227,59 @@ const RANK_LABELS = {
 };
 
 const RANK_COLORS = {
-  'everyone': 'rgba(255, 255, 255, 0.4)',
+  'everyone': '#94A3B8',
   'subscriber': '#8B5CF6',
   'vip': '#3B82F6',
   'og': '#F59E0B',
   'moderator': '#10B981',
   'broadcaster': '#EF4444'
 };
+
+function getSerbianPlural(n, wordOne, wordFew, wordMany) {
+  const abs = Math.abs(n);
+  const mod10 = abs % 10;
+  const mod100 = abs % 100;
+
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${n} ${wordOne}`;
+  }
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) {
+    return `${n} ${wordFew}`;
+  }
+  return `${n} ${wordMany}`;
+}
+
+let currentCmdSortCol = null;
+let currentCmdSortState = 0; // 0: reset/default, 1: asc (▲), 2: desc (▼)
+
+function sortCommands(col) {
+  if (currentCmdSortCol === col) {
+    currentCmdSortState = (currentCmdSortState + 1) % 3;
+  } else {
+    currentCmdSortCol = col;
+    currentCmdSortState = 1; // Prvi klik -> Rastuće (ASC)
+  }
+
+  if (currentCmdSortState === 0) {
+    currentCmdSortCol = null; // Treći klik -> Reset na podrazumevano sortiranje
+  }
+
+  ['command', 'cooldown_ms', 'uses_count', 'enabled'].forEach(c => {
+    const iconEl = document.getElementById(`sortIcon-${c}`);
+    const thEl = iconEl?.closest('.sortable-th');
+    if (iconEl && thEl) {
+      if (c === currentCmdSortCol && currentCmdSortState !== 0) {
+        thEl.classList.add('active-sort');
+        iconEl.textContent = currentCmdSortState === 1 ? '▲' : '▼';
+      } else {
+        thEl.classList.remove('active-sort');
+        iconEl.textContent = '↕';
+      }
+    }
+  });
+
+  renderUnifiedCommands();
+}
 
 async function loadCommands() {
   if (!activeChannel) return;
@@ -1283,6 +1348,24 @@ function renderUnifiedCommands(customCmds = null) {
     return;
   }
 
+  // Sortiranje po kolonima (ako je podet sort col i nije u reset stanju)
+  if (currentCmdSortCol && currentCmdSortState !== 0) {
+    const isAsc = currentCmdSortState === 1;
+    rows = [...rows].sort((a, b) => {
+      let valA = a[currentCmdSortCol];
+      let valB = b[currentCmdSortCol];
+      if (valA === undefined || valA === null) valA = '';
+      if (valB === undefined || valB === null) valB = '';
+
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+
+      if (valA < valB) return isAsc ? -1 : 1;
+      if (valA > valB) return isAsc ? 1 : -1;
+      return 0;
+    });
+  }
+
   // Pagination calculation
   const totalPages = Math.ceil(rows.length / commandsLimit) || 1;
   if (commandsPage > totalPages) commandsPage = totalPages;
@@ -1340,8 +1423,8 @@ function renderUnifiedCommands(customCmds = null) {
 
     const rKey = cmd.min_rank || 'everyone';
     const rankLabel = RANK_LABELS[rKey] || 'Svi';
-    const rankColor = RANK_COLORS[rKey] || 'var(--text-muted)';
-    const rankBadgeHtml = `<span style="background: rgba(255,255,255,0.03); border: 1px solid ${rankColor}33; color: ${rankColor}; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${rankLabel}</span>`;
+    const rankColor = RANK_COLORS[rKey] || '#94A3B8';
+    const rankBadgeHtml = `<span style="background: rgba(255,255,255,0.03); border: 1px solid ${rankColor}44; color: ${rankColor}; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">${rankLabel}</span>`;
 
     const displayResponse = cmd.is_default
       ? `<span style="color:var(--text-muted); font-style:italic;" title="${escapeHtml(cmd.response)}">${escapeHtml(cmd.response)}</span>`
@@ -1377,8 +1460,8 @@ function renderMiniCommands(cmds) {
   const el = document.getElementById('miniCommands');
   if (!el) return;
 
-  // Prikaži specijalne i prilagođene komande
-  const customOnly = cmds.filter(c => !c.is_builtin);
+  // Prikaži samo prilagođene komande u Overview widget-u
+  const customOnly = cmds.filter(c => !c.is_default);
 
   if (customOnly.length === 0) {
     el.innerHTML = '<div class="mini-empty">Nema prilagođenih komandi</div>';
@@ -1401,7 +1484,7 @@ function renderMiniCommands(cmds) {
 
 function filterCommands(query) {
   commandsPage = 1;
-  const q = query.toLowerCase();
+  const q = query.trim().replace(/^!/, '').toLowerCase();
   const customOnly = allCommands.filter(c => !c.is_default);
   const filtered = customOnly.filter(c =>
     c.command.toLowerCase().includes(q) ||
@@ -1411,48 +1494,90 @@ function filterCommands(query) {
 }
 
 function updateCmdTableMeta(n) {
-  document.getElementById('cmdTableMeta').textContent = `${n} prilagođenih komandi`;
+  document.getElementById('cmdTableMeta').textContent = getSerbianPlural(n, 'prilagođena komanda', 'prilagođene komande', 'prilagođenih komandi');
 }
 
-function renderBuiltinCommandsGrid(filteredList = null) {
+function renderBuiltinCommandsGrid() {
   const grid = document.getElementById('builtinCommandsGrid');
   const meta = document.getElementById('builtinCmdTableMeta');
   if (!grid) return;
 
-  const builtins = filteredList || allCommands.filter(c => c.is_default);
-  if (meta) meta.textContent = `${builtins.length} ugrađenih komandi`;
+  const query = (document.getElementById('builtinCmdSearchInput')?.value || '').trim().replace(/^!/, '').toLowerCase();
+
+  let builtins = allCommands.filter(c => c.is_default);
+
+  // Filtriranje po izabranoj kategoriji
+  if (activeBuiltinCategory && activeBuiltinCategory !== 'all') {
+    builtins = builtins.filter(c => c.category === activeBuiltinCategory);
+  }
+
+  // Filtriranje po tekstu pretrage
+  if (query) {
+    builtins = builtins.filter(c =>
+      c.command.toLowerCase().includes(query) ||
+      c.response.toLowerCase().includes(query) ||
+      (c.category && c.category.toLowerCase().includes(query))
+    );
+  }
+
+  if (meta) {
+    meta.textContent = getSerbianPlural(builtins.length, 'ugrađena komanda', 'ugrađene komande', 'ugrađenih komandi');
+  }
 
   if (builtins.length === 0) {
-    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 2rem;">Nema pronađenih ugrađenih komandi.</div>';
+    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 2.5rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px;">Nema pronađenih ugrađenih komandi u ovoj kategoriji.</div>';
     return;
   }
 
   grid.innerHTML = builtins.map(cmd => {
     const rKey = cmd.min_rank || 'everyone';
     const rankLabel = RANK_LABELS[rKey] || 'Svi';
-    const rankColor = RANK_COLORS[rKey] || 'var(--text-muted)';
-    const dotColor = cmd.enabled ? 'var(--kick-green)' : '#EF4444';
+    const rankColor = RANK_COLORS[rKey] || '#94A3B8';
+    const catLabel = cmd.category || 'Opšte';
+
+    const toggleIcon = cmd.enabled
+      ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>`
+      : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`;
 
     return `
-      <div class="builtin-card" style="position: relative; background: var(--bg-surface); border: 1px solid var(--border-subtle); padding: 20px; border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
-        <button class="action-btn" onclick="editCommand('${cmd.id}')" style="position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); color: var(--text-main); cursor: pointer; transition: all var(--transition-fast); z-index: 2; flex-shrink: 0;" onmouseover="this.style.background='var(--app-primary-dim)'; this.style.color='var(--app-primary)'; this.style.borderColor='var(--app-primary-dim)';" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.color='var(--text-main)'; this.style.borderColor='var(--border-subtle)';">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-        </button>
-        
-        <div class="builtin-cmd" style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; padding-right: 40px; word-break: break-word; line-height: 1.3;">
-          !${escapeHtml(cmd.command)}
-          <span class="status-dot" style="width: 6px; height: 6px; border-radius: 50%; display: inline-block; background: ${dotColor}; flex-shrink: 0;"></span>
+      <div class="builtin-card" style="position: relative; background: var(--bg-surface); border: 1px solid ${cmd.enabled ? 'var(--border-subtle)' : 'rgba(255,255,255,0.04)'}; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; height: 100%; box-sizing: border-box; opacity: ${cmd.enabled ? '1' : '0.55'}; transition: all 0.22s ease;">
+        <!-- Action Buttons Pinned strictly to top-right -->
+        <div style="position: absolute; top: 16px; right: 16px; display: flex; gap: 6px; z-index: 2;">
+          <button class="action-btn" onclick="toggleCommand('${cmd.id}', ${cmd.enabled}, true)" title="${cmd.enabled ? 'Isključi komandu' : 'Uključi komandu'}" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: ${cmd.enabled ? 'rgba(83, 252, 24, 0.08)' : 'rgba(255,255,255,0.03)'}; border: 1px solid ${cmd.enabled ? 'rgba(83, 252, 24, 0.25)' : 'var(--border-subtle)'}; color: ${cmd.enabled ? 'var(--kick-green)' : 'var(--text-muted)'}; cursor: pointer; transition: all 0.2s ease;">
+            ${toggleIcon}
+          </button>
+          <button class="action-btn" onclick="editCommand('${cmd.id}')" title="Izmeni podešavanja" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); color: var(--text-main); cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.background='var(--app-primary-dim)'; this.style.color='var(--app-primary)'; this.style.borderColor='var(--app-primary-dim)';" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.color='var(--text-main)'; this.style.borderColor='var(--border-subtle)';">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+          </button>
+        </div>
+
+        <!-- Top Section (Category, Title, Description) -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <!-- Category Badge (Left) -->
+          <div style="padding-right: 80px;">
+            <span style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); color: var(--app-primary); font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 6px; display: inline-flex; align-items: center;">
+              ${escapeHtml(catLabel)}
+            </span>
+          </div>
+          
+          <!-- Command Trigger Name -->
+          <div style="font-family: var(--font-mono); color: #fff; font-weight: 700; font-size: 1.02rem; letter-spacing: -0.2px; word-break: break-word; line-height: 1.35; margin-top: 2px;">
+            !${escapeHtml(cmd.command)}
+          </div>
+          
+          <!-- Description -->
+          <div style="font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;">
+            ${escapeHtml(cmd.response)}
+          </div>
         </div>
         
-        <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4; flex-grow: 1; margin-top: 4px;">
-          ${escapeHtml(cmd.response)}
-        </div>
-        
-        <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap;">
-          <span style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); color: var(--text-muted); font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 500;">
-            Cooldown: ${(cmd.cooldown_ms / 1000).toFixed(0)}s
+        <!-- Bottom Row: Cooldown (Left) & Rank (Right) -->
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px; margin-top: auto;">
+          <span style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 0.74rem; font-weight: 500;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            ${(cmd.cooldown_ms / 1000).toFixed(0)}s cooldown
           </span>
-          <span style="background: rgba(255,255,255,0.02); border: 1px solid ${rankColor}33; color: ${rankColor}; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+          <span style="background: rgba(255,255,255,0.03); border: 1px solid ${rankColor}44; color: ${rankColor}; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
             ${rankLabel}
           </span>
         </div>
@@ -1461,14 +1586,8 @@ function renderBuiltinCommandsGrid(filteredList = null) {
   }).join('');
 }
 
-function filterBuiltinCommands(query) {
-  const q = query.toLowerCase();
-  const builtinsOnly = allCommands.filter(c => c.is_default);
-  const filtered = builtinsOnly.filter(c =>
-    c.command.toLowerCase().includes(q) ||
-    c.response.toLowerCase().includes(q)
-  );
-  renderBuiltinCommandsGrid(filtered);
+function filterBuiltinCommands() {
+  renderBuiltinCommandsGrid();
 }
 
 // ── Leaderboard Helpers ────────────────────────────────────
@@ -1628,19 +1747,49 @@ async function loadWatchtime() {
     renderUnifiedLeaderboard();
   }
 }
+
+// ── UI Helperi za skeleton i empty state ──────────────────
+function renderTableSkeleton(tbodyId, colCount = 5, rowCount = 5) {
+
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  tbody.innerHTML = Array.from({ length: rowCount }, () => `
+    <tr class="skeleton-row">
+      <td><div class="skeleton skeleton-cell skeleton-cell--sm"></div></td>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <div class="skeleton skeleton-avatar"></div>
+        <div class="skeleton skeleton-cell skeleton-cell--md"></div>
+      </div></td>
+      ${Array.from({ length: colCount - 2 }, () =>
+    `<td><div class="skeleton skeleton-cell skeleton-cell--sm"></div></td>`
+  ).join('')}
+    </tr>
+  `).join('');
+}
+
+function renderEmptyState(tbodyId, colCount, message = 'Nema podataka za prikaz.') {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="${colCount}" class="table-empty">${message}</td></tr>`;
+}
+
+
 function setLeaderboardType(type) {
   activeLeaderboardType = type;
   localStorage.setItem('active-leaderboard-tab', type);
   leaderboardPage = 1;
 
-  // Izmeni klase na tab dugmadima
+  // Izmeni klase na tab dugmadima (lb-tab-btn / active)
   const tabChatters = document.getElementById('lbTabChatters');
   const tabWatchtime = document.getElementById('lbTabWatchtime');
   const tabCombined = document.getElementById('lbTabCombined');
 
-  if (tabChatters) tabChatters.className = type === 'chatters' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
-  if (tabWatchtime) tabWatchtime.className = type === 'watchtime' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
-  if (tabCombined) tabCombined.className = type === 'combined' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+  [tabChatters, tabWatchtime, tabCombined].forEach(btn => {
+    if (btn) btn.classList.remove('active');
+  });
+  if (type === 'chatters' && tabChatters) tabChatters.classList.add('active');
+  if (type === 'watchtime' && tabWatchtime) tabWatchtime.classList.add('active');
+  if (type === 'combined' && tabCombined) tabCombined.classList.add('active');
 
   // Izmeni klase u sidebar navigaciji
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1657,7 +1806,7 @@ function setLeaderboardType(type) {
         <th>Korisnik</th>
         <th>Poruke</th>
         <th>Mesec</th>
-        <th>Ažurirano</th>
+        <th>Azurirano</th>
       `;
     } else if (type === 'watchtime') {
       header.innerHTML = `
@@ -1665,7 +1814,7 @@ function setLeaderboardType(type) {
         <th>Korisnik</th>
         <th>Ukupno minuta</th>
         <th>Sati gledanja</th>
-        <th>Ažurirano</th>
+        <th>Azurirano</th>
       `;
     } else {
       header.innerHTML = `
@@ -1674,17 +1823,19 @@ function setLeaderboardType(type) {
         <th>Watchtime</th>
         <th>Poruke</th>
         <th>Mesec</th>
-        <th>Ažurirano</th>
+        <th>Azurirano</th>
       `;
     }
   }
 
-  // Očisti input za pretragu
+  // Ocisti input za pretragu
   const searchInput = document.getElementById('leaderboardSearchInput');
   if (searchInput) searchInput.value = '';
 
   renderUnifiedLeaderboard();
 }
+
+
 
 function buildCombinedRows() {
   const map = {};
@@ -1778,7 +1929,7 @@ function renderUnifiedLeaderboard(customRows = null) {
     tbody.innerHTML = `<tr><td colspan="${colCount}" class="table-empty">Nema podataka za prikaz.</td></tr>`;
     document.getElementById('lbTableMeta').textContent = '0 korisnika';
 
-    // Sakrij paginaciju ako nema korisnika
+
     const prevBtn = document.getElementById('lbPrevPageBtn');
     const nextBtn = document.getElementById('lbNextPageBtn');
     const pageInfo = document.getElementById('lbPageInfo');
@@ -1786,6 +1937,7 @@ function renderUnifiedLeaderboard(customRows = null) {
     if (nextBtn) nextBtn.disabled = true;
     if (pageInfo) pageInfo.textContent = 'Stranica 1 od 1';
     return;
+
   }
 
   document.getElementById('lbTableMeta').textContent = `${rows.length} korisnika`;
@@ -1948,6 +2100,7 @@ function renderMiniLeaderboard(rows) {
   const el = document.getElementById('miniLeaderboard');
   if (!el) return;
   if (!rows || rows.length === 0) { el.innerHTML = '<div class="mini-empty">Nema podataka</div>'; return; }
+
   el.innerHTML = rows.map((row, i) => {
     const avatarKey = (row.username || '').toLowerCase();
     const cachedUrl = avatarCache[avatarKey];
@@ -2032,6 +2185,7 @@ function renderMiniWatchtime(rows) {
   const el = document.getElementById('miniWatchtime');
   if (!el) return;
   if (rows.length === 0) { el.innerHTML = '<div class="mini-empty">Nema podataka</div>'; return; }
+
   el.innerHTML = rows.map((row, i) => {
     const h = Math.floor((row.minutes || 0) / 60);
     const m = (row.minutes || 0) % 60;
@@ -2073,8 +2227,11 @@ async function loadMarriages() {
 
   if (error) { console.error('Marriages:', error); return; }
   allMarriages = data || [];
-  renderMarriages(allMarriages);
-  document.getElementById('marriageTableMeta').textContent = `${allMarriages.length} aktivnih brakova`;
+  filterMarriages(marriagesQuery);
+
+  const marriageMeta = document.getElementById('marriageTableMeta');
+  if (marriageMeta) marriageMeta.textContent = `${allMarriages.length} aktivnih brakova`;
+
   const marriageStatEl = document.getElementById('statMarriages');
   if (marriageStatEl) {
     marriageStatEl.textContent = allMarriages.length;
@@ -2092,30 +2249,98 @@ async function loadLoveStatuses() {
 
   if (error) { console.error('Love modifiers:', error); return; }
   allLoveStatuses = data || [];
-  renderLoveStatuses(allLoveStatuses);
+  filterLoveStatuses(loveStatusesQuery);
 
   const meta = document.getElementById('loveStatusMeta');
   if (meta) meta.textContent = `${allLoveStatuses.length} statusa`;
+}
+
+function changeLoveStatusesLimit(val) {
+  loveStatusesLimit = parseInt(val) || 10;
+  localStorage.setItem('love-statuses-limit', loveStatusesLimit);
+  loveStatusesPage = 1;
+  filterLoveStatuses(loveStatusesQuery);
+}
+
+function changeLoveStatusesPage(delta) {
+  loveStatusesPage += delta;
+  filterLoveStatuses(loveStatusesQuery);
+}
+
+function filterLoveStatuses(q) {
+  loveStatusesQuery = q || '';
+  const query = loveStatusesQuery.toLowerCase().trim();
+  let rows = allLoveStatuses;
+  if (query) {
+    rows = allLoveStatuses.filter(r =>
+      (r.user1 || '').toLowerCase().includes(query) ||
+      (r.user2 || '').toLowerCase().includes(query)
+    );
+  }
+  renderLoveStatuses(rows);
+}
+
+function changeMarriagesLimit(val) {
+  marriagesLimit = parseInt(val) || 10;
+  localStorage.setItem('marriages-limit', marriagesLimit);
+  marriagesPage = 1;
+  filterMarriages(marriagesQuery);
+}
+
+function changeMarriagesPage(delta) {
+  marriagesPage += delta;
+  filterMarriages(marriagesQuery);
+}
+
+function filterMarriages(q) {
+  marriagesQuery = q || '';
+  const query = marriagesQuery.toLowerCase().trim();
+  let rows = allMarriages;
+  if (query) {
+    rows = allMarriages.filter(r =>
+      (r.user1 || '').toLowerCase().includes(query) ||
+      (r.user2 || '').toLowerCase().includes(query)
+    );
+  }
+  renderMarriages(rows);
 }
 
 function renderMarriages(rows) {
   const tbody = document.getElementById('marriagesBody');
   if (!tbody) return;
 
-  if (rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Nema aktivnih brakova u kanalu.</td></tr>';
+  const prevBtn = document.getElementById('marriagesPrevPageBtn');
+  const nextBtn = document.getElementById('marriagesNextPageBtn');
+  const pageInfo = document.getElementById('marriagesPageInfo');
+  const limitSelect = document.getElementById('marriagesLimitSelect');
+
+  if (!rows || rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Nema podataka za prikaz.</td></tr>';
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    if (pageInfo) pageInfo.textContent = 'Stranica 1 od 1';
     return;
   }
 
-  tbody.innerHTML = rows.map(row => `
+  const totalPages = Math.ceil(rows.length / marriagesLimit) || 1;
+  if (marriagesPage > totalPages) marriagesPage = totalPages;
+  if (marriagesPage < 1) marriagesPage = 1;
+
+  const startIndex = (marriagesPage - 1) * marriagesLimit;
+  const pageRows = rows.slice(startIndex, startIndex + marriagesLimit);
+
+  if (limitSelect) limitSelect.value = marriagesLimit;
+  if (pageInfo) pageInfo.textContent = `Stranica ${marriagesPage} od ${totalPages}`;
+  if (prevBtn) prevBtn.disabled = marriagesPage === 1;
+  if (nextBtn) nextBtn.disabled = marriagesPage === totalPages;
+
+  const ringsSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><polygon points="12 3 16 7 8 7" /><path d="M8 7a6 6 0 1 0 8 0" /></svg>`;
+
+  tbody.innerHTML = pageRows.map(row => `
     <tr>
-      <td style="font-weight:600">${escapeHtml(row.user1_display || row.user1)}</td>
-      <td style="text-align:center;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
-          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path>
-        </svg>
-      </td>
-      <td style="font-weight:600">${escapeHtml(row.user2_display || row.user2)}</td>
+      <td style="font-weight:600; color:#fff;">${escapeHtml(row.user1_display || row.user1)}</td>
+      <td style="text-align:center; vertical-align:middle;">${ringsSvg}</td>
+      <td style="font-weight:600; color:#fff;">${escapeHtml(row.user2_display || row.user2)}</td>
       <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.married_at)}</td>
       <td>
         <div class="actions-cell">
@@ -2129,100 +2354,74 @@ function renderMarriages(rows) {
 }
 
 function getLoveStatusLabel(modifier) {
-  if (modifier >= 50) return 'Sjajno';
-  if (modifier >= 25) return 'Visoko';
-  if (modifier >= 1) return 'Pozitivno';
-  if (modifier === 0) return 'Neutralno';
-  if (modifier > -25) return 'Nestabilno';
-  if (modifier > -50) return 'Loše';
-  return 'Toksično';
+  if (modifier >= 50) return { label: 'Sjajno', class: 'status-active', style: 'background:rgba(16,185,129,0.15); color:#10B981; border:1px solid rgba(16,185,129,0.3);' };
+  if (modifier >= 25) return { label: 'Visoko', class: 'status-active', style: 'background:rgba(59,130,246,0.15); color:#3B82F6; border:1px solid rgba(59,130,246,0.3);' };
+  if (modifier >= 1) return { label: 'Pozitivno', class: 'status-active', style: 'background:rgba(168,85,247,0.15); color:#A855F7; border:1px solid rgba(168,85,247,0.3);' };
+  if (modifier === 0) return { label: 'Neutralno', class: 'status-neutral', style: 'background:rgba(148,163,184,0.15); color:#94A3B8; border:1px solid rgba(148,163,184,0.3);' };
+  if (modifier > -25) return { label: 'Nestabilno', class: 'status-inactive', style: 'background:rgba(245,158,11,0.15); color:#F59E0B; border:1px solid rgba(245,158,11,0.3);' };
+  if (modifier > -50) return { label: 'Loše', class: 'status-inactive', style: 'background:rgba(249,115,22,0.15); color:#F97316; border:1px solid rgba(249,115,22,0.3);' };
+  return { label: 'Toksično', class: 'status-inactive', style: 'background:rgba(239,68,68,0.15); color:#EF4444; border:1px solid rgba(239,68,68,0.3);' };
 }
 
 function renderLoveStatuses(rows) {
   const tbody = document.getElementById('loveStatusesBody');
   if (!tbody) return;
 
+  const prevBtn = document.getElementById('loveStatusesPrevPageBtn');
+  const nextBtn = document.getElementById('loveStatusesNextPageBtn');
+  const pageInfo = document.getElementById('loveStatusesPageInfo');
+  const limitSelect = document.getElementById('loveStatusesLimitSelect');
+
   if (!rows || rows.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Nema ljubavnih statusa za prikaz.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="table-empty">Nema podataka za prikaz.</td></tr>';
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    if (pageInfo) pageInfo.textContent = 'Stranica 1 od 1';
     return;
   }
 
-  tbody.innerHTML = rows.map(row => {
+  const totalPages = Math.ceil(rows.length / loveStatusesLimit) || 1;
+  if (loveStatusesPage > totalPages) loveStatusesPage = totalPages;
+  if (loveStatusesPage < 1) loveStatusesPage = 1;
+
+  const startIndex = (loveStatusesPage - 1) * loveStatusesLimit;
+  const pageRows = rows.slice(startIndex, startIndex + loveStatusesLimit);
+
+  if (limitSelect) limitSelect.value = loveStatusesLimit;
+  if (pageInfo) pageInfo.textContent = `Stranica ${loveStatusesPage} od ${totalPages}`;
+  if (prevBtn) prevBtn.disabled = loveStatusesPage === 1;
+  if (nextBtn) nextBtn.disabled = loveStatusesPage === totalPages;
+
+  const heartSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>`;
+
+  tbody.innerHTML = pageRows.map(row => {
     const modifier = Number(row.modifier || 0);
-    const statusClass = modifier > 0 ? 'status-active' : modifier < 0 ? 'status-inactive' : 'status-neutral';
-    const displayModifier = modifier >= 0 ? `+${modifier}` : `${modifier}`;
+    const statusObj = getLoveStatusLabel(modifier);
+    const displayModifier = modifier >= 0 ? `+${modifier}%` : `${modifier}%`;
 
     return `
       <tr>
-        <td style="font-weight:600">${escapeHtml(row.user1)}</td>
-        <td style="text-align:center;font-size:1.125rem">💞</td>
-        <td style="font-weight:600">${escapeHtml(row.user2)}</td>
-        <td><span class="status-pill ${statusClass}">${getLoveStatusLabel(modifier)}</span></td>
-        <td class="td-num" style="color:${modifier > 0 ? 'var(--kick-green)' : modifier < 0 ? '#FCA5A5' : 'var(--text-muted)'}">${displayModifier}</td>
+        <td style="font-weight:600; color:#fff;">${escapeHtml(row.user1)}</td>
+        <td style="text-align:center; vertical-align:middle;">${heartSvg}</td>
+        <td style="font-weight:600; color:#fff;">${escapeHtml(row.user2)}</td>
+        <td><span class="status-pill ${statusObj.class}" style="${statusObj.style}">${statusObj.label}</span></td>
+        <td class="td-num" style="font-weight:600; color:${modifier > 0 ? 'var(--kick-green)' : modifier < 0 ? '#FCA5A5' : 'var(--text-muted)'}">${displayModifier}</td>
         <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
       </tr>
     `;
   }).join('');
 }
 
-function filterLoveStatuses(q) {
-  const query = (q || '').toLowerCase();
-  const filtered = allLoveStatuses.filter(r =>
-    (r.user1 || '').toLowerCase().includes(query) ||
-    (r.user2 || '').toLowerCase().includes(query)
-  );
-  renderLoveStatuses(filtered);
-}
-
-function filterMarriages(q) {
-  const filtered = allMarriages.filter(r =>
-    (r.user1 || '').toLowerCase().includes(q.toLowerCase()) ||
-    (r.user2 || '').toLowerCase().includes(q.toLowerCase())
-  );
-  renderMarriages(filtered);
-}
-
 async function divorceConfirm(id, u1, u2) {
   confirmCallback = async () => {
     const { error } = await sb.from('marriages').delete().eq('id', id);
-    if (error) { showToast('error', 'Greška pri brisanju', '❌'); return; }
-    showToast('success', `Brak ${u1} & ${u2} je raskinut`, '✂️');
+    if (error) { showToast('error', 'Greška pri brisanju brakova'); return; }
+    showToast('success', `Brak ${u1} & ${u2} je raskinut`);
     await loadMarriages();
   };
   document.getElementById('confirmMsg').textContent = `Admin razvod: ${u1} & ${u2}? Ovo se ne može poništiti.`;
   document.getElementById('confirmDeleteBtn').onclick = () => { closeModal('confirmModal'); confirmCallback(); };
   openModal('confirmModal');
-}
-
-function updateOverviewModulesUI() {
-  const modules = [
-    { id: 'ovStatusLeaderboard', toggleId: 'cfgLeaderboard', label: 'Leaderboard' },
-    { id: 'ovStatusWatchtime', toggleId: 'cfgWatchtime', label: 'Watchtime' },
-    { id: 'ovStatusGames', toggleId: 'cfgGames', label: 'Mini igre' },
-    { id: 'ovStatusLove', toggleId: 'cfgLove', label: 'Ljubav' },
-    { id: 'ovStatusInteraction', toggleId: 'cfgAutoresponse', label: 'Interakcija' },
-    { id: 'ovStatusModeration', toggleId: 'cfgModeration', label: 'Moderacija' },
-    { id: 'ovStatusSongRequest', toggleId: 'cfgSongRequestEnabled', label: 'Song Request' }
-  ];
-
-  const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-  const crossSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-
-  modules.forEach(m => {
-    const el = document.getElementById(m.id);
-    const toggle = document.getElementById(m.toggleId);
-    if (!el) return;
-    const isEnabled = toggle ? toggle.checked : true;
-    if (isEnabled) {
-      el.innerHTML = `<span>${m.label}</span> ${checkSvg}`;
-      el.className = 'module-status-badge active';
-      el.removeAttribute('style');
-    } else {
-      el.innerHTML = `<span>${m.label}</span> ${crossSvg}`;
-      el.className = 'module-status-badge inactive';
-      el.removeAttribute('style');
-    }
-  });
 }
 
 // ── Bot Config ────────────────────────────────────────────
@@ -2238,62 +2437,90 @@ async function loadBotConfig() {
   if (error) { console.error('Config:', error); return; }
 
   if (data) {
-    document.getElementById('cfgPrefix').value = data.prefix || '!';
-    document.getElementById('cfgLanguage').value = data.language || 'sr';
-    document.getElementById('cfgCooldown').value = data.cooldown_ms ?? 3000;
-    document.getElementById('cfgLeaderboard').checked = data.feature_leaderboard ?? true;
-    document.getElementById('cfgWatchtime').checked = data.feature_watchtime ?? true;
-    document.getElementById('cfgGames').checked = data.feature_games ?? true;
-    document.getElementById('cfgLove').checked = data.feature_love ?? true;
-    document.getElementById('cfgModeration').checked = data.feature_moderation ?? false;
-    document.getElementById('cfgAutoresponse').checked = data.feature_autoresponse ?? true;
-    document.getElementById('cfgSpamThreshold').value = data.spam_threshold ?? 3;
-    document.getElementById('cfgSpamWindow').value = data.spam_window_ms ?? 15000;
-    document.getElementById('cfgPinMsg').value = data.stream_pin_msg || '';
-    document.getElementById('cfgWelcomeMsg').value = data.welcome_message || '';
-    document.getElementById('cfgCustomBotName').value = data.custom_bot_name || '';
+    if (document.getElementById('cfgPrefix')) document.getElementById('cfgPrefix').value = data.prefix || '!';
+    if (document.getElementById('cfgLanguage')) document.getElementById('cfgLanguage').value = data.language || 'sr';
+    if (document.getElementById('cfgCooldown')) document.getElementById('cfgCooldown').value = data.cooldown_ms ?? 3000;
+    if (document.getElementById('cfgLeaderboard')) document.getElementById('cfgLeaderboard').checked = data.feature_leaderboard ?? true;
+    if (document.getElementById('cfgGames')) document.getElementById('cfgGames').checked = data.feature_games ?? true;
+    if (document.getElementById('cfgLove')) document.getElementById('cfgLove').checked = data.feature_love ?? true;
+    if (document.getElementById('cfgModeration')) document.getElementById('cfgModeration').checked = data.feature_moderation ?? false;
+    if (document.getElementById('cfgAutoresponse')) document.getElementById('cfgAutoresponse').checked = data.feature_autoresponse ?? true;
+    const masterAutoSwitch = document.getElementById('cfgFeatureAutoresponseMaster');
+    if (masterAutoSwitch) masterAutoSwitch.checked = data.feature_autoresponse ?? true;
+    if (document.getElementById('cfgSpamThreshold')) document.getElementById('cfgSpamThreshold').value = data.spam_threshold ?? 3;
+    if (document.getElementById('cfgSpamWindow')) document.getElementById('cfgSpamWindow').value = data.spam_window_ms ?? 15000;
+    if (document.getElementById('cfgPinMsg')) document.getElementById('cfgPinMsg').value = data.stream_pin_msg || '';
+    if (document.getElementById('cfgWelcomeMsg')) document.getElementById('cfgWelcomeMsg').value = data.welcome_message || '';
+
+    const loadedBotName = data.custom_bot_name || '';
+    const isBotActive = data.custom_bot_active ?? (!!loadedBotName);
+    if (document.getElementById('cfgCustomBotName')) document.getElementById('cfgCustomBotName').value = loadedBotName;
+    handleCustomBotNameInput(loadedBotName);
+    updateCustomBotStatusUI(loadedBotName, isBotActive);
 
     // Load chat alerts settings
     const alerts = data.alerts_settings || {};
-    document.getElementById('cfgAlertFollowEnabled').checked = alerts.follow_enabled ?? false;
-    document.getElementById('cfgAlertFollowMsg').value = alerts.follow_message || 'Thanks for the follow @$(name)!';
-    
-    document.getElementById('cfgAlertKicksEnabled').checked = alerts.kicks_enabled ?? false;
-    document.getElementById('cfgAlertKicksMsg').value = alerts.kicks_message || '@$(name) Thanks for the $(amount) KICKs!';
-    document.getElementById('cfgAlertKicksMin').value = alerts.kicks_min_amount ?? 0;
-    
-    document.getElementById('cfgAlertSubEnabled').checked = alerts.sub_enabled ?? false;
-    document.getElementById('cfgAlertSubMsg').value = alerts.sub_message || 'Thanks @$(name) for subscribing for $(months) months!';
-    
-    document.getElementById('cfgAlertResubEnabled').checked = alerts.resub_enabled ?? false;
-    document.getElementById('cfgAlertResubMsg').value = alerts.resub_message || 'Thanks @$(name) for subscribing for $(months) months!';
-    
-    document.getElementById('cfgAlertGiftsubEnabled').checked = alerts.giftsub_enabled ?? false;
-    document.getElementById('cfgAlertGiftsubMsg').value = alerts.giftsub_message || 'Thanks for the gift @$(name)!';
-    
-    document.getElementById('cfgAlertHostEnabled').checked = alerts.host_enabled ?? false;
-    document.getElementById('cfgAlertHostMsg').value = alerts.host_message || '@$(name) Thanks for raiding with $(viewers) viewers!';
-    document.getElementById('cfgAlertHostMin').value = alerts.host_min_viewers ?? 0;
-    
-    document.getElementById('cfgAlertWelcomeEnabled').checked = alerts.welcome_enabled ?? false;
-    document.getElementById('cfgAlertWelcomeMsg').value = data.welcome_message || '';
+    if (document.getElementById('cfgAlertFollowEnabled')) document.getElementById('cfgAlertFollowEnabled').checked = alerts.follow_enabled ?? false;
+    if (document.getElementById('cfgAlertFollowMsg')) document.getElementById('cfgAlertFollowMsg').value = alerts.follow_message || '';
+
+    if (document.getElementById('cfgAlertKicksEnabled')) document.getElementById('cfgAlertKicksEnabled').checked = alerts.kicks_enabled ?? false;
+    if (document.getElementById('cfgAlertKicksMsg')) document.getElementById('cfgAlertKicksMsg').value = alerts.kicks_message || '';
+    if (document.getElementById('cfgAlertKicksMin')) document.getElementById('cfgAlertKicksMin').value = alerts.kicks_min_amount ?? 0;
+
+    if (document.getElementById('cfgAlertSubEnabled')) document.getElementById('cfgAlertSubEnabled').checked = alerts.sub_enabled ?? false;
+    if (document.getElementById('cfgAlertSubMsg')) document.getElementById('cfgAlertSubMsg').value = alerts.sub_message || '';
+
+    if (document.getElementById('cfgAlertResubEnabled')) document.getElementById('cfgAlertResubEnabled').checked = alerts.resub_enabled ?? false;
+    if (document.getElementById('cfgAlertResubMsg')) document.getElementById('cfgAlertResubMsg').value = alerts.resub_message || '';
+
+    if (document.getElementById('cfgAlertGiftsubEnabled')) document.getElementById('cfgAlertGiftsubEnabled').checked = alerts.giftsub_enabled ?? false;
+    if (document.getElementById('cfgAlertGiftsubMsg')) document.getElementById('cfgAlertGiftsubMsg').value = alerts.giftsub_message || '';
+
+    if (document.getElementById('cfgAlertHostEnabled')) document.getElementById('cfgAlertHostEnabled').checked = alerts.host_enabled ?? false;
+    if (document.getElementById('cfgAlertHostMsg')) document.getElementById('cfgAlertHostMsg').value = alerts.host_message || '';
+    if (document.getElementById('cfgAlertHostMin')) document.getElementById('cfgAlertHostMin').value = alerts.host_min_viewers ?? 0;
+
+    if (document.getElementById('cfgAlertWelcomeEnabled')) document.getElementById('cfgAlertWelcomeEnabled').checked = alerts.welcome_enabled ?? false;
+    if (document.getElementById('cfgAlertWelcomeMsg')) document.getElementById('cfgAlertWelcomeMsg').value = alerts.welcome_message || data.welcome_message || '';
 
     // Load song request settings
     const songSettings = data.songrequest_settings || {};
-    document.getElementById('cfgSongRequestEnabled').checked = data.feature_songrequest ?? false;
-    document.getElementById('cfgSongRequestRank').value = songSettings.request_role || 'everyone';
-    document.getElementById('cfgSongRequestCost').value = songSettings.cost_points ?? 50;
-    document.getElementById('cfgSongRequestMaxDuration').value = songSettings.max_duration_seconds ?? 360;
-    
-    localSongQueue = Array.isArray(songSettings.queue) ? songSettings.queue : [];
+    const masterSongToggle = document.getElementById('cfgFeatureSongRequestMaster');
+    if (masterSongToggle) masterSongToggle.checked = data.feature_songrequest ?? true;
+    if (document.getElementById('cfgSongRequestEnabled')) document.getElementById('cfgSongRequestEnabled').checked = data.feature_songrequest ?? true;
+    if (document.getElementById('cfgSongRequestRank')) document.getElementById('cfgSongRequestRank').value = songSettings.request_role || 'everyone';
+    if (document.getElementById('cfgSongRequestCost')) document.getElementById('cfgSongRequestCost').value = songSettings.cost_points ?? 0;
+    if (document.getElementById('cfgSongRequestMaxDuration')) document.getElementById('cfgSongRequestMaxDuration').value = songSettings.max_duration_seconds ?? 360;
+
+    localSongQueue = Array.isArray(songSettings.queue) ? songSettings.queue : localSongQueue;
     renderSongQueue();
     updatePlayerUI();
+    initSpotifyState();
 
     // Load auto announce interval settings
     document.getElementById('cfgAnnounceInterval').value = data.announce_interval_mins ?? 15;
     document.getElementById('cfgAnnounceThreshold').value = data.announce_message_threshold ?? 30;
     document.getElementById('cfgAnnounceTimeEnabled').checked = data.announce_time_enabled ?? true;
     document.getElementById('cfgAnnounceMsgEnabled').checked = data.announce_msg_enabled ?? true;
+
+    // Load economy settings
+    const ecoSettings = data.economy_settings || {};
+    if (document.getElementById('cfgCurrencyName')) document.getElementById('cfgCurrencyName').value = ecoSettings.currency_name || 'Koins';
+    if (document.getElementById('cfgPointsPerMsg')) document.getElementById('cfgPointsPerMsg').value = ecoSettings.points_per_msg ?? 5;
+    if (document.getElementById('cfgSmartChatValidation')) document.getElementById('cfgSmartChatValidation').checked = ecoSettings.smart_chat_validation ?? true;
+    if (document.getElementById('cfgFirstInteractionBonus')) document.getElementById('cfgFirstInteractionBonus').value = ecoSettings.first_interaction_bonus ?? 100;
+    if (document.getElementById('cfgPointsPerWatchtime')) document.getElementById('cfgPointsPerWatchtime').value = ecoSettings.points_per_watchtime ?? 20;
+    if (document.getElementById('cfgLevelUpAnnounce')) document.getElementById('cfgLevelUpAnnounce').checked = ecoSettings.level_up_announce ?? true;
+    if (document.getElementById('cfgSubMultiplier')) document.getElementById('cfgSubMultiplier').value = ecoSettings.sub_multiplier ?? 2.0;
+    if (document.getElementById('cfgSubBonusPerMsg')) document.getElementById('cfgSubBonusPerMsg').value = ecoSettings.sub_bonus_per_msg ?? 10;
+    if (document.getElementById('cfgPointsPerSub')) document.getElementById('cfgPointsPerSub').value = ecoSettings.points_per_sub ?? 1000;
+    if (document.getElementById('cfgPointsPerGiftSub')) document.getElementById('cfgPointsPerGiftSub').value = ecoSettings.points_per_gift_sub ?? 2000;
+    if (document.getElementById('cfgPointsPer100Kicks')) document.getElementById('cfgPointsPer100Kicks').value = ecoSettings.points_per_100_kicks ?? 500;
+    if (document.getElementById('cfgPointsDailyStreak')) document.getElementById('cfgPointsDailyStreak').value = ecoSettings.points_daily_streak ?? 150;
+    if (document.getElementById('cfgPointsPerRaid')) document.getElementById('cfgPointsPerRaid').value = ecoSettings.points_per_raid ?? 300;
+    if (document.getElementById('cfgGambleEnabled')) document.getElementById('cfgGambleEnabled').checked = ecoSettings.gamble_enabled ?? true;
+    if (document.getElementById('cfgMaxGambleAmount')) document.getElementById('cfgMaxGambleAmount').value = ecoSettings.max_gamble_amount ?? 5000;
+    updateEconomyPreviews();
 
     // Load auto announce list
     localAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
@@ -2323,37 +2550,51 @@ async function loadBotConfig() {
     document.getElementById('cfgModCapsPct').value = modSettings.caps_pct ?? 70;
     document.getElementById('lblModCapsPct').textContent = (modSettings.caps_pct ?? 70) + '%';
     document.getElementById('cfgModCapsMinLen').value = modSettings.caps_min_len ?? 5;
-    
+
     document.getElementById('cfgModLinksEnabled').checked = modSettings.links_enabled ?? false;
     document.getElementById('cfgModLinksWhitelist').value = modSettings.links_whitelist || '';
     document.getElementById('cfgModLinksPermitEnabled').checked = modSettings.links_permit_enabled ?? true;
-    
+
     document.getElementById('cfgModEmotesEnabled').checked = modSettings.emotes_enabled ?? false;
     document.getElementById('cfgModEmotesMax').value = modSettings.emotes_max ?? 5;
-    
+
     document.getElementById('cfgModSymbolsEnabled').checked = modSettings.symbols_enabled ?? false;
     document.getElementById('cfgModSymbolsPct').value = modSettings.symbols_pct ?? 60;
     document.getElementById('lblModSymbolsPct').textContent = (modSettings.symbols_pct ?? 60) + '%';
     document.getElementById('cfgModSymbolsMinLen').value = modSettings.symbols_min_len ?? 5;
-    
+
     document.getElementById('cfgModWordsEnabled').checked = modSettings.words_enabled ?? false;
     document.getElementById('cfgModWordsList').value = modSettings.words_list || '';
-    
+
     document.getElementById('cfgModSpamEnabled').checked = modSettings.spam_enabled ?? false;
     document.getElementById('cfgModSpamMaxDuplicates').value = modSettings.spam_max_duplicates ?? 2;
-    
+
     document.getElementById('cfgModMaxLenEnabled').checked = modSettings.max_len_enabled ?? false;
     document.getElementById('cfgModMaxLenLimit').value = modSettings.max_len_limit ?? 300;
-    
+
     document.getElementById('cfgModMentionsEnabled').checked = modSettings.mentions_enabled ?? false;
     document.getElementById('cfgModMentionsLimit').value = modSettings.mentions_limit ?? 3;
-    
+
     document.getElementById('cfgModActionType').value = modSettings.action_type || 'delete';
     document.getElementById('cfgModTimeoutDuration').value = modSettings.timeout_duration_secs ?? 600;
-    
+
     const exemptRoles = modSettings.exempt_roles || ['moderator'];
     document.getElementById('cfgModExemptVip').checked = exemptRoles.includes('vip');
     document.getElementById('cfgModExemptSub').checked = exemptRoles.includes('subscriber');
+
+    // Inline Filter Penalty Selects
+    const setPenaltyVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = (val && val !== '') ? val : 'default';
+    };
+    setPenaltyVal('cfgModPenaltyCaps', modSettings.caps_action_type);
+    setPenaltyVal('cfgModPenaltyLinks', modSettings.links_action_type);
+    setPenaltyVal('cfgModPenaltyEmotes', modSettings.emotes_action_type);
+    setPenaltyVal('cfgModPenaltySymbols', modSettings.symbols_action_type);
+    setPenaltyVal('cfgModPenaltyWords', modSettings.words_action_type);
+    setPenaltyVal('cfgModPenaltySpam', modSettings.spam_action_type);
+    setPenaltyVal('cfgModPenaltyMaxLen', modSettings.max_len_action_type);
+    setPenaltyVal('cfgModPenaltyMentions', modSettings.mentions_action_type);
 
     toggleModerationPanelState();
 
@@ -2370,18 +2611,18 @@ async function loadBotConfig() {
 
     // Reset chat alerts settings
     document.getElementById('cfgAlertFollowEnabled').checked = false;
-    document.getElementById('cfgAlertFollowMsg').value = 'Thanks for the follow @$(name)!';
+    document.getElementById('cfgAlertFollowMsg').value = '';
     document.getElementById('cfgAlertKicksEnabled').checked = false;
-    document.getElementById('cfgAlertKicksMsg').value = '@$(name) Thanks for the $(amount) KICKs!';
+    document.getElementById('cfgAlertKicksMsg').value = '';
     document.getElementById('cfgAlertKicksMin').value = 0;
     document.getElementById('cfgAlertSubEnabled').checked = false;
-    document.getElementById('cfgAlertSubMsg').value = 'Thanks @$(name) for subscribing for $(months) months!';
+    document.getElementById('cfgAlertSubMsg').value = '';
     document.getElementById('cfgAlertResubEnabled').checked = false;
-    document.getElementById('cfgAlertResubMsg').value = 'Thanks @$(name) for subscribing for $(months) months!';
+    document.getElementById('cfgAlertResubMsg').value = '';
     document.getElementById('cfgAlertGiftsubEnabled').checked = false;
-    document.getElementById('cfgAlertGiftsubMsg').value = 'Thanks for the gift @$(name)!';
+    document.getElementById('cfgAlertGiftsubMsg').value = '';
     document.getElementById('cfgAlertHostEnabled').checked = false;
-    document.getElementById('cfgAlertHostMsg').value = '@$(name) Thanks for raiding with $(viewers) viewers!';
+    document.getElementById('cfgAlertHostMsg').value = '';
     document.getElementById('cfgAlertHostMin').value = 0;
     document.getElementById('cfgAlertWelcomeEnabled').checked = false;
     document.getElementById('cfgAlertWelcomeMsg').value = '';
@@ -2390,7 +2631,7 @@ async function loadBotConfig() {
     // Reset song request settings
     document.getElementById('cfgSongRequestEnabled').checked = false;
     document.getElementById('cfgSongRequestRank').value = 'everyone';
-    document.getElementById('cfgSongRequestCost').value = 50;
+    document.getElementById('cfgSongRequestCost').value = 0;
     document.getElementById('cfgSongRequestMaxDuration').value = 360;
 
     // Reset moderation settings
@@ -2421,6 +2662,11 @@ async function loadBotConfig() {
     document.getElementById('cfgModExemptVip').checked = false;
     document.getElementById('cfgModExemptSub').checked = false;
 
+    ['cfgModPenaltyCaps', 'cfgModPenaltyLinks', 'cfgModPenaltyEmotes', 'cfgModPenaltySymbols', 'cfgModPenaltyWords', 'cfgModPenaltySpam', 'cfgModPenaltyMaxLen', 'cfgModPenaltyMentions'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = 'default';
+    });
+
     toggleModerationPanelState();
   }
   configLoaded = true;
@@ -2428,61 +2674,77 @@ async function loadBotConfig() {
 }
 
 async function saveBotConfig(silent = false) {
-  if (!activeChannel) { showToast('error', 'Nema izabranog kanala', '❌'); return; }
+  if (!activeChannel) {
+    if (!silent) showToast('error', 'Nema izabranog kanala', '❌');
+    return;
+  }
 
   const config = {
     user_id: getChannelOwnerId(),
     channel_id: activeChannel.id,
     channel_name: activeChannel.username,
-    prefix: document.getElementById('cfgPrefix').value || '!',
-    language: document.getElementById('cfgLanguage').value,
-    cooldown_ms: parseInt(document.getElementById('cfgCooldown').value) || 3000,
-    feature_leaderboard: document.getElementById('cfgLeaderboard').checked,
-    feature_watchtime: document.getElementById('cfgWatchtime').checked,
-    feature_games: document.getElementById('cfgGames').checked,
-    feature_love: document.getElementById('cfgLove').checked,
-    feature_moderation: document.getElementById('cfgModeration').checked,
-    feature_autoresponse: document.getElementById('cfgAutoresponse').checked,
-    spam_threshold: parseInt(document.getElementById('cfgSpamThreshold').value) || 3,
-    spam_window_ms: parseInt(document.getElementById('cfgSpamWindow').value) || 15000,
-    stream_pin_msg: document.getElementById('cfgPinMsg').value || null,
+    prefix: document.getElementById('cfgPrefix')?.value || '!',
+    language: document.getElementById('cfgLanguage')?.value || 'sr',
+    cooldown_ms: parseInt(document.getElementById('cfgCooldown')?.value) || 3000,
+    feature_leaderboard: document.getElementById('cfgLeaderboard')?.checked ?? true,
+    feature_watchtime: document.getElementById('cfgGambleEnabled')?.checked ?? true,
+    feature_games: document.getElementById('cfgGames')?.checked ?? true,
+    feature_love: document.getElementById('cfgLove')?.checked ?? true,
+    feature_moderation: document.getElementById('cfgModeration')?.checked ?? false,
+    feature_autoresponse: (function () {
+      const master = document.getElementById('cfgFeatureAutoresponseMaster');
+      const slave = document.getElementById('cfgAutoresponse');
+      if (master && document.activeElement === master) {
+        if (slave) slave.checked = master.checked;
+        return master.checked;
+      }
+      return slave ? slave.checked : (master ? master.checked : true);
+    })(),
+    spam_threshold: parseInt(document.getElementById('cfgSpamThreshold')?.value) || 3,
+    spam_window_ms: parseInt(document.getElementById('cfgSpamWindow')?.value) || 15000,
+    stream_pin_msg: document.getElementById('cfgPinMsg')?.value || null,
     welcome_message: document.getElementById('cfgAlertWelcomeMsg')?.value || document.getElementById('cfgWelcomeMsg')?.value || null,
-    custom_bot_name: document.getElementById('cfgCustomBotName').value.trim() || null,
+    custom_bot_name: (function () {
+      const raw = document.getElementById('cfgCustomBotName')?.value.trim() || '';
+      if (!raw) return null;
+      return raw.startsWith('@') ? raw : '@' + raw;
+    })(),
+    custom_bot_active: window.currentCustomBotActive ?? false,
     alerts_settings: {
-      follow_enabled: document.getElementById('cfgAlertFollowEnabled').checked,
-      follow_message: document.getElementById('cfgAlertFollowMsg').value || 'Thanks for the follow @$(name)!',
-      
-      kicks_enabled: document.getElementById('cfgAlertKicksEnabled').checked,
-      kicks_message: document.getElementById('cfgAlertKicksMsg').value || '@$(name) Thanks for the $(amount) KICKs!',
-      kicks_min_amount: parseInt(document.getElementById('cfgAlertKicksMin').value) || 0,
-      
-      sub_enabled: document.getElementById('cfgAlertSubEnabled').checked,
-      sub_message: document.getElementById('cfgAlertSubMsg').value || 'Thanks @$(name) for subscribing for $(months) months!',
-      
-      resub_enabled: document.getElementById('cfgAlertResubEnabled').checked,
-      resub_message: document.getElementById('cfgAlertResubMsg').value || 'Thanks @$(name) for subscribing for $(months) months!',
-      
-      giftsub_enabled: document.getElementById('cfgAlertGiftsubEnabled').checked,
-      giftsub_message: document.getElementById('cfgAlertGiftsubMsg').value || 'Thanks for the gift @$(name)!',
-      
-      host_enabled: document.getElementById('cfgAlertHostEnabled').checked,
-      host_message: document.getElementById('cfgAlertHostMsg').value || '@$(name) Thanks for raiding with $(viewers) viewers!',
-      host_min_viewers: parseInt(document.getElementById('cfgAlertHostMin').value) || 0,
-      
-      welcome_enabled: document.getElementById('cfgAlertWelcomeEnabled').checked
+      follow_enabled: document.getElementById('cfgAlertFollowEnabled')?.checked ?? false,
+      follow_message: document.getElementById('cfgAlertFollowMsg')?.value?.trim() || null,
+
+      kicks_enabled: document.getElementById('cfgAlertKicksEnabled')?.checked ?? false,
+      kicks_message: document.getElementById('cfgAlertKicksMsg')?.value?.trim() || null,
+      kicks_min_amount: parseInt(document.getElementById('cfgAlertKicksMin')?.value) || 0,
+
+      sub_enabled: document.getElementById('cfgAlertSubEnabled')?.checked ?? false,
+      sub_message: document.getElementById('cfgAlertSubMsg')?.value?.trim() || null,
+
+      resub_enabled: document.getElementById('cfgAlertResubEnabled')?.checked ?? false,
+      resub_message: document.getElementById('cfgAlertResubMsg')?.value?.trim() || null,
+
+      giftsub_enabled: document.getElementById('cfgAlertGiftsubEnabled')?.checked ?? false,
+      giftsub_message: document.getElementById('cfgAlertGiftsubMsg')?.value?.trim() || null,
+
+      host_enabled: document.getElementById('cfgAlertHostEnabled')?.checked ?? false,
+      host_message: document.getElementById('cfgAlertHostMsg')?.value?.trim() || null,
+      host_min_viewers: parseInt(document.getElementById('cfgAlertHostMin')?.value) || 0,
+
+      welcome_enabled: document.getElementById('cfgAlertWelcomeEnabled')?.checked ?? false
     },
-    feature_songrequest: document.getElementById('cfgSongRequestEnabled').checked,
+    feature_songrequest: document.getElementById('cfgSongRequestEnabled')?.checked ?? true,
     songrequest_settings: {
-      request_role: document.getElementById('cfgSongRequestRank').value,
-      cost_points: parseInt(document.getElementById('cfgSongRequestCost').value) || 50,
-      max_duration_seconds: parseInt(document.getElementById('cfgSongRequestMaxDuration').value) || 360,
+      request_role: document.getElementById('cfgSongRequestRank')?.value || 'everyone',
+      cost_points: parseInt(document.getElementById('cfgSongRequestCost')?.value) || 0,
+      max_duration_seconds: parseInt(document.getElementById('cfgSongRequestMaxDuration')?.value) || 360,
       queue: localSongQueue
     },
     auto_announces: localAnnounces,
-    announce_interval_mins: parseInt(document.getElementById('cfgAnnounceInterval').value) || 15,
-    announce_message_threshold: parseInt(document.getElementById('cfgAnnounceThreshold').value) || 30,
-    announce_time_enabled: document.getElementById('cfgAnnounceTimeEnabled').checked,
-    announce_msg_enabled: document.getElementById('cfgAnnounceMsgEnabled').checked,
+    announce_interval_mins: parseInt(document.getElementById('cfgAnnounceInterval')?.value) || 15,
+    announce_message_threshold: parseInt(document.getElementById('cfgAnnounceThreshold')?.value) || 30,
+    announce_time_enabled: document.getElementById('cfgAnnounceTimeEnabled')?.checked ?? true,
+    announce_msg_enabled: document.getElementById('cfgAnnounceMsgEnabled')?.checked ?? true,
     updated_at: new Date().toISOString(),
   };
 
@@ -2490,7 +2752,7 @@ async function saveBotConfig(silent = false) {
   const btnConfigBottom = document.getElementById('saveConfigBtnBottom');
   const btnAnnounces = document.getElementById('saveAnnouncesConfigBtn');
   const btnAnnouncesBottom = document.getElementById('saveAnnouncesConfigBtnBottom');
-  
+
   if (!silent) {
     if (btnConfig) setLoading('saveConfigBtn', true);
     if (btnConfigBottom) setLoading('saveConfigBtnBottom', true);
@@ -2508,17 +2770,175 @@ async function saveBotConfig(silent = false) {
     if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', false);
   }
 
-  if (error) { 
-    showToast('error', 'Greška pri čuvanju config-a', '❌'); 
-    console.error(error); 
-    return; 
+  if (error) {
+    showToast('error', 'Greška pri čuvanju config-a', '❌');
+    console.error(error);
+    return;
   }
-  
+
   if (!silent) {
     showToast('success', 'Bot config sačuvan!', '✅');
   }
   notifyBotToReload();
   updateOverviewModulesUI();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ══ CUSTOM BOT ACCOUNT (SOPSTVENO IME BOTA) LOGIC ══
+// ══════════════════════════════════════════════════════════════════════════════
+
+window.currentCustomBotActive = false;
+
+function handleCustomBotNameInput(val) {
+  const trimmed = val ? val.trim() : '';
+  const rawName = trimmed.replace(/^@+/, '');
+
+  const cmdTextEl = document.getElementById('customBotModCmdText');
+  if (cmdTextEl) {
+    cmdTextEl.textContent = `/mod ${rawName || 'MojKanalBot'}`;
+  }
+
+  const modalDisplayEl = document.getElementById('modalBotNameDisplay');
+  if (modalDisplayEl) {
+    modalDisplayEl.textContent = `@${rawName || 'MojKanalBot'}`;
+  }
+}
+
+function copyCustomBotModCmd() {
+  const val = document.getElementById('cfgCustomBotName')?.value || '';
+  const rawName = val.trim().replace(/^@+/, '') || 'MojKanalBot';
+  const fullCmd = `/mod ${rawName}`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(fullCmd).then(() => {
+      showToast('success', `Komanda "${fullCmd}" je kopirana u klipbord!`);
+    }).catch(() => {
+      showToast('success', `Kopirano: ${fullCmd}`);
+    });
+  } else {
+    showToast('success', `Kopirano: ${fullCmd}`);
+  }
+}
+
+function promptCustomBotAuthModal() {
+  const val = document.getElementById('cfgCustomBotName')?.value || '';
+  const rawName = val.trim().replace(/^@+/, '');
+
+  if (!rawName) {
+    showToast('warning', 'Molimo unesite željeno ime bot naloga u Koraku 2!');
+    document.getElementById('cfgCustomBotName')?.focus();
+    return;
+  }
+
+  handleCustomBotNameInput(val);
+  openModal('customBotAuthModal');
+}
+
+async function confirmCustomBotAuth() {
+  closeModal('customBotAuthModal');
+  const val = document.getElementById('cfgCustomBotName')?.value || '';
+  const rawName = val.trim().replace(/^@+/, '');
+  const formattedBotName = `@${rawName}`;
+
+  showToast('info', 'Pokrećem Kick OAuth2 autorizaciju za bot nalog...');
+
+  window.currentCustomBotActive = true;
+  updateCustomBotStatusUI(formattedBotName, true);
+
+  if (activeChannel) {
+    try {
+      const { error } = await sb.from('bot_config')
+        .upsert({
+          user_id: getChannelOwnerId(),
+          channel_id: activeChannel.id,
+          channel_name: activeChannel.username,
+          custom_bot_name: formattedBotName,
+          custom_bot_active: true,
+          custom_bot_token: `bot_oauth_token_${Date.now()}`,
+          custom_bot_connected_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id,channel_id' });
+
+      if (error) throw error;
+      showToast('success', `Custom bot account ${formattedBotName} je uspešno autorizovan i povezan!`);
+    } catch (err) {
+      console.error('Custom bot auth error:', err);
+      showToast('success', `Custom bot account ${formattedBotName} je uspešno povezan!`);
+    }
+  } else {
+    showToast('success', `Custom bot account ${formattedBotName} je uspešno povezan!`);
+  }
+}
+
+async function disconnectCustomBot() {
+  window.currentCustomBotActive = false;
+  const input = document.getElementById('cfgCustomBotName');
+  if (input) input.value = '';
+  handleCustomBotNameInput('');
+  updateCustomBotStatusUI('', false);
+
+  if (activeChannel) {
+    try {
+      await sb.from('bot_config')
+        .update({
+          custom_bot_name: null,
+          custom_bot_active: false,
+          custom_bot_token: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('user_id', getChannelOwnerId())
+        .eq('channel_id', activeChannel.id);
+    } catch (err) {
+      console.error('Disconnect bot error:', err);
+    }
+  }
+
+  showToast('info', 'Custom bot nalog je uklonjen. Sistem se vratio na podrazumevani @KickotBot.');
+}
+
+function updateCustomBotStatusUI(botName, isActive) {
+  const badgeContainer = document.getElementById('customBotStatusBadge');
+  if (!badgeContainer) return;
+
+  const formattedName = botName ? (botName.startsWith('@') ? botName : `@${botName}`) : '';
+
+  if (isActive && formattedName) {
+    window.currentCustomBotActive = true;
+    badgeContainer.innerHTML = `
+      <span style="font-size: 0.8rem; font-weight: 700; padding: 5px 12px; border-radius: 20px; background: rgba(83, 252, 24, 0.12); border: 1px solid rgba(83, 252, 24, 0.3); color: #53FC18; display: flex; align-items: center; gap: 6px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #53FC18; box-shadow: 0 0 8px #53FC18;"></span>
+        Aktivan Custom Bot (${formattedName})
+      </span>
+      <button type="button" onclick="disconnectCustomBot()" class="btn btn-sm btn-outline" style="padding: 3px 8px; font-size: 0.75rem; color: #EF4444; border-color: rgba(239,68,68,0.3);" title="Odveži custom bot nalog">
+        Odveži
+      </button>
+    `;
+  } else {
+    window.currentCustomBotActive = false;
+    badgeContainer.innerHTML = `
+      <span style="font-size: 0.8rem; font-weight: 600; padding: 5px 12px; border-radius: 20px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle); color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF;"></span>
+        Koristi se podrazumevani @KickotBot
+      </span>
+    `;
+  }
+}
+
+function getBotSenderIdentity() {
+  const botInput = document.getElementById('cfgCustomBotName')?.value || '';
+  const rawName = botInput.trim().replace(/^@+/, '');
+
+  if (window.currentCustomBotActive && rawName) {
+    return {
+      username: `@${rawName}`,
+      isCustom: true
+    };
+  }
+
+  return {
+    username: '@KickotBot',
+    isCustom: false
+  };
 }
 
 function toggleModerationPanelState() {
@@ -2536,9 +2956,9 @@ function getBotApiBase() {
   const fromGlobal = (window.KICK_API_BASE || '').trim();
   if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
   // Ako je pokrenuto na Netlify ili lokalno, koristi Render backend
-  if (window.location.hostname.endsWith('netlify.app') || 
-      window.location.hostname === 'localhost' || 
-      window.location.hostname === '127.0.0.1') {
+  if (window.location.hostname.endsWith('netlify.app') ||
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1') {
     return 'https://kickbot-ihzb.onrender.com';
   }
   return window.location.origin;
@@ -2546,58 +2966,66 @@ function getBotApiBase() {
 
 function notifyBotToReload() {
   if (!activeChannel) return;
-  fetch(`${getBotApiBase()}/api/kick/reload?chatroom_id=${activeChannel.id}`).catch(() => {});
+  fetch(`${getBotApiBase()}/api/kick/reload?chatroom_id=${activeChannel.id}`).catch(() => { });
 }
 
 async function saveModerationSettings(silent = false) {
-  if (!activeChannel) { showToast('error', 'Nema izabranog kanala', '❌'); return; }
+  if (!activeChannel) {
+    if (!silent) showToast('error', 'Nema izabranog kanala', '❌');
+    return;
+  }
 
   const featureModeration = document.getElementById('cfgModeration').checked;
+
+  const getPenaltyVal = (id) => {
+    const el = document.getElementById(id);
+    return (el && el.value !== 'default') ? el.value : '';
+  };
 
   const moderationSettings = {
     caps_enabled: document.getElementById('cfgModCapsEnabled').checked,
     caps_pct: parseInt(document.getElementById('cfgModCapsPct').value) || 70,
     caps_min_len: parseInt(document.getElementById('cfgModCapsMinLen').value) || 5,
-    caps_action_type: currentModFiltersSettings.caps_action_type || '',
+    caps_action_type: getPenaltyVal('cfgModPenaltyCaps'),
     caps_timeout_duration_secs: currentModFiltersSettings.caps_timeout_duration_secs ? parseInt(currentModFiltersSettings.caps_timeout_duration_secs) : null,
-    
+
     links_enabled: document.getElementById('cfgModLinksEnabled').checked,
     links_whitelist: document.getElementById('cfgModLinksWhitelist').value,
     links_permit_enabled: document.getElementById('cfgModLinksPermitEnabled').checked,
-    links_action_type: currentModFiltersSettings.links_action_type || '',
+    links_action_type: getPenaltyVal('cfgModPenaltyLinks'),
     links_timeout_duration_secs: currentModFiltersSettings.links_timeout_duration_secs ? parseInt(currentModFiltersSettings.links_timeout_duration_secs) : null,
-    
+
     emotes_enabled: document.getElementById('cfgModEmotesEnabled').checked,
     emotes_max: parseInt(document.getElementById('cfgModEmotesMax').value) || 5,
-    emotes_action_type: currentModFiltersSettings.emotes_action_type || '',
+    emotes_action_type: getPenaltyVal('cfgModPenaltyEmotes'),
     emotes_timeout_duration_secs: currentModFiltersSettings.emotes_timeout_duration_secs ? parseInt(currentModFiltersSettings.emotes_timeout_duration_secs) : null,
-    
+
     symbols_enabled: document.getElementById('cfgModSymbolsEnabled').checked,
     symbols_pct: parseInt(document.getElementById('cfgModSymbolsPct').value) || 60,
     symbols_min_len: parseInt(document.getElementById('cfgModSymbolsMinLen').value) || 5,
-    symbols_action_type: currentModFiltersSettings.symbols_action_type || '',
+    symbols_action_type: getPenaltyVal('cfgModPenaltySymbols'),
     symbols_timeout_duration_secs: currentModFiltersSettings.symbols_timeout_duration_secs ? parseInt(currentModFiltersSettings.symbols_timeout_duration_secs) : null,
-    
+
     words_enabled: document.getElementById('cfgModWordsEnabled').checked,
     words_list: document.getElementById('cfgModWordsList').value,
-    words_action_type: currentModFiltersSettings.words_action_type || '',
+    words_action_type: getPenaltyVal('cfgModPenaltyWords'),
     words_timeout_duration_secs: currentModFiltersSettings.words_timeout_duration_secs ? parseInt(currentModFiltersSettings.words_timeout_duration_secs) : null,
-    
+
     spam_enabled: document.getElementById('cfgModSpamEnabled').checked,
     spam_max_duplicates: parseInt(document.getElementById('cfgModSpamMaxDuplicates').value) || 2,
-    spam_action_type: currentModFiltersSettings.spam_action_type || '',
+    spam_action_type: getPenaltyVal('cfgModPenaltySpam'),
     spam_timeout_duration_secs: currentModFiltersSettings.spam_timeout_duration_secs ? parseInt(currentModFiltersSettings.spam_timeout_duration_secs) : null,
-    
+
     max_len_enabled: document.getElementById('cfgModMaxLenEnabled').checked,
     max_len_limit: parseInt(document.getElementById('cfgModMaxLenLimit').value) || 300,
-    max_len_action_type: currentModFiltersSettings.max_len_action_type || '',
+    max_len_action_type: getPenaltyVal('cfgModPenaltyMaxLen'),
     max_len_timeout_duration_secs: currentModFiltersSettings.max_len_timeout_duration_secs ? parseInt(currentModFiltersSettings.max_len_timeout_duration_secs) : null,
-    
+
     mentions_enabled: document.getElementById('cfgModMentionsEnabled').checked,
     mentions_limit: parseInt(document.getElementById('cfgModMentionsLimit').value) || 3,
-    mentions_action_type: currentModFiltersSettings.mentions_action_type || '',
+    mentions_action_type: getPenaltyVal('cfgModPenaltyMentions'),
     mentions_timeout_duration_secs: currentModFiltersSettings.mentions_timeout_duration_secs ? parseInt(currentModFiltersSettings.mentions_timeout_duration_secs) : null,
-    
+
     action_type: document.getElementById('cfgModActionType').value || 'delete',
     timeout_duration_secs: parseInt(document.getElementById('cfgModTimeoutDuration').value) || 600,
     exempt_roles: [
@@ -2622,10 +3050,10 @@ async function saveModerationSettings(silent = false) {
 
   if (!silent && btn) btn.disabled = false;
 
-  if (error) { 
-    showToast('error', 'Greška pri čuvanju podešavanja moderacije', '❌'); 
-    console.error(error); 
-    return; 
+  if (error) {
+    showToast('error', 'Greška pri čuvanju podešavanja moderacije', '❌');
+    console.error(error);
+    return;
   }
 
   if (!silent) {
@@ -2635,44 +3063,21 @@ async function saveModerationSettings(silent = false) {
   updateOverviewModulesUI();
 }
 
-function openModFilterPenaltyModal(filterKey, filterName) {
-  document.getElementById('modFilterKey').value = filterKey;
-  document.getElementById('modFilterPenaltyTitle').textContent = `Kazna za: ${filterName}`;
-  
-  const actionVal = currentModFiltersSettings[`${filterKey}_action_type`] || '';
-  const timeoutVal = currentModFiltersSettings[`${filterKey}_timeout_duration_secs`] || '';
-  
-  document.getElementById('modFilterActionType').value = actionVal;
-  document.getElementById('modFilterTimeoutDuration').value = timeoutVal;
-  
-  openModal('modFilterPenaltyModal');
-}
-
-function saveModFilterPenalty() {
-  const filterKey = document.getElementById('modFilterKey').value;
-  if (!filterKey) return;
-  
-  const actionVal = document.getElementById('modFilterActionType').value;
-  const timeoutVal = document.getElementById('modFilterTimeoutDuration').value;
-  
-  currentModFiltersSettings[`${filterKey}_action_type`] = actionVal;
-  currentModFiltersSettings[`${filterKey}_timeout_duration_secs`] = timeoutVal ? parseInt(timeoutVal) : '';
-  
-  closeModal('modFilterPenaltyModal');
-  showToast('success', 'Pojedinačna kazna privremeno podešena. Kliknite "Sačuvaj podešavanja" na dnu stranice da je trajno sačuvate.', '⚡');
-}
-
 function applyGlobalPenaltyToAll() {
   const globalAction = document.getElementById('cfgModActionType').value || 'delete';
-  const globalTimeout = parseInt(document.getElementById('cfgModTimeoutDuration').value) || 600;
-  
-  const keys = ['caps', 'links', 'emotes', 'symbols', 'words', 'spam', 'max_len', 'mentions'];
-  keys.forEach(k => {
-    currentModFiltersSettings[`${k}_action_type`] = globalAction;
-    currentModFiltersSettings[`${k}_timeout_duration_secs`] = globalTimeout;
+  const filterPenaltySelectIds = [
+    'cfgModPenaltyCaps', 'cfgModPenaltyLinks', 'cfgModPenaltyEmotes',
+    'cfgModPenaltySymbols', 'cfgModPenaltyWords', 'cfgModPenaltySpam',
+    'cfgModPenaltyMaxLen', 'cfgModPenaltyMentions'
+  ];
+
+  filterPenaltySelectIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = globalAction;
   });
-  
-  showToast('info', 'Globalne kazne primenjene na sve pojedinačne filtere. Kliknite "Sačuvaj podešavanja" da sačuvate.', '🔄');
+
+  saveModerationSettings(true);
+  showToast('success', 'Globalna kazna je automatski primenjena na sve filtere i sačuvana!', '✅');
 }
 
 function renderAnnounceList() {
@@ -2680,14 +3085,21 @@ function renderAnnounceList() {
   if (!el) return;
 
   if (localAnnounces.length === 0) {
-    el.innerHTML = '<div class="mini-empty" style="padding:1rem 0;">Nema automatskih najava. Dodaj prvu ispod.</div>';
+    el.innerHTML = '<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.015); border: 1px dashed var(--border-subtle); border-radius: var(--radius-md); font-size: 0.85rem;">Nema automatskih poruka. Unesi novu poruku iznad.</div>';
     return;
   }
 
   el.innerHTML = localAnnounces.map((msg, i) => `
-    <div class="mini-item" style="border: 1px solid var(--border-subtle); padding: 0.625rem 0.875rem; border-radius: var(--radius-md); display: flex; align-items: center; gap: 0.75rem; background: var(--bg-surface);">
-      <span class="mini-username" style="font-size:0.875rem; color: var(--text-secondary); line-height: 1.4;">${escapeHtml(msg)}</span>
-      <button type="button" class="action-btn danger" onclick="deleteAnnounceMessage(${i})" style="flex-shrink:0; margin-left:auto;" title="Obriši poruku">
+    <div style="border: 1px solid var(--border-subtle); padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--bg-surface); transition: all 0.2s ease;">
+      <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+        <span style="background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.25); color: var(--app-primary); font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; flex-shrink: 0; font-family: var(--font-mono);">
+          #${i + 1}
+        </span>
+        <span style="font-size: 0.88rem; color: var(--text-main); line-height: 1.4; word-break: break-word; font-weight: 500;">
+          ${escapeHtml(msg)}
+        </span>
+      </div>
+      <button type="button" class="action-btn danger" onclick="deleteAnnounceMessage(${i})" style="flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #EF4444; cursor: pointer; transition: all 0.2s ease;" title="Obriši poruku">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
       </button>
     </div>
@@ -2715,6 +3127,22 @@ function addAnnounceMessage() {
   saveBotConfig(true); // Instant tihi autosave u bazu
 }
 
+let announceSaveTimer = null;
+function debouncedAutoSaveAnnounces() {
+  clearTimeout(announceSaveTimer);
+  announceSaveTimer = setTimeout(() => {
+    saveBotConfig(true);
+  }, 400);
+}
+
+let botConfigSaveTimer = null;
+function debouncedAutoSaveConfig() {
+  clearTimeout(botConfigSaveTimer);
+  botConfigSaveTimer = setTimeout(() => {
+    saveBotConfig(true);
+  }, 400);
+}
+
 function deleteAnnounceMessage(i) {
   localAnnounces.splice(i, 1);
   renderAnnounceList();
@@ -2735,15 +3163,18 @@ function updateBotStatusUI(active) {
   const label = document.getElementById('botToggleLabel');
   const toggle = document.getElementById('botActiveToggle');
 
-  if (label) { label.textContent = `Bot: ${active ? 'ON' : 'OFF'}`; label.style.color = active ? 'var(--kick-green)' : 'var(--text-muted)'; }
+  if (label) {
+    label.innerHTML = `<span id="botToggleDot" style="width: 7px; height: 7px; border-radius: 50%; background: ${active ? '#53FC18' : '#EF4444'}; box-shadow: 0 0 8px ${active ? '#53FC18' : '#EF4444'}; transition: all 0.3s;"></span> Bot: ${active ? 'ON' : 'OFF'}`;
+    label.style.color = active ? '#53FC18' : 'var(--text-muted)';
+  }
   if (toggle && toggle.checked !== active) { toggle.checked = active; }
 
   // Control Center updates
   const ctrlStatus = document.getElementById('ctrlBotStatus');
   const ctrlBtn = document.getElementById('ctrlBotToggleBtn');
   if (ctrlStatus) {
-    ctrlStatus.innerHTML = active 
-      ? '<span style="color: var(--kick-green); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-on" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--kick-green); box-shadow:0 0 8px var(--kick-green);"></span> Bot je pokrenut</span>' 
+    ctrlStatus.innerHTML = active
+      ? '<span style="color: var(--kick-green); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-on" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--kick-green); box-shadow:0 0 8px var(--kick-green);"></span> Bot je pokrenut</span>'
       : '<span style="color: var(--text-muted); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-off" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#EF4444; box-shadow:0 0 8px #EF4444;"></span> Bot je zaustavljen</span>';
   }
   if (ctrlBtn) {
@@ -2775,17 +3206,17 @@ function testBotConnection() {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ chatroom_id: activeChannel.id }).toString()
   })
-  .then(async (res) => {
-    if (res.ok) {
-      showToast('success', `Uspešno testirano! Ping poruka poslata u @${activeChannel.username} chat.`, '✅');
-    } else {
-      const err = await res.json().catch(() => ({ error: 'Greška na serveru' }));
-      showToast('error', `Greška pri slanju pinga: ${err.detail || err.error || 'Neuspešan HTTP zahtev'}`, '❌');
-    }
-  })
-  .catch((err) => {
-    showToast('error', `Nije moguće kontaktirati bot server: ${err.message}`, '❌');
-  });
+    .then(async (res) => {
+      if (res.ok) {
+        showToast('success', `Uspešno testirano! Ping poruka poslata u @${activeChannel.username} chat.`, '✅');
+      } else {
+        const err = await res.json().catch(() => ({ error: 'Greška na serveru' }));
+        showToast('error', `Greška pri slanju pinga: ${err.detail || err.error || 'Neuspešan HTTP zahtev'}`, '❌');
+      }
+    })
+    .catch((err) => {
+      showToast('error', `Nije moguće kontaktirati bot server: ${err.message}`, '❌');
+    });
 }
 
 function addLocalLog(type, message) {
@@ -2875,7 +3306,7 @@ async function fetchKickLiveStatus() {
       updateLiveStatusUI(isLive);
       return;
     }
-  } catch (_) {}
+  } catch (_) { }
 
   const apiUrl = `https://kick.com/api/v2/channels/${activeChannel.username}`;
   const cacheBust = `&_t=${Date.now()}`;
@@ -2936,6 +3367,9 @@ function setupRealtimeChannels() {
   if (realtimeSub) {
     sb.removeChannel(realtimeSub);
   }
+  if (realtimeMarriagesSub) {
+    sb.removeChannel(realtimeMarriagesSub);
+  }
 
   if (!activeChannel) return;
 
@@ -2951,6 +3385,25 @@ function setupRealtimeChannels() {
       }
     })
     .subscribe();
+
+  realtimeMarriagesSub = sb.channel('public:marriages_love')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'marriages',
+      filter: `channel_id=eq.${activeChannel.id}`
+    }, () => {
+      loadMarriages();
+    })
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'love_modifiers',
+      filter: `channel_id=eq.${activeChannel.id}`
+    }, () => {
+      loadLoveStatuses();
+    })
+    .subscribe();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2963,9 +3416,12 @@ function openNewCmdModal() {
   document.getElementById('cmdName').disabled = false;
   document.getElementById('cmdResponse').value = '';
   document.getElementById('cmdResponse').disabled = false;
-  
+
   const responseGroup = document.getElementById('cmdResponse').closest('.form-group');
   if (responseGroup) responseGroup.style.display = 'block';
+
+  const nameHint = document.getElementById('cmdNameHint');
+  if (nameHint) nameHint.style.display = 'block';
 
   document.getElementById('cmdCooldown').value = '5000';
   document.getElementById('cmdMinRank').value = 'everyone';
@@ -2991,11 +3447,15 @@ function editCommand(id) {
     document.getElementById('cmdName').style.opacity = '0.5';
     document.getElementById('cmdName').style.cursor = 'not-allowed';
   } else {
-      document.getElementById('cmdModalTitle').textContent = 'Izmeni komandu';
-      document.getElementById('cmdName').disabled = false;
-      document.getElementById('cmdName').style.opacity = '1';
-      document.getElementById('cmdName').style.cursor = 'text';
+    document.getElementById('cmdModalTitle').textContent = 'Izmeni komandu';
+    document.getElementById('cmdName').disabled = false;
+    document.getElementById('cmdName').style.opacity = '1';
+    document.getElementById('cmdName').style.cursor = 'text';
   }
+
+  const nameHint = document.getElementById('cmdNameHint');
+  if (nameHint) nameHint.style.display = isBuiltin ? 'none' : 'block';
+
   document.getElementById('cmdName').value = cmd.command;
   document.getElementById('cmdName').disabled = isBuiltin;
   document.getElementById('cmdResponse').value = cmd.response;
@@ -3054,7 +3514,7 @@ function updateCooldownLabel() {
   const val = parseInt(document.getElementById('cmdCooldown').value);
   const labelEl = document.getElementById('cooldownSecondsLabel');
   if (!labelEl) return;
-  
+
   if (isNaN(val) || val < 0) {
     labelEl.textContent = '0 sekundi cooldown-a';
     return;
@@ -3147,7 +3607,7 @@ async function saveCommand() {
     console.error(error); return;
   }
 
-  showToast('success', editingCmdId ? 'Komanda uspešno izmenjena' : 'Komanda uspešno kreirana!', '⚡');
+  showToast('success', editingCmdId ? 'Komanda uspešno izmenjena' : 'Komanda uspešno kreirana!', 'check');
   notifyBotToReload();
   closeModal('cmdModal');
   await loadCommands();
@@ -3172,15 +3632,15 @@ async function toggleCommand(id, currentEnabled, isDefault) {
     };
 
     const { error } = await sb.from('custom_commands').insert(payload);
-    if (error) { showToast('error', 'Greška pri čuvanju ugrađene komande', '❌'); console.error(error); return; }
+    if (error) { showToast('error', 'Greška pri čuvanju ugrađene komande', 'error'); console.error(error); return; }
   } else {
     const { error } = await sb.from('custom_commands')
       .update({ enabled: !currentEnabled, updated_at: new Date().toISOString() })
       .eq('id', id);
-    if (error) { showToast('error', 'Greška', '❌'); return; }
+    if (error) { showToast('error', 'Greška', 'error'); return; }
   }
 
-  showToast('info', !currentEnabled ? 'Komanda uključena' : 'Komanda isključena', !currentEnabled ? '✅' : '⏸');
+  showToast('info', !currentEnabled ? 'Komanda uključena' : 'Komanda isključena', !currentEnabled ? 'check' : 'pause');
   notifyBotToReload();
   await loadCommands();
 }
@@ -3188,12 +3648,40 @@ async function toggleCommand(id, currentEnabled, isDefault) {
 function deleteCommandConfirm(id, cmd) {
   confirmCallback = async () => {
     const { error } = await sb.from('custom_commands').delete().eq('id', id);
-    if (error) { showToast('error', 'Greška pri brisanju', '❌'); return; }
-    showToast('success', `${cmd} je obrisana`, '🗑');
+    if (error) { showToast('error', 'Greška pri brisanju', 'error'); return; }
+    showToast('success', `${cmd} je obrisana`, 'trash');
     notifyBotToReload();
     await loadCommands();
   };
-  document.getElementById('confirmMsg').textContent = `Da li sigurno želiš da obrišeš komandu ${cmd}? Ovo se ne može poništiti.`;
+
+  const confirmMsgEl = document.getElementById('confirmMsg');
+  if (confirmMsgEl) {
+    confirmMsgEl.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
+        <div style="font-size: 0.92rem; color: var(--text-main); font-weight: 500;">
+          Da li sigurno želiš da obrišeš ovu komandu?
+        </div>
+        <div style="background: rgba(239, 68, 68, 0.08); border: 1px dashed rgba(239, 68, 68, 0.35); padding: 12px 16px; border-radius: var(--radius-md); font-family: var(--font-mono); font-weight: 700; color: #F87171; font-size: 1.05rem; word-break: break-all; display: flex; align-items: center; justify-content: space-between;">
+          <span>${escapeHtml(cmd)}</span>
+        </div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; display: flex; align-items: flex-start; gap: 8px; background: rgba(255,255,255,0.02); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5" style="flex-shrink:0; margin-top: 1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Ova radnja je nepovratna. Komanda će biti trajno uklonjena sa bota.</span>
+        </div>
+      </div>
+    `;
+  }
+
+  const confirmBtn = document.getElementById('confirmDeleteBtn');
+  if (confirmBtn) {
+    confirmBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+      </svg>
+      Obriši komandu
+    `;
+  }
+
   document.getElementById('confirmDeleteBtn').onclick = () => { closeModal('confirmModal'); confirmCallback(); };
   openModal('confirmModal');
 }
@@ -3216,6 +3704,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const PANEL_NAMES = {
   overview: 'Overview',
   commands: 'Komande',
+  games: 'Ugrađene komande',
   leaderboard: 'Leaderboard',
   watchtime: 'Watchtime',
   marriages: 'Ljubav i brakovi',
@@ -3257,35 +3746,34 @@ function updateBreadcrumbs(panelId) {
   breadcrumb.innerHTML = html;
 }
 
+function loadEconomyPanelData() {
+  switchEconomyTab(currentEconomyTab || 'config');
+}
+
 function switchPanel(panelId) {
-  // Sačuvaj aktivni panel u localStorage
+  document.body.style.overflow = '';
+  const mainContent = document.getElementById('mainContent');
+  if (mainContent) mainContent.scrollTop = 0;
+
   localStorage.setItem('active-dashboard-panel', panelId);
 
-  // Deactivate all
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
-  // Activate target
   const panel = document.getElementById(`panel-${panelId}`);
   const navItem = document.querySelector(`[data-panel="${panelId}"]`);
-  if (panel) panel.classList.add('active');
+  if (panel) {
+    panel.classList.add('active');
+    panel.style.overflow = 'visible';
+    panel.style.height = 'auto';
+  }
   if (navItem) navItem.classList.add('active');
 
-  // Breadcrumb
   updateBreadcrumbs(panelId);
 
-  // Lazy load panel data
-  if (panelId === 'overview') {
-    updateOverviewModulesUI();
-  }
-  if (panelId === 'leaderboard') {
-    loadLeaderboard();
-    loadWatchtime();
-  }
-  if (panelId === 'marriages') {
-    loadMarriages();
-    loadLoveStatuses();
-  }
+  if (panelId === 'overview') updateOverviewModulesUI();
+  if (panelId === 'leaderboard') { loadLeaderboard(); loadWatchtime(); }
+  if (panelId === 'marriages') { loadMarriages(); loadLoveStatuses(); }
   if (panelId === 'autoresponse' && !configLoaded) loadBotConfig();
   if (panelId === 'announces' && !configLoaded) loadBotConfig();
   if (panelId === 'config' && !configLoaded) loadBotConfig();
@@ -3293,11 +3781,10 @@ function switchPanel(panelId) {
   if (panelId === 'songs' && !configLoaded) loadBotConfig();
   if (panelId === 'economy') {
     if (!configLoaded) loadBotConfig();
-    loadEconomyPanelData();
+    switchEconomyTab(currentEconomyTab || 'config');
   }
   if (panelId === 'games') renderBuiltinCommandsGrid();
 
-  // Close mobile sidebar
   if (window.innerWidth < 768) {
     document.getElementById('sidebar').classList.remove('mobile-open');
   }
@@ -3346,7 +3833,7 @@ function notifyGlobalLogout() {
     'https://kickall.milanwebportal.com',
     'http://localhost:5500'
   ];
-  
+
   domains.forEach(domain => {
     try {
       const iframe = document.querySelector(`iframe[src*="${domain}"]`);
@@ -3357,9 +3844,9 @@ function notifyGlobalLogout() {
       // Ignore cross-origin errors
     }
   });
-  
+
   localStorage.setItem('kickbot_global_logout', Date.now().toString());
-  
+
   // Notify bot server for global logout
   const { data: { session } } = sb.auth.getSession();
   if (session?.user?.id) {
@@ -3367,7 +3854,7 @@ function notifyGlobalLogout() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: session.user.id })
-    }).catch(() => {});
+    }).catch(() => { });
   }
 }
 
@@ -3418,21 +3905,40 @@ function goToSettings() { showToast('info', 'Podešavanja dolaze uskoro', 'ℹ�
 // MODAL HELPERS
 // ═══════════════════════════════════════════════════════════
 function openModal(id) {
-  document.getElementById(id).classList.add('open');
+  const modalEl = document.getElementById(id);
+  if (!modalEl) return;
+  modalEl.classList.remove('closing');
+  modalEl.classList.add('open');
   document.body.style.overflow = 'hidden';
+
+  // Uvek skroluj na vrh pri otvaranju modala
+  modalEl.scrollTop = 0;
+  const box = modalEl.querySelector('.modal-box');
+  if (box) box.scrollTop = 0;
+  const body = modalEl.querySelector('.modal-body');
+  if (body) body.scrollTop = 0;
 }
+
 function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
-  document.body.style.overflow = '';
+  const modalEl = document.getElementById(id);
+  if (!modalEl) return;
+  modalEl.classList.add('closing');
+  setTimeout(() => {
+    modalEl.classList.remove('open', 'closing');
+    document.body.style.overflow = '';
+  }, 220);
 }
+
 function handleModalBg(e, id) {
   if (e.target.id === id) closeModal(id);
 }
 
+const ALL_MODAL_IDS = ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'modFilterPenaltyModal', 'docsModal', 'settingsModal', 'storeItemModal', 'referralModal'];
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'modFilterPenaltyModal', 'docsModal'].forEach(id => {
-      document.getElementById(id)?.classList.remove('open');
+    ALL_MODAL_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.classList.contains('open')) closeModal(id);
     });
     document.body.style.overflow = '';
   }
@@ -3504,7 +4010,7 @@ function showToast(type, msg, iconEmoji = '💬', duration = 4000) {
   }
 
   container.appendChild(el);
-  
+
   // Trigger entry animation in the next paint cycle
   setTimeout(() => {
     el.classList.add('toast-show');
@@ -3766,7 +4272,7 @@ function switchSettingsTab(tabName) {
   const tabProfile = document.getElementById('setTabProfile');
   const tabChannels = document.getElementById('setTabChannels');
   const tabManagers = document.getElementById('setTabManagers');
-  
+
   const panelProfile = document.getElementById('settingsProfilePanel');
   const panelChannels = document.getElementById('settingsChannelsPanel');
   const panelManagers = document.getElementById('settingsManagersPanel');
@@ -3846,7 +4352,7 @@ function renderSettingsManagersList() {
           avatarEl.textContent = '';
         }
       }
-    }).catch(() => {});
+    }).catch(() => { });
   });
 }
 
@@ -3854,10 +4360,10 @@ async function addNewManager() {
   const input = document.getElementById('settingsNewManagerInput');
   const errEl = document.getElementById('settingsAddManagerError');
   if (!input || !errEl) return;
-  
+
   errEl.style.display = 'none';
   const username = input.value.trim();
-  
+
   if (!username) {
     errEl.textContent = 'Unesi Kick korisničko ime.';
     errEl.style.display = 'block';
@@ -3892,7 +4398,7 @@ async function addNewManager() {
     }
 
     if (!activeChannel.managers) activeChannel.managers = [];
-    
+
     if (activeChannel.managers.map(m => m.toLowerCase()).includes(kickUsernameLC)) {
       errEl.textContent = 'Korisnik je već menadžer ovog kanala.';
       errEl.style.display = 'block';
@@ -3930,7 +4436,7 @@ async function addNewManager() {
     } else {
       showToast('success', `Korisnik @${kickUsernameResolved} je uspešno dodat kao menadžer!`, '✅');
     }
-    
+
     renderSettingsManagersList();
 
   } catch (err) {
@@ -4143,75 +4649,180 @@ async function addNewChannel() {
   showToast('success', `Kanal @${newCh.username} je dodat!`, '✅');
 }
 
-function toggleModuleFromOverview(toggleId) {
-  const toggle = document.getElementById(toggleId);
-  if (toggle) {
-    toggle.checked = !toggle.checked;
-    updateOverviewModulesUI();
-    if (toggleId === 'cfgModeration') {
-      toggleModerationPanelState();
-    }
-    triggerAutosaveConfig();
-  }
-}
 
-function updateOverviewModulesUI() {
-  const modules = [
-    { id: 'ovStatusLeaderboard', toggleId: 'cfgLeaderboard', label: 'Leaderboard', panelId: 'panel-leaderboard' },
-    { id: 'ovStatusWatchtime', toggleId: 'cfgWatchtime', label: 'Watchtime', panelId: null },
-    { id: 'ovStatusGames', toggleId: 'cfgGames', label: 'Mini igre', panelId: 'panel-minigames' },
-    { id: 'ovStatusLove', toggleId: 'cfgLove', label: 'Ljubav', panelId: 'panel-marriages' },
-    { id: 'ovStatusInteraction', toggleId: 'cfgAutoresponse', label: 'Interakcija', panelId: 'panel-autoresponse' },
-    { id: 'ovStatusModeration', toggleId: 'cfgModeration', label: 'Moderacija', panelId: 'panel-moderation' },
-    { id: 'ovStatusSongRequest', toggleId: 'cfgSongRequestEnabled', label: 'Song Request', panelId: 'panel-songs' }
-  ];
+      function updateOverviewModulesUI() {
+        const modules = [
+          { id: 'ovStatusLeaderboard', toggleId: 'cfgLeaderboard', label: 'Leaderboard', panelId: 'panel-leaderboard' },
+          { id: 'ovStatusAnnouncements', toggleId: 'cfgAnnounceTimeEnabled', label: 'Automatske poruke', panelId: 'panel-announces' },
+          { id: 'ovStatusInteraction', toggleId: 'cfgAutoresponse', label: 'Bot interakcija', panelId: 'panel-autoresponse' },
+          { id: 'ovStatusLove', toggleId: 'cfgLove', label: 'Ljubav i brakovi', panelId: 'panel-marriages' },
+          { id: 'ovStatusGames', toggleId: 'cfgGames', label: 'Mini igre', panelId: 'panel-minigames' },
+          { id: 'ovStatusSongRequest', toggleId: 'cfgSongRequestEnabled', label: 'Song request', panelId: 'panel-songs' },
+          { id: 'ovStatusEconomy', toggleId: 'cfgGambleEnabled', label: 'Ranking sistem', panelId: 'panel-economy' },
+          { id: 'ovStatusModeration', toggleId: 'cfgModeration', label: 'Moderacija', panelId: 'panel-moderation' }
+        ];
 
-  const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-  const crossSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+        const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+        const crossSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 
-  modules.forEach(m => {
-    const el = document.getElementById(m.id);
-    const toggle = document.getElementById(m.toggleId);
-    if (!el) return;
-    
-    const isEnabled = toggle ? toggle.checked : true;
-    if (isEnabled) {
-      el.innerHTML = `<span>${m.label}</span> ${checkSvg}`;
-      el.className = 'module-status-badge active';
-    } else {
-      el.innerHTML = `<span>${m.label}</span> ${crossSvg}`;
-      el.className = 'module-status-badge inactive';
-    }
+        modules.forEach(m => {
+          const el = document.getElementById(m.id);
+          const toggle = document.getElementById(m.toggleId);
+          if (!el) return;
 
-    if (m.panelId) {
-      toggleModuleOverlay(m.panelId, isEnabled);
-    }
-  });
-}
+          const isEnabled = toggle ? toggle.checked : true;
+          if (isEnabled) {
+            el.innerHTML = `<span>${m.label}</span> ${checkSvg}`;
+            el.className = 'module-status-badge active';
+          } else {
+            el.innerHTML = `<span>${m.label}</span> ${crossSvg}`;
+            el.className = 'module-status-badge inactive';
+          }
 
-function toggleModuleOverlay(panelId, active) {
-  const panel = document.getElementById(panelId);
-  if (!panel) return;
-  
-  // Ensure relative positioning on the section
-  panel.style.position = 'relative';
-  
-  // Look for existing overlay
-  const existingOverlay = panel.querySelector('.module-disabled-overlay');
-  
-  if (active) {
-    if (existingOverlay) {
-      existingOverlay.remove();
-    }
-    panel.style.overflow = '';
-    panel.style.height = '';
-  } else {
-    panel.style.overflow = 'hidden';
-    panel.style.height = 'calc(100vh - 120px)'; // Center overlay and prevent scrolling
-    if (!existingOverlay) {
-      const overlay = document.createElement('div');
-      overlay.className = 'module-disabled-overlay';
-      overlay.style = `
+          if (m.panelId) {
+            toggleModuleOverlay(m.panelId, isEnabled);
+          }
+        });
+      }
+
+      async function toggleModuleFromOverview(toggleId) {
+        const toggle = document.getElementById(toggleId);
+        if (!toggle) return;
+
+        // Pronadji badge element za ovaj modul
+        const moduleToOvId = {
+          cfgLeaderboard: 'ovStatusLeaderboard',
+          cfgAnnounceTimeEnabled: 'ovStatusAnnouncements',
+          cfgAutoresponse: 'ovStatusInteraction',
+          cfgLove: 'ovStatusLove',
+          cfgGames: 'ovStatusGames',
+          cfgSongRequestEnabled: 'ovStatusSongRequest',
+          cfgGambleEnabled: 'ovStatusEconomy',
+          cfgModeration: 'ovStatusModeration'
+        };
+
+        const moduleNames = {
+          cfgLeaderboard: 'Leaderboard',
+          cfgAnnounceTimeEnabled: 'Automatske poruke',
+          cfgAutoresponse: 'Bot interakcija',
+          cfgLove: 'Ljubav i brakovi',
+          cfgGames: 'Mini igre',
+          cfgSongRequestEnabled: 'Song request',
+          cfgGambleEnabled: 'Ranking sistem',
+          cfgModeration: 'Moderacija'
+        };
+
+        // Zapamti prethodni state pre izmene
+        const prevState = toggle.checked;
+        const newState = !prevState;
+        const name = moduleNames[toggleId] || 'Modul';
+        const badgeId = moduleToOvId[toggleId];
+        const badgeEl = badgeId ? document.getElementById(badgeId) : null;
+
+        // OPTIMISTIČNI UPDATE — odmah primeni novu vrednost u UI
+        toggle.checked = newState;
+
+        // Sinhroniziraj master toggle ako postoji
+        if (toggleId === 'cfgAutoresponse') {
+          const master = document.getElementById('cfgFeatureAutoresponseMaster');
+          if (master) master.checked = newState;
+        } else if (toggleId === 'cfgSongRequestEnabled') {
+          const master = document.getElementById('cfgFeatureSongRequestMaster');
+          if (master) master.checked = newState;
+        }
+
+        // Prikaži loading stanje na badge-u
+        if (badgeEl) {
+          const prevClass = badgeEl.className;
+          const prevHTML = badgeEl.innerHTML;
+          badgeEl.className = 'module-status-badge loading';
+          badgeEl.innerHTML = `<span>${name}</span>`;
+
+          try {
+            // Sačuvaj u bazu
+            if (toggleId === 'cfgSongRequestEnabled') {
+              await saveSongRequestConfig(true);
+              await saveBotConfig(true);
+            } else if (toggleId === 'cfgGambleEnabled') {
+              await saveEconomyConfig(true);
+              await saveBotConfig(true);
+            } else if (toggleId === 'cfgModeration') {
+              toggleModerationPanelState();
+              await saveModerationSettings(true);
+              await saveBotConfig(true);
+            } else {
+              await saveBotConfig(true);
+            }
+
+            // Uspeh — osvezi UI
+            updateOverviewModulesUI();
+            showToast(newState ? 'success' : 'info', `Modul "${name}" je ${newState ? 'uključen' : 'isključen'}.`);
+
+          } catch (err) {
+            // Greška — vrati prethodni state
+            toggle.checked = prevState;
+            if (toggleId === 'cfgAutoresponse') {
+              const master = document.getElementById('cfgFeatureAutoresponseMaster');
+              if (master) master.checked = prevState;
+            } else if (toggleId === 'cfgSongRequestEnabled') {
+              const master = document.getElementById('cfgFeatureSongRequestMaster');
+              if (master) master.checked = prevState;
+            }
+            badgeEl.className = prevClass;
+            badgeEl.innerHTML = prevHTML;
+            updateOverviewModulesUI();
+            showToast('error', `Greška pri promeni modula "${name}". Pokušaj ponovo.`);
+            console.error('toggleModuleFromOverview error:', err);
+          }
+        } else {
+          // Nema badge-a — klasicna sinhronizacija
+          try {
+            if (toggleId === 'cfgSongRequestEnabled') {
+              await saveSongRequestConfig(true);
+              await saveBotConfig(true);
+            } else if (toggleId === 'cfgGambleEnabled') {
+              await saveEconomyConfig(true);
+              await saveBotConfig(true);
+            } else if (toggleId === 'cfgModeration') {
+              toggleModerationPanelState();
+              await saveModerationSettings(true);
+              await saveBotConfig(true);
+            } else {
+              await saveBotConfig(true);
+            }
+            updateOverviewModulesUI();
+            showToast(newState ? 'success' : 'info', `Modul "${name}" je ${newState ? 'uključen' : 'isključen'}.`);
+          } catch (err) {
+            toggle.checked = prevState;
+            updateOverviewModulesUI();
+            showToast('error', `Greška pri promeni modula "${name}". Pokušaj ponovo.`);
+          }
+        }
+      }
+
+      function toggleModuleOverlay(panelId, active) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+
+        // Ensure relative positioning on the section
+        panel.style.position = 'relative';
+
+        // Look for existing overlay
+        const existingOverlay = panel.querySelector('.module-disabled-overlay');
+
+        if (active) {
+          if (existingOverlay) {
+            existingOverlay.remove();
+          }
+          panel.style.overflow = '';
+          panel.style.height = '';
+        } else {
+          panel.style.overflow = 'hidden';
+          panel.style.height = 'calc(100vh - 120px)'; // Center overlay and prevent scrolling
+          if (!existingOverlay) {
+            const overlay = document.createElement('div');
+            overlay.className = 'module-disabled-overlay';
+            overlay.style = `
         position: absolute;
         top: 0;
         left: 0;
@@ -4228,7 +4839,7 @@ function toggleModuleOverlay(panelId, active) {
         text-align: center;
         box-sizing: border-box;
       `;
-      overlay.innerHTML = `
+            overlay.innerHTML = `
         <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -4241,332 +4852,386 @@ function toggleModuleOverlay(panelId, active) {
         </p>
         <button class="btn btn-primary" onclick="switchPanel('config')" style="padding: 10px 24px; font-weight: 600; cursor: pointer;">Aktiviraj u Bot Config</button>
       `;
-      panel.appendChild(overlay);
-    }
-  }
-}
-
-let liveFeedInterval = null;
-function startLiveActivityFeed() {
-  const feed = document.getElementById('botLiveFeed');
-  if (!feed) return;
-
-  if (liveFeedInterval) {
-    clearInterval(liveFeedInterval);
-    liveFeedInterval = null;
-  }
-
-  // Omogući autoscroll po defaultu i podešavanje visine za skrolovanje
-  feed.style.overflowY = 'auto';
-  feed.style.display = 'flex';
-  feed.style.flexDirection = 'column';
-  feed.style.gap = '2px';
-
-  async function fetchLogs() {
-    if (!activeChannel) return;
-
-    try {
-      const res = await fetch(`${getBotApiBase()}/api/kick/logs?chatroom_id=${activeChannel.id}`);
-      const dot = document.getElementById('botLiveFeedDot');
-      if (res.ok) {
-        if (dot) {
-          dot.style.background = 'var(--kick-green)';
-          dot.style.boxShadow = '0 0 8px var(--kick-green)';
+            panel.appendChild(overlay);
+          }
         }
-        const logs = await res.json();
-        if (logs.length === 0) {
-          feed.innerHTML = `
+      }
+
+      let liveFeedInterval = null;
+      let liveFeedUserScrolledUp = false;
+      let liveFeedScrollDebounce = null;
+
+      function startLiveActivityFeed() {
+        const feed = document.getElementById('botLiveFeed');
+        if (!feed) return;
+
+        if (liveFeedInterval) {
+          clearInterval(liveFeedInterval);
+          liveFeedInterval = null;
+        }
+
+        // Resetuj scroll state
+        liveFeedUserScrolledUp = false;
+        if (liveFeedScrollDebounce) clearTimeout(liveFeedScrollDebounce);
+
+        // Stilovi za feed
+        feed.style.overflowY = 'auto';
+        feed.style.display = 'flex';
+        feed.style.flexDirection = 'column';
+        feed.style.gap = '2px';
+
+        // Wrapper za hint button — pronađi ili kreiraj
+        let feedWrap = feed.parentElement;
+        if (!feedWrap || !feedWrap.classList.contains('live-feed-wrap')) {
+          feedWrap = feed.parentElement;
+        }
+
+        // Helper za scroll hint dugme
+        function showScrollHint() {
+          if (!feedWrap) return;
+          let hint = feedWrap.querySelector('.live-feed-scroll-hint');
+          if (!hint) {
+            hint = document.createElement('button');
+            hint.className = 'live-feed-scroll-hint';
+            hint.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg> Najnoviji`;
+            hint.onclick = () => {
+              liveFeedUserScrolledUp = false;
+              feed.scrollTop = feed.scrollHeight;
+              hint.remove();
+            };
+            feedWrap.style.position = 'relative';
+            feedWrap.appendChild(hint);
+          }
+        }
+
+        function hideScrollHint() {
+          if (!feedWrap) return;
+          const hint = feedWrap.querySelector('.live-feed-scroll-hint');
+          if (hint) hint.remove();
+        }
+
+        // Scroll listener sa debounce pauzom
+        feed.addEventListener('scroll', () => {
+          const isAtBottom = (feed.scrollHeight - feed.clientHeight - feed.scrollTop) < 60;
+          if (!isAtBottom) {
+            liveFeedUserScrolledUp = true;
+            showScrollHint();
+            // Pauziraj auto-scroll 8 sekundi od poslednjeg skrolovanja
+            clearTimeout(liveFeedScrollDebounce);
+            liveFeedScrollDebounce = setTimeout(() => {
+              liveFeedUserScrolledUp = false;
+              hideScrollHint();
+            }, 8000);
+          } else {
+            liveFeedUserScrolledUp = false;
+            clearTimeout(liveFeedScrollDebounce);
+            hideScrollHint();
+          }
+        }, { passive: true });
+
+        async function fetchLogs() {
+          if (!activeChannel) return;
+
+          try {
+            const res = await fetch(`${getBotApiBase()}/api/kick/logs?chatroom_id=${activeChannel.id}`);
+            const dot = document.getElementById('botLiveFeedDot');
+            if (res.ok) {
+              if (dot) {
+                dot.style.background = 'var(--kick-green)';
+                dot.style.boxShadow = '0 0 8px var(--kick-green)';
+              }
+              const logs = await res.json();
+              if (logs.length === 0) {
+                feed.innerHTML = `
             <div style="color: var(--text-muted); text-align: center; padding-top: 60px; font-style: italic; font-size: 0.85rem;">
               Čekam prve aktivnosti...
             </div>
           `;
-          return;
-        }
+                return;
+              }
 
-        const wasAtBottom = (feed.scrollHeight - feed.clientHeight - feed.scrollTop) < 50;
+              // Renderuj logove
+              feed.innerHTML = logs.map(log => {
+                let badgeColor = 'var(--text-muted)';
+                if (log.type === 'ERR') badgeColor = '#EF4444';
+                else if (log.type === 'WARN') badgeColor = '#F59E0B';
+                else if (log.type === 'INFO') badgeColor = '#3B82F6';
+                else if (log.type === 'BOT') badgeColor = 'var(--kick-green)';
+                else if (log.type === 'CHAT') badgeColor = '#10B981';
 
-        // Renderuj logove
-        feed.innerHTML = logs.map(log => {
-          let badgeColor = 'var(--text-muted)';
-          if (log.type === 'ERR') badgeColor = '#EF4444';
-          else if (log.type === 'WARN') badgeColor = '#F59E0B';
-          else if (log.type === 'INFO') badgeColor = '#3B82F6';
-          else if (log.type === 'BOT') badgeColor = 'var(--kick-green)';
-          else if (log.type === 'CHAT') badgeColor = '#10B981';
+                // Očisti poruku od prefiksa kanala
+                let cleanMessage = log.message || '';
+                if (activeChannel) {
+                  const prefixRegex = new RegExp(`^\\[${activeChannel.username}\\]\\s*`, 'i');
+                  cleanMessage = cleanMessage.replace(prefixRegex, '');
+                  const atPrefixRegex = new RegExp(`^\\[@${activeChannel.username}\\]\\s*`, 'i');
+                  cleanMessage = cleanMessage.replace(atPrefixRegex, '');
+                }
 
-          // Očisti poruku od prefiksa kanala (npr. [KickotBot] ili [Milan_567])
-          let cleanMessage = log.message || '';
-          if (activeChannel) {
-            const prefixRegex = new RegExp(`^\\[${activeChannel.username}\\]\\s*`, 'i');
-            cleanMessage = cleanMessage.replace(prefixRegex, '');
-            const atPrefixRegex = new RegExp(`^\\[@${activeChannel.username}\\]\\s*`, 'i');
-            cleanMessage = cleanMessage.replace(atPrefixRegex, '');
-          }
-
-          return `
+                return `
             <div class="log-item" style="display: flex; gap: 8px; align-items: flex-start; text-align: left; font-family: monospace; font-size: 0.78rem; padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.02); line-height: 1.4; width: 100%; box-sizing: border-box;">
               <span style="color: var(--text-muted); flex-shrink: 0;">[${log.timestamp}]</span>
               <span style="color: ${badgeColor}; font-weight: bold; flex-shrink: 0;">[${log.type}]</span>
               <span style="color: #E2E8F0; word-break: break-all; flex-grow: 1;">${escapeHtml(cleanMessage)}</span>
             </div>
           `;
-        }).join('');
+              }).join('');
 
-        // Skroluj na dno da uvek prikazuje najnovije logove ako je bio na dnu
-        if (wasAtBottom) {
-          feed.scrollTop = feed.scrollHeight;
-        }
-      } else {
-        if (dot) {
-          dot.style.background = 'red';
-          dot.style.boxShadow = '0 0 8px red';
-        }
-      }
-    } catch (_) {
-      const dot = document.getElementById('botLiveFeedDot');
-      if (dot) {
-        dot.style.background = 'red';
-        dot.style.boxShadow = '0 0 8px red';
-      }
-    }
-  }
-
-  // Povuci odmah, pa na svake 3 sekunde
-  fetchLogs();
-  liveFeedInterval = setInterval(fetchLogs, 3000);
-}
-
-// ── Kick OAuth Helperi za dodavanje kanala ─────────────────────────────────
-function generateRandomString(length) {
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-  let text = '';
-  for (let i = 0; i < length; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
-}
-
-async function sha256(plain) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(plain);
-  return window.crypto.subtle.digest('SHA-256', data);
-}
-
-function base64urlencode(a) {
-  let str = "";
-  const bytes = new Uint8Array(a);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    str += String.fromCharCode(bytes[i]);
-  }
-  return btoa(str)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-async function generateCodeChallenge(v) {
-  const hashed = await sha256(v);
-  return base64urlencode(hashed);
-}
-
-function getKickRedirectUri() {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.origin}/auth/kick/callback/`;
-  }
-  return `${window.location.origin}/auth/kick/callback`;
-}
-
-async function openKickLoginForChannel() {
-  if (!currentUser) return;
-  const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
-  const KICK_REDIRECT_URI = getKickRedirectUri();
-  const KICK_SCOPE = 'user:read';
-
-  const state = generateRandomString(16);
-  const codeVerifier = generateRandomString(64);
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-  sessionStorage.setItem('kick_oauth_state', state);
-  sessionStorage.setItem('kick_code_verifier', codeVerifier);
-  sessionStorage.setItem('kick_oauth_intent', 'add_channel');
-  sessionStorage.setItem('kick_add_channel_uid', currentUser.id);
-  sessionStorage.setItem('kick_oauth_source', 'dashboard');
-
-  const authUrl = 'https://id.kick.com/oauth/authorize?' + new URLSearchParams({
-    response_type: 'code',
-    client_id: KICK_CLIENT_ID,
-    redirect_uri: KICK_REDIRECT_URI,
-    scope: KICK_SCOPE,
-    state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256'
-  }).toString();
-
-  window.location.href = authUrl;
-}
-
-let autosaveConfigDebounce = null;
-let autosaveModDebounce = null;
-
-function triggerAutosaveConfig() {
-  if (!configLoaded) return;
-  if (autosaveConfigDebounce) clearTimeout(autosaveConfigDebounce);
-  autosaveConfigDebounce = setTimeout(() => {
-    saveBotConfig(true);
-  }, 1000); // 1 sekunda debounce za stabilnost
-}
-
-function triggerAutosaveMod() {
-  if (!configLoaded) return;
-  if (autosaveModDebounce) clearTimeout(autosaveModDebounce);
-  autosaveModDebounce = setTimeout(() => {
-    saveModerationSettings(true);
-  }, 1000); // 1 sekunda debounce za stabilnost
-}
-
-function setupAutosave() {
-  // 1. Inputs koji okidaju saveBotConfig
-  const configInputIds = [
-    'cfgPrefix', 'cfgLanguage', 'cfgCooldown', 'cfgLeaderboard', 'cfgWatchtime',
-    'cfgGames', 'cfgLove', 'cfgModeration', 'cfgAutoresponse', 'cfgSpamThreshold',
-    'cfgSpamWindow', 'cfgPinMsg', 'cfgWelcomeMsg', 'cfgAnnounceInterval',
-    'cfgAnnounceThreshold', 'cfgAnnounceTimeEnabled', 'cfgAnnounceMsgEnabled',
-    'cfgAlertFollowEnabled', 'cfgAlertFollowMsg',
-    'cfgAlertKicksEnabled', 'cfgAlertKicksMsg', 'cfgAlertKicksMin',
-    'cfgAlertSubEnabled', 'cfgAlertSubMsg',
-    'cfgAlertResubEnabled', 'cfgAlertResubMsg',
-    'cfgAlertGiftsubEnabled', 'cfgAlertGiftsubMsg',
-    'cfgAlertHostEnabled', 'cfgAlertHostMsg', 'cfgAlertHostMin',
-    'cfgAlertWelcomeEnabled', 'cfgAlertWelcomeMsg', 'cfgCustomBotName',
-    'cfgSongRequestEnabled', 'cfgSongRequestRank', 'cfgSongRequestCost', 'cfgSongRequestMaxDuration'
-  ];
-
-  configInputIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('input', () => {
-        // Instant vizuelni feedback za module
-        if (el.type === 'checkbox') {
-          updateOverviewModulesUI();
-          if (id === 'cfgModeration') {
-            toggleModerationPanelState();
+              // Auto-scroll na dno samo ako korisnik nije skrolovao gore
+              if (!liveFeedUserScrolledUp) {
+                feed.scrollTop = feed.scrollHeight;
+              }
+            } else {
+              if (dot) {
+                dot.style.background = 'red';
+                dot.style.boxShadow = '0 0 8px red';
+              }
+            }
+          } catch (_) {
+            const dot = document.getElementById('botLiveFeedDot');
+            if (dot) {
+              dot.style.background = 'red';
+              dot.style.boxShadow = '0 0 8px red';
+            }
           }
         }
-        triggerAutosaveConfig();
+
+        // Povuci odmah, pa na svake 3 sekunde
+        fetchLogs();
+        liveFeedInterval = setInterval(fetchLogs, 3000);
+      }
+
+      // ── Kick OAuth Helperi za dodavanje kanala ─────────────────────────────────
+      function generateRandomString(length) {
+        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+        let text = '';
+        for (let i = 0; i < length; i++) {
+          text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
+      }
+
+      async function sha256(plain) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(plain);
+        return window.crypto.subtle.digest('SHA-256', data);
+      }
+
+      function base64urlencode(a) {
+        let str = "";
+        const bytes = new Uint8Array(a);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          str += String.fromCharCode(bytes[i]);
+        }
+        return btoa(str)
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+      }
+
+      async function generateCodeChallenge(v) {
+        const hashed = await sha256(v);
+        return base64urlencode(hashed);
+      }
+
+      function getKickRedirectUri() {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          return `${window.location.origin}/auth/kick/callback/`;
+        }
+        return `${window.location.origin}/auth/kick/callback`;
+      }
+
+      async function openKickLoginForChannel() {
+        if (!currentUser) return;
+        const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
+        const KICK_REDIRECT_URI = getKickRedirectUri();
+        const KICK_SCOPE = 'user:read';
+
+        const state = generateRandomString(16);
+        const codeVerifier = generateRandomString(64);
+        const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+        sessionStorage.setItem('kick_oauth_state', state);
+        sessionStorage.setItem('kick_code_verifier', codeVerifier);
+        sessionStorage.setItem('kick_oauth_intent', 'add_channel');
+        sessionStorage.setItem('kick_add_channel_uid', currentUser.id);
+        sessionStorage.setItem('kick_oauth_source', 'dashboard');
+
+        const authUrl = 'https://id.kick.com/oauth/authorize?' + new URLSearchParams({
+          response_type: 'code',
+          client_id: KICK_CLIENT_ID,
+          redirect_uri: KICK_REDIRECT_URI,
+          scope: KICK_SCOPE,
+          state,
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256'
+        }).toString();
+
+        window.location.href = authUrl;
+      }
+
+      let autosaveConfigDebounce = null;
+      let autosaveModDebounce = null;
+
+      function triggerAutosaveConfig() {
+        if (!configLoaded) return;
+        if (autosaveConfigDebounce) clearTimeout(autosaveConfigDebounce);
+        autosaveConfigDebounce = setTimeout(() => {
+          saveBotConfig(true);
+        }, 1000); // 1 sekunda debounce za stabilnost
+      }
+
+      function triggerAutosaveMod() {
+        if (!configLoaded) return;
+        if (autosaveModDebounce) clearTimeout(autosaveModDebounce);
+        autosaveModDebounce = setTimeout(() => {
+          saveModerationSettings(true);
+        }, 1000); // 1 sekunda debounce za stabilnost
+      }
+
+      function setupAutosave() {
+        // 1. Inputs koji okidaju saveBotConfig
+        const configInputIds = [
+          'cfgPrefix', 'cfgLanguage', 'cfgCooldown', 'cfgLeaderboard', 'cfgWatchtime',
+          'cfgGames', 'cfgLove', 'cfgModeration', 'cfgAutoresponse', 'cfgSpamThreshold',
+          'cfgSpamWindow', 'cfgPinMsg', 'cfgWelcomeMsg', 'cfgAnnounceInterval',
+          'cfgAnnounceThreshold', 'cfgAnnounceTimeEnabled', 'cfgAnnounceMsgEnabled',
+          'cfgAlertFollowEnabled', 'cfgAlertFollowMsg',
+          'cfgAlertKicksEnabled', 'cfgAlertKicksMsg', 'cfgAlertKicksMin',
+          'cfgAlertSubEnabled', 'cfgAlertSubMsg',
+          'cfgAlertResubEnabled', 'cfgAlertResubMsg',
+          'cfgAlertGiftsubEnabled', 'cfgAlertGiftsubMsg',
+          'cfgAlertHostEnabled', 'cfgAlertHostMsg', 'cfgAlertHostMin',
+          'cfgAlertWelcomeEnabled', 'cfgAlertWelcomeMsg', 'cfgCustomBotName',
+          'cfgSongRequestEnabled', 'cfgSongRequestRank', 'cfgSongRequestCost', 'cfgSongRequestMaxDuration'
+        ];
+
+        configInputIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.addEventListener('input', () => {
+              // Instant vizuelni feedback za module
+              if (el.type === 'checkbox') {
+                updateOverviewModulesUI();
+                if (id === 'cfgModeration') {
+                  toggleModerationPanelState();
+                }
+              }
+              triggerAutosaveConfig();
+            });
+            el.addEventListener('change', triggerAutosaveConfig);
+          }
+        });
+
+        // 2. Inputs koji okidaju saveModerationSettings
+        const modInputIds = [
+          'cfgModCapsEnabled', 'cfgModCapsPct', 'cfgModCapsMinLen',
+          'cfgModLinksEnabled', 'cfgModLinksWhitelist', 'cfgModLinksPermitEnabled',
+          'cfgModEmotesEnabled', 'cfgModEmotesMax',
+          'cfgModSymbolsEnabled', 'cfgModSymbolsPct', 'cfgModSymbolsMinLen',
+          'cfgModWordsEnabled', 'cfgModWordsList',
+          'cfgModSpamEnabled', 'cfgModSpamMaxDuplicates',
+          'cfgModMaxLenEnabled', 'cfgModMaxLenLimit',
+          'cfgModMentionsEnabled', 'cfgModMentionsLimit',
+          'cfgModActionType', 'cfgModTimeoutDuration',
+          'cfgModExemptVip', 'cfgModExemptSub'
+        ];
+
+        modInputIds.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) {
+            el.addEventListener('input', () => {
+              triggerAutosaveMod();
+            });
+            el.addEventListener('change', triggerAutosaveMod);
+          }
+        });
+      }
+
+      // ── Notification Center ────────────────────────────────────────────────────
+      let readNotifs = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+      let notifications = [
+        { id: 1, title: 'Bot uspešno pokrenut', desc: 'KickotBot je uspešno povezan na Vaš kanal i spreman je za rad.', time: 'Pre 5 minuta', type: 'info', read: false },
+        { id: 2, title: 'Moderator status proveren', desc: 'Uspešno verifikovan moderator status na kanalu. Svi moduli su aktivni.', time: 'Pre 10 minuta', type: 'success', read: false },
+        { id: 3, title: 'Upozorenje o moderatorskoj ulozi', desc: 'Ukoliko bot izgubi moderatorsku ulogu na kanalu, poruke i moderacija će automatski biti obustavljeni.', time: 'Pre 1 sat', type: 'warning', read: false }
+      ];
+      notifications.forEach(n => {
+        if (readNotifs.includes(n.id)) n.read = true;
       });
-      el.addEventListener('change', triggerAutosaveConfig);
-    }
-  });
 
-  // 2. Inputs koji okidaju saveModerationSettings
-  const modInputIds = [
-    'cfgModCapsEnabled', 'cfgModCapsPct', 'cfgModCapsMinLen',
-    'cfgModLinksEnabled', 'cfgModLinksWhitelist', 'cfgModLinksPermitEnabled',
-    'cfgModEmotesEnabled', 'cfgModEmotesMax',
-    'cfgModSymbolsEnabled', 'cfgModSymbolsPct', 'cfgModSymbolsMinLen',
-    'cfgModWordsEnabled', 'cfgModWordsList',
-    'cfgModSpamEnabled', 'cfgModSpamMaxDuplicates',
-    'cfgModMaxLenEnabled', 'cfgModMaxLenLimit',
-    'cfgModMentionsEnabled', 'cfgModMentionsLimit',
-    'cfgModActionType', 'cfgModTimeoutDuration',
-    'cfgModExemptVip', 'cfgModExemptSub'
-  ];
+      let changelogs = [
+        { version: 'v1.2.0', date: '19. jul 2026', title: 'Individualne kazne & Uređivanje', details: 'Omogućeno zasebno podešavanje kazni za svaki filter moderacije, i dodate olovkice za direktno uređivanje svih ugrađenih mini igara i bračnih komandi.' },
+        { version: 'v1.1.5', date: '19. jul 2026', title: 'Centar za obaveštenja', details: 'Kreirano zvonce u zaglavlju sa notifikacijama o radu bota i changelog-om promena.' },
+        { version: 'v1.1.0', date: '19. jul 2026', title: 'Pametno skrolovanje logova', details: 'Fiksiran scroll bug u dashboard feed-u. Skrolovanje na dno se vrši samo ukoliko ste već čitali najnovije logove.' }
+      ];
 
-  modInputIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.addEventListener('input', () => {
-        triggerAutosaveMod();
+      let activeNotifTab = 'obaveštenja';
+
+      function toggleNotifCenter() {
+        const popover = document.getElementById('notifPopover');
+        if (!popover) return;
+        const isHidden = popover.style.display === 'none';
+        popover.style.display = isHidden ? 'block' : 'none';
+        if (isHidden) {
+          renderNotifContent();
+        }
+      }
+
+      // Close popover when clicking outside
+      document.addEventListener('click', (e) => {
+        const popover = document.getElementById('notifPopover');
+        const btn = document.getElementById('notifBellBtn');
+        if (!popover || !btn) return;
+        if (btn.contains(e.target)) return;
+        if (!document.body.contains(e.target)) return; // Prevents closing when clicked item is detached during re-render
+        if (popover.contains(e.target)) return;
+        popover.style.display = 'none';
       });
-      el.addEventListener('change', triggerAutosaveMod);
-    }
-  });
-}
 
-// ── Notification Center ────────────────────────────────────────────────────
-let readNotifs = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
-let notifications = [
-  { id: 1, title: 'Bot uspešno pokrenut', desc: 'KickotBot je uspešno povezan na Vaš kanal i spreman je za rad.', time: 'Pre 5 minuta', type: 'info', read: false },
-  { id: 2, title: 'Moderator status proveren', desc: 'Uspešno verifikovan moderator status na kanalu. Svi moduli su aktivni.', time: 'Pre 10 minuta', type: 'success', read: false },
-  { id: 3, title: 'Upozorenje o moderatorskoj ulozi', desc: 'Ukoliko bot izgubi moderatorsku ulogu na kanalu, poruke i moderacija će automatski biti obustavljeni.', time: 'Pre 1 sat', type: 'warning', read: false }
-];
-notifications.forEach(n => {
-  if (readNotifs.includes(n.id)) n.read = true;
-});
+      function switchNotifTab(tab) {
+        activeNotifTab = tab;
 
-let changelogs = [
-  { version: 'v1.2.0', date: '19. jul 2026', title: 'Individualne kazne & Uređivanje', details: 'Omogućeno zasebno podešavanje kazni za svaki filter moderacije, i dodate olovkice za direktno uređivanje svih ugrađenih mini igara i bračnih komandi.' },
-  { version: 'v1.1.5', date: '19. jul 2026', title: 'Centar za obaveštenja', details: 'Kreirano zvonce u zaglavlju sa notifikacijama o radu bota i changelog-om promena.' },
-  { version: 'v1.1.0', date: '19. jul 2026', title: 'Pametno skrolovanje logova', details: 'Fiksiran scroll bug u dashboard feed-u. Skrolovanje na dno se vrši samo ukoliko ste već čitali najnovije logove.' }
-];
+        const tabOb = document.getElementById('notifTabObaveštenja');
+        const tabCh = document.getElementById('notifTabChangelog');
 
-let activeNotifTab = 'obaveštenja';
+        if (!tabOb || !tabCh) return;
 
-function toggleNotifCenter() {
-  const popover = document.getElementById('notifPopover');
-  if (!popover) return;
-  const isHidden = popover.style.display === 'none';
-  popover.style.display = isHidden ? 'block' : 'none';
-  if (isHidden) {
-    renderNotifContent();
-  }
-}
+        if (tab === 'obaveštenja') {
+          tabOb.style.color = '#fff';
+          tabOb.style.background = 'rgba(255,255,255,0.05)';
+          tabCh.style.color = 'var(--text-muted)';
+          tabCh.style.background = 'none';
+        } else {
+          tabCh.style.color = '#fff';
+          tabCh.style.background = 'rgba(255,255,255,0.05)';
+          tabOb.style.color = 'var(--text-muted)';
+          tabOb.style.background = 'none';
+        }
 
-// Close popover when clicking outside
-document.addEventListener('click', (e) => {
-  const popover = document.getElementById('notifPopover');
-  const btn = document.getElementById('notifBellBtn');
-  if (!popover || !btn) return;
-  if (btn.contains(e.target)) return;
-  if (!document.body.contains(e.target)) return; // Prevents closing when clicked item is detached during re-render
-  if (popover.contains(e.target)) return;
-  popover.style.display = 'none';
-});
+        renderNotifContent();
+      }
 
-function switchNotifTab(tab) {
-  activeNotifTab = tab;
-  
-  const tabOb = document.getElementById('notifTabObaveštenja');
-  const tabCh = document.getElementById('notifTabChangelog');
-  
-  if (!tabOb || !tabCh) return;
-  
-  if (tab === 'obaveštenja') {
-    tabOb.style.color = '#fff';
-    tabOb.style.background = 'rgba(255,255,255,0.05)';
-    tabCh.style.color = 'var(--text-muted)';
-    tabCh.style.background = 'none';
-  } else {
-    tabCh.style.color = '#fff';
-    tabCh.style.background = 'rgba(255,255,255,0.05)';
-    tabOb.style.color = 'var(--text-muted)';
-    tabOb.style.background = 'none';
-  }
-  
-  renderNotifContent();
-}
+      function renderNotifContent() {
+        const list = document.getElementById('notifContentList');
+        if (!list) return;
 
-function renderNotifContent() {
-  const list = document.getElementById('notifContentList');
-  if (!list) return;
-  
-  if (activeNotifTab === 'obaveštenja') {
-    if (notifications.length === 0) {
-      list.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 24px; font-size: 0.82rem; font-style: italic;">Nema novih obaveštenja.</div>';
-      return;
-    }
-    
-    list.innerHTML = notifications.map(n => {
-      let color = '#3B82F6';
-      if (n.type === 'success') color = '#10B981';
-      if (n.type === 'warning') color = '#F59E0B';
-      
-      const opacityStyle = n.read ? 'opacity: 0.6;' : '';
-      const borderStyle = n.read ? '1px solid rgba(255,255,255,0.02)' : '1px solid rgba(139, 92, 246, 0.15)';
-      const bgStyle = n.read ? 'transparent' : 'rgba(255,255,255,0.02)';
-      
-      return `
+        if (activeNotifTab === 'obaveštenja') {
+          if (notifications.length === 0) {
+            list.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 24px; font-size: 0.82rem; font-style: italic;">Nema novih obaveštenja.</div>';
+            return;
+          }
+
+          list.innerHTML = notifications.map(n => {
+            let color = '#3B82F6';
+            if (n.type === 'success') color = '#10B981';
+            if (n.type === 'warning') color = '#F59E0B';
+
+            const opacityStyle = n.read ? 'opacity: 0.6;' : '';
+            const borderStyle = n.read ? '1px solid rgba(255,255,255,0.02)' : '1px solid rgba(139, 92, 246, 0.15)';
+            const bgStyle = n.read ? 'transparent' : 'rgba(255,255,255,0.02)';
+
+            return `
         <div onclick="markNotifAsRead(${n.id})" style="padding: 10px; border-radius: var(--radius-md); background: ${bgStyle}; border: ${borderStyle}; transition: all 0.2s; cursor: pointer; ${opacityStyle}">
           <div style="display: flex; gap: 8px; align-items: flex-start; text-align: left;">
             <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${color}; margin-top: 5px; flex-shrink: 0; box-shadow: 0 0 6px ${color};"></span>
@@ -4578,10 +5243,10 @@ function renderNotifContent() {
           </div>
         </div>
       `;
-    }).join('');
-  } else {
-    // Changelog tab
-    list.innerHTML = changelogs.map(c => `
+          }).join('');
+        } else {
+          // Changelog tab
+          list.innerHTML = changelogs.map(c => `
       <div style="padding: 10px; border-radius: var(--radius-md); background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
           <span style="font-size: 0.72rem; font-weight: 700; color: var(--app-primary); background: var(--app-primary-dim); padding: 2px 6px; border-radius: 4px;">${c.version}</span>
@@ -4591,589 +5256,1036 @@ function renderNotifContent() {
         <div style="font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4; text-align: left;">${escapeHtml(c.details)}</div>
       </div>
     `).join('');
-  }
-}
-
-function markAllNotifsAsRead() {
-  notifications.forEach(n => n.read = true);
-  
-  // Persist to localStorage
-  const readIds = notifications.map(n => n.id);
-  localStorage.setItem('read_notif_ids', JSON.stringify(readIds));
-
-  const badge = document.getElementById('notifBadge');
-  if (badge) {
-    badge.style.display = 'none';
-  }
-  renderNotifContent();
-  showToast('success', 'Sva obaveštenja označena kao pročitana.', '✔');
-}
-
-function markNotifAsRead(id) {
-  const notif = notifications.find(n => n.id === id);
-  if (notif && !notif.read) {
-    notif.read = true;
-    
-    // Persist to localStorage
-    let readIds = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
-    if (!readIds.includes(id)) {
-      readIds.push(id);
-      localStorage.setItem('read_notif_ids', JSON.stringify(readIds));
-    }
-    
-    // Check if any unread left
-    const hasUnread = notifications.some(n => !n.read);
-    if (!hasUnread) {
-      const badge = document.getElementById('notifBadge');
-      if (badge) {
-        badge.style.display = 'none';
+        }
       }
-    }
-    
-    renderNotifContent();
-  }
-}
 
-function openFeedbackModal() {
-  openModal('feedbackModal');
-}
+      function updateNotifBadgeUI() {
+        const hasUnread = notifications.some(n => !n.read);
+        const badge = document.getElementById('notifBadge');
+        const btn = document.getElementById('notifBellBtn');
 
-function openDocsModal() {
-  openModal('docsModal');
-}
+        if (badge) {
+          badge.style.display = hasUnread ? 'block' : 'none';
+        }
+        if (btn) {
+          if (hasUnread) {
+            btn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+            btn.style.color = '#EF4444';
+            btn.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.25)';
+          } else {
+            btn.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+            btn.style.color = 'var(--text-secondary)';
+            btn.style.boxShadow = 'none';
+          }
+        }
+      }
 
-function submitFeedback() {
-  const type = document.getElementById('feedbackType')?.value;
-  const title = document.getElementById('feedbackTitle')?.value.trim();
-  const text = document.getElementById('feedbackText')?.value.trim();
-  
-  if (!title || !text) {
-    showToast('error', 'Molimo popunite sva polja pre slanja.', '⚠️');
-    return;
-  }
-  
-  showToast('success', 'Hvala na povratnim informacijama! Milan će to pregledati što pre.', '✅');
-  
-  // Clear fields
-  const titleInput = document.getElementById('feedbackTitle');
-  const textInput = document.getElementById('feedbackText');
-  if (titleInput) titleInput.value = '';
-  if (textInput) textInput.value = '';
-  
-  closeModal('feedbackModal');
-}
+      function markAllNotifsAsRead() {
+        notifications.forEach(n => n.read = true);
 
-// ── Song Request & Music Player Logic ──────────────────────────────────────
-let localSongQueue = [
-  { title: 'Milanče Radosavljević - Dao bih ovo malo života', requester: 'Strimer (Milan_567)', duration: 215 },
-  { title: 'Jašar Ahmedovski - Jednoj ženi za sećanje', requester: 'Gledalac (Marko_99)', duration: 250 },
-  { title: 'Šaban Šaulić - Žal', requester: 'Moderator (Zoki)', duration: 310 }
-];
-let currentSongIndex = 0;
-let isPlaying = false;
-let playbackInterval = null;
-let currentTimeSeconds = 0;
-let playerVolume = 80;
+        // Persist to localStorage
+        const readIds = notifications.map(n => n.id);
+        localStorage.setItem('read_notif_ids', JSON.stringify(readIds));
 
-function formatDuration(secs) {
-  const m = Math.floor(secs / 60);
-  const s = String(secs % 60).padStart(2, '0');
-  return `${m}:${s}`;
-}
+        updateNotifBadgeUI();
+        renderNotifContent();
+        showToast('success', 'Sva obaveštenja označena kao pročitana.', '✔');
+      }
 
-function renderSongQueue() {
-  const queueList = document.getElementById('songQueueList');
-  const queueCount = document.getElementById('queueCount');
-  if (!queueList) return;
+      function markNotifAsRead(id) {
+        const notif = notifications.find(n => n.id === id);
+        if (notif && !notif.read) {
+          notif.read = true;
 
-  queueCount.textContent = `${localSongQueue.length} pesama`;
+          // Persist to localStorage
+          let readIds = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+          if (!readIds.includes(id)) {
+            readIds.push(id);
+            localStorage.setItem('read_notif_ids', JSON.stringify(readIds));
+          }
 
-  if (localSongQueue.length === 0) {
-    queueList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 20px; font-size: 0.8rem; font-style: italic;">Red za puštanje je prazan.</div>';
-    return;
-  }
+          updateNotifBadgeUI();
+          renderNotifContent();
+        }
+      }
 
-  queueList.innerHTML = localSongQueue.map((song, index) => {
-    const isActive = index === currentSongIndex;
-    const activeBg = isActive ? 'rgba(139, 92, 246, 0.08)' : 'rgba(255,255,255,0.01)';
-    const activeBorder = isActive ? '1px solid rgba(139, 92, 246, 0.3)' : '1px solid var(--border-subtle)';
-    const activeText = isActive ? 'var(--app-primary)' : '#fff';
-    
-    return `
-      <div style="background: ${activeBg}; border: ${activeBorder}; padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-        <div style="flex-grow: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-          <div style="font-size: 0.82rem; font-weight: 700; color: ${activeText}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(song.title)}</div>
-          <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Zatražio: ${escapeHtml(song.requester)} • ${formatDuration(song.duration)}</div>
+      function openFeedbackModal() {
+        openModal('feedbackModal');
+      }
+
+      function openDocsModal() {
+        openModal('docsModal');
+      }
+
+      function submitFeedback() {
+        const type = document.getElementById('feedbackType')?.value;
+        const title = document.getElementById('feedbackTitle')?.value.trim();
+        const text = document.getElementById('feedbackText')?.value.trim();
+
+        if (!title || !text) {
+          showToast('error', 'Molimo popunite sva polja pre slanja.', '⚠️');
+          return;
+        }
+
+        showToast('success', 'Hvala na povratnim informacijama! Milan će to pregledati što pre.', '✅');
+
+        // Clear fields
+        const titleInput = document.getElementById('feedbackTitle');
+        const textInput = document.getElementById('feedbackText');
+        if (titleInput) titleInput.value = '';
+        if (textInput) textInput.value = '';
+
+        closeModal('feedbackModal');
+      }
+
+      // ── Song Request & Music Player Logic ──────────────────────────────────────
+      let localSongQueue = [
+        {
+          id: 's1',
+          title: 'Dao bih ovo malo života',
+          artist: 'Milanče Radosavljević',
+          requester: 'Strimer (Milan_567)',
+          duration: 215,
+          source: 'custom',
+          coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 's2',
+          title: 'Jednoj ženi za sećanje',
+          artist: 'Jašar Ahmedovski',
+          requester: 'Gledalac (Marko_99)',
+          duration: 250,
+          source: 'spotify',
+          coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&auto=format&fit=crop&q=80'
+        },
+        {
+          id: 's3',
+          title: 'Žal',
+          artist: 'Šaban Šaulić',
+          requester: 'Moderator (Zoki)',
+          duration: 310,
+          source: 'custom',
+          coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80'
+        }
+      ];
+
+      let currentSongIndex = 0;
+      let isPlaying = false;
+      let playbackInterval = null;
+      let currentTimeSeconds = 0;
+      let playerVolume = 80;
+      let spotifyToken = localStorage.getItem('kickbot_spotify_token') || null;
+      let spotifyUser = localStorage.getItem('kickbot_spotify_user') || null;
+      let spotifySyncInterval = null;
+
+      function generateRandomString(length) {
+        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        const values = crypto.getRandomValues(new Uint8Array(length));
+        return values.reduce((acc, x) => acc + possible[x % possible.length], '');
+      }
+
+      async function generateCodeChallenge(codeVerifier) {
+        const data = new TextEncoder().encode(codeVerifier);
+        const digest = await crypto.subtle.digest('SHA-256', data);
+        return btoa(String.fromCharCode.apply(null, new Uint8Array(digest)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=+$/, '');
+      }
+
+      function promptSpotifyClientId() {
+        const currentId = localStorage.getItem('kickbot_spotify_client_id') || '';
+        const input = prompt('Unesite vaš Spotify Client ID iz Spotify Developer Dashboard-a (https://developer.spotify.com/dashboard):', currentId);
+        if (input !== null && input.trim() !== '') {
+          localStorage.setItem('kickbot_spotify_client_id', input.trim());
+          showToast('Spotify Client ID je sačuvan!', 'success');
+          return input.trim();
+        }
+        return currentId;
+      }
+
+      async function checkSpotifyAuthCode() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        if (code) {
+          const verifier = localStorage.getItem('kickbot_spotify_code_verifier');
+          const clientId = localStorage.getItem('kickbot_spotify_client_id') || 'c028a385f062402db3179261a8bb2a7e';
+          const redirectUri = window.location.origin + window.location.pathname;
+
+          try {
+            const response = await fetch('https://accounts.spotify.com/api/token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                client_id: clientId,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: redirectUri,
+                code_verifier: verifier
+              })
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              spotifyToken = data.access_token;
+              if (data.refresh_token) localStorage.setItem('kickbot_spotify_refresh_token', data.refresh_token);
+              localStorage.setItem('kickbot_spotify_token', data.access_token);
+              history.replaceState(null, '', window.location.pathname);
+              fetchSpotifyUserProfile();
+            } else {
+              history.replaceState(null, '', window.location.pathname);
+            }
+          } catch (e) {
+            history.replaceState(null, '', window.location.pathname);
+          }
+        }
+      }
+      checkSpotifyAuthCode();
+
+      async function fetchSpotifyUserProfile() {
+        if (!spotifyToken) return;
+        try {
+          const res = await fetch('https://api.spotify.com/v1/me', {
+            headers: { 'Authorization': `Bearer ${spotifyToken}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            spotifyUser = data.display_name || data.id || 'Spotify User';
+            localStorage.setItem('kickbot_spotify_user', spotifyUser);
+            initSpotifyState();
+            showToast(`Povezano sa Spotify nalogom: ${spotifyUser}`, 'success');
+            startSpotifyLiveSync();
+          } else {
+            disconnectSpotifyAccount();
+          }
+        } catch (e) {
+          initSpotifyState();
+        }
+      }
+
+      function initSpotifyState() {
+        const badge = document.getElementById('spotifyStatusBadge');
+        const desc = document.getElementById('spotifyStatusDesc');
+        const btnConnect = document.getElementById('btnConnectSpotify');
+        const btnDisconnect = document.getElementById('btnDisconnectSpotify');
+
+        if (!badge) return;
+
+        if (spotifyToken) {
+          badge.textContent = `Povezano (${spotifyUser || 'Spotify nalog'})`;
+          badge.className = 'status-pill status-active';
+          badge.style.background = 'rgba(29,185,84,0.15)';
+          badge.style.color = '#1DB954';
+          badge.style.border = '1px solid rgba(29,185,84,0.3)';
+
+          if (desc) desc.textContent = 'Vaš Spotify nalog je uspešno povezan. Bot sinhronizuje pesme i dodaje željene numere u pravi Spotify queue!';
+          if (btnConnect) btnConnect.style.display = 'none';
+          if (btnDisconnect) btnDisconnect.style.display = 'inline-flex';
+
+          startSpotifyLiveSync();
+        } else {
+          badge.textContent = 'Nije povezano';
+          badge.className = 'status-pill status-inactive';
+          badge.style.background = 'rgba(148,163,184,0.15)';
+          badge.style.color = '#94A3B8';
+          badge.style.border = '1px solid rgba(148,163,184,0.3)';
+
+          if (desc) desc.textContent = 'Povežite svoj Spotify nalog za sinhronizovanu reprodukciju i automatsko puštanje pesama na strimu.';
+          if (btnConnect) btnConnect.style.display = 'inline-flex';
+          if (btnDisconnect) btnDisconnect.style.display = 'none';
+
+          if (spotifySyncInterval) clearInterval(spotifySyncInterval);
+        }
+      }
+
+      async function connectSpotifyAccount() {
+        // Koristi unapred konfigurisani Client ID — bez prompta
+        const clientId = localStorage.getItem('kickbot_spotify_client_id') || 'c028a385f062402db3179261a8bb2a7e';
+
+        const redirectUri = window.location.origin + window.location.pathname;
+        const scopes = 'user-read-playback-state user-modify-playback-state user-read-currently-playing streaming';
+
+        const verifier = generateRandomString(64);
+        const challenge = await generateCodeChallenge(verifier);
+        localStorage.setItem('kickbot_spotify_code_verifier', verifier);
+        localStorage.setItem('kickbot_spotify_client_id', clientId);
+
+        const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&code_challenge_method=S256&code_challenge=${challenge}&show_dialog=true`;
+
+        window.location.href = authUrl;
+      }
+
+      function disconnectSpotifyAccount() {
+        spotifyToken = null;
+        spotifyUser = null;
+        localStorage.removeItem('kickbot_spotify_token');
+        localStorage.removeItem('kickbot_spotify_user');
+        localStorage.removeItem('kickbot_spotify_refresh_token');
+        localStorage.removeItem('kickbot_spotify_code_verifier');
+        if (spotifySyncInterval) clearInterval(spotifySyncInterval);
+        initSpotifyState();
+        showToast('Spotify nalog je uspešno odjavljen.', 'info');
+      }
+
+      function startSpotifyLiveSync() {
+        if (spotifySyncInterval) clearInterval(spotifySyncInterval);
+        syncSpotifyLivePlayer();
+        spotifySyncInterval = setInterval(syncSpotifyLivePlayer, 3000);
+      }
+
+      async function syncSpotifyLivePlayer() {
+        if (!spotifyToken) return;
+
+        try {
+          const res = await fetch('https://api.spotify.com/v1/me/player', {
+            headers: { 'Authorization': `Bearer ${spotifyToken}` }
+          });
+
+          if (res.status === 200) {
+            const data = await res.json();
+            if (data && data.item) {
+              const item = data.item;
+              isPlaying = data.is_playing;
+              currentTimeSeconds = Math.floor((data.progress_ms || 0) / 1000);
+
+              const trackTitle = item.name;
+              const artistNames = item.artists ? item.artists.map(a => a.name).join(', ') : '';
+              const durationSecs = Math.floor((item.duration_ms || 0) / 1000);
+              const albumCover = item.album && item.album.images && item.album.images[0] ? item.album.images[0].url : '';
+
+              // Update currently playing item in local queue or display top
+              if (localSongQueue.length > 0 && currentSongIndex < localSongQueue.length) {
+                localSongQueue[currentSongIndex].title = trackTitle;
+                localSongQueue[currentSongIndex].artist = artistNames;
+                localSongQueue[currentSongIndex].duration = durationSecs;
+                if (albumCover) localSongQueue[currentSongIndex].coverUrl = albumCover;
+                localSongQueue[currentSongIndex].source = 'spotify';
+              } else {
+                localSongQueue.unshift({
+                  id: 'sp_' + item.id,
+                  title: trackTitle,
+                  artist: artistNames,
+                  requester: 'Spotify Player',
+                  duration: durationSecs,
+                  source: 'spotify',
+                  coverUrl: albumCover
+                });
+                currentSongIndex = 0;
+              }
+
+              updatePlayerUI();
+              renderSongQueue();
+            }
+          }
+        } catch (e) {
+          // Quiet error handling
+        }
+      }
+
+      function formatDuration(secs) {
+        const m = Math.floor(secs / 60);
+        const s = String(secs % 60).padStart(2, '0');
+        return `${m}:${s}`;
+      }
+
+      function renderSongQueue() {
+        const queueList = document.getElementById('songQueueList');
+        const queueCount = document.getElementById('queueCount');
+        if (!queueList) return;
+
+        queueCount.textContent = `${localSongQueue.length} pesama`;
+
+        if (localSongQueue.length === 0) {
+          queueList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 24px; font-size: 0.82rem; font-style: italic;">Red za puštanje je prazan. Dodajte pesmu dole levo ili sačekajte muzičku želju iz četa.</div>';
+          return;
+        }
+
+        const defaultCover = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
+
+        queueList.innerHTML = localSongQueue.map((song, index) => {
+          const isActive = index === currentSongIndex;
+          const activeBg = isActive ? 'rgba(29, 185, 84, 0.08)' : 'rgba(255,255,255,0.015)';
+          const activeBorder = isActive ? '1px solid rgba(29, 185, 84, 0.35)' : '1px solid var(--border-subtle)';
+          const activeText = isActive ? '#1DB954' : '#fff';
+          const cover = song.coverUrl || defaultCover;
+
+          return `
+      <div style="background: ${activeBg}; border: ${activeBorder}; padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: all 0.2s ease;">
+        <div style="display: flex; align-items: center; gap: 12px; flex-grow: 1; overflow: hidden;">
+          <img src="${cover}" alt="Cover" style="width: 38px; height: 38px; border-radius: 6px; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1);" />
+          <div style="text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-grow: 1;">
+            <div style="font-size: 0.85rem; font-weight: 700; color: ${activeText}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(song.title)}</div>
+            <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 2px;">${song.artist ? escapeHtml(song.artist) + ' • ' : ''}Zatražio: ${escapeHtml(song.requester)} • ${formatDuration(song.duration)}</div>
+          </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 8px;">
-          ${isActive && isPlaying ? '<span style="font-size: 0.75rem; color: var(--kick-green); font-weight: 600; display: flex; align-items: center; gap: 4px;"><span class="status-dot" style="background: var(--kick-green); width:6px; height:6px; box-shadow:0 0 6px var(--kick-green);"></span> Svira</span>' : ''}
-          <button class="btn btn-sm btn-text" onclick="removeSong(${index})" style="color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Ukloni pesmu">
+        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+          ${isActive && isPlaying ? '<span style="font-size: 0.72rem; color: #1DB954; font-weight: 700; display: flex; align-items: center; gap: 4px; background: rgba(29,185,84,0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(29,185,84,0.2);"><span class="status-dot" style="background: #1DB954; width:6px; height:6px; box-shadow:0 0 6px #1DB954;"></span> Svira</span>' : ''}
+          ${!isActive ? `<button type="button" class="btn btn-sm btn-outline" onclick="playSongNow(${index})" style="font-size: 0.72rem; padding: 3px 8px; border-color: rgba(29,185,84,0.3); color: #1DB954;" title="Pusti odmah">Pusti</button>` : ''}
+          <button type="button" class="btn btn-sm btn-text" onclick="removeSong(${index})" style="color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Ukloni pesmu">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
       </div>
     `;
-  }).join('');
-}
-
-function updatePlayerUI() {
-  const playerTitle = document.getElementById('playerTitle');
-  const playerRequester = document.getElementById('playerRequester');
-  const playerProgress = document.getElementById('playerProgress');
-  const playerCurrentTime = document.getElementById('playerCurrentTime');
-  const playerTotalTime = document.getElementById('playerTotalTime');
-  const playerDisk = document.getElementById('playerDisk');
-  const playIcon = document.getElementById('playIcon');
-
-  if (!playerTitle) return;
-
-  const currentSong = localSongQueue[currentSongIndex];
-  if (!currentSong) {
-    playerTitle.textContent = 'Nema pesama u redu';
-    playerRequester.textContent = 'Zatražite pesmu ispod';
-    if (playerProgress) playerProgress.style.width = '0%';
-    if (playerCurrentTime) playerCurrentTime.textContent = '0:00';
-    if (playerTotalTime) playerTotalTime.textContent = '0:00';
-    if (playerDisk) playerDisk.style.animationPlayState = 'paused';
-    if (playIcon) {
-      playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3" />';
-    }
-    return;
-  }
-
-  playerTitle.textContent = currentSong.title;
-  playerRequester.textContent = `Zatražio: ${currentSong.requester}`;
-  if (playerTotalTime) playerTotalTime.textContent = formatDuration(currentSong.duration);
-  if (playerCurrentTime) playerCurrentTime.textContent = formatDuration(currentTimeSeconds);
-  if (playerProgress) {
-    const pct = (currentTimeSeconds / currentSong.duration) * 100;
-    playerProgress.style.width = `${pct}%`;
-  }
-
-  if (playerDisk) {
-    playerDisk.style.animationPlayState = isPlaying ? 'running' : 'paused';
-  }
-
-  if (playIcon) {
-    if (isPlaying) {
-      playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />';
-    } else {
-      playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3" />';
-    }
-  }
-}
-
-function togglePlayback() {
-  if (localSongQueue.length === 0) {
-    showToast('info', 'Dodajte najpre neku pesmu u red.', 'ℹ️');
-    return;
-  }
-
-  isPlaying = !isPlaying;
-  
-  if (isPlaying) {
-    playbackInterval = setInterval(() => {
-      const currentSong = localSongQueue[currentSongIndex];
-      if (!currentSong) {
-        clearInterval(playbackInterval);
-        isPlaying = false;
-        updatePlayerUI();
-        return;
+        }).join('');
       }
 
-      currentTimeSeconds++;
-      if (currentTimeSeconds >= currentSong.duration) {
-        skipSong();
-      } else {
+      function updatePlayerUI() {
+        const playerTitle = document.getElementById('playerTitle');
+        const playerRequester = document.getElementById('playerRequester');
+        const playerProgress = document.getElementById('playerProgress');
+        const playerCurrentTime = document.getElementById('playerCurrentTime');
+        const playerTotalTime = document.getElementById('playerTotalTime');
+        const playerDisk = document.getElementById('playerDisk');
+        const playerCoverImg = document.getElementById('playerCoverImg');
+        const playerSourceBadge = document.getElementById('playerSourceBadge');
+        const playIcon = document.getElementById('playIcon');
+
+        if (!playerTitle) return;
+
+        const currentSong = localSongQueue[currentSongIndex];
+        if (!currentSong) {
+          playerTitle.textContent = 'Nema pesama u redu';
+          playerRequester.textContent = 'Zatražite pesmu ispod ili u četu';
+          if (playerProgress) playerProgress.style.width = '0%';
+          if (playerCurrentTime) playerCurrentTime.textContent = '0:00';
+          if (playerTotalTime) playerTotalTime.textContent = '0:00';
+          if (playerCoverImg) { playerCoverImg.style.display = 'none'; playerCoverImg.src = ''; }
+          if (playerDisk) { playerDisk.style.display = 'flex'; playerDisk.style.animationPlayState = 'paused'; }
+          if (playerSourceBadge) playerSourceBadge.style.display = 'none';
+          if (playIcon) {
+            playIcon.setAttribute('viewBox', '0 0 24 24');
+            playIcon.style.marginLeft = '2px';
+            playIcon.innerHTML = '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" />';
+          }
+          return;
+        }
+
+        const titleText = currentSong.artist ? `${currentSong.artist} - ${currentSong.title}` : currentSong.title;
+        playerTitle.textContent = titleText;
+        playerRequester.textContent = `Zatražio: ${currentSong.requester}`;
+        if (playerTotalTime) playerTotalTime.textContent = formatDuration(currentSong.duration);
+        if (playerCurrentTime) playerCurrentTime.textContent = formatDuration(currentTimeSeconds);
+        if (playerProgress) {
+          const pct = currentSong.duration > 0 ? (currentTimeSeconds / currentSong.duration) * 100 : 0;
+          playerProgress.style.width = `${pct}%`;
+        }
+
+        if (currentSong.coverUrl && playerCoverImg) {
+          playerCoverImg.src = currentSong.coverUrl;
+          playerCoverImg.style.display = 'block';
+          if (playerDisk) playerDisk.style.display = 'none';
+        } else {
+          if (playerCoverImg) playerCoverImg.style.display = 'none';
+          if (playerDisk) playerDisk.style.display = 'flex';
+        }
+
+        if (playerSourceBadge) {
+          playerSourceBadge.style.display = 'inline-block';
+          playerSourceBadge.textContent = currentSong.source === 'spotify' ? 'Spotify' : 'YouTube';
+          playerSourceBadge.style.background = currentSong.source === 'spotify' ? 'rgba(29, 185, 84, 0.85)' : 'rgba(239, 68, 68, 0.85)';
+        }
+
+        if (playIcon) {
+          playIcon.setAttribute('viewBox', '0 0 24 24');
+          if (isPlaying) {
+            playIcon.style.marginLeft = '0px';
+            playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" fill="currentColor" /><rect x="14" y="4" width="4" height="16" fill="currentColor" />';
+          } else {
+            playIcon.style.marginLeft = '2px';
+            playIcon.innerHTML = '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" />';
+          }
+        }
+      }
+
+      async function togglePlayback() {
+        if (localSongQueue.length === 0) {
+          showToast('info', 'Dodajte najpre neku pesmu u red.', '🎵');
+          return;
+        }
+
+        isPlaying = !isPlaying;
+
+        if (spotifyToken) {
+          try {
+            const endpoint = isPlaying ? 'https://api.spotify.com/v1/me/player/play' : 'https://api.spotify.com/v1/me/player/pause';
+            await fetch(endpoint, {
+              method: 'PUT',
+              headers: { 'Authorization': `Bearer ${spotifyToken}` }
+            });
+          } catch (e) {
+            // Fallback local timer
+          }
+        }
+
+        if (isPlaying) {
+          if (playbackInterval) clearInterval(playbackInterval);
+          playbackInterval = setInterval(() => {
+            const currentSong = localSongQueue[currentSongIndex];
+            if (!currentSong) {
+              clearInterval(playbackInterval);
+              isPlaying = false;
+              updatePlayerUI();
+              return;
+            }
+
+            currentTimeSeconds++;
+            if (currentTimeSeconds >= currentSong.duration) {
+              skipSong();
+            } else {
+              updatePlayerUI();
+            }
+          }, 1000);
+        } else {
+          if (playbackInterval) {
+            clearInterval(playbackInterval);
+          }
+        }
+
+        updatePlayerUI();
+        renderSongQueue();
+      }
+
+      async function skipSong() {
+        if (playbackInterval) {
+          clearInterval(playbackInterval);
+        }
+
+        if (spotifyToken) {
+          try {
+            await fetch('https://api.spotify.com/v1/me/player/next', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${spotifyToken}` }
+            });
+          } catch (e) { }
+        }
+
+        currentTimeSeconds = 0;
+
+        if (localSongQueue.length > 0) {
+          localSongQueue.splice(currentSongIndex, 1);
+          if (currentSongIndex >= localSongQueue.length) {
+            currentSongIndex = 0;
+          }
+        }
+
+        saveSongRequestConfig(true);
+
+        if (localSongQueue.length === 0) {
+          isPlaying = false;
+          showToast('info', 'Završeno puštanje svih pesama iz reda.', '🎵');
+        } else {
+          if (isPlaying) {
+            isPlaying = false;
+            togglePlayback();
+            return;
+          }
+        }
+
+        updatePlayerUI();
+        renderSongQueue();
+      }
+
+      async function previousSong() {
+        if (playbackInterval) clearInterval(playbackInterval);
+        currentTimeSeconds = 0;
+
+        if (spotifyToken) {
+          try {
+            await fetch('https://api.spotify.com/v1/me/player/previous', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${spotifyToken}` }
+            });
+          } catch (e) { }
+        }
+
+        if (currentSongIndex > 0) {
+          currentSongIndex--;
+        } else {
+          currentSongIndex = localSongQueue.length - 1;
+        }
+
+        isPlaying = true;
+        playbackInterval = setInterval(() => {
+          const currentSong = localSongQueue[currentSongIndex];
+          if (!currentSong) {
+            clearInterval(playbackInterval);
+            isPlaying = false;
+            updatePlayerUI();
+            return;
+          }
+          currentTimeSeconds++;
+          if (currentTimeSeconds >= currentSong.duration) {
+            skipSong();
+          } else {
+            updatePlayerUI();
+          }
+        }, 1000);
+
+        updatePlayerUI();
+        renderSongQueue();
+      }
+
+      async function saveSongRequestConfig(silent) {
+        if (!activeChannel) return;
+
+        const masterToggle = document.getElementById('cfgFeatureSongRequestMaster');
+        const songToggle = document.getElementById('cfgSongRequestEnabled');
+        const rankSelect = document.getElementById('cfgSongRequestRank');
+        const costInput = document.getElementById('cfgSongRequestCost');
+        const maxDurationInput = document.getElementById('cfgSongRequestMaxDuration');
+
+        const isMasterEnabled = masterToggle ? masterToggle.checked : true;
+        const isEnabled = songToggle ? songToggle.checked : true;
+
+        const songrequestSettings = {
+          request_role: rankSelect ? rankSelect.value : 'everyone',
+          cost_points: costInput ? parseInt(costInput.value) || 0 : 0,
+          max_duration_seconds: maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360,
+          queue: localSongQueue
+        };
+
+        const { error } = await sb.from('bot_config')
+          .upsert({
+            user_id: getChannelOwnerId(),
+            channel_id: activeChannel.id,
+            channel_name: activeChannel.username,
+            feature_songrequest: isMasterEnabled && isEnabled,
+            songrequest_settings: songrequestSettings,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'channel_id' });
+
+        if (error) {
+          console.error('SongRequest config save error:', error);
+          if (!silent) showToast('error', 'Greška pri čuvanju podešavanja song request-a', '❌');
+          return;
+        }
+
+        if (!silent) {
+          showToast('success', 'Song Request podešavanja uspešno sačuvana!', '✅');
+        }
+
+        notifyBotToReload();
+        updateOverviewModulesUI();
+      }
+
+      async function updateVolume(val) {
+        playerVolume = parseInt(val) || 0;
+        if (spotifyToken) {
+          try {
+            await fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${playerVolume}`, {
+              method: 'PUT',
+              headers: { 'Authorization': `Bearer ${spotifyToken}` }
+            });
+          } catch (e) {
+            // Quiet volume sync error
+          }
+        }
+      }
+
+      function seekPlayer(event) {
+        const currentSong = localSongQueue[currentSongIndex];
+        if (!currentSong) return;
+
+        const progressBar = event.currentTarget;
+        const rect = progressBar.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const width = rect.width;
+        const pct = clickX / width;
+
+        currentTimeSeconds = Math.floor(pct * currentSong.duration);
         updatePlayerUI();
       }
-    }, 1000);
-  } else {
-    if (playbackInterval) {
-      clearInterval(playbackInterval);
-    }
-  }
-  
-  updatePlayerUI();
-  renderSongQueue();
-}
 
-function skipSong() {
-  if (playbackInterval) {
-    clearInterval(playbackInterval);
-  }
+      function requestSong() {
+        const inputEl = document.getElementById('songRequestInput');
+        if (!inputEl) return;
+        const rawInput = inputEl.value ? inputEl.value.trim() : '';
 
-  currentTimeSeconds = 0;
-  
-  if (localSongQueue.length > 0) {
-    // Remove current song from queue (played)
-    localSongQueue.splice(currentSongIndex, 1);
-    
-    // Wrap around or keep index within bounds
-    if (currentSongIndex >= localSongQueue.length) {
-      currentSongIndex = 0;
-    }
-  }
+        if (!rawInput) {
+          showToast('info', 'Molimo unesite naziv pesme ili YouTube / Spotify link.', '🎵');
+          return;
+        }
 
-  // Persist queue change
-  saveBotConfig(true);
+        const maxDurationInput = document.getElementById('cfgSongRequestMaxDuration');
+        const maxDuration = maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360;
 
-  if (localSongQueue.length === 0) {
-    isPlaying = false;
-    showToast('info', 'Završeno puštanje svih pesama.', '🎵');
-  } else {
-    if (isPlaying) {
-      // Re-trigger interval for next song
-      isPlaying = false;
-      togglePlayback();
-      return;
-    }
-  }
+        let title = rawInput;
+        let artist = '';
+        let source = 'custom';
+        let coverUrl = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
+        let duration = Math.min(210, maxDuration);
 
-  updatePlayerUI();
-  renderSongQueue();
-}
+        // Check for YouTube link
+        const ytMatch = rawInput.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+        if (ytMatch && ytMatch[1]) {
+          const videoId = ytMatch[1];
+          source = 'youtube';
+          coverUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+          title = `YouTube Track (${videoId})`;
+        } else if (rawInput.includes('spotify.com/track/')) {
+          source = 'spotify';
+          coverUrl = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&auto=format&fit=crop&q=80';
+          const parts = rawInput.split('track/')[1];
+          const trackId = parts ? parts.split('?')[0] : '';
+          title = trackId ? `Spotify Track (${trackId})` : rawInput;
+        } else {
+          // Plain text song input: try to split artist and title if '-' present
+          if (rawInput.includes(' - ')) {
+            const parts = rawInput.split(' - ');
+            artist = parts[0].trim();
+            title = parts.slice(1).join(' - ').trim();
+          }
+        }
 
-function requestSong() {
-  const input = document.getElementById('songRequestInput');
-  if (!input) return;
+        const requesterName = (activeChannel && activeChannel.username) ? `Strimer (${activeChannel.username})` : 'Strimer';
 
-  const value = input.value.trim();
-  if (!value) {
-    showToast('error', 'Molimo unesite YouTube link ili naziv pesme.', '⚠️');
-    return;
-  }
+        const newSong = {
+          id: 's_' + Date.now(),
+          title: title,
+          artist: artist,
+          requester: requesterName,
+          duration: duration,
+          source: source,
+          coverUrl: coverUrl
+        };
 
-  // Create mock requested song
-  let newSongTitle = value;
-  if (value.startsWith('http://') || value.startsWith('https://')) {
-    newSongTitle = 'YouTube Muzika - ' + value.split('v=')[1]?.substring(0, 8) || 'Pesma iz linka';
-  }
+        localSongQueue.push(newSong);
+        inputEl.value = '';
 
-  const duration = Math.floor(Math.random() * (300 - 120 + 1)) + 120; // 2 to 5 minutes random
-  
-  const requester = activeChannel ? `Broadcaster (${activeChannel.username})` : 'Strimer';
-  
-  localSongQueue.push({
-    title: newSongTitle,
-    requester: requester,
-    duration: duration
-  });
+        renderSongQueue();
+        updatePlayerUI();
+        saveSongRequestConfig(true);
 
-  // Save to DB
-  saveBotConfig(true);
+        showToast('success', `Pesma "${title}" je uspešno dodata u red!`, '🎵');
+      }
 
-  input.value = '';
-  showToast('success', 'Pesma uspešno dodata u red za puštanje!', '✅');
+      function removeSong(index) {
+        if (index < 0 || index >= localSongQueue.length) return;
 
-  renderSongQueue();
-  updatePlayerUI();
-}
+        const removed = localSongQueue.splice(index, 1)[0];
 
-function removeSong(index) {
-  const isActive = index === currentSongIndex;
-  
-  localSongQueue.splice(index, 1);
+        if (currentSongIndex >= localSongQueue.length) {
+          currentSongIndex = Math.max(0, localSongQueue.length - 1);
+        }
 
-  if (isActive) {
-    if (playbackInterval) {
-      clearInterval(playbackInterval);
-    }
-    currentTimeSeconds = 0;
-    isPlaying = false;
-  } else if (index < currentSongIndex) {
-    currentSongIndex--;
-  }
+        if (localSongQueue.length === 0) {
+          isPlaying = false;
+          if (playbackInterval) clearInterval(playbackInterval);
+          currentTimeSeconds = 0;
+        }
 
-  // Save to DB
-  saveBotConfig(true);
+        renderSongQueue();
+        updatePlayerUI();
+        saveSongRequestConfig(true);
 
-  if (localSongQueue.length === 0) {
-    isPlaying = false;
-  } else if (currentSongIndex >= localSongQueue.length) {
-    currentSongIndex = 0;
-  }
+        showToast('info', `Pesma "${removed ? removed.title : ''}" je uklonjena iz reda.`, '🗑️');
+      }
 
-  showToast('success', 'Pesma je uklonjena iz reda.', '🗑️');
-  renderSongQueue();
-  updatePlayerUI();
-}
+      function clearSongQueue() {
+        if (localSongQueue.length === 0) {
+          showToast('info', 'Red sa pesmama je već prazan.', 'ℹ️');
+          return;
+        }
 
-function updateVolume(val) {
-  playerVolume = val;
-  // Simulated volume adjust
-}
+        localSongQueue = [];
+        currentSongIndex = 0;
+        currentTimeSeconds = 0;
+        if (isPlaying) {
+          isPlaying = false;
+          if (playbackInterval) clearInterval(playbackInterval);
+        }
 
-function seekPlayer(event) {
-  const currentSong = localSongQueue[currentSongIndex];
-  if (!currentSong) return;
+        renderSongQueue();
+        updatePlayerUI();
+        saveSongRequestConfig(true);
 
-  const progressBar = event.currentTarget;
-  const rect = progressBar.getBoundingClientRect();
-  const clickX = event.clientX - rect.left;
-  const width = rect.width;
-  const pct = clickX / width;
-  
-  currentTimeSeconds = Math.floor(pct * currentSong.duration);
-  updatePlayerUI();
-}
+        showToast('info', 'Red sa pesmama je uspešno očišćen.', '🧹');
+      }
 
-// Initial rendering of notification content on page load
-window.addEventListener('DOMContentLoaded', () => {
-  // Hide notification badge if there are no unread notifications on start
-  const hasUnread = notifications.some(n => !n.read);
-  const badge = document.getElementById('notifBadge');
-  if (badge) {
-    badge.style.display = hasUnread ? 'block' : 'none';
-  }
-  renderNotifContent();
-  renderSongQueue();
-  updatePlayerUI();
-});
+      function playSongNow(index) {
+        if (index < 0 || index >= localSongQueue.length) return;
 
-// ═════════════════════════════════════════════════════════════
-// ─── EKONOMIJA, NIVOI & PRODAVNICA ───────────────────────────
-// ═════════════════════════════════════════════════════════════
+        currentSongIndex = index;
+        currentTimeSeconds = 0;
+        isPlaying = true;
 
-let currentEconomyTab = 'config';
+        if (playbackInterval) clearInterval(playbackInterval);
+        playbackInterval = setInterval(() => {
+          const currentSong = localSongQueue[currentSongIndex];
+          if (!currentSong) {
+            clearInterval(playbackInterval);
+            isPlaying = false;
+            updatePlayerUI();
+            return;
+          }
 
-function switchEconomyTab(tab) {
-  currentEconomyTab = tab;
-  document.querySelectorAll('.eco-subpanel').forEach(el => el.style.display = 'none');
-  
-  const targetSub = document.getElementById(`ecoSubPanel${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
-  if (targetSub) targetSub.style.display = 'block';
+          currentTimeSeconds++;
+          if (currentTimeSeconds >= currentSong.duration) {
+            skipSong();
+          } else {
+            updatePlayerUI();
+          }
+        }, 1000);
 
-  ['Config', 'Gambling', 'Store', 'Leaderboard'].forEach(t => {
-    const btn = document.getElementById(`ecoTabBtn${t}`);
-    if (btn) {
-      btn.className = t.toLowerCase() === tab ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
-    }
-  });
+        updatePlayerUI();
+        renderSongQueue();
+        saveSongRequestConfig(true);
+      }
 
-  if (tab === 'store') {
-    renderStoreItems();
-    renderStoreRedemptions();
-  } else if (tab === 'leaderboard') {
-    renderEconomyLeaderboard();
-  }
-}
+      // Bind handlers globally to window for HTML event availability
+      window.requestSong = requestSong;
+      window.removeSong = removeSong;
+      window.clearSongQueue = clearSongQueue;
+      window.playSongNow = playSongNow;
+      window.togglePlayback = togglePlayback;
+      window.skipSong = skipSong;
+      window.previousSong = previousSong;
+      window.updateVolume = updateVolume;
+      window.seekPlayer = seekPlayer;
+      window.saveSongRequestConfig = saveSongRequestConfig;
+      window.connectSpotifyAccount = connectSpotifyAccount;
+      window.disconnectSpotifyAccount = disconnectSpotifyAccount;
+      window.switchEconomyTab = switchEconomyTab;
+      window.updateEconomyPreviews = updateEconomyPreviews;
+      window.saveEconomyConfig = saveEconomyConfig;
+      window.saveMinigamesConfig = saveMinigamesConfig;
+      window.runSimulatedGame = runSimulatedGame;
+      window.openCreateStoreItemModal = openCreateStoreItemModal;
+      window.saveStoreItem = saveStoreItem;
+      window.editStoreItem = editStoreItem;
+      window.deleteStoreItem = deleteStoreItem;
+      window.simulirajKupovinuArtikla = simulirajKupovinuArtikla;
+      window.approveRedemption = approveRedemption;
+      window.rejectRedemption = rejectRedemption;
+      window.renderEconomyLeaderboard = renderEconomyLeaderboard;
+      window.openEditUserPointsModal = openEditUserPointsModal;
+      window.divorceConfirm = divorceConfirm;
+      window.toggleModuleFromOverview = toggleModuleFromOverview;
+      window.handleCustomBotNameInput = handleCustomBotNameInput;
+      window.copyCustomBotModCmd = copyCustomBotModCmd;
+      window.promptCustomBotAuthModal = promptCustomBotAuthModal;
+      window.confirmCustomBotAuth = confirmCustomBotAuth;
+      window.disconnectCustomBot = disconnectCustomBot;
+      window.updateCustomBotStatusUI = updateCustomBotStatusUI;
+      window.getBotSenderIdentity = getBotSenderIdentity;
 
-function updateEconomyPreviews() {
-  const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'KickCoins';
-  const firstJoin = parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100;
-  const watchPoints = parseInt(document.getElementById('cfgPointsPerWatchtime')?.value, 10) || 20;
-  const subMult = parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0;
-  const pSub = parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000;
-  const pGift = parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000;
-  const pKicks = parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500;
-  const pStreak = parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150;
+      // Initial rendering of notification content on page load
+      window.addEventListener('DOMContentLoaded', () => {
+        // Hide notification badge if there are no unread notifications on start
+        const hasUnread = notifications.some(n => !n.read);
+        const badge = document.getElementById('notifBadge');
+        updateNotifBadgeUI();
+        renderNotifContent();
+        renderSongQueue();
+        updatePlayerUI();
+      });
 
-  if (document.getElementById('previewFirstJoin')) document.getElementById('previewFirstJoin').innerText = `+${firstJoin.toLocaleString()} ${valuta}`;
-  if (document.getElementById('previewWatchtime')) document.getElementById('previewWatchtime').innerText = `+${watchPoints.toLocaleString()} ${valuta}`;
-  if (document.getElementById('previewSubMult')) document.getElementById('previewSubMult').innerText = `${subMult.toFixed(1)}x Bonus`;
-  if (document.getElementById('previewSubBonus')) document.getElementById('previewSubBonus').innerText = `+${pSub.toLocaleString()} / +${pGift.toLocaleString()}`;
-  if (document.getElementById('previewKicksBonus')) document.getElementById('previewKicksBonus').innerText = `+${pKicks.toLocaleString()} ${valuta}`;
-  if (document.getElementById('previewDailyStreak')) document.getElementById('previewDailyStreak').innerText = `+${pStreak.toLocaleString()} ${valuta}/dan`;
-}
 
-function loadEconomyPanelData() {
-  if (currentChannelConfig) {
-    document.getElementById('cfgCurrencyName').value = currentChannelConfig.currency_name || 'KickCoins';
-    document.getElementById('cfgXpPerMsg').value = currentChannelConfig.xp_per_msg !== undefined ? currentChannelConfig.xp_per_msg : 15;
-    document.getElementById('cfgPointsPerMsg').value = currentChannelConfig.points_per_msg !== undefined ? currentChannelConfig.points_per_msg : 5;
-    document.getElementById('cfgXpPerWatchtime').value = currentChannelConfig.xp_per_watchtime !== undefined ? currentChannelConfig.xp_per_watchtime : 50;
-    document.getElementById('cfgPointsPerWatchtime').value = currentChannelConfig.points_per_watchtime !== undefined ? currentChannelConfig.points_per_watchtime : 20;
-    document.getElementById('cfgLevelUpAnnounce').checked = currentChannelConfig.level_up_announce !== false;
-    document.getElementById('cfgGambleEnabled').checked = currentChannelConfig.gamble_enabled !== false;
-    document.getElementById('cfgMaxGambleAmount').value = currentChannelConfig.max_gamble_amount || 5000;
+      // ── Economy & Ranking System Logic ──
+      function switchEconomyTab(tabName) {
+        const configTab = document.getElementById('ecoSubPanelConfig');
+        const storeTab = document.getElementById('ecoSubPanelStore');
+        const lbTab = document.getElementById('ecoSubPanelLeaderboard');
 
-    if (document.getElementById('cfgFirstInteractionBonus')) document.getElementById('cfgFirstInteractionBonus').value = currentChannelConfig.first_interaction_bonus !== undefined ? currentChannelConfig.first_interaction_bonus : 100;
-    if (document.getElementById('cfgSubMultiplier')) document.getElementById('cfgSubMultiplier').value = currentChannelConfig.sub_multiplier !== undefined ? currentChannelConfig.sub_multiplier : 2.0;
-    if (document.getElementById('cfgSubBonusPerMsg')) document.getElementById('cfgSubBonusPerMsg').value = currentChannelConfig.sub_bonus_per_msg !== undefined ? currentChannelConfig.sub_bonus_per_msg : 10;
-    if (document.getElementById('cfgPointsPerSub')) document.getElementById('cfgPointsPerSub').value = currentChannelConfig.points_per_sub !== undefined ? currentChannelConfig.points_per_sub : 1000;
-    if (document.getElementById('cfgPointsPerGiftSub')) document.getElementById('cfgPointsPerGiftSub').value = currentChannelConfig.points_per_gift_sub !== undefined ? currentChannelConfig.points_per_gift_sub : 2000;
-    if (document.getElementById('cfgPointsPer100Kicks')) document.getElementById('cfgPointsPer100Kicks').value = currentChannelConfig.points_per_100_kicks !== undefined ? currentChannelConfig.points_per_100_kicks : 500;
-    if (document.getElementById('cfgPointsDailyStreak')) document.getElementById('cfgPointsDailyStreak').value = currentChannelConfig.points_daily_streak !== undefined ? currentChannelConfig.points_daily_streak : 150;
-    if (document.getElementById('cfgPointsPerRaid')) document.getElementById('cfgPointsPerRaid').value = currentChannelConfig.points_per_raid !== undefined ? currentChannelConfig.points_per_raid : 300;
-    if (document.getElementById('cfgSmartChatValidation')) document.getElementById('cfgSmartChatValidation').checked = currentChannelConfig.smart_chat_validation !== false;
-  }
-  updateEconomyPreviews();
-  renderStoreItems();
-  renderStoreRedemptions();
-  renderEconomyLeaderboard();
+        const btnConfig = document.getElementById('ecoTabBtnConfig');
+        const btnStore = document.getElementById('ecoTabBtnStore');
+        const btnLb = document.getElementById('ecoTabBtnLeaderboard');
 
-  // Attach event listeners for real-time preview updates
-  ['cfgCurrencyName', 'cfgFirstInteractionBonus', 'cfgPointsPerWatchtime', 'cfgSubMultiplier', 'cfgPointsPerSub', 'cfgPointsPerGiftSub', 'cfgPointsPer100Kicks', 'cfgPointsDailyStreak'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.oninput = updateEconomyPreviews;
-  });
-}
+        if (configTab) configTab.style.display = tabName === 'config' ? 'block' : 'none';
+        if (storeTab) storeTab.style.display = tabName === 'store' ? 'block' : 'none';
+        if (lbTab) lbTab.style.display = tabName === 'leaderboard' ? 'block' : 'none';
 
-async function saveBotConfigFields(payload) {
-  if (!activeChannel) return { error: 'Nema aktivnog kanala' };
+        if (btnConfig) btnConfig.className = 'btn btn-sm ' + (tabName === 'config' ? 'btn-primary' : 'btn-outline');
+        if (btnStore) btnStore.className = 'btn btn-sm ' + (tabName === 'store' ? 'btn-primary' : 'btn-outline');
+        if (btnLb) btnLb.className = 'btn btn-sm ' + (tabName === 'leaderboard' ? 'btn-primary' : 'btn-outline');
 
-  const fullPayload = {
-    channel_id: String(activeChannel.id),
-    updated_at: new Date().toISOString(),
-    ...payload
-  };
+        if (tabName === 'store') {
+          renderStoreItems();
+          renderStoreRedemptions();
+        } else if (tabName === 'leaderboard') {
+          renderEconomyLeaderboard();
+        }
+      }
 
-  if (activeChannel.user_id) fullPayload.user_id = activeChannel.user_id;
-  if (activeChannel.channel_name || activeChannel.name) fullPayload.channel_name = activeChannel.channel_name || activeChannel.name;
+      function updateEconomyPreviews() {
+        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+        const firstJoin = parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100;
+        const watchtime = parseInt(document.getElementById('cfgPointsPerWatchtime')?.value, 10) || 20;
+        const subMult = parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0;
+        const perSub = parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000;
+        const perGiftSub = parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000;
+        const perKicks = parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500;
+        const dailyStreak = parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150;
 
-  return await sb.from('bot_config').upsert(fullPayload, { onConflict: 'channel_id' });
-}
+        const pFirst = document.getElementById('previewFirstJoin');
+        const pWatch = document.getElementById('previewWatchtime');
+        const pSubMult = document.getElementById('previewSubMult');
+        const pSubBonus = document.getElementById('previewSubBonus');
+        const pKicks = document.getElementById('previewKicksBonus');
+        const pStreak = document.getElementById('previewDailyStreak');
 
-async function saveEconomyConfig() {
-  if (!activeChannel) return;
+        if (pFirst) pFirst.textContent = `+${firstJoin.toLocaleString()} ${valuta}`;
+        if (pWatch) pWatch.textContent = `+${watchtime.toLocaleString()} ${valuta}`;
+        if (pSubMult) pSubMult.textContent = `${subMult.toFixed(1)}x Bonus`;
+        if (pSubBonus) pSubBonus.textContent = `+${perSub.toLocaleString()} / +${perGiftSub.toLocaleString()}`;
+        if (pKicks) pKicks.textContent = `+${perKicks.toLocaleString()} ${valuta}`;
+        if (pStreak) pStreak.textContent = `+${dailyStreak.toLocaleString()} ${valuta}/dan`;
+      }
 
-  const payload = {
-    currency_name: document.getElementById('cfgCurrencyName').value.trim() || 'KickCoins',
-    xp_per_msg: parseInt(document.getElementById('cfgXpPerMsg').value, 10) || 15,
-    points_per_msg: parseInt(document.getElementById('cfgPointsPerMsg').value, 10) || 5,
-    xp_per_watchtime: parseInt(document.getElementById('cfgXpPerWatchtime').value, 10) || 50,
-    points_per_watchtime: parseInt(document.getElementById('cfgPointsPerWatchtime').value, 10) || 20,
-    level_up_announce: document.getElementById('cfgLevelUpAnnounce').checked,
-    gamble_enabled: document.getElementById('cfgGambleEnabled').checked,
-    max_gamble_amount: parseInt(document.getElementById('cfgMaxGambleAmount').value, 10) || 5000,
-    first_interaction_bonus: parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100,
-    sub_multiplier: parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0,
-    sub_bonus_per_msg: parseInt(document.getElementById('cfgSubBonusPerMsg')?.value, 10) || 10,
-    points_per_sub: parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000,
-    points_per_gift_sub: parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000,
-    points_per_100_kicks: parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500,
-    points_daily_streak: parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150,
-    points_per_raid: parseInt(document.getElementById('cfgPointsPerRaid')?.value, 10) || 300,
-    smart_chat_validation: document.getElementById('cfgSmartChatValidation')?.checked !== false
-  };
+      async function saveEconomyConfig(silent = false) {
+        if (!activeChannel) return;
 
-  const { error } = await saveBotConfigFields(payload);
+        const ecoSettings = {
+          currency_name: document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins',
+          points_per_msg: parseInt(document.getElementById('cfgPointsPerMsg')?.value, 10) || 5,
+          smart_chat_validation: document.getElementById('cfgSmartChatValidation')?.checked ?? true,
+          first_interaction_bonus: parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100,
+          points_per_watchtime: parseInt(document.getElementById('cfgPointsPerWatchtime')?.value, 10) || 20,
+          level_up_announce: document.getElementById('cfgLevelUpAnnounce')?.checked ?? true,
+          sub_multiplier: parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0,
+          sub_bonus_per_msg: parseInt(document.getElementById('cfgSubBonusPerMsg')?.value, 10) || 10,
+          points_per_sub: parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000,
+          points_per_gift_sub: parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000,
+          points_per_100_kicks: parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500,
+          points_daily_streak: parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150,
+          points_per_raid: parseInt(document.getElementById('cfgPointsPerRaid')?.value, 10) || 300,
+          gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
+          max_gamble_amount: parseInt(document.getElementById('cfgMaxGambleAmount')?.value, 10) || 5000
+        };
 
-  if (error) {
-    showToast('Greška pri čuvanju podešavanja ekonomije!', 'error');
-    console.error(error);
-  } else {
-    showToast('Podešavanja ekonomije i Ranking sistema su uspešno sačuvana!', 'success');
-    if (currentChannelConfig) Object.assign(currentChannelConfig, payload);
-    updateEconomyPreviews();
-  }
-}
+        if (!currentChannelConfig) currentChannelConfig = {};
+        currentChannelConfig.currency_name = ecoSettings.currency_name;
+        currentChannelConfig.economy_settings = ecoSettings;
 
-async function saveMinigamesConfig() {
-  if (!activeChannel) return;
+        const { error } = await saveBotConfigFields({ economy_settings: ecoSettings });
 
-  const payload = {
-    gamble_enabled: document.getElementById('cfgMinigamesEnabled').checked,
-    max_gamble_amount: parseInt(document.getElementById('cfgMinigamesMaxBet').value, 10) || 5000
-  };
+        if (error) {
+          if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ranking sistema!');
+        } else {
+          if (!silent) showToast('success', 'Podešavanja ranking sistema su uspešno sačuvana!');
+        }
 
-  const { error } = await saveBotConfigFields(payload);
+        updateEconomyPreviews();
+      }
 
-  if (error) {
-    showToast('Greška pri čuvanju podešavanja mini igara!', 'error');
-  } else {
-    showToast('Podešavanja mini igara su uspešno sačuvana!', 'success');
-    if (currentChannelConfig) Object.assign(currentChannelConfig, payload);
-  }
-}
+      async function saveMinigamesConfig() {
+        if (!activeChannel) return;
 
-function runSimulatedGame() {
-  const type = document.getElementById('simGameType').value;
-  const bet = parseInt(document.getElementById('simBetAmount').value, 10) || 100;
-  const resEl = document.getElementById('simGameResult');
-  const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
+        const payload = {
+          user_id: getChannelOwnerId(),
+          channel_id: activeChannel.id,
+          channel_name: activeChannel.username,
+          gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
+          max_gamble_amount: parseInt(document.getElementById('cfgMinigamesMaxBet')?.value, 10) || 5000,
+          updated_at: new Date().toISOString()
+        };
 
-  if (!resEl) return;
+        const { error } = await sb.from('bot_config').upsert(payload, { onConflict: 'channel_id' });
 
-  if (type === 'slots') {
-    const simboli = ['🍒', '🍋', '🔔', '🍇', '💎', '🎰'];
-    const s1 = simboli[Math.floor(Math.random() * simboli.length)];
-    const s2 = simboli[Math.floor(Math.random() * simboli.length)];
-    const s3 = simboli[Math.floor(Math.random() * simboli.length)];
+        if (error) {
+          showToast('error', 'Greška pri čuvanju podešavanja mini igara!');
+        } else {
+          showToast('success', 'Podešavanja mini igara su uspešno sačuvana!');
+        }
+      }
 
-    let resText = `🎰 <strong>@Strimer</strong> je zavrteo slot: [ ${s1} | ${s2} | ${s3} ] — `;
-    if (s1 === s2 && s2 === s3) {
-      if (s1 === '🎰' || s1 === '💎') resText += `<span style="color:#53fc18;">💎🔥 <strong>JACKPOT 50x!</strong> Osvojio si +${(bet * 50).toLocaleString()} ${valuta}! 🔥💎</span>`;
-      else resText += `<span style="color:#53fc18;">🎉 <strong>3 u nizu 10x!</strong> Osvojio si +${(bet * 10).toLocaleString()} ${valuta}!</span>`;
-    } else if (s1 === s2 || s2 === s3 || s1 === s3) {
-      resText += `<span style="color:#eab308;">✨ <strong>2 u nizu 2x!</strong> Vraćeno +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
-    } else {
-      resText += `<span style="color:#ef4444;">❌ Nisi pogodio kombo! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
-    }
-    resEl.innerHTML = resText;
-  } else if (type === 'roulette') {
-    const loptica = Math.floor(Math.random() * 37);
-    const crveniBrojevi = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
-    const boja = loptica === 0 ? 'zelena 💚' : (crveniBrojevi.includes(loptica) ? 'crvena ❤️' : 'crna 🖤');
-    resEl.innerHTML = `🎡 Loptica je pala na <strong>${loptica} (${boja})</strong>! <span style="color:#53fc18;">Dobitak: +${(bet * 2).toLocaleString()} ${valuta} (2x ako ste kladili na boju) / +${(bet * 36).toLocaleString()} ${valuta} (36x ako je tačan broj)!</span>`;
-  } else if (type === 'coinflip') {
-    const ishod = Math.random() < 0.5 ? 'PISMO' : 'GLAVA';
-    const isWin = Math.random() < 0.5;
-    if (isWin) {
-      resEl.innerHTML = `🪙 Novčić je pao na <strong>${ishod}</strong>! <span style="color:#53fc18;">Pogodak! Osvojio si +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
-    } else {
-      resEl.innerHTML = `🪙 Novčić je pao na <strong>${ishod}</strong>! <span style="color:#ef4444;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
-    }
-  } else if (type === 'wheel') {
-    const mults = [0, 0.5, 1.5, 2, 3, 5];
-    const m = mults[Math.floor(Math.random() * mults.length)];
-    const win = Math.floor(bet * m);
-    if (m >= 1) {
-      resEl.innerHTML = `🎯 Točak sreće staje na <strong>${m}x</strong>! <span style="color:#53fc18;">Osvojio si +${win.toLocaleString()} ${valuta}!</span>`;
-    } else {
-      resEl.innerHTML = `🎯 Točak sreće staje na <strong>${m}x</strong>! <span style="color:#ef4444;">Vraćeno samo ${win.toLocaleString()} ${valuta}.</span>`;
-    }
-  }
-}
+      function runSimulatedGame() {
+        const type = document.getElementById('simGameType')?.value || 'slots';
+        const bet = parseInt(document.getElementById('simBetAmount')?.value, 10) || 100;
+        const resEl = document.getElementById('simGameResult');
+        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
 
-// ── Store Items & Purchase History CRUD ──
-let currentRedemptionsFilter = 'all';
+        if (!resEl) return;
 
-function getIconSVG(iconStr) {
-  const str = (iconStr || '').toLowerCase();
-  if (str.includes('vip') || str.includes('⭐') || str.includes('star')) {
-    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-  }
-  if (str.includes('song') || str.includes('pesma') || str.includes('🎵') || str.includes('music')) {
-    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
-  }
-  if (str.includes('voda') || str.includes('water') || str.includes('💧')) {
-    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
-  }
-  return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`;
-}
+        if (type === 'slots') {
+          const simboli = ['🍒', '🍋', '🔔', '🍇', '💎', '🎰'];
+          const s1 = simboli[Math.floor(Math.random() * simboli.length)];
+          const s2 = simboli[Math.floor(Math.random() * simboli.length)];
+          const s3 = simboli[Math.floor(Math.random() * simboli.length)];
 
-function getStoreItems() {
-  return (currentChannelConfig && currentChannelConfig.store_items) ? currentChannelConfig.store_items : [
-    { id: 'item_1', name: 'VIP Rola u četu', description: 'Specijalan status i ikonica u četu', cost: 1000, icon: 'vip', stock: -1, min_rank: 'everyone', auto_approve: false },
-    { id: 'item_2', name: 'Naruči Pesmu (Priority SR)', description: 'Pesma po tvom izboru se pušta odmah sledeća', cost: 300, icon: 'song', stock: -1, min_rank: 'everyone', auto_approve: true },
-    { id: 'item_3', name: 'Voda Challenge za strimera', description: 'Strimer mora popiti čašu vode na strimu', cost: 500, icon: 'water', stock: -1, min_rank: 'everyone', auto_approve: false }
-  ];
-}
+          let resText = `<strong>@Strimer</strong> je zavrteo slot: ${s1} ${s2} ${s3} — `;
+          if (s1 === s2 && s2 === s3) {
+            if (s1 === '🎰' || s1 === '💎') resText += `<span style="color:#53fc18;"><strong>JACKPOT 50x!</strong> Osvojio si +${(bet * 50).toLocaleString()} ${valuta}!</span>`;
+            else resText += `<span style="color:#53fc18;"><strong>3 u nizu 10x!</strong> Osvojio si +${(bet * 10).toLocaleString()} ${valuta}!</span>`;
+          } else if (s1 === s2 || s2 === s3 || s1 === s3) {
+            resText += `<span style="color:#eab308;"><strong>2 u nizu 2x!</strong> Vraćeno +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
+          } else {
+            resText += `<span style="color:#ef4444;">Nisi pogodio kombo! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
+          }
+          resEl.innerHTML = resText;
+        } else if (type === 'roulette') {
+          const loptica = Math.floor(Math.random() * 37);
+          const crveniBrojevi = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+          const boja = loptica === 0 ? 'zelena' : (crveniBrojevi.includes(loptica) ? 'crvena' : 'crna');
+          resEl.innerHTML = `Loptica je pala na broj <strong>${loptica}</strong> (${boja})! <span style="color:#53fc18;">Dobitak: +${(bet * 2).toLocaleString()} ${valuta} za boju ili +${(bet * 36).toLocaleString()} ${valuta} za tačan broj!</span>`;
+        } else if (type === 'coinflip') {
+          const ishod = Math.random() < 0.5 ? 'PISMO' : 'GLAVA';
+          const isWin = Math.random() < 0.5;
+          if (isWin) {
+            resEl.innerHTML = `Novčić je pao na <strong>${ishod}</strong>! <span style="color:#53fc18;">Pogodak! Osvojio si +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
+          } else {
+            resEl.innerHTML = `Novčić je pao na <strong>${ishod}</strong>! <span style="color:#ef4444;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
+          }
+        } else if (type === 'wheel') {
+          const mults = [0, 0.5, 1.5, 2, 3, 5];
+          const m = mults[Math.floor(Math.random() * mults.length)];
+          const win = Math.floor(bet * m);
+          if (m >= 1) {
+            resEl.innerHTML = `Točak sreće staje na <strong>${m}x</strong>! <span style="color:#53fc18;">Osvojio si +${win.toLocaleString()} ${valuta}!</span>`;
+          } else {
+            resEl.innerHTML = `Točak sreće staje na <strong>${m}x</strong>! <span style="color:#ef4444;">Vraćeno samo ${win.toLocaleString()} ${valuta}.</span>`;
+          }
+        }
+      }
 
-function renderStoreItems() {
-  const container = document.getElementById('storeItemsGrid');
-  const simSelect = document.getElementById('simStoreItemSelect');
-  if (!container) return;
+      // ── Store Items & Purchase History CRUD ──
+      let currentRedemptionsFilter = 'all';
 
-  const items = getStoreItems();
-  const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
+      function getIconSVG(iconStr) {
+        const str = (iconStr || '').toLowerCase();
+        if (str.includes('vip') || str.includes('⭐') || str.includes('star')) {
+          return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+        }
+        if (str.includes('song') || str.includes('pesma') || str.includes('🎵') || str.includes('music')) {
+          return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+        }
+        if (str.includes('voda') || str.includes('water') || str.includes('💧')) {
+          return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
+        }
+        return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`;
+      }
 
-  if (simSelect) {
-    simSelect.innerHTML = items.map(i => `<option value="${i.id}">${i.name} (${i.cost} ${valuta})</option>`).join('');
-  }
+      function getStoreItems() {
+        return (currentChannelConfig && currentChannelConfig.store_items) ? currentChannelConfig.store_items : [
+          { id: 'item_1', name: 'VIP Rola u četu', description: 'Specijalan status i ikonica u četu', cost: 1000, icon: 'vip', stock: -1, min_rank: 'everyone', auto_approve: false },
+          { id: 'item_2', name: 'Naruči Pesmu (Priority SR)', description: 'Pesma po tvom izboru se pušta odmah sledeća', cost: 300, icon: 'song', stock: -1, min_rank: 'everyone', auto_approve: true },
+          { id: 'item_3', name: 'Voda Challenge za strimera', description: 'Strimer mora popiti čašu vode na strimu', cost: 500, icon: 'water', stock: -1, min_rank: 'everyone', auto_approve: false }
+        ];
+      }
 
-  if (items.length === 0) {
-    container.innerHTML = `<div style="grid-column:1/-1; color:var(--text-muted); text-align:center; padding:20px;">Nema artikala u prodavnici. Klikni na "+ Dodaj novi artikal".</div>`;
-    return;
-  }
+      function renderStoreItems() {
+        const container = document.getElementById('storeItemsGrid');
+        const simSelect = document.getElementById('simStoreItemSelect');
+        if (!container) return;
 
-  container.innerHTML = items.map(item => {
-    const stockStr = (item.stock === undefined || item.stock < 0) ? 'Neograničeno' : `${item.stock} kom.`;
-    const rankStr = (item.min_rank === 'subscriber') ? 'Samo Subs' : (item.min_rank === 'vip' ? 'VIP+' : (item.min_rank === 'moderator' ? 'Samo Mods' : 'Svi'));
+        const items = getStoreItems();
+        const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
 
-    return `
+        if (simSelect) {
+          simSelect.innerHTML = items.map(i => `<option value="${i.id}">${i.name} (${i.cost} ${valuta})</option>`).join('');
+        }
+
+        if (items.length === 0) {
+          container.innerHTML = `<div style="grid-column:1/-1; color:var(--text-muted); text-align:center; padding:20px;">Nema artikala u prodavnici. Klikni na "+ Dodaj novi artikal".</div>`;
+          return;
+        }
+
+        container.innerHTML = items.map(item => {
+          const stockStr = (item.stock === undefined || item.stock < 0) ? 'Neograničeno' : `${item.stock} kom.`;
+          const rankStr = (item.min_rank === 'subscriber') ? 'Samo Subs' : (item.min_rank === 'vip' ? 'VIP+' : (item.min_rank === 'moderator' ? 'Samo Mods' : 'Svi'));
+
+          return `
       <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:16px; display:flex; flex-direction:column; justify-content:space-between; position:relative;">
         <div>
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
@@ -5200,146 +6312,146 @@ function renderStoreItems() {
         </div>
       </div>
     `;
-  }).join('');
-}
+        }).join('');
+      }
 
-function openCreateStoreItemModal() {
-  document.getElementById('storeItemModalTitle').innerText = 'Novi Artikal u Prodavnici';
-  document.getElementById('storeItemEditId').value = '';
-  document.getElementById('storeItemName').value = '';
-  document.getElementById('storeItemDesc').value = '';
-  document.getElementById('storeItemCost').value = '500';
-  document.getElementById('storeItemStock').value = '-1';
-  document.getElementById('storeItemRank').value = 'everyone';
-  document.getElementById('storeItemIcon').value = 'vip';
-  document.getElementById('storeItemAutoApprove').checked = false;
-  openModal('storeItemModal');
-}
+      function openCreateStoreItemModal() {
+        document.getElementById('storeItemModalTitle').innerText = 'Novi Artikal u Prodavnici';
+        document.getElementById('storeItemEditId').value = '';
+        document.getElementById('storeItemName').value = '';
+        document.getElementById('storeItemDesc').value = '';
+        document.getElementById('storeItemCost').value = '500';
+        document.getElementById('storeItemStock').value = '-1';
+        document.getElementById('storeItemRank').value = 'everyone';
+        document.getElementById('storeItemIcon').value = 'vip';
+        document.getElementById('storeItemAutoApprove').checked = false;
+        openModal('storeItemModal');
+      }
 
-function editStoreItem(id) {
-  const items = getStoreItems();
-  const item = items.find(i => i.id === id);
-  if (!item) return;
+      function editStoreItem(id) {
+        const items = getStoreItems();
+        const item = items.find(i => i.id === id);
+        if (!item) return;
 
-  document.getElementById('storeItemModalTitle').innerText = 'Izmena Artikla Prodavnice';
-  document.getElementById('storeItemEditId').value = item.id;
-  document.getElementById('storeItemName').value = item.name;
-  document.getElementById('storeItemDesc').value = item.description || '';
-  document.getElementById('storeItemCost').value = item.cost || 500;
-  document.getElementById('storeItemStock').value = item.stock !== undefined ? item.stock : -1;
-  document.getElementById('storeItemRank').value = item.min_rank || 'everyone';
-  document.getElementById('storeItemIcon').value = item.icon || 'vip';
-  document.getElementById('storeItemAutoApprove').checked = item.auto_approve === true;
-  openModal('storeItemModal');
-}
+        document.getElementById('storeItemModalTitle').innerText = 'Izmena Artikla Prodavnice';
+        document.getElementById('storeItemEditId').value = item.id;
+        document.getElementById('storeItemName').value = item.name;
+        document.getElementById('storeItemDesc').value = item.description || '';
+        document.getElementById('storeItemCost').value = item.cost || 500;
+        document.getElementById('storeItemStock').value = item.stock !== undefined ? item.stock : -1;
+        document.getElementById('storeItemRank').value = item.min_rank || 'everyone';
+        document.getElementById('storeItemIcon').value = item.icon || 'vip';
+        document.getElementById('storeItemAutoApprove').checked = item.auto_approve === true;
+        openModal('storeItemModal');
+      }
 
-async function saveStoreItem() {
-  const editId = document.getElementById('storeItemEditId').value;
-  const name = document.getElementById('storeItemName').value.trim();
-  const desc = document.getElementById('storeItemDesc').value.trim();
-  const cost = parseInt(document.getElementById('storeItemCost').value, 10) || 500;
-  const stock = parseInt(document.getElementById('storeItemStock').value, 10);
-  const min_rank = document.getElementById('storeItemRank').value;
-  const icon = document.getElementById('storeItemIcon').value;
-  const auto_approve = document.getElementById('storeItemAutoApprove').checked;
+      async function saveStoreItem() {
+        const editId = document.getElementById('storeItemEditId').value;
+        const name = document.getElementById('storeItemName').value.trim();
+        const desc = document.getElementById('storeItemDesc').value.trim();
+        const cost = parseInt(document.getElementById('storeItemCost').value, 10) || 500;
+        const stock = parseInt(document.getElementById('storeItemStock').value, 10);
+        const min_rank = document.getElementById('storeItemRank').value;
+        const icon = document.getElementById('storeItemIcon').value;
+        const auto_approve = document.getElementById('storeItemAutoApprove').checked;
 
-  if (!name) {
-    showToast('Unesi naziv artikla!', 'warning');
-    return;
-  }
+        if (!name) {
+          showToast('Unesi naziv artikla!', 'warning');
+          return;
+        }
 
-  let items = getStoreItems();
-  if (editId) {
-    const idx = items.findIndex(i => i.id === editId);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], name, description: desc, cost, stock: isNaN(stock) ? -1 : stock, min_rank, icon, auto_approve };
-    }
-  } else {
-    items.push({
-      id: 'item_' + Date.now(),
-      name,
-      description: desc,
-      cost,
-      stock: isNaN(stock) ? -1 : stock,
-      min_rank,
-      icon,
-      auto_approve
-    });
-  }
+        let items = getStoreItems();
+        if (editId) {
+          const idx = items.findIndex(i => i.id === editId);
+          if (idx !== -1) {
+            items[idx] = { ...items[idx], name, description: desc, cost, stock: isNaN(stock) ? -1 : stock, min_rank, icon, auto_approve };
+          }
+        } else {
+          items.push({
+            id: 'item_' + Date.now(),
+            name,
+            description: desc,
+            cost,
+            stock: isNaN(stock) ? -1 : stock,
+            min_rank,
+            icon,
+            auto_approve
+          });
+        }
 
-  if (!currentChannelConfig) currentChannelConfig = {};
-  currentChannelConfig.store_items = items;
+        if (!currentChannelConfig) currentChannelConfig = {};
+        currentChannelConfig.store_items = items;
 
-  const { error } = await saveBotConfigFields({ store_items: items });
+        const { error } = await saveBotConfigFields({ store_items: items });
 
-  if (error) {
-    showToast('Greška pri čuvanju artikla!', 'error');
-  } else {
-    showToast(editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!', 'success');
-    closeModal('storeItemModal');
-    renderStoreItems();
-  }
-}
+        if (error) {
+          showToast('Greška pri čuvanju artikla!', 'error');
+        } else {
+          showToast(editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!', 'success');
+          closeModal('storeItemModal');
+          renderStoreItems();
+        }
+      }
 
-async function deleteStoreItem(id) {
-  let items = getStoreItems().filter(i => i.id !== id);
-  if (!currentChannelConfig) currentChannelConfig = {};
-  currentChannelConfig.store_items = items;
+      async function deleteStoreItem(id) {
+        let items = getStoreItems().filter(i => i.id !== id);
+        if (!currentChannelConfig) currentChannelConfig = {};
+        currentChannelConfig.store_items = items;
 
-  const { error } = await saveBotConfigFields({ store_items: items });
+        const { error } = await saveBotConfigFields({ store_items: items });
 
-  if (error) {
-    showToast('Greška pri brisanju artikla!', 'error');
-  } else {
-    showToast('Artikal obrisan!', 'success');
-    renderStoreItems();
-  }
-}
+        if (error) {
+          showToast('Greška pri brisanju artikla!', 'error');
+        } else {
+          showToast('Artikal obrisan!', 'success');
+          renderStoreItems();
+        }
+      }
 
-// ── Store Redemptions Queue & Purchase History ──
-function getStoreRedemptions() {
-  return (currentChannelConfig && currentChannelConfig.store_redemptions) ? currentChannelConfig.store_redemptions : [];
-}
+      // ── Store Redemptions Queue & Purchase History ──
+      function getStoreRedemptions() {
+        return (currentChannelConfig && currentChannelConfig.store_redemptions) ? currentChannelConfig.store_redemptions : [];
+      }
 
-function filterRedemptions(status) {
-  currentRedemptionsFilter = status;
-  ['redFilterAll', 'redFilterPending', 'redFilterCompleted', 'redFilterRejected'].forEach(id => {
-    const btn = document.getElementById(id);
-    if (btn) {
-      btn.className = 'btn btn-xs ' + (id.toLowerCase().includes(status) || (status === 'all' && id === 'redFilterAll') ? 'btn-primary' : 'btn-outline');
-    }
-  });
-  renderStoreRedemptions();
-}
+      function filterRedemptions(status) {
+        currentRedemptionsFilter = status;
+        ['redFilterAll', 'redFilterPending', 'redFilterCompleted', 'redFilterRejected'].forEach(id => {
+          const btn = document.getElementById(id);
+          if (btn) {
+            btn.className = 'btn btn-xs ' + (id.toLowerCase().includes(status) || (status === 'all' && id === 'redFilterAll') ? 'btn-primary' : 'btn-outline');
+          }
+        });
+        renderStoreRedemptions();
+      }
 
-function renderStoreRedemptions() {
-  const tbody = document.getElementById('storeRedemptionsTbody');
-  if (!tbody) return;
+      function renderStoreRedemptions() {
+        const tbody = document.getElementById('storeRedemptionsTbody');
+        if (!tbody) return;
 
-  let redemptions = getStoreRedemptions();
-  const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
+        let redemptions = getStoreRedemptions();
+        const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
 
-  if (currentRedemptionsFilter !== 'all') {
-    redemptions = redemptions.filter(r => r.status === currentRedemptionsFilter);
-  }
+        if (currentRedemptionsFilter !== 'all') {
+          redemptions = redemptions.filter(r => r.status === currentRedemptionsFilter);
+        }
 
-  if (redemptions.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema zahteva za kupovinu za izabrani filter.</td></tr>`;
-    return;
-  }
+        if (redemptions.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema zahteva za kupovinu za izabrani filter.</td></tr>`;
+          return;
+        }
 
-  tbody.innerHTML = redemptions.map(r => {
-    let statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(234,179,8,0.15); color:#eab308; border:1px solid rgba(234,179,8,0.3);">Čeka odobrenje 🟡</span>`;
-    if (r.status === 'completed') {
-      statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">Odobreno 🟢</span>`;
-    } else if (r.status === 'rejected') {
-      statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">Odbijeno (Vraćeno) 🔴</span>`;
-    }
+        tbody.innerHTML = redemptions.map(r => {
+          let statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(234,179,8,0.15); color:#eab308; border:1px solid rgba(234,179,8,0.3);">Čeka odobrenje 🟡</span>`;
+          if (r.status === 'completed') {
+            statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">Odobreno 🟢</span>`;
+          } else if (r.status === 'rejected') {
+            statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">Odbijeno (Vraćeno) 🔴</span>`;
+          }
 
-    const datum = r.requested_at ? new Date(r.requested_at).toLocaleString('sr-RS') : '—';
-    const isPending = (r.status === 'pending');
+          const datum = r.requested_at ? new Date(r.requested_at).toLocaleString('sr-RS') : '—';
+          const isPending = (r.status === 'pending');
 
-    return `
+          return `
       <tr>
         <td style="font-size:0.8rem; color:var(--text-muted);">${datum}</td>
         <td style="font-weight:600; color:#fff;">@${r.username}</td>
@@ -5354,285 +6466,300 @@ function renderStoreRedemptions() {
         </td>
       </tr>
     `;
-  }).join('');
-}
+        }).join('');
+      }
 
-async function simulirajKupovinuArtikla() {
-  const itemId = document.getElementById('simStoreItemSelect')?.value;
-  const username = (document.getElementById('simStoreUser')?.value || 'TestGledalac').replace(/^@/, '').trim();
-  const items = getStoreItems();
-  const item = items.find(i => i.id === itemId);
+      async function simulirajKupovinuArtikla() {
+        const itemId = document.getElementById('simStoreItemSelect')?.value;
+        const username = (document.getElementById('simStoreUser')?.value || 'TestGledalac').replace(/^@/, '').trim();
+        const items = getStoreItems();
+        const item = items.find(i => i.id === itemId);
 
-  if (!item) {
-    showToast('Izaberi artikal iz prodavnice!', 'warning');
-    return;
-  }
+        if (!item) {
+          showToast('Izaberi artikal iz prodavnice!', 'warning');
+          return;
+        }
 
-  let redemptions = getStoreRedemptions();
-  const newRed = {
-    id: 'red_' + Date.now(),
-    username: username,
-    item_id: item.id,
-    item_name: item.name,
-    cost: item.cost,
-    status: item.auto_approve ? 'completed' : 'pending',
-    requested_at: new Date().toISOString()
-  };
+        let redemptions = getStoreRedemptions();
+        const newRed = {
+          id: 'red_' + Date.now(),
+          username: username,
+          item_id: item.id,
+          item_name: item.name,
+          cost: item.cost,
+          status: item.auto_approve ? 'completed' : 'pending',
+          requested_at: new Date().toISOString()
+        };
 
-  redemptions.unshift(newRed);
-  if (!currentChannelConfig) currentChannelConfig = {};
-  currentChannelConfig.store_redemptions = redemptions;
+        redemptions.unshift(newRed);
+        if (!currentChannelConfig) currentChannelConfig = {};
+        currentChannelConfig.store_redemptions = redemptions;
 
-  const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
+        const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
-  if (error) {
-    showToast('Greška pri simulaciji kupovine!', 'error');
-  } else {
-    showToast(`Simulirana kupovina za "${item.name}" od strane @${username}!`, 'success');
-    renderStoreRedemptions();
-  }
-}
+        if (error) {
+          showToast('Greška pri simulaciji kupovine!', 'error');
+        } else {
+          showToast(`Simulirana kupovina za "${item.name}" od strane @${username}!`, 'success');
+          renderStoreRedemptions();
+        }
+      }
 
-async function approveRedemption(id) {
-  let redemptions = getStoreRedemptions();
-  const target = redemptions.find(r => r.id === id);
-  if (!target) return;
+      async function approveRedemption(id) {
+        let redemptions = getStoreRedemptions();
+        const target = redemptions.find(r => r.id === id);
+        if (!target) return;
 
-  target.status = 'completed';
-  if (!currentChannelConfig) currentChannelConfig = {};
-  currentChannelConfig.store_redemptions = redemptions;
+        target.status = 'completed';
+        if (!currentChannelConfig) currentChannelConfig = {};
+        currentChannelConfig.store_redemptions = redemptions;
 
-  const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
+        const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
-  if (!error) {
-    showToast(`Kupovina za @${target.username} je uspešno odobrena!`, 'success');
-    renderStoreRedemptions();
-  }
-}
+        if (!error) {
+          showToast(`Kupovina za @${target.username} je uspešno odobrena!`, 'success');
+          renderStoreRedemptions();
+        }
+      }
 
-async function rejectRedemption(id) {
-  let redemptions = getStoreRedemptions();
-  const target = redemptions.find(r => r.id === id);
-  if (!target) return;
+      async function rejectRedemption(id) {
+        let redemptions = getStoreRedemptions();
+        const target = redemptions.find(r => r.id === id);
+        if (!target) return;
 
-  target.status = 'rejected';
-  if (!currentChannelConfig) currentChannelConfig = {};
-  currentChannelConfig.store_redemptions = redemptions;
+        target.status = 'rejected';
+        if (!currentChannelConfig) currentChannelConfig = {};
+        currentChannelConfig.store_redemptions = redemptions;
 
-  // Refund points to viewer if found on leaderboard
-  const userKey = target.username.toLowerCase();
-  const row = (allLeaderboard || []).find(x => (x.username || '').toLowerCase() === userKey);
-  if (row) {
-    row.points = (row.points || 0) + target.cost;
-    const { error: lbError } = await sb.from('leaderboard')
-      .upsert({ channel_id: String(activeChannel.id), username: userKey, points: row.points }, { onConflict: 'channel_id,username' });
-    if (!lbError) renderEconomyLeaderboard();
-  }
+        // Refund points to viewer if found on leaderboard
+        const userKey = target.username.toLowerCase();
+        const row = (allLeaderboard || []).find(x => (x.username || '').toLowerCase() === userKey);
+        if (row) {
+          row.points = (row.points || 0) + target.cost;
+          const { error: lbError } = await sb.from('leaderboard')
+            .upsert({ channel_id: String(activeChannel.id), username: userKey, points: row.points }, { onConflict: 'channel_id,username' });
+          if (!lbError) renderEconomyLeaderboard();
+        }
 
-  const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
+        const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
-  if (!error) {
-    showToast(`Kupovina za @${target.username} je odbijena i ${target.cost} poena je refundirano!`, 'info');
-    renderStoreRedemptions();
-  }
-}
+        if (!error) {
+          showToast(`Kupovina za @${target.username} je odbijena i ${target.cost} poena je refundirano!`, 'info');
+          renderStoreRedemptions();
+        }
+      }
 
-// ── Economy Leaderboard Render ──
-function renderEconomyLeaderboard() {
-  const tbody = document.getElementById('ecoLeaderboardTbody');
-  if (!tbody) return;
+      // ── Economy Leaderboard Render ──
+      function renderEconomyLeaderboard() {
+        const tbody = document.getElementById('ecoLeaderboardTbody');
+        if (!tbody) return;
 
-  const query = (document.getElementById('ecoLbSearchInput')?.value || '').toLowerCase();
-  const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
+        const query = (document.getElementById('ecoLbSearchInput')?.value || '').toLowerCase().trim();
+        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || (currentChannelConfig && currentChannelConfig.currency_name) || 'Koins';
 
-  let list = (allLeaderboard || []).map(row => {
-    const xp = row.xp || ((row.points || 0) * 15);
-    const nivo = row.level || Math.floor(0.1 * Math.sqrt(xp));
-    
-    let titula = 'Pijun';
-    if (nivo >= 50) titula = 'Legenda';
-    else if (nivo >= 35) titula = 'Kralj Četa';
-    else if (nivo >= 20) titula = 'VIP Gledalac';
-    else if (nivo >= 10) titula = 'Čet Majstor';
-    else if (nivo >= 5) titula = 'Redovan Gledalac';
+        let list = (allLeaderboard || []).map(row => {
+          return {
+            username: row.display_name || row.username,
+            rawUsername: row.username,
+            points: row.points_currency || row.points || 0,
+            messages: row.points || 0,
+            updated_at: row.updated_at
+          };
+        });
 
-    const tekuca = Math.pow(nivo / 0.1, 2);
-    const sledeca = Math.pow((nivo + 1) / 0.1, 2);
-    const napredak = xp - tekuca;
-    const ukupnoPotrebno = sledeca - tekuca;
-    const procenat = ukupnoPotrebno > 0 ? Math.min(100, Math.floor((napredak / ukupnoPotrebno) * 100)) : 100;
+        if (query) {
+          list = list.filter(item => item.username.toLowerCase().includes(query) || item.rawUsername.toLowerCase().includes(query));
+        }
 
-    return {
-      username: row.display_name || row.username,
-      rawUsername: row.username,
-      xp,
-      level: nivo,
-      titula,
-      procenat,
-      points: row.points_currency || row.points || 0
-    };
-  });
+        // Sortiraj prema izabranoj koloni i smeru
+        const sortKey = typeof ecoLbSortKey !== 'undefined' ? ecoLbSortKey : 'points';
+        const sortDir = typeof ecoLbSortDir !== 'undefined' ? ecoLbSortDir : 'desc';
+        list.sort((a, b) => {
+          let va, vb;
+          if (sortKey === 'activity') {
+            va = a.messages || 0;
+            vb = b.messages || 0;
+          } else {
+            va = a.points || 0;
+            vb = b.points || 0;
+          }
+          return sortDir === 'asc' ? va - vb : vb - va;
+        });
 
-  if (query) {
-    list = list.filter(item => item.username.toLowerCase().includes(query) || item.rawUsername.toLowerCase().includes(query));
-  }
+        if (list.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema podataka na rang listi.</td></tr>`;
+          return;
+        }
 
-  list.sort((a, b) => b.xp - a.xp);
+        const coinIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" style="vertical-align:middle;"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>`;
 
-  if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema podataka na rang listi.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = list.slice(0, 50).map((u, idx) => `
+        tbody.innerHTML = list.slice(0, 50).map((u, idx) => `
     <tr>
       <td style="font-weight:700; color:var(--text-muted);">${idx + 1}</td>
-      <td style="font-weight:600; color:#fff;">@${u.username}</td>
-      <td>
-        <span style="padding:2px 8px; border-radius:10px; background:rgba(139,92,246,0.15); color:#a78bfa; font-weight:700; font-size:0.8rem; border:1px solid rgba(139,92,246,0.3);">
-          Lvl ${u.level}
+      <td style="font-weight:600; color:#fff;">@${escapeHtml(u.username)}</td>
+      <td style="color:#eab308; font-weight:700;">
+        <span style="display:inline-flex; align-items:center; gap:4px;">
+          ${coinIconSvg}
+          ${u.points.toLocaleString()} ${valuta}
         </span>
-        <span style="font-size:0.75rem; color:var(--text-muted); margin-left:6px;">${u.titula}</span>
       </td>
-      <td style="width:200px;">
-        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-muted); margin-bottom:3px;">
-          <span>${u.xp.toLocaleString()} XP</span>
-          <span>${u.procenat}%</span>
-        </div>
-        <div style="background:rgba(255,255,255,0.08); height:6px; border-radius:3px; overflow:hidden;">
-          <div style="background:linear-gradient(90deg, #a78bfa, #8b5cf6); height:100%; width:${u.procenat}%;"></div>
-        </div>
-      </td>
-      <td style="color:#eab308; font-weight:700; display:flex; align-items:center; gap:4px; padding-top:14px;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>
-        ${u.points.toLocaleString()} ${valuta}
-      </td>
+      <td style="color:var(--text-muted);">${formatPorukeCount(u.messages)} poruka</td>
+      <td style="color:var(--text-muted); font-size:0.8rem;">${fmtDate(u.updated_at)}</td>
       <td style="text-align:right;">
-        <button class="btn btn-sm btn-outline" onclick="openEditUserPointsModal('${u.rawUsername}', ${u.points}, ${u.xp})" style="padding:2px 8px; font-size:0.72rem;">Izmeni</button>
+        <button class="btn btn-sm btn-outline" onclick="openEditUserPointsModal('${escapeHtml(u.rawUsername)}', ${u.points})" style="padding:2px 8px; font-size:0.72rem;">Izmeni</button>
       </td>
     </tr>
   `).join('');
-}
+      }
 
-function openEditUserPointsModal(username, currentPoints, currentXp) {
-  const newPoints = prompt(`Unesi novi broj poena za @${username}:`, currentPoints);
-  if (newPoints === null) return;
-  const parsed = parseInt(newPoints, 10);
-  if (isNaN(parsed) || parsed < 0) return;
+      function openEditUserPointsModal(username, currentPoints) {
+        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+        const newPoints = prompt(`Unesi novi broj poena (${valuta}) za @${username}:`, currentPoints);
+        if (newPoints === null) return;
+        const parsed = parseInt(newPoints, 10);
+        if (isNaN(parsed) || parsed < 0) return;
 
-  const target = allLeaderboard.find(x => (x.username || '').toLowerCase() === username.toLowerCase());
-  if (target) {
-    target.points_currency = parsed;
-    target.points = parsed;
-    renderEconomyLeaderboard();
-    showToast(`Poeni za @${username} su ažurirani na ${parsed}!`, 'success');
-  }
-}
-// ═══════════════════════════════════════════════════════════
-// REFERRAL PROGRAM MODAL & LOGIC
-// ═══════════════════════════════════════════════════════════
-async function openReferralModal() {
-  const userMenuSm = document.getElementById('userMenuSm');
-  if (userMenuSm) userMenuSm.classList.remove('visible');
+        const target = allLeaderboard.find(x => (x.username || '').toLowerCase() === username.toLowerCase());
+        if (target) {
+          target.points_currency = parsed;
+          target.points = parsed;
+          renderEconomyLeaderboard();
+          showToast('success', `Poeni za @${username} su ažurirani na ${parsed.toLocaleString()} ${valuta}!`);
+        }
+      }
+      // ─── Economy Leaderboard Sortiranje ────────────────────────
+      let ecoLbSortKey = 'points';  // 'points' | 'activity'
+      let ecoLbSortDir = 'desc';    // 'asc' | 'desc'
 
-  openModal('referralModal');
+      function sortEconomyLeaderboard(key) {
+        if (ecoLbSortKey === key) {
+          ecoLbSortDir = ecoLbSortDir === 'desc' ? 'asc' : 'desc';
+        } else {
+          ecoLbSortKey = key;
+          ecoLbSortDir = 'desc';
+        }
 
-  if (currentUser && currentUser.id) {
-    await ensureUserHasReferralCode(currentUser.id);
-    await loadReferralData(currentUser.id);
-  }
-}
+        // Osvezi vizuelno stanje headera
+        ['ecoLbThPoints', 'ecoLbThActivity'].forEach(id => {
+          const th = document.getElementById(id);
+          if (!th) return;
+          th.classList.remove('sort-asc', 'sort-desc');
+        });
+        const activeKey = key === 'points' ? 'ecoLbThPoints' : 'ecoLbThActivity';
+        const activeTh = document.getElementById(activeKey);
+        if (activeTh) activeTh.classList.add(ecoLbSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
 
-async function ensureUserHasReferralCode(userId) {
-  try {
-    const { data: stats } = await sb.from('referral_stats').select('referral_code').eq('user_id', userId).single();
-    if (!stats || !stats.referral_code) {
-      await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: null });
-    }
-  } catch (err) {
-    console.error('Referral code check error:', err);
-  }
-}
+        renderEconomyLeaderboard();
+      }
 
-async function loadReferralData(userId) {
-  try {
-    const { data: stats } = await sb.from('referral_stats').select('*').eq('user_id', userId).single();
-    if (stats) updateReferralStats(stats);
+      // Expose globally
+      window.sortEconomyLeaderboard = sortEconomyLeaderboard;
 
-    const { data: rewards } = await sb.from('referral_rewards').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-    updateRewardsList(rewards || []);
-  } catch (err) {
-    console.error('Error loading referral data:', err);
-  }
-}
+      // ═══════════════════════════════════════════════════════════
+      // REFERRAL PROGRAM MODAL & LOGIC
+      // ═══════════════════════════════════════════════════════════
+      async function openReferralModal() {
+        const userMenuSm = document.getElementById('userMenuSm');
+        if (userMenuSm) userMenuSm.classList.remove('visible');
 
-function generateReferralLink(referralCode) {
-  const baseUrl = window.location.origin;
-  return `${baseUrl}/index.html?ref=${referralCode}`;
-}
+        openModal('referralModal');
 
-function updateReferralStats(stats) {
-  const totalReferrals = document.getElementById('totalReferrals');
-  const successfulReferrals = document.getElementById('successfulReferrals');
-  const totalEarned = document.getElementById('totalEarned');
-  const availableRewards = document.getElementById('availableRewards');
-  const referralCodeInput = document.getElementById('referralCodeInput');
-  const referralLinkText = document.getElementById('referralLinkText');
-  const withdrawalBtn = document.getElementById('withdrawalBtn');
+        if (currentUser && currentUser.id) {
+          await ensureUserHasReferralCode(currentUser.id);
+          await loadReferralData(currentUser.id);
+        }
+      }
 
-  if (totalReferrals) totalReferrals.textContent = stats.total_referrals || 0;
-  if (successfulReferrals) successfulReferrals.textContent = stats.successful_referrals || 0;
-  if (totalEarned) totalEarned.textContent = `€${(stats.total_earned || 0).toFixed(2)}`;
+      async function ensureUserHasReferralCode(userId) {
+        try {
+          const { data: stats } = await sb.from('referral_stats').select('referral_code').eq('user_id', userId).single();
+          if (!stats || !stats.referral_code) {
+            await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: null });
+          }
+        } catch (err) {
+          console.error('Referral code check error:', err);
+        }
+      }
 
-  const available = stats.available_balance || 0;
-  if (availableRewards) availableRewards.textContent = `€${available.toFixed(2)}`;
+      async function loadReferralData(userId) {
+        try {
+          const { data: stats } = await sb.from('referral_stats').select('*').eq('user_id', userId).single();
+          if (stats) updateReferralStats(stats);
 
-  if (withdrawalBtn) {
-    withdrawalBtn.disabled = available < 5;
-  }
+          const { data: rewards } = await sb.from('referral_rewards').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+          updateRewardsList(rewards || []);
+        } catch (err) {
+          console.error('Error loading referral data:', err);
+        }
+      }
 
-  if (stats.referral_code) {
-    if (referralCodeInput) referralCodeInput.value = stats.referral_code;
-    const refLink = generateReferralLink(stats.referral_code);
-    if (referralLinkText) referralLinkText.textContent = refLink;
+      function generateReferralLink(referralCode) {
+        const baseUrl = window.location.origin;
+        return `${baseUrl}/index.html?ref=${referralCode}`;
+      }
 
-    setupReferralCopyBtn(stats.referral_code, refLink);
-  }
+      function updateReferralStats(stats) {
+        const totalReferrals = document.getElementById('totalReferrals');
+        const successfulReferrals = document.getElementById('successfulReferrals');
+        const totalEarned = document.getElementById('totalEarned');
+        const availableRewards = document.getElementById('availableRewards');
+        const referralCodeInput = document.getElementById('referralCodeInput');
+        const referralLinkText = document.getElementById('referralLinkText');
+        const withdrawalBtn = document.getElementById('withdrawalBtn');
 
-  window.currentAvailableBalance = available;
-}
+        if (totalReferrals) totalReferrals.textContent = stats.total_referrals || 0;
+        if (successfulReferrals) successfulReferrals.textContent = stats.successful_referrals || 0;
+        if (totalEarned) totalEarned.textContent = `€${(stats.total_earned || 0).toFixed(2)}`;
 
-function setupReferralCopyBtn(code, link) {
-  const btn = document.getElementById('copyReferralBtn');
-  if (!btn) return;
+        const available = stats.available_balance || 0;
+        if (availableRewards) availableRewards.textContent = `€${available.toFixed(2)}`;
 
-  btn.onclick = async () => {
-    try {
-      const textToCopy = `Moj referral kod: ${code}\nReferral link: ${link}`;
-      await navigator.clipboard.writeText(textToCopy);
-      btn.textContent = 'Kopirano!';
-      btn.style.background = '#10B981';
-      showToast('Referral link uspešno kopiran!', 'success');
-      setTimeout(() => {
-        btn.textContent = 'Kopiraj Link';
-        btn.style.background = '';
-      }, 2000);
-    } catch (e) {
-      showToast('Greška pri kopiranju!', 'error');
-    }
-  };
-}
+        if (withdrawalBtn) {
+          withdrawalBtn.disabled = available < 5;
+        }
 
-function updateRewardsList(rewards) {
-  const container = document.getElementById('rewardsList');
-  if (!container) return;
+        if (stats.referral_code) {
+          if (referralCodeInput) referralCodeInput.value = stats.referral_code;
+          const refLink = generateReferralLink(stats.referral_code);
+          if (referralLinkText) referralLinkText.textContent = refLink;
 
-  if (!rewards || rewards.length === 0) {
-    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 0.85rem;">Još uvek nemaš nagrade. Pozovi prijatelje da započneš!</div>`;
-    return;
-  }
+          setupReferralCopyBtn(stats.referral_code, refLink);
+        }
 
-  container.innerHTML = rewards.map(r => `
+        window.currentAvailableBalance = available;
+      }
+
+      function setupReferralCopyBtn(code, link) {
+        const btn = document.getElementById('copyReferralBtn');
+        if (!btn) return;
+
+        btn.onclick = async () => {
+          try {
+            const textToCopy = `Moj referral kod: ${code}\nReferral link: ${link}`;
+            await navigator.clipboard.writeText(textToCopy);
+            btn.textContent = 'Kopirano!';
+            btn.style.background = '#10B981';
+            showToast('Referral link uspešno kopiran!', 'success');
+            setTimeout(() => {
+              btn.textContent = 'Kopiraj Link';
+              btn.style.background = '';
+            }, 2000);
+          } catch (e) {
+            showToast('Greška pri kopiranju!', 'error');
+          }
+        };
+      }
+
+      function updateRewardsList(rewards) {
+        const container = document.getElementById('rewardsList');
+        if (!container) return;
+
+        if (!rewards || rewards.length === 0) {
+          container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 0.85rem;">Još uvek nemaš nagrade. Pozovi prijatelje da započneš!</div>`;
+          return;
+        }
+
+        container.innerHTML = rewards.map(r => `
     <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); padding:10px 14px; border-radius:var(--radius-md);">
       <div>
         <div style="font-weight:600; color:#fff; font-size:0.85rem;">${r.reward_description || 'Provizija od kupovine'}</div>
@@ -5643,68 +6770,388 @@ function updateRewardsList(rewards) {
       </span>
     </div>
   `).join('');
-}
+      }
 
-function openWithdrawalModal() {
-  closeModal('referralModal');
-  const balEl = document.getElementById('modalAvailableBalance');
-  if (balEl) balEl.textContent = `€${(window.currentAvailableBalance || 0).toFixed(2)}`;
-  openModal('withdrawalModal');
-}
+      function openWithdrawalModal() {
+        closeModal('referralModal');
+        const balEl = document.getElementById('modalAvailableBalance');
+        if (balEl) balEl.textContent = `€${(window.currentAvailableBalance || 0).toFixed(2)}`;
+        openModal('withdrawalModal');
+      }
 
-function updatePaymentDetailsLabel(method) {
-  const label = document.getElementById('paymentDetailsLabel');
-  const input = document.getElementById('paymentDetails');
-  if (!label || !input) return;
+      function updatePaymentDetailsLabel(method) {
+        const label = document.getElementById('paymentDetailsLabel');
+        const input = document.getElementById('paymentDetails');
+        if (!label || !input) return;
 
-  if (method === 'paypal') {
-    label.textContent = 'PayPal Email Adresa';
-    input.placeholder = 'tvoj@email.com';
-  } else if (method === 'bank_transfer') {
-    label.textContent = 'Broj računa (IBAN)';
-    input.placeholder = 'RS00 0000 0000 0000 0000 00';
-  } else if (method === 'crypto') {
-    label.textContent = 'Crypto Wallet Adresa (USDT / BTC)';
-    input.placeholder = '0x... ili bc1...';
-  }
-}
+        if (method === 'paypal') {
+          label.textContent = 'PayPal Email Adresa';
+          input.placeholder = 'tvoj@email.com';
+        } else if (method === 'bank_transfer') {
+          label.textContent = 'Broj računa (IBAN)';
+          input.placeholder = 'RS00 0000 0000 0000 0000 00';
+        } else if (method === 'crypto') {
+          label.textContent = 'Crypto Wallet Adresa (USDT / BTC)';
+          input.placeholder = '0x... ili bc1...';
+        }
+      }
 
-async function handleWithdrawalSubmit(e) {
-  e.preventDefault();
-  const amount = parseFloat(document.getElementById('withdrawalAmount').value);
-  const method = document.getElementById('paymentMethod').value;
-  const details = document.getElementById('paymentDetails').value.trim();
+      async function handleWithdrawalSubmit(e) {
+        e.preventDefault();
+        const amount = parseFloat(document.getElementById('withdrawalAmount').value);
+        const method = document.getElementById('paymentMethod').value;
+        const details = document.getElementById('paymentDetails').value.trim();
 
-  if (!amount || amount < 5) {
-    showToast('Minimalni iznos za isplatu je €5.00', 'warning');
-    return;
-  }
-  if (amount > (window.currentAvailableBalance || 0)) {
-    showToast('Nedovoljno sredstava za isplatu!', 'error');
-    return;
-  }
-  if (!details) {
-    showToast('Unesi podatke za isplatu!', 'warning');
-    return;
-  }
+        if (!amount || amount < 5) {
+          showToast('Minimalni iznos za isplatu je €5.00', 'warning');
+          return;
+        }
+        if (amount > (window.currentAvailableBalance || 0)) {
+          showToast('Nedovoljno sredstava za isplatu!', 'error');
+          return;
+        }
+        if (!details) {
+          showToast('Unesi podatke za isplatu!', 'warning');
+          return;
+        }
 
-  try {
-    const { error } = await sb.rpc('create_withdrawal_request', {
-      p_user_id: currentUser.id,
-      p_amount: amount,
-      p_payment_method: method,
-      p_payment_details: details
-    });
+        try {
+          const { error } = await sb.rpc('create_withdrawal_request', {
+            p_user_id: currentUser.id,
+            p_amount: amount,
+            p_payment_method: method,
+            p_payment_details: details
+          });
 
-    if (error) throw error;
+          if (error) throw error;
 
-    showToast('Zahtev za isplatu je uspešno poslat! Bićete obavešteni o isplati.', 'success');
-    closeModal('withdrawalModal');
-  } catch (err) {
-    console.error('Withdrawal error:', err);
-    showToast('Uspešno poslat zahtev za isplatu!', 'success');
-    closeModal('withdrawalModal');
-  }
-}
+          showToast('Zahtev za isplatu je uspešno poslat! Bićete obavešteni o isplati.', 'success');
+          closeModal('withdrawalModal');
+        } catch (err) {
+          console.error('Withdrawal error:', err);
+          showToast('success', 'Uspešno poslat zahtev za isplatu!', '✅');
+          closeModal('withdrawalModal');
+        }
+      }
 
-initAuth();
+      // ══════════════════════════════════════════════════════════════════════════════
+      // ══ EKONOMIJA & RANKING SISTEM (KOINS) ══
+      // ══════════════════════════════════════════════════════════════════════════════
+
+      let currentEconomyTab = 'config';
+
+      function switchEconomyTab(tabName) {
+        currentEconomyTab = tabName;
+
+        const btnConfig = document.getElementById('ecoTabBtnConfig');
+        const btnStore = document.getElementById('ecoTabBtnStore');
+        const btnLeaderboard = document.getElementById('ecoTabBtnLeaderboard');
+
+        const panelConfig = document.getElementById('ecoSubPanelConfig');
+        const panelStore = document.getElementById('ecoSubPanelStore');
+        const panelLeaderboard = document.getElementById('ecoSubPanelLeaderboard');
+
+        if (btnConfig) btnConfig.className = `btn btn-sm ${tabName === 'config' ? 'btn-primary' : 'btn-outline'}`;
+        if (btnStore) btnStore.className = `btn btn-sm ${tabName === 'store' ? 'btn-primary' : 'btn-outline'}`;
+        if (btnLeaderboard) btnLeaderboard.className = `btn btn-sm ${tabName === 'leaderboard' ? 'btn-primary' : 'btn-outline'}`;
+
+        if (panelConfig) panelConfig.style.display = tabName === 'config' ? 'block' : 'none';
+        if (panelStore) panelStore.style.display = tabName === 'store' ? 'block' : 'none';
+        if (panelLeaderboard) panelLeaderboard.style.display = tabName === 'leaderboard' ? 'block' : 'none';
+
+        if (tabName === 'store') {
+          renderStoreItems();
+          renderStoreRedemptions();
+        } else if (tabName === 'leaderboard') {
+          renderEconomyLeaderboard();
+        }
+      }
+
+      function updateEconomyPreviews() {
+        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+        const firstJoin = document.getElementById('cfgFirstInteractionBonus')?.value || 100;
+        const watchtime = document.getElementById('cfgPointsPerWatchtime')?.value || 20;
+        const subMult = document.getElementById('cfgSubMultiplier')?.value || 2.0;
+        const subBonus = document.getElementById('cfgPointsPerSub')?.value || 1000;
+        const giftBonus = document.getElementById('cfgPointsPerGiftSub')?.value || 2000;
+        const kicksBonus = document.getElementById('cfgPointsPer100Kicks')?.value || 500;
+        const streakBonus = document.getElementById('cfgPointsDailyStreak')?.value || 150;
+
+        const pFirst = document.getElementById('previewFirstJoin');
+        const pWatch = document.getElementById('previewWatchtime');
+        const pMult = document.getElementById('previewSubMult');
+        const pSub = document.getElementById('previewSubBonus');
+        const pKicks = document.getElementById('previewKicksBonus');
+        const pStreak = document.getElementById('previewDailyStreak');
+
+        if (pFirst) pFirst.textContent = `+${firstJoin} ${currencyName}`;
+        if (pWatch) pWatch.textContent = `+${watchtime} ${currencyName}`;
+        if (pMult) pMult.textContent = `${subMult}x Bonus`;
+        if (pSub) pSub.textContent = `+${subBonus} / +${giftBonus}`;
+        if (pKicks) pKicks.textContent = `+${kicksBonus} ${currencyName}`;
+        if (pStreak) pStreak.textContent = `+${streakBonus} ${currencyName}/dan`;
+      }
+
+      async function saveEconomyConfig(silent = false) {
+        if (!activeChannel) return;
+
+        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+        const pointsPerMsg = parseInt(document.getElementById('cfgPointsPerMsg')?.value) || 5;
+        const smartChatValidation = document.getElementById('cfgSmartChatValidation')?.checked ?? true;
+        const firstInteractionBonus = parseInt(document.getElementById('cfgFirstInteractionBonus')?.value) || 100;
+        const pointsPerWatchtime = parseInt(document.getElementById('cfgPointsPerWatchtime')?.value) || 20;
+        const levelUpAnnounce = document.getElementById('cfgLevelUpAnnounce')?.checked ?? true;
+        const subMultiplier = parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0;
+        const subBonusPerMsg = parseInt(document.getElementById('cfgSubBonusPerMsg')?.value) || 10;
+        const pointsPerSub = parseInt(document.getElementById('cfgPointsPerSub')?.value) || 1000;
+        const pointsPerGiftSub = parseInt(document.getElementById('cfgPointsPerGiftSub')?.value) || 2000;
+        const pointsPer100Kicks = parseInt(document.getElementById('cfgPointsPer100Kicks')?.value) || 500;
+        const pointsDailyStreak = parseInt(document.getElementById('cfgPointsDailyStreak')?.value) || 150;
+        const pointsPerRaid = parseInt(document.getElementById('cfgPointsPerRaid')?.value) || 300;
+        const gambleEnabled = document.getElementById('cfgGambleEnabled')?.checked ?? true;
+        const maxGambleAmount = parseInt(document.getElementById('cfgMaxGambleAmount')?.value) || 5000;
+
+        const economySettings = {
+          currency_name: currencyName,
+          points_per_msg: pointsPerMsg,
+          smart_chat_validation: smartChatValidation,
+          first_interaction_bonus: firstInteractionBonus,
+          points_per_watchtime: pointsPerWatchtime,
+          level_up_announce: levelUpAnnounce,
+          sub_multiplier: subMultiplier,
+          sub_bonus_per_msg: subBonusPerMsg,
+          points_per_sub: pointsPerSub,
+          points_per_gift_sub: pointsPerGiftSub,
+          points_per_100_kicks: pointsPer100Kicks,
+          points_daily_streak: pointsDailyStreak,
+          points_per_raid: pointsPerRaid,
+          gamble_enabled: gambleEnabled,
+          max_gamble_amount: maxGambleAmount
+        };
+
+        const { error } = await sb.from('bot_config')
+          .upsert({
+            user_id: getChannelOwnerId(),
+            channel_id: activeChannel.id,
+            channel_name: activeChannel.username,
+            economy_settings: economySettings,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'channel_id' });
+
+        if (error) {
+          console.error('Economy config save error:', error);
+          if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ekonomije', '❌');
+          return;
+        }
+
+        updateEconomyPreviews();
+
+        if (!silent) {
+          showToast('success', 'Podešavanja ranking sistema sačuvana!', '✅');
+        }
+
+        notifyBotToReload();
+      }
+
+      function renderEconomyLeaderboard() {
+        const tbody = document.getElementById('ecoLeaderboardTbody');
+        if (!tbody) return;
+
+        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+        const q = (document.getElementById('ecoLbSearchInput')?.value || '').toLowerCase();
+
+        let rows = (allLeaderboard || []).slice();
+        if (q) {
+          rows = rows.filter(r => (r.display_name || r.username || '').toLowerCase().includes(q));
+        }
+
+        rows.sort((a, b) => (b.points || 0) - (a.points || 0));
+
+        if (rows.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Nema pronađenih korisnika na rang listi.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = rows.map((row, i) => {
+          const avatarKey = (row.username || '').toLowerCase();
+          const cachedUrl = avatarCache[avatarKey];
+          const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
+          const avatarStyle = hasAvatar
+            ? `background-image:url('${cachedUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
+            : '';
+          const avatarContent = hasAvatar ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
+
+          if (!hasAvatar && row.username) {
+            setTimeout(() => {
+              getOrFetchAvatar(row.username, `ecolb-avatar-${i}`);
+            }, 40 * i);
+          }
+
+          const rankBadge = i === 0
+            ? `<span style="background: rgba(251, 191, 36, 0.12); color: #FBBF24; border: 1px solid rgba(251, 191, 36, 0.25); padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"/></svg> #1</span>`
+            : i === 1
+              ? `<span style="background: rgba(148, 163, 184, 0.12); color: #94A3B8; border: 1px solid rgba(148, 163, 184, 0.25); padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;">#2</span>`
+              : i === 2
+                ? `<span style="background: rgba(180, 83, 9, 0.12); color: #F59E0B; border: 1px solid rgba(180, 83, 9, 0.25); padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;">#3</span>`
+                : `<span style="color: var(--text-muted); font-weight: 600; font-family: var(--font-mono); font-size: 0.85rem; padding-left: 6px;">#${i + 1}</span>`;
+
+          return `
+      <tr>
+        <td>${rankBadge}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div id="ecolb-avatar-${i}" style="width:28px; height:28px; border-radius:50%; background:var(--app-gradient); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; flex-shrink:0; ${avatarStyle}">
+              ${avatarContent}
+            </div>
+            <span style="font-weight:600; color:var(--text-primary);">${escapeHtml(row.display_name || row.username)}</span>
+          </div>
+        </td>
+        <td>
+          <span class="td-cmd" style="color: #eab308; background: rgba(234, 179, 8, 0.08); border-color: rgba(234, 179, 8, 0.2);">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>
+            ${(row.points || 0).toLocaleString()} ${currencyName}
+          </span>
+        </td>
+        <td style="color:var(--text-secondary); font-weight:500;"><span class="td-num">${formatPorukeCount(row.points || 0)} poruka</span></td>
+        <td style="text-align:right; color:var(--text-muted); font-size:0.82rem;">${fmtDate(row.updated_at)}</td>
+      </tr>
+    `;
+        }).join('');
+      }
+
+      let localStoreItems = [
+        { id: 'item_1', name: 'VIP Rola (1 Nedelja)', cost: 5000, description: 'Dobij VIP rolu u četu na 7 dana.', enabled: true },
+        { id: 'item_2', name: 'Zatraži Pesmu (!sr)', cost: 1000, description: 'Zatraži pesmu bez obzira na tvoj rank u četu.', enabled: true },
+        { id: 'item_3', name: 'Mute Igrača na 5 Min', cost: 3000, description: 'Privremeno utišaj drugog gledaoca u četu.', enabled: true }
+      ];
+
+      let localStoreRedemptions = [
+        { id: 'red_1', created_at: new Date(Date.now() - 3600000).toISOString(), username: 'Stefan_BG', item_name: 'VIP Rola (1 Nedelja)', cost: 5000, status: 'completed' },
+        { id: 'red_2', created_at: new Date(Date.now() - 7200000).toISOString(), username: 'Marko123', item_name: 'Zatraži Pesmu (!sr)', cost: 1000, status: 'pending' }
+      ];
+
+      function renderStoreItems() {
+        const grid = document.getElementById('storeItemsGrid');
+        if (!grid) return;
+        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+
+        if (localStoreItems.length === 0) {
+          grid.innerHTML = `<div style="grid-column: 1/-1; padding: 24px; text-align: center; color: var(--text-muted);">Nema artikala u prodavnici. Kliknite na "+ Dodaj novi artikal" iznad.</div>`;
+          return;
+        }
+
+        grid.innerHTML = localStoreItems.map(item => `
+    <div class="config-section" style="padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+          <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary);">${escapeHtml(item.name)}</h4>
+          <span style="background: rgba(234,179,8,0.15); color: #eab308; border: 1px solid rgba(234,179,8,0.3); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 700; white-space: nowrap;">
+            ${item.cost} ${currencyName}
+          </span>
+        </div>
+        <p style="font-size: 0.83rem; color: var(--text-muted); margin: 0 0 12px 0; line-height: 1.4;">${escapeHtml(item.description || '')}</p>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 8px;">
+        <span style="font-size: 0.78rem; color: ${item.enabled ? '#53fc18' : 'var(--text-muted)'}; font-weight: 600; display: flex; align-items: center; gap: 5px;">
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="${item.enabled ? '#53fc18' : 'var(--text-muted)'}"><circle cx="12" cy="12" r="10"/></svg>
+          ${item.enabled ? 'Aktivno' : 'Neaktivno'}
+        </span>
+        <button class="btn btn-outline btn-sm" onclick="deleteStoreItem('${item.id}')" style="color: #ef4444; border-color: rgba(239,68,68,0.3); padding: 3px 10px; font-size: 0.75rem;">Ukloni</button>
+      </div>
+    </div>
+  `).join('');
+      }
+
+      function renderStoreRedemptions() {
+        const tbody = document.getElementById('storeRedemptionsTbody');
+        if (!tbody) return;
+        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+
+        if (localStoreRedemptions.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Nema istorije kupovina.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = localStoreRedemptions.map(r => {
+          let statusBadge = '';
+          if (r.status === 'pending') {
+            statusBadge = `<span style="background: rgba(245, 158, 11, 0.12); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Na čekanju</span>`;
+          } else if (r.status === 'completed') {
+            statusBadge = `<span style="background: rgba(83, 252, 24, 0.12); color: var(--kick-green); border: 1px solid rgba(83, 252, 24, 0.25); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Odobreno</span>`;
+          } else {
+            statusBadge = `<span style="background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.25); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Odbijeno</span>`;
+          }
+
+          return `
+      <tr>
+        <td style="color:var(--text-muted); font-size:0.83rem;">${fmtDate(r.created_at)}</td>
+        <td style="font-weight:600; color:var(--text-primary);">${escapeHtml(r.username)}</td>
+        <td style="font-weight:600; color:var(--text-secondary);">${escapeHtml(r.item_name)}</td>
+        <td>
+          <span class="td-cmd" style="color: #eab308; background: rgba(234, 179, 8, 0.08); border-color: rgba(234, 179, 8, 0.2);">
+            ${r.cost} ${currencyName}
+          </span>
+        </td>
+        <td>${statusBadge}</td>
+        <td style="text-align:right;">
+          ${r.status === 'pending' ? `
+            <button class="btn btn-primary btn-sm" onclick="updateRedemptionStatus('${r.id}', 'completed')" style="padding: 4px 12px; font-size: 0.78rem; margin-right: 4px; display: inline-flex; align-items: center; gap: 4px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Odobri
+            </button>
+            <button class="btn btn-outline btn-sm" onclick="updateRedemptionStatus('${r.id}', 'rejected')" style="padding: 4px 12px; font-size: 0.78rem; color: #ef4444; border-color: rgba(239,68,68,0.3); display: inline-flex; align-items: center; gap: 4px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              Odbij
+            </button>
+          ` : '<span style="color:var(--text-muted); font-size:0.8rem; font-weight: 500;">Završeno</span>'}
+        </td>
+      </tr>
+    `;
+        }).join('');
+      }
+
+      function updateRedemptionStatus(id, newStatus) {
+        const item = localStoreRedemptions.find(x => x.id === id);
+        if (item) {
+          item.status = newStatus;
+          renderStoreRedemptions();
+          showToast(newStatus === 'completed' ? 'success' : 'info', `Kupovina ${newStatus === 'completed' ? 'odobrena' : 'odbijena'}.`, newStatus === 'completed' ? '✅' : 'ℹ️');
+        }
+      }
+
+      function deleteStoreItem(id) {
+        localStoreItems = localStoreItems.filter(x => x.id !== id);
+        renderStoreItems();
+        showToast('info', 'Artikal uklonjen iz prodavnice.', '🗑️');
+      }
+
+      function openCreateStoreItemModal() {
+        const name = prompt('Unesite naziv novog artikla za prodavnicu:');
+        if (!name) return;
+        const costStr = prompt('Unesite cenu artikla u Koins-ima:');
+        const cost = parseInt(costStr) || 1000;
+        const desc = prompt('Unesite kratak opis artikla (opciono):') || '';
+
+        localStoreItems.push({
+          id: 'item_' + Date.now(),
+          name: name.trim(),
+          cost: cost,
+          description: desc.trim(),
+          enabled: true
+        });
+
+        renderStoreItems();
+        showToast('success', `Artikal "${name}" uspešno dodat u prodavnicu!`, '🛍️');
+      }
+
+      window.switchEconomyTab = switchEconomyTab;
+      window.updateEconomyPreviews = updateEconomyPreviews;
+      window.saveEconomyConfig = saveEconomyConfig;
+      window.renderEconomyLeaderboard = renderEconomyLeaderboard;
+      window.renderStoreItems = renderStoreItems;
+      window.renderStoreRedemptions = renderStoreRedemptions;
+      window.updateRedemptionStatus = updateRedemptionStatus;
+      window.deleteStoreItem = deleteStoreItem;
+      window.openCreateStoreItemModal = openCreateStoreItemModal;
+
+      initAuth();
