@@ -34,6 +34,7 @@ let allMarriages = [];   // cached marriages
 let allLoveStatuses = [];  // cached love modifiers
 const avatarCache = {};
 let currentModFiltersSettings = {};
+let currentEconomyTab = 'config';
 
 async function getOrFetchAvatar(username, elementId) {
   if (!username) return;
@@ -566,6 +567,11 @@ async function initApp() {
 
   // Proveri da li treba otvoriti settings modal na tabu za kanale
   const urlParams = new URLSearchParams(window.location.search);
+  const refCode = urlParams.get('ref');
+  if (refCode) {
+    localStorage.setItem('kickot_referral_code', refCode.trim().toUpperCase());
+  }
+
   if (urlParams.get('settings') === 'channels') {
     openSettingsModal('channels');
     // Ukloni parametre iz URL-a
@@ -1152,15 +1158,17 @@ async function addChannel() {
 async function loadAllData() {
   if (!activeChannel) return;
 
-  // Pokrećemo učitavanje asinhrono bez blokiranja celog toka (non-blocking)
-  loadCommands();
-  loadLeaderboard();
-  loadWatchtime();
-  loadMarriages();
-  loadLoveStatuses();
-  loadBotConfig();
-  loadBotStatus();
-  loadChannelLiveStatus();
+  // Sačekamo sve asinhrone pozive kako bismo znali da li je osvežavanje uspešno
+  await Promise.all([
+    loadCommands(),
+    loadLeaderboard(),
+    loadWatchtime(),
+    loadMarriages(),
+    loadLoveStatuses(),
+    loadBotConfig(),
+    loadBotStatus(),
+    loadChannelLiveStatus()
+  ]);
 
   setupRealtimeChannels();
   startLiveActivityFeed();
@@ -1168,9 +1176,40 @@ async function loadAllData() {
 
 async function refreshAllData() {
   if (!activeChannel) return;
-  showToast('info', 'Osvežavam podatke...', '🔄');
-  await loadAllData();
-  showToast('success', 'Podaci osveženi!', '✅');
+
+  const btn = document.querySelector('.topbar-refresh-btn');
+  if (!btn) return;
+
+  const originalHtml = btn.innerHTML;
+  
+  // Onemogućavamo višestruke klikove i pokrećemo rotaciju
+  btn.style.pointerEvents = 'none';
+  const icon = btn.querySelector('.refresh-icon');
+  if (icon) icon.style.animation = 'spin 0.8s linear infinite';
+
+  try {
+    showToast('info', 'Osvežavam podatke...', '🔄');
+    await loadAllData();
+    showToast('success', 'Podaci osveženi!', '✅');
+
+    // Prikaz zelenog štiklića
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+  } catch (err) {
+    console.error('Greška pri osvežavanju:', err);
+    showToast('error', 'Greška pri osvežavanju podataka.', '⚠️');
+
+    // Prikaz crvenog X znaka
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    btn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+  } finally {
+    // Vraćanje na prvobitnu ikonicu osvežavanja posle 2 sekunde
+    setTimeout(() => {
+      btn.innerHTML = originalHtml;
+      btn.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+      btn.style.pointerEvents = 'auto';
+    }, 2000);
+  }
 }
 
 // ── Commands ──────────────────────────────────────────────
@@ -1738,7 +1777,7 @@ async function loadWatchtime() {
   if (hours > 0) {
     watchtimeText = `${hours}h ${mins}min`;
   } else {
-    watchtimeText = `${mins}min`;
+    watchtimeText = `${mins} minuta`;
   }
   document.getElementById('statTotalWatchtime').textContent = watchtimeText;
 
@@ -2840,7 +2879,7 @@ async function confirmCustomBotAuth() {
   const rawName = val.trim().replace(/^@+/, '');
   const formattedBotName = `@${rawName}`;
 
-  showToast('info', 'Pokrećem Kick OAuth2 autorizaciju za bot nalog...');
+  showToast('info', 'Pokrećem Kick autorizaciju za bot nalog...');
 
   window.currentCustomBotActive = true;
   updateCustomBotStatusUI(formattedBotName, true);
@@ -3270,7 +3309,7 @@ async function toggleBotActive() {
     document.getElementById('botActiveToggle').checked = !active;
     updateBotStatusUI(!active);
   } else {
-    showToast(active ? 'success' : 'info', `Bot ${active ? 'pokrenut' : 'zaustavljen'}`, active ? '🟢' : '⭕');
+    showToast(active ? 'success' : 'info', `Bot je ${active ? 'pokrenut' : 'zaustavljen'}`, active ? '🟢' : '⭕');
     addLocalLog('INFO', active ? 'Korisnik je pokrenuo bota' : 'Korisnik je zaustavio bota');
     notifyBotToReload();
   }
@@ -3922,9 +3961,11 @@ function openModal(id) {
 function closeModal(id) {
   const modalEl = document.getElementById(id);
   if (!modalEl) return;
+  modalEl.style.pointerEvents = 'none';
   modalEl.classList.add('closing');
   setTimeout(() => {
     modalEl.classList.remove('open', 'closing');
+    modalEl.style.pointerEvents = '';
     document.body.style.overflow = '';
   }, 220);
 }
@@ -3933,7 +3974,7 @@ function handleModalBg(e, id) {
   if (e.target.id === id) closeModal(id);
 }
 
-const ALL_MODAL_IDS = ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'modFilterPenaltyModal', 'docsModal', 'settingsModal', 'storeItemModal', 'referralModal'];
+const ALL_MODAL_IDS = ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'helpModal', 'modFilterPenaltyModal', 'docsModal', 'settingsModal', 'storeItemModal', 'referralModal'];
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     ALL_MODAL_IDS.forEach(id => {
@@ -3949,8 +3990,15 @@ window.addEventListener('keydown', e => {
 // ═══════════════════════════════════════════════════════════
 let toastId = 0;
 function showToast(type, msg, iconEmoji = '💬', duration = 4000) {
-  const container = document.getElementById('toastContainer');
-  if (!container) return;
+  let container = document.getElementById('toastContainer');
+  // Ensure container is a direct child of body (fixes DOM nesting issues)
+  if (!container || container.parentElement !== document.body) {
+    if (container) container.remove();
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    container.id = 'toastContainer';
+    document.body.appendChild(container);
+  }
 
   const id = ++toastId;
   const el = document.createElement('div');
@@ -4104,19 +4152,18 @@ function openSettingsModal(activeTab = 'profile') {
       return;
     }
 
-    // Fill in fields
     const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
     const avatarVal = user.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
 
-    document.getElementById('settingsEmail').value = user.email;
-    document.getElementById('settingsName').value = name;
-    document.getElementById('settingsPassword').value = '';
-    document.getElementById('settingsConfirmPassword').value = '';
+    if (document.getElementById('settingsEmail')) document.getElementById('settingsEmail').value = user.email || '';
+    if (document.getElementById('settingsName')) document.getElementById('settingsName').value = name;
+    if (document.getElementById('settingsPassword')) document.getElementById('settingsPassword').value = '';
+    if (document.getElementById('settingsConfirmPassword')) document.getElementById('settingsConfirmPassword').value = '';
 
     setSettingsAvatarPreview(avatarVal);
     settingsUploadedAvatarBase64 = null;
 
-    modal.classList.add('open');
+    openModal('settingsModal');
     switchSettingsTab(activeTab);
   });
 }
@@ -4432,7 +4479,7 @@ async function addNewManager() {
     input.value = '';
 
     if (!profileUser) {
-      showToast('success', `Korisnik @${kickUsernameResolved} je dodat! Nalog na sajtu će mu biti aktiviran čim se prvi put prijavi preko Kick OAuth-a.`, '✅');
+      showToast('success', `Korisnik @${kickUsernameResolved} je dodat! Nalog na sajtu će mu biti aktiviran čim se prvi put prijavi preko Kick-a`, '✅');
     } else {
       showToast('success', `Korisnik @${kickUsernameResolved} je uspešno dodat kao menadžer!`, '✅');
     }
@@ -4649,6 +4696,30 @@ async function addNewChannel() {
   showToast('success', `Kanal @${newCh.username} je dodat!`, '✅');
 }
 
+      function syncOverviewCardsHeight() {
+        const ctrlCard = document.getElementById('ovCtrlCard');
+        const liveCard = document.getElementById('ovLiveCard');
+        const liveFeed = document.getElementById('botLiveFeed');
+        if (ctrlCard && liveCard && liveFeed) {
+          // Allow ctrlCard to measure its exact natural compact height
+          ctrlCard.style.height = 'auto';
+          const targetHeight = ctrlCard.offsetHeight;
+          
+          if (window.innerWidth >= 768) {
+            liveCard.style.height = targetHeight + 'px';
+            const headHeight = liveCard.querySelector('.ov-card-head')?.offsetHeight || 30;
+            const availableFeedHeight = Math.max(100, targetHeight - headHeight - 44);
+            liveFeed.style.maxHeight = availableFeedHeight + 'px';
+            liveFeed.style.height = availableFeedHeight + 'px';
+          } else {
+            liveCard.style.height = 'auto';
+            liveFeed.style.maxHeight = '250px';
+            liveFeed.style.height = 'auto';
+          }
+        }
+      }
+
+      window.addEventListener('resize', syncOverviewCardsHeight);
 
       function updateOverviewModulesUI() {
         const modules = [
@@ -4664,6 +4735,25 @@ async function addNewChannel() {
 
         const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
         const crossSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+
+        // Synchronize all header master toggles
+        const masterMap = {
+          cfgLeaderboard: 'cfgFeatureLeaderboardMaster',
+          cfgLove: 'cfgFeatureLoveMaster',
+          cfgGames: 'cfgFeatureGamesMaster',
+          cfgAutoresponse: 'cfgFeatureAutoresponseMaster',
+          cfgAnnounceTimeEnabled: 'cfgFeatureAnnouncementsMaster',
+          cfgModeration: 'cfgFeatureModerationMaster',
+          cfgSongRequestEnabled: 'cfgFeatureSongRequestMaster',
+          cfgGambleEnabled: 'cfgFeatureEconomyMaster'
+        };
+        Object.keys(masterMap).forEach(key => {
+          const toggle = document.getElementById(key);
+          const master = document.getElementById(masterMap[key]);
+          if (toggle && master) {
+            master.checked = toggle.checked;
+          }
+        });
 
         modules.forEach(m => {
           const el = document.getElementById(m.id);
@@ -4683,6 +4773,31 @@ async function addNewChannel() {
             toggleModuleOverlay(m.panelId, isEnabled);
           }
         });
+
+        setTimeout(syncOverviewCardsHeight, 20);
+      }
+
+      async function toggleModuleFromHeader(toggleId, isChecked) {
+        const toggle = document.getElementById(toggleId);
+        if (toggle) toggle.checked = isChecked;
+
+        // INSTANT SYNCHRONOUS UI UPDATE
+        updateOverviewModulesUI();
+
+        if (toggleId === 'cfgModeration') {
+          if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
+          await saveModerationSettings(true);
+          await saveBotConfig(true);
+        } else if (toggleId === 'cfgSongRequestEnabled') {
+          await saveSongRequestConfig(true);
+          await saveBotConfig(true);
+        } else if (toggleId === 'cfgGambleEnabled') {
+          await saveEconomyConfig(true);
+          await saveBotConfig(true);
+        } else {
+          await saveBotConfig(true);
+        }
+        updateOverviewModulesUI();
       }
 
       async function toggleModuleFromOverview(toggleId) {
@@ -4747,7 +4862,7 @@ async function addNewChannel() {
               await saveEconomyConfig(true);
               await saveBotConfig(true);
             } else if (toggleId === 'cfgModeration') {
-              toggleModerationPanelState();
+              if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
               await saveModerationSettings(true);
               await saveBotConfig(true);
             } else {
@@ -4804,41 +4919,18 @@ async function addNewChannel() {
         const panel = document.getElementById(panelId);
         if (!panel) return;
 
-        // Ensure relative positioning on the section
-        panel.style.position = 'relative';
-
-        // Look for existing overlay
         const existingOverlay = panel.querySelector('.module-disabled-overlay');
 
         if (active) {
+          panel.classList.remove('module-disabled-panel');
           if (existingOverlay) {
             existingOverlay.remove();
           }
-          panel.style.overflow = '';
-          panel.style.height = '';
         } else {
-          panel.style.overflow = 'hidden';
-          panel.style.height = 'calc(100vh - 120px)'; // Center overlay and prevent scrolling
+          panel.classList.add('module-disabled-panel');
           if (!existingOverlay) {
             const overlay = document.createElement('div');
             overlay.className = 'module-disabled-overlay';
-            overlay.style = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: #0a0614;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-        border-radius: var(--radius-lg);
-        padding: 40px;
-        text-align: center;
-        box-sizing: border-box;
-      `;
             overlay.innerHTML = `
         <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -4848,13 +4940,48 @@ async function addNewChannel() {
         </div>
         <h2 style="font-family: var(--font-heading); font-size: 1.5rem; font-weight: 700; color: #fff; margin: 0 0 10px 0;">Modul nije aktiviran</h2>
         <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.5; max-width: 400px; margin: 0 0 24px 0;">
-          Ovaj modul je trenutno isključen. Da biste pristupili podacima i koristili ove opcije, aktivirajte ga u podešavanjima bota.
+          Ovaj modul je trenutno isključen. Da biste pristupili podacima i koristili ove opcije, aktivirajte ga.
         </p>
-        <button class="btn btn-primary" onclick="switchPanel('config')" style="padding: 10px 24px; font-weight: 600; cursor: pointer;">Aktiviraj u Bot Config</button>
+        <button class="btn btn-primary" onclick="enableCurrentPanelModule(this)" style="padding: 10px 24px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Aktiviraj</span>
+        </button>
       `;
             panel.appendChild(overlay);
           }
         }
+      }
+
+      async function enableCurrentPanelModule(btn) {
+        const activePanel = document.querySelector('.panel.active');
+        if (!activePanel) return;
+
+        const panelId = activePanel.id;
+        const panelToToggleId = {
+          'panel-leaderboard': 'cfgLeaderboard',
+          'panel-announces': 'cfgAnnounceTimeEnabled',
+          'panel-autoresponse': 'cfgAutoresponse',
+          'panel-marriages': 'cfgLove',
+          'panel-minigames': 'cfgGames',
+          'panel-songs': 'cfgSongRequestEnabled',
+          'panel-economy': 'cfgGambleEnabled',
+          'panel-moderation': 'cfgModeration'
+        };
+
+        const toggleId = panelToToggleId[panelId];
+        if (!toggleId) return;
+
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Aktiviram...';
+        }
+
+        await toggleModuleFromHeader(toggleId, true);
+
+        const notice = activePanel.querySelector('#modDisabledNotice');
+        if (notice) notice.style.display = 'none';
+
+        showToast('success', 'Modul je uspešno aktiviran!', '⚡');
       }
 
       let liveFeedInterval = null;
@@ -5150,64 +5277,88 @@ async function addNewChannel() {
       }
 
       // ── Notification Center ────────────────────────────────────────────────────
-      let readNotifs = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+      let readNotifIds = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+      let activeNotifTab = 'obaveštenja';
+
+      // Primer realnih podataka sa ISO datumima za dinamički proračun
       let notifications = [
-        { id: 1, title: 'Bot uspešno pokrenut', desc: 'KickotBot je uspešno povezan na Vaš kanal i spreman je za rad.', time: 'Pre 5 minuta', type: 'info', read: false },
-        { id: 2, title: 'Moderator status proveren', desc: 'Uspešno verifikovan moderator status na kanalu. Svi moduli su aktivni.', time: 'Pre 10 minuta', type: 'success', read: false },
-        { id: 3, title: 'Upozorenje o moderatorskoj ulozi', desc: 'Ukoliko bot izgubi moderatorsku ulogu na kanalu, poruke i moderacija će automatski biti obustavljeni.', time: 'Pre 1 sat', type: 'warning', read: false }
+        { 
+          id: 2, 
+          title: 'Novo obaveštenje', 
+          desc: 'Ovo je najnovija poruka', 
+          timestamp: new Date().toISOString(), 
+          type: 'info' 
+        },
+        { 
+          id: 1, 
+          title: 'Starije obaveštenje', 
+          desc: 'Ovo je starija poruka', 
+          timestamp: new Date(Date.now() - 3600000).toISOString(), 
+          type: 'success' 
+        }
       ];
-      notifications.forEach(n => {
-        if (readNotifs.includes(n.id)) n.read = true;
-      });
 
       let changelogs = [
-        { version: 'v1.2.0', date: '19. jul 2026', title: 'Individualne kazne & Uređivanje', details: 'Omogućeno zasebno podešavanje kazni za svaki filter moderacije, i dodate olovkice za direktno uređivanje svih ugrađenih mini igara i bračnih komandi.' },
-        { version: 'v1.1.5', date: '19. jul 2026', title: 'Centar za obaveštenja', details: 'Kreirano zvonce u zaglavlju sa notifikacijama o radu bota i changelog-om promena.' },
-        { version: 'v1.1.0', date: '19. jul 2026', title: 'Pametno skrolovanje logova', details: 'Fiksiran scroll bug u dashboard feed-u. Skrolovanje na dno se vrši samo ukoliko ste već čitali najnovije logove.' }
+        { 
+          version: 'v0.5', 
+          date: '01. avgust 2026.', 
+          title: 'Lansiranje KickALL platforme', 
+          details: 'KickALL platforma je lansirana sa Kickot botom!' 
+        }
       ];
 
-      let activeNotifTab = 'obaveštenja';
+      // Pomoćna funkcija za prirodno relativno vreme
+      function formatRelativeTime(isoString) {
+        const date = new Date(isoString);
+        const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+        const diffMin = Math.floor(diffSec / 60);
+        const diffHours = Math.floor(diffMin / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffSec < 60) return 'Upravo sada';
+        if (diffMin < 60) return `Pre ${diffMin} min`;
+        if (diffHours < 24) return `Pre ${diffHours} h`;
+        return `Pre ${diffDays} d`;
+      }
+
+      function initNotificationCenter() {
+        updateNotifBadgeUI();
+      }
 
       function toggleNotifCenter() {
         const popover = document.getElementById('notifPopover');
         if (!popover) return;
-        const isHidden = popover.style.display === 'none';
+        const isHidden = popover.style.display === 'none' || !popover.style.display;
         popover.style.display = isHidden ? 'block' : 'none';
         if (isHidden) {
           renderNotifContent();
         }
       }
 
-      // Close popover when clicking outside
-      document.addEventListener('click', (e) => {
-        const popover = document.getElementById('notifPopover');
-        const btn = document.getElementById('notifBellBtn');
-        if (!popover || !btn) return;
-        if (btn.contains(e.target)) return;
-        if (!document.body.contains(e.target)) return; // Prevents closing when clicked item is detached during re-render
-        if (popover.contains(e.target)) return;
-        popover.style.display = 'none';
-      });
-
       function switchNotifTab(tab) {
         activeNotifTab = tab;
-
         const tabOb = document.getElementById('notifTabObaveštenja');
         const tabCh = document.getElementById('notifTabChangelog');
-
         if (!tabOb || !tabCh) return;
 
-        if (tab === 'obaveštenja') {
-          tabOb.style.color = '#fff';
-          tabOb.style.background = 'rgba(255,255,255,0.05)';
-          tabCh.style.color = 'var(--text-muted)';
-          tabCh.style.background = 'none';
-        } else {
-          tabCh.style.color = '#fff';
-          tabCh.style.background = 'rgba(255,255,255,0.05)';
-          tabOb.style.color = 'var(--text-muted)';
-          tabOb.style.background = 'none';
-        }
+        const activeStyle = {
+          color: '#fff',
+          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1))',
+          border: '1px solid rgba(139, 92, 246, 0.3)',
+          boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)',
+          fontWeight: '700'
+        };
+
+        const inactiveStyle = {
+          color: 'var(--text-muted)',
+          background: 'transparent',
+          border: '1px solid transparent',
+          boxShadow: 'none',
+          fontWeight: '600'
+        };
+
+        Object.assign(tabOb.style, tab === 'obaveštenja' ? activeStyle : inactiveStyle);
+        Object.assign(tabCh.style, tab === 'changelog' ? activeStyle : inactiveStyle);
 
         renderNotifContent();
       }
@@ -5218,57 +5369,95 @@ async function addNewChannel() {
 
         if (activeNotifTab === 'obaveštenja') {
           if (notifications.length === 0) {
-            list.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 24px; font-size: 0.82rem; font-style: italic;">Nema novih obaveštenja.</div>';
+            list.innerHTML = `
+              <div style="color: var(--text-muted); text-align: center; padding: 32px 16px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.5;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                <span>Trenutno nema novih obaveštenja.</span>
+              </div>`;
             return;
           }
 
-          list.innerHTML = notifications.map(n => {
-            let color = '#3B82F6';
-            if (n.type === 'success') color = '#10B981';
-            if (n.type === 'warning') color = '#F59E0B';
+          const sortedNotifications = [...notifications].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-            const opacityStyle = n.read ? 'opacity: 0.6;' : '';
-            const borderStyle = n.read ? '1px solid rgba(255,255,255,0.02)' : '1px solid rgba(139, 92, 246, 0.15)';
-            const bgStyle = n.read ? 'transparent' : 'rgba(255,255,255,0.02)';
+          list.innerHTML = sortedNotifications.map(n => {
+            // Provera po String vrednosti sprečava greške sa tipovima
+            const isRead = readNotifIds.includes(String(n.id));
+            let color = '#3B82F6';
+            let iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+
+            if (n.type === 'success') {
+              color = '#10B981';
+              iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+            } else if (n.type === 'warning') {
+              color = '#F59E0B';
+              iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.03 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+            }
+
+            const opacityStyle = isRead ? 'opacity: 0.55;' : '';
+            const borderStyle = isRead ? 'border: 1px solid rgba(255,255,255,0.05);' : `border: 1px solid ${color}40; box-shadow: 0 4px 14px ${color}15;`;
+            const bgStyle = isRead ? 'background: rgba(255,255,255,0.02);' : 'background: rgba(255,255,255,0.04);';
+            const formattedTime = formatRelativeTime(n.timestamp);
 
             return `
-        <div onclick="markNotifAsRead(${n.id})" style="padding: 10px; border-radius: var(--radius-md); background: ${bgStyle}; border: ${borderStyle}; transition: all 0.2s; cursor: pointer; ${opacityStyle}">
-          <div style="display: flex; gap: 8px; align-items: flex-start; text-align: left;">
-            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: ${color}; margin-top: 5px; flex-shrink: 0; box-shadow: 0 0 6px ${color};"></span>
-            <div style="flex-grow: 1;">
-              <div style="font-size: 0.82rem; font-weight: 700; color: #fff; line-height: 1.3;">${escapeHtml(n.title)}</div>
-              <div style="font-size: 0.76rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4;">${escapeHtml(n.desc)}</div>
-              <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 5px;">${n.time}</div>
-            </div>
-          </div>
-        </div>
-      `;
+              <div onclick="markNotifAsRead('${n.id}')" style="padding: 12px 14px; border-radius: 12px; ${bgStyle} ${borderStyle} transition: all 0.2s; cursor: pointer; ${opacityStyle}">
+                <div style="display: flex; gap: 10px; align-items: flex-start; text-align: left;">
+                  <div style="width: 24px; height: 24px; border-radius: 50%; background: ${color}20; color: ${color}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; border: 1px solid ${color}35;">
+                    ${iconSvg}
+                  </div>
+                  <div style="flex-grow: 1;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                      <div style="font-size: 0.83rem; font-weight: 700; color: #fff; line-height: 1.3;">${escapeHtml(n.title)}</div>
+                      <div style="font-size: 0.68rem; color: var(--text-muted); white-space: nowrap;">${formattedTime}</div>
+                    </div>
+                    <div style="font-size: 0.77rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.45;">${escapeHtml(n.desc)}</div>
+                  </div>
+                </div>
+              </div>
+            `;
           }).join('');
         } else {
-          // Changelog tab
           list.innerHTML = changelogs.map(c => `
-      <div style="padding: 10px; border-radius: var(--radius-md); background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.04);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-          <span style="font-size: 0.72rem; font-weight: 700; color: var(--app-primary); background: var(--app-primary-dim); padding: 2px 6px; border-radius: 4px;">${c.version}</span>
-          <span style="font-size: 0.65rem; color: var(--text-muted);">${c.date}</span>
-        </div>
-        <div style="font-size: 0.8rem; font-weight: 700; color: #fff; margin-bottom: 3px; text-align: left;">${escapeHtml(c.title)}</div>
-        <div style="font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4; text-align: left;">${escapeHtml(c.details)}</div>
-      </div>
-    `).join('');
+            <div style="padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); transition: all 0.2s;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 0.72rem; font-weight: 800; color: #a78bfa; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px;">${c.version}</span>
+                <span style="font-size: 0.68rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  ${c.date}
+                </span>
+              </div>
+              <div style="font-size: 0.84rem; font-weight: 700; color: #fff; margin-bottom: 4px; text-align: left;">${escapeHtml(c.title)}</div>
+              <div style="font-size: 0.77rem; color: var(--text-secondary); line-height: 1.45; text-align: left;">${escapeHtml(c.details)}</div>
+            </div>
+          `).join('');
         }
       }
 
+      function addNotification(title, desc, type = 'info') {
+        const newNotif = {
+          id: 'notif_' + Date.now(), 
+          title: title,
+          desc: desc,
+          timestamp: new Date().toISOString(),
+          type: type
+        };
+        
+        notifications.push(newNotif);
+        updateNotifBadgeUI();
+        renderNotifContent();
+      }
+
       function updateNotifBadgeUI() {
-        const hasUnread = notifications.some(n => !n.read);
+        const unreadCount = notifications.filter(n => !readNotifIds.includes(String(n.id))).length;
         const badge = document.getElementById('notifBadge');
         const btn = document.getElementById('notifBellBtn');
 
         if (badge) {
-          badge.style.display = hasUnread ? 'block' : 'none';
+          badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+          badge.innerText = unreadCount > 9 ? '9+' : unreadCount;
         }
+
         if (btn) {
-          if (hasUnread) {
+          if (unreadCount > 0) {
             btn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
             btn.style.color = '#EF4444';
             btn.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.25)';
@@ -5281,36 +5470,63 @@ async function addNewChannel() {
       }
 
       function markAllNotifsAsRead() {
-        notifications.forEach(n => n.read = true);
-
-        // Persist to localStorage
-        const readIds = notifications.map(n => n.id);
-        localStorage.setItem('read_notif_ids', JSON.stringify(readIds));
+        notifications.forEach(n => {
+          if (!readNotifIds.includes(n.id)) readNotifIds.push(n.id);
+        });
+        localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
 
         updateNotifBadgeUI();
         renderNotifContent();
-        showToast('success', 'Sva obaveštenja označena kao pročitana.', '✔');
+        if (typeof showToast === 'function') {
+          showToast('success', 'Sva obaveštenja su označena kao pročitana.', '✔');
+        }
       }
 
-      function markNotifAsRead(id) {
-        const notif = notifications.find(n => n.id === id);
-        if (notif && !notif.read) {
-          notif.read = true;
+      // Zatvaranje popovera na klik sa strane ili na taster Esc
+      document.addEventListener('click', (e) => {
+        const popover = document.getElementById('notifPopover');
+        const btn = document.getElementById('notifBellBtn');
+        if (!popover || !btn) return;
 
-          // Persist to localStorage
-          let readIds = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
-          if (!readIds.includes(id)) {
-            readIds.push(id);
-            localStorage.setItem('read_notif_ids', JSON.stringify(readIds));
+        // Ako kliknuti element više nije u dokumentu (re-render), ignorišemo
+        if (!document.body.contains(e.target)) return;
+
+        if (popover.style.display === 'block') {
+          if (!popover.contains(e.target) && !btn.contains(e.target)) {
+            popover.style.display = 'none';
           }
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const popover = document.getElementById('notifPopover');
+          if (popover && popover.style.display === 'block') {
+            popover.style.display = 'none';
+          }
+        }
+      });
+
+      function markNotifAsRead(id) {
+        const strId = String(id);
+        
+        if (!readNotifIds.includes(strId)) {
+          readNotifIds.push(strId);
+          localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
 
           updateNotifBadgeUI();
           renderNotifContent();
         }
       }
 
+      document.addEventListener('DOMContentLoaded', initNotificationCenter);
+
       function openFeedbackModal() {
         openModal('feedbackModal');
+      }
+
+      function openHelpModal() {
+        openModal('helpModal');
       }
 
       function openDocsModal() {
@@ -6084,6 +6300,7 @@ async function addNewChannel() {
 
       // ── Economy & Ranking System Logic ──
       function switchEconomyTab(tabName) {
+        currentEconomyTab = tabName;
         const configTab = document.getElementById('ecoSubPanelConfig');
         const storeTab = document.getElementById('ecoSubPanelStore');
         const lbTab = document.getElementById('ecoSubPanelLeaderboard');
@@ -6660,13 +6877,17 @@ async function addNewChannel() {
       // ═══════════════════════════════════════════════════════════
       async function openReferralModal() {
         const userMenuSm = document.getElementById('userMenuSm');
-        if (userMenuSm) userMenuSm.classList.remove('visible');
+        if (userMenuSm) userMenuSm.classList.remove('open');
 
         openModal('referralModal');
 
         if (currentUser && currentUser.id) {
-          await ensureUserHasReferralCode(currentUser.id);
-          await loadReferralData(currentUser.id);
+          try {
+            await ensureUserHasReferralCode(currentUser.id);
+            await loadReferralData(currentUser.id);
+          } catch (err) {
+            console.error('Referral load error:', err);
+          }
         }
       }
 
@@ -6748,6 +6969,24 @@ async function addNewChannel() {
             showToast('Greška pri kopiranju!', 'error');
           }
         };
+      }
+
+      function copyCustomRefEmail(btn) {
+        const email = 'contact@milanwebportal.com';
+        navigator.clipboard.writeText(email).then(() => {
+          const origHTML = btn.innerHTML;
+          btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> <span>Kopirano!</span>`;
+          btn.style.color = '#53fc18';
+          btn.style.borderColor = '#53fc18';
+          showToast('Mejl adresa uspešno kopirana!', 'success');
+          setTimeout(() => {
+            btn.innerHTML = origHTML;
+            btn.style.color = '';
+            btn.style.borderColor = '';
+          }, 2000);
+        }).catch(() => {
+          showToast('Greška pri kopiranju mejla.', 'error');
+        });
       }
 
       function updateRewardsList(rewards) {
@@ -6833,325 +7072,5 @@ async function addNewChannel() {
           closeModal('withdrawalModal');
         }
       }
-
-      // ══════════════════════════════════════════════════════════════════════════════
-      // ══ EKONOMIJA & RANKING SISTEM (KOINS) ══
-      // ══════════════════════════════════════════════════════════════════════════════
-
-      let currentEconomyTab = 'config';
-
-      function switchEconomyTab(tabName) {
-        currentEconomyTab = tabName;
-
-        const btnConfig = document.getElementById('ecoTabBtnConfig');
-        const btnStore = document.getElementById('ecoTabBtnStore');
-        const btnLeaderboard = document.getElementById('ecoTabBtnLeaderboard');
-
-        const panelConfig = document.getElementById('ecoSubPanelConfig');
-        const panelStore = document.getElementById('ecoSubPanelStore');
-        const panelLeaderboard = document.getElementById('ecoSubPanelLeaderboard');
-
-        if (btnConfig) btnConfig.className = `btn btn-sm ${tabName === 'config' ? 'btn-primary' : 'btn-outline'}`;
-        if (btnStore) btnStore.className = `btn btn-sm ${tabName === 'store' ? 'btn-primary' : 'btn-outline'}`;
-        if (btnLeaderboard) btnLeaderboard.className = `btn btn-sm ${tabName === 'leaderboard' ? 'btn-primary' : 'btn-outline'}`;
-
-        if (panelConfig) panelConfig.style.display = tabName === 'config' ? 'block' : 'none';
-        if (panelStore) panelStore.style.display = tabName === 'store' ? 'block' : 'none';
-        if (panelLeaderboard) panelLeaderboard.style.display = tabName === 'leaderboard' ? 'block' : 'none';
-
-        if (tabName === 'store') {
-          renderStoreItems();
-          renderStoreRedemptions();
-        } else if (tabName === 'leaderboard') {
-          renderEconomyLeaderboard();
-        }
-      }
-
-      function updateEconomyPreviews() {
-        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
-        const firstJoin = document.getElementById('cfgFirstInteractionBonus')?.value || 100;
-        const watchtime = document.getElementById('cfgPointsPerWatchtime')?.value || 20;
-        const subMult = document.getElementById('cfgSubMultiplier')?.value || 2.0;
-        const subBonus = document.getElementById('cfgPointsPerSub')?.value || 1000;
-        const giftBonus = document.getElementById('cfgPointsPerGiftSub')?.value || 2000;
-        const kicksBonus = document.getElementById('cfgPointsPer100Kicks')?.value || 500;
-        const streakBonus = document.getElementById('cfgPointsDailyStreak')?.value || 150;
-
-        const pFirst = document.getElementById('previewFirstJoin');
-        const pWatch = document.getElementById('previewWatchtime');
-        const pMult = document.getElementById('previewSubMult');
-        const pSub = document.getElementById('previewSubBonus');
-        const pKicks = document.getElementById('previewKicksBonus');
-        const pStreak = document.getElementById('previewDailyStreak');
-
-        if (pFirst) pFirst.textContent = `+${firstJoin} ${currencyName}`;
-        if (pWatch) pWatch.textContent = `+${watchtime} ${currencyName}`;
-        if (pMult) pMult.textContent = `${subMult}x Bonus`;
-        if (pSub) pSub.textContent = `+${subBonus} / +${giftBonus}`;
-        if (pKicks) pKicks.textContent = `+${kicksBonus} ${currencyName}`;
-        if (pStreak) pStreak.textContent = `+${streakBonus} ${currencyName}/dan`;
-      }
-
-      async function saveEconomyConfig(silent = false) {
-        if (!activeChannel) return;
-
-        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
-        const pointsPerMsg = parseInt(document.getElementById('cfgPointsPerMsg')?.value) || 5;
-        const smartChatValidation = document.getElementById('cfgSmartChatValidation')?.checked ?? true;
-        const firstInteractionBonus = parseInt(document.getElementById('cfgFirstInteractionBonus')?.value) || 100;
-        const pointsPerWatchtime = parseInt(document.getElementById('cfgPointsPerWatchtime')?.value) || 20;
-        const levelUpAnnounce = document.getElementById('cfgLevelUpAnnounce')?.checked ?? true;
-        const subMultiplier = parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0;
-        const subBonusPerMsg = parseInt(document.getElementById('cfgSubBonusPerMsg')?.value) || 10;
-        const pointsPerSub = parseInt(document.getElementById('cfgPointsPerSub')?.value) || 1000;
-        const pointsPerGiftSub = parseInt(document.getElementById('cfgPointsPerGiftSub')?.value) || 2000;
-        const pointsPer100Kicks = parseInt(document.getElementById('cfgPointsPer100Kicks')?.value) || 500;
-        const pointsDailyStreak = parseInt(document.getElementById('cfgPointsDailyStreak')?.value) || 150;
-        const pointsPerRaid = parseInt(document.getElementById('cfgPointsPerRaid')?.value) || 300;
-        const gambleEnabled = document.getElementById('cfgGambleEnabled')?.checked ?? true;
-        const maxGambleAmount = parseInt(document.getElementById('cfgMaxGambleAmount')?.value) || 5000;
-
-        const economySettings = {
-          currency_name: currencyName,
-          points_per_msg: pointsPerMsg,
-          smart_chat_validation: smartChatValidation,
-          first_interaction_bonus: firstInteractionBonus,
-          points_per_watchtime: pointsPerWatchtime,
-          level_up_announce: levelUpAnnounce,
-          sub_multiplier: subMultiplier,
-          sub_bonus_per_msg: subBonusPerMsg,
-          points_per_sub: pointsPerSub,
-          points_per_gift_sub: pointsPerGiftSub,
-          points_per_100_kicks: pointsPer100Kicks,
-          points_daily_streak: pointsDailyStreak,
-          points_per_raid: pointsPerRaid,
-          gamble_enabled: gambleEnabled,
-          max_gamble_amount: maxGambleAmount
-        };
-
-        const { error } = await sb.from('bot_config')
-          .upsert({
-            user_id: getChannelOwnerId(),
-            channel_id: activeChannel.id,
-            channel_name: activeChannel.username,
-            economy_settings: economySettings,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'channel_id' });
-
-        if (error) {
-          console.error('Economy config save error:', error);
-          if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ekonomije', '❌');
-          return;
-        }
-
-        updateEconomyPreviews();
-
-        if (!silent) {
-          showToast('success', 'Podešavanja ranking sistema sačuvana!', '✅');
-        }
-
-        notifyBotToReload();
-      }
-
-      function renderEconomyLeaderboard() {
-        const tbody = document.getElementById('ecoLeaderboardTbody');
-        if (!tbody) return;
-
-        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
-        const q = (document.getElementById('ecoLbSearchInput')?.value || '').toLowerCase();
-
-        let rows = (allLeaderboard || []).slice();
-        if (q) {
-          rows = rows.filter(r => (r.display_name || r.username || '').toLowerCase().includes(q));
-        }
-
-        rows.sort((a, b) => (b.points || 0) - (a.points || 0));
-
-        if (rows.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="5" class="table-empty">Nema pronađenih korisnika na rang listi.</td></tr>`;
-          return;
-        }
-
-        tbody.innerHTML = rows.map((row, i) => {
-          const avatarKey = (row.username || '').toLowerCase();
-          const cachedUrl = avatarCache[avatarKey];
-          const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
-          const avatarStyle = hasAvatar
-            ? `background-image:url('${cachedUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
-            : '';
-          const avatarContent = hasAvatar ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
-
-          if (!hasAvatar && row.username) {
-            setTimeout(() => {
-              getOrFetchAvatar(row.username, `ecolb-avatar-${i}`);
-            }, 40 * i);
-          }
-
-          const rankBadge = i === 0
-            ? `<span style="background: rgba(251, 191, 36, 0.12); color: #FBBF24; border: 1px solid rgba(251, 191, 36, 0.25); padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"/></svg> #1</span>`
-            : i === 1
-              ? `<span style="background: rgba(148, 163, 184, 0.12); color: #94A3B8; border: 1px solid rgba(148, 163, 184, 0.25); padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;">#2</span>`
-              : i === 2
-                ? `<span style="background: rgba(180, 83, 9, 0.12); color: #F59E0B; border: 1px solid rgba(180, 83, 9, 0.25); padding: 3px 10px; border-radius: 20px; font-weight: 800; font-size: 0.78rem; display: inline-flex; align-items: center; gap: 4px;">#3</span>`
-                : `<span style="color: var(--text-muted); font-weight: 600; font-family: var(--font-mono); font-size: 0.85rem; padding-left: 6px;">#${i + 1}</span>`;
-
-          return `
-      <tr>
-        <td>${rankBadge}</td>
-        <td>
-          <div style="display:flex; align-items:center; gap:10px;">
-            <div id="ecolb-avatar-${i}" style="width:28px; height:28px; border-radius:50%; background:var(--app-gradient); display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700; flex-shrink:0; ${avatarStyle}">
-              ${avatarContent}
-            </div>
-            <span style="font-weight:600; color:var(--text-primary);">${escapeHtml(row.display_name || row.username)}</span>
-          </div>
-        </td>
-        <td>
-          <span class="td-cmd" style="color: #eab308; background: rgba(234, 179, 8, 0.08); border-color: rgba(234, 179, 8, 0.2);">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>
-            ${(row.points || 0).toLocaleString()} ${currencyName}
-          </span>
-        </td>
-        <td style="color:var(--text-secondary); font-weight:500;"><span class="td-num">${formatPorukeCount(row.points || 0)} poruka</span></td>
-        <td style="text-align:right; color:var(--text-muted); font-size:0.82rem;">${fmtDate(row.updated_at)}</td>
-      </tr>
-    `;
-        }).join('');
-      }
-
-      let localStoreItems = [
-        { id: 'item_1', name: 'VIP Rola (1 Nedelja)', cost: 5000, description: 'Dobij VIP rolu u četu na 7 dana.', enabled: true },
-        { id: 'item_2', name: 'Zatraži Pesmu (!sr)', cost: 1000, description: 'Zatraži pesmu bez obzira na tvoj rank u četu.', enabled: true },
-        { id: 'item_3', name: 'Mute Igrača na 5 Min', cost: 3000, description: 'Privremeno utišaj drugog gledaoca u četu.', enabled: true }
-      ];
-
-      let localStoreRedemptions = [
-        { id: 'red_1', created_at: new Date(Date.now() - 3600000).toISOString(), username: 'Stefan_BG', item_name: 'VIP Rola (1 Nedelja)', cost: 5000, status: 'completed' },
-        { id: 'red_2', created_at: new Date(Date.now() - 7200000).toISOString(), username: 'Marko123', item_name: 'Zatraži Pesmu (!sr)', cost: 1000, status: 'pending' }
-      ];
-
-      function renderStoreItems() {
-        const grid = document.getElementById('storeItemsGrid');
-        if (!grid) return;
-        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
-
-        if (localStoreItems.length === 0) {
-          grid.innerHTML = `<div style="grid-column: 1/-1; padding: 24px; text-align: center; color: var(--text-muted);">Nema artikala u prodavnici. Kliknite na "+ Dodaj novi artikal" iznad.</div>`;
-          return;
-        }
-
-        grid.innerHTML = localStoreItems.map(item => `
-    <div class="config-section" style="padding: 16px; display: flex; flex-direction: column; justify-content: space-between;">
-      <div>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-          <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: var(--text-primary);">${escapeHtml(item.name)}</h4>
-          <span style="background: rgba(234,179,8,0.15); color: #eab308; border: 1px solid rgba(234,179,8,0.3); padding: 2px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 700; white-space: nowrap;">
-            ${item.cost} ${currencyName}
-          </span>
-        </div>
-        <p style="font-size: 0.83rem; color: var(--text-muted); margin: 0 0 12px 0; line-height: 1.4;">${escapeHtml(item.description || '')}</p>
-      </div>
-      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 10px; margin-top: 8px;">
-        <span style="font-size: 0.78rem; color: ${item.enabled ? '#53fc18' : 'var(--text-muted)'}; font-weight: 600; display: flex; align-items: center; gap: 5px;">
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="${item.enabled ? '#53fc18' : 'var(--text-muted)'}"><circle cx="12" cy="12" r="10"/></svg>
-          ${item.enabled ? 'Aktivno' : 'Neaktivno'}
-        </span>
-        <button class="btn btn-outline btn-sm" onclick="deleteStoreItem('${item.id}')" style="color: #ef4444; border-color: rgba(239,68,68,0.3); padding: 3px 10px; font-size: 0.75rem;">Ukloni</button>
-      </div>
-    </div>
-  `).join('');
-      }
-
-      function renderStoreRedemptions() {
-        const tbody = document.getElementById('storeRedemptionsTbody');
-        if (!tbody) return;
-        const currencyName = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
-
-        if (localStoreRedemptions.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="table-empty">Nema istorije kupovina.</td></tr>`;
-          return;
-        }
-
-        tbody.innerHTML = localStoreRedemptions.map(r => {
-          let statusBadge = '';
-          if (r.status === 'pending') {
-            statusBadge = `<span style="background: rgba(245, 158, 11, 0.12); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.25); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Na čekanju</span>`;
-          } else if (r.status === 'completed') {
-            statusBadge = `<span style="background: rgba(83, 252, 24, 0.12); color: var(--kick-green); border: 1px solid rgba(83, 252, 24, 0.25); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Odobreno</span>`;
-          } else {
-            statusBadge = `<span style="background: rgba(239, 68, 68, 0.12); color: #EF4444; border: 1px solid rgba(239, 68, 68, 0.25); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; display: inline-flex; align-items: center; gap: 5px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Odbijeno</span>`;
-          }
-
-          return `
-      <tr>
-        <td style="color:var(--text-muted); font-size:0.83rem;">${fmtDate(r.created_at)}</td>
-        <td style="font-weight:600; color:var(--text-primary);">${escapeHtml(r.username)}</td>
-        <td style="font-weight:600; color:var(--text-secondary);">${escapeHtml(r.item_name)}</td>
-        <td>
-          <span class="td-cmd" style="color: #eab308; background: rgba(234, 179, 8, 0.08); border-color: rgba(234, 179, 8, 0.2);">
-            ${r.cost} ${currencyName}
-          </span>
-        </td>
-        <td>${statusBadge}</td>
-        <td style="text-align:right;">
-          ${r.status === 'pending' ? `
-            <button class="btn btn-primary btn-sm" onclick="updateRedemptionStatus('${r.id}', 'completed')" style="padding: 4px 12px; font-size: 0.78rem; margin-right: 4px; display: inline-flex; align-items: center; gap: 4px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-              Odobri
-            </button>
-            <button class="btn btn-outline btn-sm" onclick="updateRedemptionStatus('${r.id}', 'rejected')" style="padding: 4px 12px; font-size: 0.78rem; color: #ef4444; border-color: rgba(239,68,68,0.3); display: inline-flex; align-items: center; gap: 4px;">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              Odbij
-            </button>
-          ` : '<span style="color:var(--text-muted); font-size:0.8rem; font-weight: 500;">Završeno</span>'}
-        </td>
-      </tr>
-    `;
-        }).join('');
-      }
-
-      function updateRedemptionStatus(id, newStatus) {
-        const item = localStoreRedemptions.find(x => x.id === id);
-        if (item) {
-          item.status = newStatus;
-          renderStoreRedemptions();
-          showToast(newStatus === 'completed' ? 'success' : 'info', `Kupovina ${newStatus === 'completed' ? 'odobrena' : 'odbijena'}.`, newStatus === 'completed' ? '✅' : 'ℹ️');
-        }
-      }
-
-      function deleteStoreItem(id) {
-        localStoreItems = localStoreItems.filter(x => x.id !== id);
-        renderStoreItems();
-        showToast('info', 'Artikal uklonjen iz prodavnice.', '🗑️');
-      }
-
-      function openCreateStoreItemModal() {
-        const name = prompt('Unesite naziv novog artikla za prodavnicu:');
-        if (!name) return;
-        const costStr = prompt('Unesite cenu artikla u Koins-ima:');
-        const cost = parseInt(costStr) || 1000;
-        const desc = prompt('Unesite kratak opis artikla (opciono):') || '';
-
-        localStoreItems.push({
-          id: 'item_' + Date.now(),
-          name: name.trim(),
-          cost: cost,
-          description: desc.trim(),
-          enabled: true
-        });
-
-        renderStoreItems();
-        showToast('success', `Artikal "${name}" uspešno dodat u prodavnicu!`, '🛍️');
-      }
-
-      window.switchEconomyTab = switchEconomyTab;
-      window.updateEconomyPreviews = updateEconomyPreviews;
-      window.saveEconomyConfig = saveEconomyConfig;
-      window.renderEconomyLeaderboard = renderEconomyLeaderboard;
-      window.renderStoreItems = renderStoreItems;
-      window.renderStoreRedemptions = renderStoreRedemptions;
-      window.updateRedemptionStatus = updateRedemptionStatus;
-      window.deleteStoreItem = deleteStoreItem;
-      window.openCreateStoreItemModal = openCreateStoreItemModal;
 
       initAuth();

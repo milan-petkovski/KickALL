@@ -18,6 +18,17 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
 
 let currentUser = null;
 
+// Track Referral Code from URL
+(function checkReferralParam() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) {
+      localStorage.setItem('kickot_referral_code', ref.trim().toUpperCase());
+    }
+  } catch (e) {}
+})();
+
 // ── Translations ───────────────────────────────────────────
 const translations = {
   sr: {
