@@ -45,17 +45,17 @@
 
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header" style="display: flex; align-items: center; gap: 12px; justify-content: flex-start;">
-        <a href="../dashboard.html" class="back-to-router-btn" title="Nazad na ruter (KickAll)" style="flex-shrink: 0;">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <div class="sidebar-header">
+        <a href="../dashboard.html" class="sidebar-header-btn back-btn" title="Nazad na KickALL">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </a>
-        <a href="index.html" class="sidebar-logo" style="display: flex; align-items: center;">
-          <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 42px;">
+        <a href="index.html" class="sidebar-logo">
+          <img src="assets/logo.png" alt="Kickot Logo" class="logo-img">
         </a>
-        <a href="https://paypal.me/milanwebportal" target="_blank" title="Kupi mi kafu" style="margin-left: auto; color: #8B5A2B; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: rgba(139, 90, 43, 0.08); border: 1px solid rgba(139, 90, 43, 0.2); transition: all 0.2s;" onmouseover="this.style.background='rgba(139, 90, 43, 0.15)'" onmouseout="this.style.background='rgba(139, 90, 43, 0.08)'">
+        <a href="https://paypal.me/milanwebportal" target="_blank" class="sidebar-header-btn coffee-btn" title="Kupi mi kafu">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M17 8h1a4 4 0 1 1 0 8h-1"></path>
             <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path>
@@ -97,11 +97,10 @@
       <nav class="sidebar-nav">
         <div class="nav-section-label">Pregled</div>
         <button class="nav-item active" data-panel="overview" onclick="switchPanel('overview')">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="3" y="3" width="7" height="7" />
-            <rect x="14" y="3" width="7" height="7" />
-            <rect x="14" y="14" width="7" height="7" />
-            <rect x="3" y="14" width="7" height="7" />
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
           </svg>
           Overview
         </button>
@@ -177,6 +176,17 @@
           </svg>
           Song Request
         </button>
+        <button class="nav-item" data-panel="economy" onclick="switchPanel('economy')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+            <path d="M4 22h16"></path>
+            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path>
+            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path>
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
+          </svg>
+          Ranking sistem
+        </button>
 
         <div class="nav-section-label">Upravljanje</div>
         <button class="nav-item" data-panel="config" onclick="switchPanel('config')">
@@ -203,6 +213,17 @@
             <div class="user-plan" id="sidebarPlan">Free</div>
           </div>
           <div class="user-menu-sm" id="userMenuSm">
+            <button onclick="openReferralModal()" class="dropdown-item">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+                <path d="M20 12v10H4V12"/>
+                <path d="M22 7H2v5h20V7z"/>
+                <path d="M12 22V7"/>
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+              </svg>
+              <span>Referral Program</span>
+            </button>
             <button onclick="openFeedbackModal()" class="dropdown-item">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                 stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
@@ -460,15 +481,36 @@
 
                 <!-- Module Status Inline List -->
                 <div style="font-size: 0.8rem; margin-bottom: 16px;">
-                  <div style="font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; margin-bottom: 8px;">Statusi aktivnih modula</div>
-                  <div style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.75rem;">
-                    <span id="ovStatusLeaderboard" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Leaderboard ✔</span>
-                    <span id="ovStatusWatchtime" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Watchtime ✔</span>
-                    <span id="ovStatusGames" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Mini igre ✔</span>
-                    <span id="ovStatusLove" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Ljubav ✔</span>
-                    <span id="ovStatusInteraction" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Interakcija ✔</span>
-                    <span id="ovStatusModeration" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Moderacija ✔</span>
-                    <span id="ovStatusSongRequest" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); padding: 3px 8px; border-radius: 4px; display: inline-block;">Song Request ✔</span>
+                  <div style="font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 6px; margin-bottom: 10px;">Statusi aktivnih modula</div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                    <span id="ovStatusLeaderboard" class="module-status-badge active" onclick="toggleModuleFromOverview('cfgLeaderboard')" style="cursor: pointer;">
+                      <span>Leaderboard</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    <span id="ovStatusWatchtime" class="module-status-badge active" onclick="toggleModuleFromOverview('cfgWatchtime')" style="cursor: pointer;">
+                      <span>Watchtime</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    <span id="ovStatusGames" class="module-status-badge active" onclick="toggleModuleFromOverview('cfgGames')" style="cursor: pointer;">
+                      <span>Mini igre</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    <span id="ovStatusLove" class="module-status-badge active" onclick="toggleModuleFromOverview('cfgLove')" style="cursor: pointer;">
+                      <span>Ljubav</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    <span id="ovStatusInteraction" class="module-status-badge active" onclick="toggleModuleFromOverview('cfgAutoresponse')" style="cursor: pointer;">
+                      <span>Interakcija</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    <span id="ovStatusModeration" class="module-status-badge active" onclick="toggleModuleFromOverview('cfgModeration')" style="cursor: pointer;">
+                      <span>Moderacija</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    <span id="ovStatusSongRequest" class="module-status-badge active" onclick="toggleModuleFromOverview('cfgSongRequestEnabled')" style="cursor: pointer;">
+                      <span>Song Request</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -569,8 +611,7 @@
             <div
               style="flex: 1; display: flex; justify-content: flex-start; align-items: center; gap: 8px; min-width: 150px;">
               <span style="font-size: 0.8rem; color: var(--text-muted);">Prikaži:</span>
-              <select class="select-input" id="cmdLimitSelect" onchange="changeCommandsLimit(this.value)"
-                style="padding: 4px 8px; font-size: 0.8rem; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: var(--text-main);">
+              <select class="select-input select-input-sm" id="cmdLimitSelect" onchange="changeCommandsLimit(this.value)">
                 <option value="10">10</option>
                 <option value="25">25</option>
                 <option value="50">50</option>
@@ -710,8 +751,7 @@
             <div
               style="flex: 1; display: flex; justify-content: flex-start; align-items: center; gap: 8px; min-width: 150px;">
               <span style="font-size: 0.8rem; color: var(--text-muted);">Prikaži:</span>
-              <select class="select-input" id="lbLimitSelect" onchange="changeLeaderboardLimit(this.value)"
-                style="padding: 4px 8px; font-size: 0.8rem; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); color: var(--text-main);">
+              <select class="select-input select-input-sm" id="lbLimitSelect" onchange="changeLeaderboardLimit(this.value)">
                 <option value="15">15</option>
                 <option value="30">30</option>
                 <option value="50">50</option>
@@ -928,14 +968,13 @@
           </div>
         </section>
 
-        <!-- ══ MINI IGRE ══ -->
+        <!-- ══ MINI IGRE & KOCKANJE POENIMA ══ -->
         <section id="panel-minigames" class="panel">
           <div class="panel-header">
             <div>
               <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
-                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: var(--app-primary-dim); color: var(--app-primary);">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-                    stroke-linecap="round" stroke-linejoin="round">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: rgba(83, 252, 24, 0.15); color: #53fc18; border: 1px solid rgba(83, 252, 24, 0.3);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="6" width="20" height="12" rx="3"></rect>
                     <line x1="6" y1="12" x2="10" y2="12"></line>
                     <line x1="8" y1="10" x2="8" y2="14"></line>
@@ -943,86 +982,199 @@
                     <line x1="18" y1="11" x2="18.01" y2="11"></line>
                   </svg>
                 </div>
-                <span>Mini igre</span>
+                <span>Mini Igre & Zabava</span>
               </h1>
-              <p class="panel-desc">Pregled svih ugrađenih mini igara za tvoje gledaoce.</p>
+              <p class="panel-desc">Pregled ugrađenih zabavnih komandi za čet i upravljanje kazino igrama sa poenima.</p>
             </div>
           </div>
 
-          <div class="config-grid" style="grid-template-columns: 1fr; margin-bottom: 2rem;">
-            <div class="config-section">
-              <h3 class="config-section-title"
-                style="color: var(--app-primary); font-size: 1.15rem; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 15px;">
-                Dostupne komande za zabavu
-              </h3>
-              <div class="builtin-grid"
-                style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !duel @korisnik</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">
-                    Pokreće simulaciju epske borbe između tebe i mete (ili dva označena čitera). Ishod je slučajan uz
-                    duhovit opis i detalje borbe.
-                  </div>
+          <!-- 1. KLASIČNE ZABAVNE ČET IGRE (PRVA LINIJA) -->
+          <div style="margin-bottom: 28px;">
+            <h3 style="margin: 0 0 14px 0; font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>Klasične Komande za Zabavu</span>
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px;">
+              
+              <div class="config-section" style="padding: 16px;">
+                <div style="font-family: var(--font-mono); color: #a78bfa; font-weight: 700; font-size: 0.92rem; margin-bottom: 6px;">!duel @korisnik</div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+                  Pokreće simulaciju epske borbe između tebe i mete. Ishod je slučajan uz duhovit opis borbe.
                 </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !roll @korisnik</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">
-                    Dvoboj u bacanju kockica (1-100). Veći broj pobeđuje. Legendaran broj <strong>67</strong> donosi
-                    automatsku pobedu!
-                  </div>
+              </div>
+
+              <div class="config-section" style="padding: 16px;">
+                <div style="font-family: var(--font-mono); color: #a78bfa; font-weight: 700; font-size: 0.92rem; margin-bottom: 6px;">!roll @korisnik</div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+                  Dvoboj u bacanju kockica (1-100). Veći broj pobeđuje. Legendaran broj <strong style="color:#53fc18;">67</strong> donosi automatsku pobedu!
                 </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !iq [@korisnik]</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">
-                    Meri koeficijent inteligencije pošiljaocu ili tagovanoj osobi uz urnebesne balkanske komentare.
-                  </div>
+              </div>
+
+              <div class="config-section" style="padding: 16px;">
+                <div style="font-family: var(--font-mono); color: #a78bfa; font-weight: 700; font-size: 0.92rem; margin-bottom: 6px;">!iq [@korisnik]</div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+                  Meri koeficijent inteligencije pošiljaocu ili tagovanoj osobi uz urnebesne balkanske komentare.
                 </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !samar @korisnik</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">
-                    Zalepi šamarčinu izabranom korisniku! Bot bira nasumičan smešan predmet (mokra krpa, pokvaren
-                    parizer, dvolitra piva...).
-                  </div>
+              </div>
+
+              <div class="config-section" style="padding: 16px;">
+                <div style="font-family: var(--font-mono); color: #a78bfa; font-weight: 700; font-size: 0.92rem; margin-bottom: 6px;">!samar @korisnik</div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+                  Zalepi šamarčinu izabranom korisniku! Bot bira nasumičan smešan predmet (mokra krpa, pokvaren parizer, dvolitra piva...).
                 </div>
-                <div class="builtin-card"
-                  style="background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px;">
-                  <div class="builtin-cmd"
-                    style="font-family: var(--font-mono); color: var(--app-primary); font-weight: bold; font-size: 0.95rem; margin-bottom: 5px;">
-                    !rulet</div>
-                  <div class="builtin-desc" style="font-size: 0.85rem; color: var(--text-muted);">
-                    Ruski rulet sa revolverom od 6 komora. Šansa 1 od 6 da popiješ simulirani metak! Da li imaš sreće
-                    danas?
+              </div>
+
+              <div class="config-section" style="padding: 16px;">
+                <div style="font-family: var(--font-mono); color: #a78bfa; font-weight: 700; font-size: 0.92rem; margin-bottom: 6px;">!rulet (Ruski rulet)</div>
+                <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+                  Ruski rulet sa revolverom od 6 komora. Šansa 1 od 6 da popiješ simulirani metak i timeout sa strima!
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- 2. KAZINO IGRE SA ULOGOM POENA (DRUGA LINIJA) -->
+          <div style="margin-bottom: 24px; border-top: 1px solid var(--border-subtle); padding-top: 20px;">
+            <h3 style="margin: 0 0 14px 0; font-size: 1.1rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>
+              <span>Kazino Igre sa Ulogom Poena (Ranking Sistem)</span>
+            </h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+              
+              <!-- Rulet -->
+              <div class="config-section" style="padding: 20px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(239, 68, 68, 0.15); display: flex; align-items: center; justify-content: center; color: #ef4444;">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/><path d="M12 12l4.5-4.5"/></svg>
+                    </div>
+                    <h4 style="margin: 0; font-size: 1.05rem; color: #fff;">Rulet (Roulette)</h4>
                   </div>
+                  <span style="font-size: 0.75rem; font-weight: 700; color: #ef4444; background: rgba(239, 68, 68, 0.15); padding: 2px 8px; border-radius: 10px;">36x Payout</span>
+                </div>
+                <p style="margin: 0 0 14px 0; font-size: 0.83rem; color: var(--text-muted); line-height: 1.4;">
+                  Gledalac gađa tačan broj od 0 do 36 (dobija **36x**) ili se kladi na crvenu/crnu/par/nepar (dobija **2x**).
+                </p>
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 0.78rem; color: #53fc18;">
+                  !rulet &lt;broj/crvena/crna&gt; &lt;ulog&gt;
+                </div>
+              </div>
+
+              <!-- Slot Mašina -->
+              <div class="config-section" style="padding: 20px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(234, 179, 8, 0.15); display: flex; align-items: center; justify-content: center; color: #eab308;">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="3"/><circle cx="7" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="17" cy="12" r="1.5"/></svg>
+                    </div>
+                    <h4 style="margin: 0; font-size: 1.05rem; color: #fff;">Slot (Tri Voćkice)</h4>
+                  </div>
+                  <span style="font-size: 0.75rem; font-weight: 700; color: #eab308; background: rgba(234, 179, 8, 0.15); padding: 2px 8px; border-radius: 10px;">Jackpot 50x</span>
+                </div>
+                <p style="margin: 0 0 14px 0; font-size: 0.83rem; color: var(--text-muted); line-height: 1.4;">
+                  3 identične voćkice donose do 10x ili 50x Jackpot! Dve voćkice vraćaju 2x ulog.
+                </p>
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 0.78rem; color: #53fc18;">
+                  !slot &lt;ulog&gt; ili !slots &lt;ulog&gt;
+                </div>
+              </div>
+
+              <!-- Gamble / Coinflip -->
+              <div class="config-section" style="padding: 20px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(167, 139, 250, 0.15); display: flex; align-items: center; justify-content: center; color: #a78bfa;">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/></svg>
+                    </div>
+                    <h4 style="margin: 0; font-size: 1.05rem; color: #fff;">Gamble / Coinflip</h4>
+                  </div>
+                  <span style="font-size: 0.75rem; font-weight: 700; color: #a78bfa; background: rgba(167, 139, 250, 0.15); padding: 2px 8px; border-radius: 10px;">2x Dupliranje</span>
+                </div>
+                <p style="margin: 0 0 14px 0; font-size: 0.83rem; color: var(--text-muted); line-height: 1.4;">
+                  50/50 klasično kockanje sa novčićem (Pismo ili Glava) za udvostručenje uloga poena.
+                </p>
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 0.78rem; color: #53fc18;">
+                  !gamble &lt;pismo/glava&gt; &lt;ulog&gt;
+                </div>
+              </div>
+
+              <!-- Točak Sreće -->
+              <div class="config-section" style="padding: 20px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                  <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(59, 130, 246, 0.15); display: flex; align-items: center; justify-content: center; color: #3b82f6;">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>
+                    </div>
+                    <h4 style="margin: 0; font-size: 1.05rem; color: #fff;">Točak Sreće (Wheel)</h4>
+                  </div>
+                  <span style="font-size: 0.75rem; font-weight: 700; color: #3b82f6; background: rgba(59, 130, 246, 0.15); padding: 2px 8px; border-radius: 10px;">Multi-Level</span>
+                </div>
+                <p style="margin: 0 0 14px 0; font-size: 0.83rem; color: var(--text-muted); line-height: 1.4;">
+                  Vrtenje točka sreće sa množiocima 0x, 0.5x, 1.5x, 2x, 3x i 5x uloga.
+                </p>
+                <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 0.78rem; color: #53fc18;">
+                  !tocak &lt;ulog&gt; ili !wheel &lt;ulog&gt;
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- 3. CONFIG & LIVE SIMULATOR (TREĆA LINIJA) -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; border-top: 1px solid var(--border-subtle); padding-top: 20px;">
+            
+            <!-- Controls -->
+            <div class="config-section" style="padding: 24px;">
+              <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; color: var(--text-primary);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><rect x="2" y="6" width="20" height="12" rx="3"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
+                <span>Podešavanje Mini Igara na Kanalu</span>
+              </h4>
+              <div class="config-fields">
+                <div class="config-field" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                  <div>
+                    <label class="config-label" style="margin: 0;">Omogući sve mini igre u četu</label>
+                    <span class="config-hint" style="display: block;">Dozvoljava gledaocima da ulažu poene u igrama</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="cfgMinigamesEnabled" checked>
+                    <span class="toggle-track"></span>
+                  </label>
+                </div>
+                <div class="config-field" style="margin-bottom: 16px;">
+                  <label class="config-label">Maksimalni ulog po igri (Max Bet):</label>
+                  <input type="number" id="cfgMinigamesMaxBet" class="form-input" min="10" value="5000">
+                </div>
+                <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+                  <a href="#" onclick="switchPanel('economy'); switchEconomyTab('config'); return false;" style="font-size: 0.82rem; color: #a78bfa; text-decoration: underline;">Poseti Ranking sistem postojanja valute →</a>
+                  <button class="btn btn-primary" onclick="saveMinigamesConfig()" style="padding: 8px 18px; font-weight: 600;">Sačuvaj Podešavanja</button>
                 </div>
               </div>
             </div>
 
-            <!-- Premium Crvena Napomena -->
-            <div class="info-banner"
-              style="margin-top: 2.5rem; background: rgba(239, 68, 68, 0.03); border: 1px solid rgba(239, 68, 68, 0.15); border-left: 4px solid #EF4444; padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 10px; width: 100%;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5"
-                style="flex-shrink: 0; display: block;">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 16v-4M12 8h.01"></path>
-              </svg>
-              <span style="font-size: 0.85rem; color: #EF4444; line-height: 1.2; display: inline-block;">
-                Ukoliko želiš da uključiš/isključiš ili podesiš ove opcije, poseti tab <a href="#"
-                  onclick="switchPanel('config'); return false;"
-                  style="color: #EF4444; font-weight: 700; text-decoration: underline;">Bot Config</a>.
-              </span>
+            <!-- Live Simulator -->
+            <div class="config-section" style="padding: 24px;">
+              <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; color: var(--text-primary);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span>Test Simulator Mini Igara</span>
+              </h4>
+              <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+                <select id="simGameType" class="form-input" style="flex: 1;">
+                  <option value="slots">🎰 Slot (Tri Voćkice)</option>
+                  <option value="roulette">🎡 Rulet (Broj 0-36 ili Crvena/Crna)</option>
+                  <option value="coinflip">🪙 Coinflip (Pismo/Glava)</option>
+                  <option value="wheel">🎯 Točak Sreće (Wheel)</option>
+                </select>
+                <input type="number" id="simBetAmount" class="form-input" value="100" style="width: 90px;" placeholder="Ulog">
+                <button class="btn btn-primary" onclick="runSimulatedGame()" style="white-space: nowrap;">Testiraj</button>
+              </div>
+              <div id="simGameResult" style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 16px; min-height: 80px; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text-muted);">
+                Izaberi igru i klikni "Testiraj" da vidiš kako komanda reaguje u četu!
+              </div>
             </div>
+
+          </div>
+
         </section>
 
         <!-- ══ UGRAĐENE KOMANDE ══ -->
@@ -2249,6 +2401,8 @@
         </section>
 
 
+
+
         <!-- ══ SONG REQUEST & MUSIC PLAYER ══ -->
         <section id="panel-songs" class="panel">
           <div class="panel-header">
@@ -2412,6 +2566,372 @@
             </div>
 
           </div>
+        </section>
+
+        <!-- ══ EKONOMIJA & NIVOI ══ -->
+        <section id="panel-economy" class="panel">
+          <div class="panel-header">
+            <div>
+              <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: var(--radius-md); background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                    <path d="M4 22h16"></path>
+                    <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path>
+                    <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path>
+                    <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
+                  </svg>
+                </div>
+                <span>Ranking sistem</span>
+              </h1>
+              <p class="panel-desc">Podešavanje stope XP-a, naziva valute poena, pravila kockanja i upravljanje prodavnicom nagrada.</p>
+            </div>
+          </div>
+
+          <!-- Sub-Nav Tabs -->
+          <div style="display: flex; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+            <button class="btn btn-sm btn-primary" id="ecoTabBtnConfig" onclick="switchEconomyTab('config')" style="display:flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+              <span>Postavke XP-a & Valute</span>
+            </button>
+            <button class="btn btn-sm btn-outline" id="ecoTabBtnGambling" onclick="switchEconomyTab('gambling')" style="display:flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="3"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
+              <span>Kazino & Kockanje</span>
+            </button>
+            <button class="btn btn-sm btn-outline" id="ecoTabBtnStore" onclick="switchEconomyTab('store')" style="display:flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+              <span>Prodavnica & Zahtevi</span>
+            </button>
+            <button class="btn btn-sm btn-outline" id="ecoTabBtnLeaderboard" onclick="switchEconomyTab('leaderboard')" style="display:flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+              <span>Rang Lista Nivoa</span>
+            </button>
+          </div>
+
+          <!-- SUB-PANEL 1: CONFIG -->
+          <div id="ecoSubPanelConfig" class="eco-subpanel">
+            
+            <!-- Visual Breakdown Banner -->
+            <div class="config-section" style="padding: 20px; margin-bottom: 24px; background: rgba(83, 252, 24, 0.03); border: 1px solid rgba(83, 252, 24, 0.15);">
+              <h3 style="margin: 0 0 14px 0; font-size: 1.05rem; font-weight: 700; color: #53fc18; display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span>Pregled Načina Dobijanja Poena na Tvom Kanalu</span>
+              </h3>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                
+                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(83, 252, 24, 0.15); color: #53fc18; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">👋</div>
+                  <div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Prva Interakcija</div>
+                    <div style="font-weight: 700; color: #fff; font-size: 0.92rem;" id="previewFirstJoin">+100 Poena</div>
+                  </div>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(59, 130, 246, 0.15); color: #3b82f6; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">⏱️</div>
+                  <div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Gledanje (Svakih 5 min)</div>
+                    <div style="font-weight: 700; color: #fff; font-size: 0.92rem;" id="previewWatchtime">+20 Poena</div>
+                  </div>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(234, 179, 8, 0.15); color: #eab308; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">⭐</div>
+                  <div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Sub Multiplikator</div>
+                    <div style="font-weight: 700; color: #fff; font-size: 0.92rem;" id="previewSubMult">2.0x Bonus</div>
+                  </div>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(167, 139, 250, 0.15); color: #a78bfa; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">🎁</div>
+                  <div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Novi Sub / Gift Sub</div>
+                    <div style="font-weight: 700; color: #fff; font-size: 0.92rem;" id="previewSubBonus">+1,000 / +2,000</div>
+                  </div>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(239, 68, 68, 0.15); color: #ef4444; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">⚡</div>
+                  <div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Donacija na 100 KICKs</div>
+                    <div style="font-weight: 700; color: #fff; font-size: 0.92rem;" id="previewKicksBonus">+500 Poena</div>
+                  </div>
+                </div>
+
+                <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(236, 72, 153, 0.15); color: #ec4899; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0;">🔥</div>
+                  <div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted);">Dnevni Niz (Daily Streak)</div>
+                    <div style="font-weight: 700; color: #fff; font-size: 0.92rem;" id="previewDailyStreak">+150 Poena/dan</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Configuration Cards Grid -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+              
+              <!-- Card 1: Valuta i Aktivnost u Četu -->
+              <div class="config-section" style="padding: 24px;">
+                <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; color: var(--text-primary);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.5"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>
+                  <span>Naziv Valute & Poruke u Četu</span>
+                </h4>
+                <div class="config-fields">
+                  <div class="config-field">
+                    <label class="config-label">Naziv valute (npr. KickCoins, Poeni, Zvezdice):</label>
+                    <input type="text" id="cfgCurrencyName" class="form-input" value="KickCoins">
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">XP po poruci u četu:</label>
+                    <input type="number" id="cfgXpPerMsg" class="form-input" min="0" value="15">
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">Poeni po poruci u četu:</label>
+                    <input type="number" id="cfgPointsPerMsg" class="form-input" min="0" value="5">
+                  </div>
+                  <div class="config-field" style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+                    <div>
+                      <label class="config-label" style="margin: 0;">Pametna Anti-Spam Validacija Poruka</label>
+                      <span class="config-hint" style="display: block;">Nagrađuje samo smislene poruke i sprečava spam</span>
+                    </div>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgSmartChatValidation" checked>
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 2: Prva Interakcija & Watchtime Bonus -->
+              <div class="config-section" style="padding: 24px;">
+                <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; color: var(--text-primary);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <span>Prva Interakcija & Gledanje (Watchtime)</span>
+                </h4>
+                <div class="config-fields">
+                  <div class="config-field">
+                    <label class="config-label">Bonus za prvu interakciju gledaoca (Prvi Ulazak):</label>
+                    <input type="number" id="cfgFirstInteractionBonus" class="form-input" min="0" value="100">
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">XP na svakih 5 minuta gledanja strima:</label>
+                    <input type="number" id="cfgXpPerWatchtime" class="form-input" min="0" value="50">
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">Poeni na svakih 5 minuta gledanja strima:</label>
+                    <input type="number" id="cfgPointsPerWatchtime" class="form-input" min="0" value="20">
+                  </div>
+                  <div class="config-field" style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+                    <div>
+                      <label class="config-label" style="margin: 0;">Najavi Level-Up u četu</label>
+                      <span class="config-hint" style="display: block;">Pošalji čestitku kada gledalac pređe na novi nivo</span>
+                    </div>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="cfgLevelUpAnnounce" checked>
+                      <span class="toggle-track"></span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 3: Pretplatnici (Subscribers Multiplier) -->
+              <div class="config-section" style="padding: 24px;">
+                <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; color: var(--text-primary);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <span>Pretplatnici (Subscriber Bonuses)</span>
+                </h4>
+                <div class="config-fields">
+                  <div class="config-field">
+                    <label class="config-label">Sub Multiplikator XP-a i Poena (npr. 2.0 = duplo):</label>
+                    <input type="number" step="0.1" id="cfgSubMultiplier" class="form-input" min="1.0" value="2.0">
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">Dodatni poeni po poruci za Pretplatnike:</label>
+                    <input type="number" id="cfgSubBonusPerMsg" class="form-input" min="0" value="10">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 4: Subskripcije & Gift Subskripcije -->
+              <div class="config-section" style="padding: 24px;">
+                <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; color: var(--text-primary);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/></svg>
+                  <span>Sopstveni Sub & Poklanjanje (Gift Subs)</span>
+                </h4>
+                <div class="config-fields">
+                  <div class="config-field">
+                    <label class="config-label">Poeni za novu skripciju (Points for Subscribing):</label>
+                    <input type="number" id="cfgPointsPerSub" class="form-input" min="0" value="1000">
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">Poeni po 1 poklonjenoj skripciji (Gifting Sub):</label>
+                    <input type="number" id="cfgPointsPerGiftSub" class="form-input" min="0" value="2000">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 5: KICK Donacije & Elixir -->
+              <div class="config-section" style="padding: 24px;">
+                <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; color: var(--text-primary);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                  <span>KICKs / Elixir Donacije</span>
+                </h4>
+                <div class="config-fields">
+                  <div class="config-field">
+                    <label class="config-label">Poeni na svakih 100 poslatih KICK-ova:</label>
+                    <input type="number" id="cfgPointsPer100Kicks" class="form-input" min="0" value="500">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card 6: Dnevni Niz & Raid Bonus -->
+              <div class="config-section" style="padding: 24px;">
+                <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; color: var(--text-primary);">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2.5"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3.5z"/></svg>
+                  <span>Dnevni Niz (Streak) & Host/Raid Bonus</span>
+                </h4>
+                <div class="config-fields">
+                  <div class="config-field">
+                    <label class="config-label">Bonus za pisanje svakog novog dana (Daily Streak):</label>
+                    <input type="number" id="cfgPointsDailyStreak" class="form-input" min="0" value="150">
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">Bonus za učestvovanje u Host / Raid-u:</label>
+                    <input type="number" id="cfgPointsPerRaid" class="form-input" min="0" value="300">
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <div style="margin-top: 24px; display: flex; justify-content: flex-end;">
+              <button class="btn btn-primary" onclick="saveEconomyConfig()" style="padding: 12px 28px; font-weight: 600; font-size: 0.95rem;">Sačuvaj Podešavanja Ekonomije & Ranking Sistema</button>
+            </div>
+          </div>
+
+          <!-- SUB-PANEL 2: GAMBLING -->
+          <div id="ecoSubPanelGambling" class="eco-subpanel" style="display:none;">
+            <div class="config-section" style="padding: 24px; max-width: 650px;">
+              <h4 style="margin: 0 0 16px 0; font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px; color: var(--text-primary);">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><rect x="2" y="6" width="20" height="12" rx="3"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
+                <span>Podešavanje Kazino Igara</span>
+              </h4>
+              <div class="config-fields">
+                <div class="config-field" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                  <div>
+                    <label class="config-label" style="margin: 0;">Omogući kockanje u četu (!slots, !roulette, !coinflip, !duel)</label>
+                    <span class="config-hint" style="display: block;">Dozvoljava gledaocima da troše poene na zabavne igre</span>
+                  </div>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="cfgGambleEnabled" checked>
+                    <span class="toggle-track"></span>
+                  </label>
+                </div>
+                <div class="config-field" style="margin-bottom: 16px;">
+                  <label class="config-label">Maksimalni dozvoljeni ulog po igri (Max Bet):</label>
+                  <input type="number" id="cfgMaxGambleAmount" class="form-input" min="10" value="5000">
+                </div>
+                <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                  <button class="btn btn-primary" onclick="saveEconomyConfig()" style="padding: 10px 24px; font-weight: 600;">Sačuvaj kazino podešavanja</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-PANEL 3: STORE & REDEMPTIONS -->
+          <div id="ecoSubPanelStore" class="eco-subpanel" style="display:none;">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+              <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                <span>Artikli u Prodavnici Kanala</span>
+              </h3>
+              <button class="btn btn-primary btn-sm" onclick="openCreateStoreItemModal()">+ Dodaj novi artikal</button>
+            </div>
+            
+            <div id="storeItemsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-bottom: 30px;">
+              <!-- Dynamic Store Items populated by JS -->
+            </div>
+
+            <!-- Test Kupovina Simulator -->
+            <div class="config-section" style="padding: 20px; margin-bottom: 24px; background: rgba(59, 130, 246, 0.03); border: 1px solid rgba(59, 130, 246, 0.15);">
+              <h4 style="margin: 0 0 12px 0; font-size: 1rem; font-weight: 700; color: #3b82f6; display: flex; align-items: center; gap: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span>Test Simulator Kupovine u Prodavnici</span>
+              </h4>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <select id="simStoreItemSelect" class="form-input" style="flex: 1; min-width: 200px;">
+                  <!-- Dynamic options populated by JS -->
+                </select>
+                <input type="text" id="simStoreUser" class="form-input" value="TestGledalac" placeholder="Username gledaoca" style="width: 160px;">
+                <button class="btn btn-primary btn-sm" onclick="simulirajKupovinuArtikla()" style="padding: 8px 16px;">Simuliraj Kupovinu 🛍️</button>
+              </div>
+            </div>
+
+            <!-- Redemptions Header & Filter Tabs -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 24px 0 14px 0; flex-wrap: wrap; gap: 12px;">
+              <h3 style="margin: 0; font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+                <span>Istorija Kupovina & Zahtevi za Nagrade</span>
+              </h3>
+
+              <div style="display: flex; gap: 6px; background: rgba(0,0,0,0.3); padding: 3px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                <button class="btn btn-xs btn-primary" id="redFilterAll" onclick="filterRedemptions('all')">Sve</button>
+                <button class="btn btn-xs btn-outline" id="redFilterPending" onclick="filterRedemptions('pending')">🟡 Na Čekanju</button>
+                <button class="btn btn-xs btn-outline" id="redFilterCompleted" onclick="filterRedemptions('completed')">🟢 Odobreno</button>
+                <button class="btn btn-xs btn-outline" id="redFilterRejected" onclick="filterRedemptions('rejected')">🔴 Odbijeno & Vraćeno</button>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Datum i Vreme</th>
+                    <th>Gledalac</th>
+                    <th>Artikal</th>
+                    <th>Cena</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Akcije</th>
+                  </tr>
+                </thead>
+                <tbody id="storeRedemptionsTbody">
+                  <!-- Dynamic Redemptions populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- SUB-PANEL 4: LEADERBOARD -->
+          <div id="ecoSubPanelLeaderboard" class="eco-subpanel" style="display:none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="ecoLbSearchInput" class="form-input" placeholder="Pretraži gledaoca..." oninput="renderEconomyLeaderboard()" style="width: 240px;">
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="table" style="width: 100%;">
+                <thead>
+                  <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>Gledalac</th>
+                    <th>Nivo (Level)</th>
+                    <th>XP Napredak</th>
+                    <th>Poeni</th>
+                    <th style="text-align: right;">Upravljanje</th>
+                  </tr>
+                </thead>
+                <tbody id="ecoLeaderboardTbody">
+                  <!-- Dynamic Economy Leaderboard populated by JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </section>
 
         <!-- ══ NO CHANNEL PANEL ══ -->
@@ -2961,6 +3481,188 @@
         <button class="btn btn-primary" id="settingsSaveBtn" onclick="handleSaveSettings()"
           style="flex: 1; justify-content: center; text-align: center; margin: 0;">Sačuvaj</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Store Item Modal -->
+  <div class="modal-backdrop" id="storeItemModal" onclick="handleModalBg(event, 'storeItemModal')">
+    <div class="modal-box" style="max-width: 520px; width: 92%; padding: 0;">
+      <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--border-subtle);">
+        <h3 style="display: flex; align-items: center; gap: 10px; margin:0;">
+          🛍️ <span id="storeItemModalTitle">Novi Artikal u Prodavnici</span>
+        </h3>
+        <button class="modal-close" onclick="closeModal('storeItemModal')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 24px; display: flex; flex-direction: column; gap: 14px;">
+        <input type="hidden" id="storeItemEditId" value="">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Naziv Nagrade / Artikla</label>
+          <input type="text" id="storeItemName" class="form-input" placeholder="npr. VIP Rola u četu, Odaberi Igricu..." style="width:100%;">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Opis nagrade</label>
+          <input type="text" id="storeItemDesc" class="form-input" placeholder="Kratak opis šta gledalac dobija" style="width:100%;">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Cena u poenima</label>
+            <input type="number" id="storeItemCost" class="form-input" min="1" value="500" style="width:100%;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Dostupna Zaliha (Stock)</label>
+            <input type="number" id="storeItemStock" class="form-input" value="-1" style="width:100%;" placeholder="-1 za neograničeno">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Potreban Rang za Kupovinu</label>
+            <select id="storeItemRank" class="form-input" style="width:100%;">
+              <option value="everyone">Svi gledaoci</option>
+              <option value="subscriber">Samo Pretplatnici (Subs)</option>
+              <option value="vip">VIP i viši rangovi</option>
+              <option value="moderator">Samo Moderatori</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Kategorija / Ikonica</label>
+            <select id="storeItemIcon" class="form-input" style="width:100%;">
+              <option value="vip">⭐ VIP Rola / Zvezdica</option>
+              <option value="song">🎵 Naruči Pesmu / Muzika</option>
+              <option value="water">💧 Voda / Izazov</option>
+              <option value="gift">🎁 Poklon Nagrada</option>
+            </select>
+          </div>
+        </div>
+        <div class="config-field" style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
+          <div>
+            <label class="config-label" style="margin: 0;">Automatsko Odobrenje Kupovine</label>
+            <span class="config-hint" style="display: block;">Odmah označava kupovinu kao završenu umesto slanja na čekanje</span>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="storeItemAutoApprove">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-foot" style="padding: 16px 24px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-outline" onclick="closeModal('storeItemModal')">Otkaži</button>
+        <button class="btn btn-primary" onclick="saveStoreItem()">Sačuvaj Nagradu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Referral Program Modal -->
+  <div class="modal-backdrop" id="referralModal" onclick="handleModalBg(event, 'referralModal')">
+    <div class="modal-box" style="max-width: 680px; width: 92%; padding: 0;">
+      <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.15rem; color: #fff;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.5"><path d="M20 12v10H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+          <span>Referral Program</span>
+        </h3>
+        <button class="modal-close-btn" onclick="closeModal('referralModal')" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 24px; max-height: 75vh; overflow-y: auto;">
+        <p style="margin: 0 0 20px 0; color: var(--text-muted); font-size: 0.9rem; line-height: 1.4;">
+          Pozovi prijatelje i zarađuj <strong style="color:#53fc18;">20% provizije</strong> od svake njihove kupovine paketa na platformi!
+        </p>
+
+        <!-- Stats Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 24px;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; text-align: center;">
+            <div style="font-size: 1.3rem; font-weight: 800; color: #fff;" id="totalReferrals">0</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Ukupno referala</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; text-align: center;">
+            <div style="font-size: 1.3rem; font-weight: 800; color: #53fc18;" id="successfulReferrals">0</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Uspešnih referala</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; text-align: center;">
+            <div style="font-size: 1.3rem; font-weight: 800; color: #eab308;" id="totalEarned">€0.00</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Ukupno zarađeno</div>
+          </div>
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px; text-align: center;">
+            <div style="font-size: 1.3rem; font-weight: 800; color: #a78bfa;" id="availableRewards">€0.00</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Dostupno za isplatu</div>
+          </div>
+        </div>
+
+        <!-- Referral Link Box -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 18px; margin-bottom: 24px; width: 100%; box-sizing: border-box;">
+          <label style="display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">Tvoj jedinstveni Referral Kod & Link:</label>
+          <div style="display: flex; gap: 8px; margin-bottom: 10px; width: 100%;">
+            <input type="text" id="referralCodeInput" class="form-input" readonly value="UČITAVANJE..." style="flex: 1; width: 100%; font-weight: 700; color: #53fc18; letter-spacing: 1px; text-align: center;">
+            <button class="btn btn-primary" id="copyReferralBtn" style="white-space: nowrap; font-weight: 600; padding: 8px 16px; flex-shrink: 0;">Kopiraj Link</button>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); word-break: break-all;" id="referralLinkFull">
+            Link: <span id="referralLinkText" style="color: #a78bfa;">Učitavanje...</span>
+          </div>
+        </div>
+
+        <!-- Rewards History -->
+        <div style="margin-bottom: 20px;">
+          <h4 style="margin: 0 0 12px 0; font-size: 0.95rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+            <span>Tvoje Nagrade & Provizije</span>
+          </h4>
+          <div id="rewardsList" style="display: flex; flex-direction: column; gap: 8px; max-height: 160px; overflow-y: auto;">
+            <div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 0.85rem;">Još uvek nemaš nagrade. Pozovi prijatelje da započneš!</div>
+          </div>
+        </div>
+
+        <!-- Withdrawal Section -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-subtle); padding-top: 16px;">
+          <div>
+            <div style="font-size: 0.85rem; font-weight: 600; color: #fff;">Minimalni iznos za isplatu je €5.00</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted);">Isplate se obrađuju na PayPal, Bankovni račun ili Crypto.</div>
+          </div>
+          <button class="btn btn-primary" id="withdrawalBtn" onclick="openWithdrawalModal()" disabled style="padding: 10px 20px; font-weight: 600;">Zatraži isplatu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Withdrawal Request Modal -->
+  <div class="modal-backdrop" id="withdrawalModal" onclick="handleModalBg(event, 'withdrawalModal')">
+    <div class="modal-box" style="max-width: 480px; width: 90%; padding: 0;">
+      <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.1rem; color: #fff;">
+          💸 <span>Zatraži Isplatu Sredstava</span>
+        </h3>
+        <button class="modal-close-btn" onclick="closeModal('withdrawalModal')" style="background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer;">✕</button>
+      </div>
+
+      <form id="withdrawalForm" onsubmit="handleWithdrawalSubmit(event)" style="padding: 24px;">
+        <div style="margin-bottom: 16px; background: rgba(83, 252, 24, 0.08); border: 1px solid rgba(83, 252, 24, 0.2); padding: 12px; border-radius: var(--radius-md); font-size: 0.85rem; color: #53fc18;">
+          Dostupno za isplatu: <strong id="modalAvailableBalance">€0.00</strong>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label class="form-label">Iznos (€)</label>
+          <input type="number" id="withdrawalAmount" class="form-input" min="5" step="0.01" placeholder="Minimum €5.00" required style="width: 100%;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label class="form-label">Način Isplate</label>
+          <select id="paymentMethod" class="form-input" style="width: 100%;" onchange="updatePaymentDetailsLabel(this.value)">
+            <option value="paypal">PayPal</option>
+            <option value="bank_transfer">Bankovni Račun (IBAN)</option>
+            <option value="crypto">Kriptovaluta (USDT / BTC)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label class="form-label" id="paymentDetailsLabel">PayPal Email Adresa</label>
+          <input type="text" id="paymentDetails" class="form-input" placeholder="tvoj@email.com" required style="width: 100%;">
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button type="button" class="btn btn-outline" onclick="closeModal('withdrawalModal')">Otkaži</button>
+          <button type="submit" class="btn btn-primary" style="font-weight: 600;">Pošalji Zahtev</button>
+        </div>
+      </form>
     </div>
   </div>
 

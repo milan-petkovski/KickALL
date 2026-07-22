@@ -296,6 +296,18 @@ function evidentirajPoruku(chatroomId, username, poruka) {
     }
     channelState.leaderboard[key].count++;
     channelState.leaderboard[key].username = cleanUsername;
+
+    // Dodaj XP i Poene preko economy modula
+    const xpPerMsg = channelState.xp_per_msg || 15;
+    const pointsPerMsg = channelState.points_per_msg || 5;
+    try {
+        const economy = require('./economy');
+        economy.dodajXP(chatroomId, cleanUsername, xpPerMsg, pointsPerMsg);
+    } catch (e) {
+        channelState.leaderboard[key].xp = (channelState.leaderboard[key].xp || 0) + xpPerMsg;
+        channelState.leaderboard[key].points = (channelState.leaderboard[key].points || 0) + pointsPerMsg;
+    }
+
     channelState.leaderboardDeltas[key] = (channelState.leaderboardDeltas[key] || 0) + 1;
     channelState.leaderboardDirty = true;
     channelState.lastPointEarned[key] = sada;

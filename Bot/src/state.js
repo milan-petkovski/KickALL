@@ -65,6 +65,20 @@ function getChannelState(chatroomId) {
             feature_songrequest: false,
             songrequest_settings: {},
 
+            // Ekonomija, Nivoi & Kockanje
+            currency_name: 'KickCoins',
+            xp_per_msg: 15,
+            points_per_msg: 5,
+            xp_per_watchtime: 50,
+            points_per_watchtime: 20,
+            level_up_announce: true,
+            gamble_enabled: true,
+            max_gamble_amount: 5000,
+            store_enabled: true,
+            store_items: [],
+            store_redemptions: [],
+            pendingDuels: {},
+
             announce_interval_mins: 15,
             announce_message_threshold: 30,
             announce_time_enabled: true,

@@ -1801,7 +1801,9 @@ body.lang-en .lang-sr {
     align-items: center;
     gap: 12px;
     min-width: 280px;
-    max-width: 400px;
+    max-width: calc(100vw - 32px);
+    width: max-content;
+    white-space: nowrap;
     transition: opacity 0.3s ease, transform 0.3s ease;
     animation: toastIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
@@ -1832,15 +1834,22 @@ body.lang-en .lang-sr {
 
 .toast-icon {
     font-size: 1.2rem;
+    flex-shrink: 0;
 }
 
 .toast-body {
     flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .toast-msg {
     font-size: 0.88rem;
     color: var(--color-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .toast-close {

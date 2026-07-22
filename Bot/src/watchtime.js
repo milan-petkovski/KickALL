@@ -134,6 +134,15 @@ async function watchtimeTick(chatroomId) {
             }
             channelState.watchtime[key].minutes += 10;
             channelState.watchtimeDeltas[key] = (channelState.watchtimeDeltas[key] || 0) + 10;
+
+            // Nagrađivanje XP-om i Poenima za watchtime (+50 XP, +20 Poena po 10 min)
+            try {
+                const economy = require('./economy');
+                const xpBonus = channelState.xp_per_watchtime || 50;
+                const pointsBonus = channelState.points_per_watchtime || 20;
+                economy.dodajXP(chatroomId, channelState.watchtime[key].display_name || username, xpBonus, pointsBonus);
+            } catch (e) {}
+
             dodatiKorisnici.push(channelState.watchtime[key].display_name);
             nesto = true;
         }
