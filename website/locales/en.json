@@ -1,0 +1,219 @@
+{
+  "nav": {
+    "ecosystem": "Ecosystem",
+    "tryOut": "Try Out",
+    "faq": "FAQ",
+    "support": "Support",
+    "pricing": "Pricing",
+    "reviews": "Reviews",
+    "logIn": "Log In",
+    "dashboard": "Dashboard",
+    "logOut": "Log Out",
+    "features": "Features"
+  },
+  "hero": {
+    "badge": "Complete Streamer Ecosystem",
+    "title": "Conquer The <span class=\"gradient-text\">Kick</span> Scene On A Global Scale",
+    "description": "Connect your channel with the most powerful chatbot! <br><strong>Kickot</strong> is available immediately and brings chat automation, points, and games. Your stream ecosystem will soon be complete with modules <strong>kickaj</strong>, <strong>kickov</strong>, and <strong>kickan</strong> coming soon.",
+    "btnStart": "Start for free",
+    "btnPricing": "View pricing",
+    "fastOAuth": "Fast Kick OAuth Login"
+  },
+  "stats": {
+    "msgs": "Processed Chat Messages",
+    "streams": "Active Streams",
+    "widgets": "Custom Commands",
+    "uptime": "Network Uptime (%)"
+  },
+  "ecosystem": {
+    "label": "CONNECT EVERYTHING IN ONE PLACE",
+    "title": "Complete Ecosystem For Kick",
+    "subtitle": "Modular tools designed for maximum interaction and channel growth.",
+    "statusActive": "ACTIVE NOW",
+    "statusSoon": "COMING SOON",
+    "descKickot": "Ultimate chatbot with advanced moderation, custom commands, mini-games, and points system.",
+    "descKickaj": "Easiest way to create and manage engaging giveaways directly through chat.",
+    "descKickan": "Most powerful analytics for Kick streamers. Track viewer growth, chat activity, and more.",
+    "descKickov": "Modern and fully customizable stream overlays, chat boxes, alerts, and real-time goals.",
+    "connectKickot": "Connect kickot →",
+    "startSim": "Start simulation",
+    "kickot": {
+      "f1": "Smart automatic moderation",
+      "f2": "Custom commands and timers",
+      "f3": "Points and chat mini-games"
+    },
+    "kickaj": {
+      "f1": "Enter giveaway via chat",
+      "f2": "Filters for followers and subs",
+      "f3": "Beautiful drawing animation",
+      "overlay": "Giveaway system is under development. Click below to view and test simulation."
+    },
+    "kickan": {
+      "f1": "Real-time growth charts",
+      "f2": "Detailed chat reports",
+      "f3": "Stream history and metrics",
+      "overlay": "Analytics is under development. Click below to view and test simulation."
+    },
+    "kickov": {
+      "f1": "Dynamic alerts with sound",
+      "f2": "Modern chat boxes and emotes",
+      "f3": "Easy OBS setup",
+      "overlay": "Overlay integration is under development. Click below to view and test simulation."
+    }
+  },
+  "tabs": {
+    "live": "LIVE",
+    "soon": "SOON"
+  },
+  "kickot": {
+    "status": "ACTIVE & AVAILABLE",
+    "heading": "Interactive chatbot",
+    "desc": "We simulated your stream chat. Send one of the commands or type your own message to see how the bot responds.",
+    "quickCmds": "Quick commands:",
+    "connectBtn": "Connect kickot to your channel"
+  },
+  "chat": {
+    "live": "LIVE CHAT",
+    "viewers": "1,248 viewers",
+    "placeholder": "Write a message or command...",
+    "send": "Send"
+  },
+  "performanse": {
+    "label": "PERFORMANCE WITHOUT COMPROMISE",
+    "title": "World-Class Technology",
+    "subtitle": "Built for highest load and 100% compatibility with streaming software.",
+    "card1": {
+      "title": "< 15ms WebSockets Speed",
+      "desc": "Direct WebSocket connection to Kick servers ensures instant chatbot response and on-screen notifications."
+    },
+    "card2": {
+      "title": "100% OBS Support",
+      "desc": "Fully compatible with all standards without GPU or CPU performance overhead."
+    },
+    "card3": {
+      "title": "Zero-Downtime Reliability",
+      "desc": "Servers guarantee 99.98% uptime without interruption even during massive streams."
+    },
+    "card4": {
+      "title": "State-of-the-Art Encryption",
+      "desc": "Secure login via official Kick OAuth portal with encryption. Your passwords stay 100% safe."
+    }
+  },
+  "faq": {
+    "label": "FREQUENTLY ASKED QUESTIONS",
+    "title": "Everything you need to know",
+    "subtitle": "Have questions? Find quick answers to the most common questions.",
+    "placeholder": "Search questions...",
+    "q1": {
+      "question": "How do I connect Kickot chatbot to my Kick channel?",
+      "answer": "Simply click on \"Log in via Kick\", authorize your account, and activate Kickot bot in your Dashboard. The bot will join your chat automatically."
+    },
+    "q2": {
+      "question": "Is KickALL free to use?",
+      "answer": "Yes! The basic Kickot chatbot with commands and moderation is completely free forever. Pro and Elite plans are available for advanced tools and unlimited customization."
+    },
+    "q3": {
+      "question": "How do I add alerts and widgets to OBS or Streamlabs?",
+      "answer": "In your Dashboard, generate a unique Browser Source URL and paste it as a new Browser source in OBS / Streamlabs. Settings changes apply live without restarting."
+    },
+    "q4": {
+      "question": "Are my data and Kick account safe?",
+      "answer": "Absolutely. We use official Kick OAuth 2.0 authentication with S256 PKCE encryption standard. We never have access to your passwords or private keys."
+    },
+    "q5": {
+      "question": "Can I create custom commands and responses?",
+      "answer": "Yes! Through an intuitive Dashboard, you can create an unlimited number of commands, timers, and automated messages sent at set time intervals."
+    }
+  },
+  "support": {
+    "label": "SUPPORT THAT CARES",
+    "title": "Support that responds fast",
+    "desc": "We know how important it is for your stream and chatbot to run flawlessly. That's why we provide direct and fast technical support exclusively via email. For any issues, questions, or feedback, our team is ready to respond immediately.",
+    "featureTitle": "Direct Technical Email Support",
+    "featureDesc": "No waiting for bots and automated responses. Our developers directly solve your issue.",
+    "statusActive": "EMAIL SUPPORT IS ACTIVE",
+    "log1": "Viewer: \"How do I activate kickot?\"",
+    "log2": "\"Just click the Start kickot button and connect channel.\"",
+    "log3": "Support ticket successfully resolved. ⭐⭐⭐⭐⭐",
+    "tagSupport": "Support",
+    "tagResolved": "RESOLVED"
+  },
+  "pricing": {
+    "tag": "TAILORED FOR EVERYONE",
+    "title": "Transparent and flexible plans",
+    "subtitle": "Choose the plan that best fits your streaming needs and community size.",
+    "popular": "POPULAR",
+    "period": "/ month",
+    "free": {
+      "title": "FREE",
+      "desc": "Ideal for new streamers just starting out and wanting basic chat automation.",
+      "f1": "Basic <strong>Kickot</strong> chatbot",
+      "f2": "All 8 <strong>Kickot</strong> modules",
+      "f3": "Up to 50 custom commands",
+      "f4": "<strong>Kickov</strong> overlays (soon)",
+      "f5": "<strong>Kickaj</strong> giveaway system (soon)",
+      "f6": "<strong>Kickan</strong> advanced analytics (soon)",
+      "f7": "Priority support",
+      "btn": "Start for free"
+    },
+    "pro": {
+      "desc": "Everything a serious streamer needs for fast channel growth and full engagement.",
+      "f1": "Advanced <strong>kickot</strong> bot",
+      "f2": "All chat mini-games and commands",
+      "f3": "<strong>kickaj</strong> giveaway system",
+      "f4": "<strong>kickov</strong> overlays",
+      "f5": "Basic monthly analytics",
+      "f6": "Priority email support",
+      "f7": "Dedicated VIP bot",
+      "btn": "Choose Pro plan"
+    },
+    "elite": {
+      "desc": "For professional streamers seeking the absolute best technology and support.",
+      "f1": "Complete ecosystem included",
+      "f2": "<strong>kickan</strong> detailed analytics",
+      "f3": "Dedicated VIP bot with your name",
+      "f4": "Unlimited widgets and alerts",
+      "f5": "VIP email support status",
+      "f6": "<strong>24/7 continuous support with fast response</strong>",
+      "f7": "1-on-1 stream setup sessions",
+      "btn": "Buy Elite plan"
+    }
+  },
+  "modules": {
+    "active": "ACTIVE",
+    "soon": "SOON",
+    "live": "LIVE"
+  },
+  "testimonials": {
+    "tag": "USER REVIEWS",
+    "title": "What our streamers say",
+    "subtitle": "Join streamers who have already connected <strong>Kickall</strong> and elevated their chat fun.",
+    "card1": {
+      "text": "\"I connected kickot in less than a minute. My audience loves the !bacihejt and !posaljiljubav commands, points fly everywhere. Can't wait for other modules!\""
+    },
+    "card2": {
+      "text": "\"Currently using just the kickot bot and it works perfectly. Chat engagement is great. Email support is extremely fast.\""
+    },
+    "card3": {
+      "text": "\"The support team helped me configure the bot at 2 AM via email! Best support ever. Can't wait for alerts!\""
+    }
+  },
+  "cta": {
+    "title": "Ready to level up your Kick stream?",
+    "desc": "Connect your Kick account in just three clicks and activate Kickot chatbot and overlay tools completely free.",
+    "btnPrimary": "Connect Kick Account Now",
+    "btnSecondary": "Try live",
+    "login": "Log in"
+  },
+  "footer": {
+    "tagline": "Everything your Kick stream will ever need in one place. Complete ecosystem of tools and automation.",
+    "contact": "Contact email:",
+    "productsTitle": "Products",
+    "socialTitle": "Social Networks",
+    "shortcutsTitle": "Shortcuts",
+    "rights": "All rights reserved.",
+    "createdBy": "Created by",
+    "privacy": "Privacy",
+    "terms": "Terms"
+  }
+}

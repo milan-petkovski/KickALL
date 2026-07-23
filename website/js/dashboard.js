@@ -622,6 +622,7 @@ function initDashboard(user) {
   const gate = document.getElementById('authGate');
   if (gate) {
     gate.classList.add('fade-out');
+    document.body.classList.remove('auth-loading');
     setTimeout(() => gate.remove(), 400);
   }
 
@@ -953,15 +954,54 @@ if (trigger && menu) {
 // Logout Action
 const btnLogout = document.getElementById('btnLogout');
 if (btnLogout) {
-  btnLogout.addEventListener('click', () => {
-    sb.auth.signOut().then(() => {
-      notifyGlobalLogout();
-      window.location.href = 'index.html';
-    });
+  btnLogout.addEventListener('click', (e) => {
+    e.preventDefault();
+    handleLogout();
   });
 }
 
-function notifyGlobalLogout() {
+async function handleLogout() {
+  try {
+    let userId = null;
+    if (typeof sb !== 'undefined' && sb && sb.auth) {
+      const { data } = await sb.auth.getSession();
+      userId = data?.session?.user?.id;
+    }
+
+    if (userId) {
+      notifyGlobalLogout(userId);
+    }
+
+    // Obriši sve lokalne i Kick tokene odmah
+    localStorage.removeItem('kick_access_token');
+    localStorage.removeItem('kick_token_type');
+    localStorage.removeItem('kick_session_active');
+    localStorage.removeItem('kick_oauth_state');
+    localStorage.removeItem('kick_code_verifier');
+    sessionStorage.clear();
+
+    // Obriši sve Supabase auth tokene iz localStorage
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.startsWith('kick_'))) {
+        localStorage.removeItem(key);
+      }
+    }
+
+    if (typeof sb !== 'undefined' && sb && sb.auth) {
+      await Promise.race([
+        sb.auth.signOut(),
+        new Promise(resolve => setTimeout(resolve, 400))
+      ]);
+    }
+  } catch (e) {
+    console.error("Logout greška:", e);
+  } finally {
+    window.location.replace('index.html');
+  }
+}
+
+function notifyGlobalLogout(userId) {
   const domains = [
     'https://kickall.netlify.app',
     'https://kickall.milanwebportal.com',
@@ -981,61 +1021,30 @@ function notifyGlobalLogout() {
   
   localStorage.setItem('kickbot_global_logout', Date.now().toString());
   
-  // Notify bot server for global logout
-  const { data: { session } } = sb.auth.getSession();
-  if (session?.user?.id) {
+  if (userId) {
     fetch('https://kickbot-ihzb.onrender.com/api/global-logout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: session.user.id })
+      body: JSON.stringify({ userId: userId })
     }).catch(() => {});
   }
 }
 
 window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
-    sb.auth.signOut().then(() => {
-      window.location.reload();
-    });
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.replace('index.html');
   }
 });
 
-setInterval(() => {
-  const logoutTime = localStorage.getItem('kickbot_global_logout');
-  if (logoutTime && Date.now() - parseInt(logoutTime) < 5000) {
-    const { data: { session } } = sb.auth.getSession();
-    if (session) {
-      sb.auth.signOut().then(() => {
-        window.location.reload();
-      });
-    }
-    localStorage.removeItem('kickbot_global_logout');
+window.addEventListener('storage', (event) => {
+  if (event.key === 'kickbot_global_logout') {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.replace('index.html');
   }
-}, 1000);
-
-async function checkServerLogoutStatus() {
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session?.user?.id) {
-      try {
-        const res = await fetch(`https://kickbot-ihzb.onrender.com/api/check-logout?userId=${session.user.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.shouldLogout) {
-            await sb.auth.signOut();
-            window.location.reload();
-          }
-        }
-      } catch (e) {
-        // Ignore errors
-      }
-    }
-  } catch (e) {
-    // Ignore errors if session check fails
-  }
-}
-
-checkServerLogoutStatus();
+});
 
 // Set Initial Language
 setLang(currentLang);

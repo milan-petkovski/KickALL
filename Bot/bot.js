@@ -1151,8 +1151,7 @@ const ALLOWED_KICK_REDIRECT_URIS = new Set([
     'https://kickall.milanwebportal.com/auth/kick/callback',
     'https://kickall.milanwebportal.com/auth/kick/callback/',
     'http://localhost:5500/auth/kick/callback',
-    'http://localhost:5500/auth/kick/callback/',
-    'http://localhost:5500/auth/kick/callback.html'
+    'http://localhost:5500/auth/kick/callback/'
 ]);
 
 function normalizeKickRedirectUri(uri) {

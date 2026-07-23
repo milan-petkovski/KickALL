@@ -71,9 +71,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-violet, #8B5CF6) transparent;
+}
+
+/* WebKit pregledači (Chrome, Edge, Safari) */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -81,8 +87,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.3);
-  border-radius: 3px;
+  background: linear-gradient(180deg, var(--color-violet, #8B5CF6), var(--color-green, #53FC18));
+  border-radius: 20px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-green, #53FC18);
 }
 
 ::selection {
@@ -2667,7 +2677,6 @@ input[type="number"]::-webkit-inner-spin-button {
   flex-wrap: wrap;
   gap: 12px;
   padding-top: 10px;
-  border-top: 1px solid var(--border-subtle);
 }
 
 .pagination-bar__left {
@@ -3887,6 +3896,10 @@ input[type="number"]::-webkit-inner-spin-button {
   border: 1px solid rgba(139, 92, 246, 0.18);
   border-radius: var(--radius-md);
   padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .pm-ref-custom-title {
@@ -3896,25 +3909,36 @@ input[type="number"]::-webkit-inner-spin-button {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 9px;
+  margin-bottom: 4px;
 }
 
 .pm-ref-custom-body {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
   font-size: 0.8rem;
   color: var(--text-muted);
 }
 
 .pm-ref-email-btn {
-  font-size: 0.76rem;
-  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 14px;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  border-color: rgba(255,255,255,0.12) !important;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.35) !important;
+  color: #a78bfa !important;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.pm-ref-email-btn:hover {
+  background: var(--app-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--app-primary) !important;
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.4);
+  transform: translateY(-1px);
 }
 
 /* ── Referral Rewards ── */

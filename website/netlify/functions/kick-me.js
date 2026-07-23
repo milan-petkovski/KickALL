@@ -1,12 +1,15 @@
 exports.handler = async (event) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json'
+  };
+
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-      },
+      headers,
       body: ''
     };
   }
@@ -14,7 +17,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return {
       statusCode: 405,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -23,7 +26,7 @@ exports.handler = async (event) => {
   if (!base) {
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ error: 'Missing RENDER_BOT_API_BASE env var' })
     };
   }
@@ -37,15 +40,20 @@ exports.handler = async (event) => {
     });
 
     const text = await upstream.text();
+    const contentType = upstream.headers.get('content-type') || 'application/json';
+
     return {
       statusCode: upstream.status,
-      headers: { 'Content-Type': upstream.headers.get('content-type') || 'application/json' },
+      headers: {
+        ...headers,
+        'Content-Type': contentType
+      },
       body: text
     };
   } catch (error) {
     return {
       statusCode: 502,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ error: 'Upstream unavailable', detail: error.message })
     };
   }

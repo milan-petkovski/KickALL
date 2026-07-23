@@ -1,0 +1,219 @@
+{
+  "nav": {
+    "ecosystem": "Ekosistem",
+    "tryOut": "Isprobaj",
+    "faq": "FAQ",
+    "support": "Podrška",
+    "pricing": "Cene",
+    "reviews": "Utisci",
+    "logIn": "Prijavi se",
+    "dashboard": "Dashboard",
+    "logOut": "Odjavi se",
+    "features": "Funkcije"
+  },
+  "hero": {
+    "badge": "Kompletan Ekosistem za Streamere",
+    "title": "Zavladaj <span class=\"gradient-text\">Kick</span> Scenom Na Svetskom Nivou",
+    "description": "Poveži svoj kanal sa najmoćnijim chatbotom! <br><strong>Kickot</strong> je dostupan odmah i donosi automatizaciju chata, poene i igre. Tvoj strim ekosistem uskoro postaje kompletan uz module <strong>kickaj</strong>, <strong>kickov</strong> i <strong>kickan</strong> koji stižu uskoro.",
+    "btnStart": "Počni besplatno",
+    "btnPricing": "Pogledaj cene",
+    "fastOAuth": "Brza Kick Prijava"
+  },
+  "stats": {
+    "msgs": "Obrađenih Čat Poruka",
+    "streams": "Aktivnih Strimova",
+    "widgets": "Prilagođenih Komandi",
+    "uptime": "Dostupnost Mreže (%)"
+  },
+  "ecosystem": {
+    "label": "POVEŽI SVE NA JEDNOM MESTU",
+    "title": "Kompletan Ekosistem Za Kick",
+    "subtitle": "Modularni alati dizajnirani za maksimalnu interakciju i rast kanala.",
+    "statusActive": "AKTIVAN ODMAH",
+    "statusSoon": "DOLAZI USKORO",
+    "descKickot": "Ultimativni chatbot sa naprednom moderacijom, prilagođenim komandama, mini igrama i sistemom poena.",
+    "descKickaj": "Najlakši način za kreiranje i vođenje zanimljivih darivanja direktno kroz chat.",
+    "descKickan": "Najmoćnija analitika za Kick streamere. Prati rast gledalaca, aktivnost u čatu i još mnogo toga.",
+    "descKickov": "Moderni i potpuno prilagodljivi strim overleji, čet boksovi, alerti i ciljevi u realnom vremenu.",
+    "connectKickot": "Poveži kickot →",
+    "startSim": "Pokreni simulaciju",
+    "kickot": {
+      "f1": "Pametna automatska moderacija",
+      "f2": "Prilagođene komande i tajmeri",
+      "f3": "Poeni i chat mini igre"
+    },
+    "kickaj": {
+      "f1": "Ulazak u giveaway preko čata",
+      "f2": "Filteri za pratioce i subere",
+      "f3": "Prelepa animacija izvlačenja",
+      "overlay": "Sistem nagradnih igara je u razvoju. Klikni ispod da pogledaš i testiraš simulaciju."
+    },
+    "kickan": {
+      "f1": "Grafikoni rasta u realnom vremenu",
+      "f2": "Detaljni izveštaji o čatu",
+      "f3": "Istorija strimova i metrike",
+      "overlay": "Analitika je u razvoju. Klikni ispod da pogledaš i testiraš simulaciju."
+    },
+    "kickov": {
+      "f1": "Dinamični alerti sa zvukom",
+      "f2": "Moderni čet boksovi i emotikoni",
+      "f3": "Laka OBS podešavanja",
+      "overlay": "Integracija overlayeva je u razvoju. Klikni ispod da pogledaš i testiraš simulaciju."
+    }
+  },
+  "tabs": {
+    "live": "UŽIVO",
+    "soon": "USKORO"
+  },
+  "kickot": {
+    "status": "AKTIVAN I DOSTUPAN",
+    "heading": "Interaktivni chatbot",
+    "desc": "Simulirali smo tvoj strim čet. Pošalji neku od komandi ili unesi svoju poruku i vidi kako bot reaguje.",
+    "quickCmds": "Brze komande:",
+    "connectBtn": "Poveži kickot za svoj kanal"
+  },
+  "chat": {
+    "live": "UŽIVO CHAT",
+    "viewers": "1.248 gledalaca",
+    "placeholder": "Napiši poruku ili komandu...",
+    "send": "Pošalji"
+  },
+  "performanse": {
+    "label": "PERFORMANSE BEZ KOMPROMISA",
+    "title": "Tehnologija svetskog nivoa",
+    "subtitle": "Stvoreno za najveće opterećenje i 100% kompatibilnost sa striming softverom.",
+    "card1": {
+      "title": "< 15ms WebSockets Brzina",
+      "desc": "Direktna WebSocket veza sa Kick serverima obezbeđuje trenutno reagovanje chatbota i obaveštenja na ekranu."
+    },
+    "card2": {
+      "title": "100% OBS Podrška",
+      "desc": "Potpuno kompatibilno sa svim standardima bez opterećenja procesora ili grafičke kartice."
+    },
+    "card3": {
+      "title": "Sigurnost bez prekida rada",
+      "desc": "Serveri garantuju 99.98% dostupnosti bez prekida rada čak i tokom masovnih strimova."
+    },
+    "card4": {
+      "title": "Najnaprednija enkripcija",
+      "desc": "Sigurna prijava preko zvaničnog Kick OAuth portala sa enkripcijom. Tvoje lozinke ostaju 100% bezbedne."
+    }
+  },
+  "faq": {
+    "label": "ČESTA PITANJA",
+    "title": "Sve što treba da znaš",
+    "subtitle": "Imate pitanja? Pronađite brze odgovore na najčešće postavljana pitanja.",
+    "placeholder": "Pretraži pitanja...",
+    "q1": {
+      "question": "Kako da povežem Kickot četbot sa mojim Kick kanalom?",
+      "answer": "Dovoljno je da klikneš na dugme \"Prijavi se preko Kicka\", autorizuješ nalog i u Dashboard-u aktiviraš Kickot bota. Bot će se automatski pridružiti tvom chatu."
+    },
+    "q2": {
+      "question": "Da li je KickALL besplatan za korišćenje?",
+      "answer": "Da! Osnovni Kickot četbot sa komandama i moderacijom je potpuno besplatan zauvek. Za napredne alate i neograničenu prilagodljivost dostupni su Pro i Elite paketi."
+    },
+    "q3": {
+      "question": "Kako ubacujem alertove i vidžete u OBS ili Streamlabs?",
+      "answer": "U svom Dashboard-u generišeš jedinstveni Browser Source URL link i nalepiš ga kao novi Browser izvor u OBS / Streamlabs softveru. Izmena podešavanja se primenjuje uživo bez ponovnog pokretanja."
+    },
+    "q4": {
+      "question": "Da li su moji podaci i Kick nalog bezbedni?",
+      "answer": "Apsolutno. Koristimo zvaničnu Kick OAuth 2.0 autentifikaciju sa S256 PKCE standardom za enkripciju. Mi nikada nemamo pristup tvojim lozinkama niti privatnim pristupnim ključevima."
+    },
+    "q5": {
+      "question": "Mogu li praviti sopstvene komande i odzive?",
+      "answer": "Da! Kroz intuitivni Dashboard možete kreirati neograničen broj komandi, tajmera i automatskih poruka koje se šalju u određenim vremenskim intervalima."
+    }
+  },
+  "support": {
+    "label": "PODRŠKA KOJA BRINE",
+    "title": "Podrška koja brzo odgovara",
+    "desc": "Znamo koliko je važno da ti strim i chatbot rade bez greške. Zato obezbeđujemo direktnu i brzu tehničku podršku isključivo putem email-a. Za sve probleme, pitanja ili predloge, naš tim je spreman da reaguje odmah.",
+    "featureTitle": "Direktna Tehnička Email Podrška",
+    "featureDesc": "Bez čekanja na botove i automatske odgovore. Naši developeri direktno rešavaju tvoj problem.",
+    "statusActive": "EMAIL PODRŠKA JE AKTIVNA",
+    "log1": "Gledalac: \"Kako da aktiviram kickot?\"",
+    "log2": "\"Samo klikni na dugme Pokreni kickot i poveži kanal.\"",
+    "log3": "Podrška uspešno zatvorena. ⭐⭐⭐⭐⭐",
+    "tagSupport": "Podrška",
+    "tagResolved": "REŠENO"
+  },
+  "pricing": {
+    "tag": "PRILAGOĐENO SVIMA",
+    "title": "Transparentni i fleksibilni paketi",
+    "subtitle": "Izaberi paket koji najbolje odgovara tvojim strimerskim potrebama i veličini tvoje zajednice.",
+    "popular": "POPULARNO",
+    "period": "/ mesečno",
+    "free": {
+      "title": "BESPLATNO",
+      "desc": "Idealno za nove strimere koji tek počinju i žele osnovnu automatizaciju chata.",
+      "f1": "Osnovni <strong>Kickot</strong> chatbot",
+      "f2": "Svih 8 <strong>Kickot</strong> modula",
+      "f3": "Do 50 prilagođenih komandi",
+      "f4": "<strong>Kickov</strong> overlayevi (uskoro)",
+      "f5": "<strong>Kickaj</strong> giveaway sistem (uskoro)",
+      "f6": "<strong>Kickan</strong> napredna analitika (uskoro)",
+      "f7": "Prioritetna podrška",
+      "btn": "Započni besplatno"
+    },
+    "pro": {
+      "desc": "Sve što je potrebno ozbiljnom strimeru za brzi rast kanala i punu interakciju.",
+      "f1": "Napredni <strong>kickot</strong> bot",
+      "f2": "Sve čet mini igre i komande",
+      "f3": "<strong>kickaj</strong> giveaway sistem",
+      "f4": "<strong>kickov</strong> overleji",
+      "f5": "Osnovna mesečna analitika",
+      "f6": "Prioritetna imejl podrška",
+      "f7": "Namenski VIP bot",
+      "btn": "Izaberi Pro paket"
+    },
+    "elite": {
+      "desc": "Za profesionalne strimere koji traže apsolutno najbolju tehnologiju i podršku.",
+      "f1": "Ceo ekosistem uključen",
+      "f2": "<strong>kickan</strong> detaljna analitika",
+      "f3": "Namenski VIP bot sa tvojim imenom",
+      "f4": "Neograničen broj vidžeta i alertova",
+      "f5": "VIP imejl status podrške",
+      "f6": "<strong>Neprekidna podrška uz brzi odziv</strong>",
+      "f7": "Individualne sesije podešavanja strima",
+      "btn": "Kupi Elite paket"
+    }
+  },
+  "modules": {
+    "active": "AKTIVNO",
+    "soon": "USKORO",
+    "live": "UŽIVO"
+  },
+  "testimonials": {
+    "tag": "RECENZIJE KORISNIKA",
+    "title": "Šta kažu naši strimeri",
+    "subtitle": "Pridruži se strimerima koji su već povezali <strong>Kickall</strong> i podigli nivo zabave u četu.",
+    "card1": {
+      "text": "\"Povezao sam kickot za manje od minut. Moja publika obožava komande !bacihejt i !posaljiljubav, poeni lete na sve strane. Čekam ostale module!\""
+    },
+    "card2": {
+      "text": "\"Trenutno koristim samo kickot bota i radi savršeno. Čet ima odličnu interakciju. Podrška na imejl je ekstremno brza.\""
+    },
+    "card3": {
+      "text": "\"Momci na podršci su mi pomogli da podesim bot u dva sata ujutru preko imejla! Najbolja podrška ikada. Jedva čekam da ubace i alertove!\""
+    }
+  },
+  "cta": {
+    "title": "Spreman da podigneš svoj Kick strim?",
+    "desc": "Poveži svoj Kick nalog u samo tri klika i potpuno besplatno aktiviraj Kickot četbot i overlay alate.",
+    "btnPrimary": "Poveži Kick Nalog Odmah",
+    "btnSecondary": "Isprobaj uživo",
+    "login": "Prijavi se"
+  },
+  "footer": {
+    "tagline": "Sve što tvoj Kick strim ikada treba na jednom mestu. Kompletan ekosistem alata i automatizacije.",
+    "contact": "Kontakt email:",
+    "productsTitle": "Proizvodi",
+    "socialTitle": "Socijalne mreže",
+    "shortcutsTitle": "Prečice",
+    "rights": "Sva prava zadržana.",
+    "createdBy": "Napravio",
+    "privacy": "Privatnost",
+    "terms": "Uslovi"
+  }
+}

@@ -60,22 +60,28 @@ body {
 }
 
 /* Custom Cyberpunk Scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-violet) transparent;
+}
+
+/* WebKit pregledači (Chrome, Edge, Safari) */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--color-bg-dark);
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, var(--color-violet) 0%, var(--color-green) 100%);
-    border-radius: 8px;
+    background: linear-gradient(180deg, var(--color-violet), var(--color-green));
+    border-radius: 20px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(180deg, var(--color-green) 0%, var(--color-violet) 100%);
+    background: var(--color-green);
 }
 
 /* Zasebne klase za širinu i kontejnere */
@@ -2155,4 +2161,325 @@ body.lang-en .lang-sr {
     background: rgba(83, 252, 24, 0.1);
     color: var(--color-green);
     border: 1px solid rgba(83, 252, 24, 0.2);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Awwwards Level Enhancements for Kickot Landing Page
+   ───────────────────────────────────────────────────────────── */
+
+/* Lenis Smooth Scroll Fixes */
+html.lenis, html.lenis body {
+    height: auto;
+}
+.lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+}
+.lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+}
+.lenis.lenis-stopped {
+    overflow: hidden;
+}
+
+/* Cursor Spotlight Glow Effect */
+body::before {
+    content: '';
+    position: fixed;
+    top: var(--mouse-y, 50vh);
+    left: var(--mouse-x, 50vw);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, rgba(83, 252, 24, 0.03) 40%, transparent 70%);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Floating Back to Top Button */
+.back-to-top-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(14, 10, 29, 0.85);
+    border: 1px solid var(--color-green);
+    color: var(--color-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 99;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px) scale(0.9);
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(83, 252, 24, 0.2);
+    backdrop-filter: blur(12px);
+}
+
+.back-to-top-btn.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.back-to-top-btn:hover {
+    background: var(--color-green);
+    color: #000;
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 12px 30px rgba(83, 252, 24, 0.4);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   AWWWARDS MASTERPIECE OVERHAUL (SEAMLESS CANVAS & GLASSMORPHISM)
+   ───────────────────────────────────────────────────────────── */
+
+/* Seamless Canvas: Remove hard background fills & border divides */
+.hero-section,
+.ekosistem-section,
+.playground-section,
+.pricing-section,
+.cta-section,
+.faq-section,
+.footer {
+    background: transparent !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+}
+
+/* Glassmorphism Floating Cards */
+.feature-card,
+.pricing-card,
+.commands-showcase,
+.cta-card,
+.faq-item,
+.dashboard-preview-card {
+    background: rgba(14, 10, 29, 0.6) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(139, 92, 246, 0.18) !important;
+    border-radius: 24px !important;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.feature-card:hover,
+.pricing-card:hover,
+.faq-item:hover {
+    transform: translateY(-8px) !important;
+    border-color: rgba(83, 252, 24, 0.45) !important;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6), 0 0 25px rgba(83, 252, 24, 0.15) !important;
+}
+
+.pricing-card.popular {
+    border: 2px solid var(--color-green) !important;
+    box-shadow: 0 0 30px rgba(83, 252, 24, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.cmd-preview {
+    background-color: rgba(6, 4, 12, 0.8) !important;
+    border: 1px solid rgba(139, 92, 246, 0.2) !important;
+    backdrop-filter: blur(12px) !important;
+}
+
+/* Header Nav Menu Links Fix */
+.nav-menu {
+    display: flex !important;
+    align-items: center !important;
+    gap: 32px !important;
+}
+
+.nav-link {
+    font-family: var(--font-heading) !important;
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    color: var(--color-text-muted) !important;
+    position: relative !important;
+    padding: 8px 0 !important;
+    transition: color 0.2s ease !important;
+}
+
+.nav-link:hover, .nav-link.active {
+    color: var(--color-text) !important;
+}
+
+.nav-link::after {
+    content: '' !important;
+    position: absolute !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 0 !important;
+    height: 2px !important;
+    background: linear-gradient(90deg, var(--color-violet), var(--color-green)) !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.nav-link:hover::after {
+    width: 100% !important;
+}
+
+/* Section Label & Glow Tag Badge Overhaul */
+.section-label, .glow-tag {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 6px 18px !important;
+    background: rgba(139, 92, 246, 0.12) !important;
+    border: 1px solid rgba(139, 92, 246, 0.25) !important;
+    border-radius: 100px !important;
+    font-family: var(--font-heading) !important;
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+    color: var(--color-violet) !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 0 15px rgba(139, 92, 246, 0.15) !important;
+}
+
+.p-tag-active {
+    font-size: 0.65rem !important;
+    font-weight: 800 !important;
+    background-color: rgba(83, 252, 24, 0.15) !important;
+    color: var(--color-green) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    margin-left: 8px !important;
+    flex-shrink: 0 !important;
+}
+
+.p-tag-soon {
+    font-size: 0.65rem !important;
+    font-weight: 800 !important;
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #F59E0B !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    margin-left: 8px !important;
+    flex-shrink: 0 !important;
+}
+
+/* Footer */
+.footer {
+    background: transparent !important;
+    background-color: transparent !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 80px 0 40px 0;
+}
+
+.footer-container {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 60px;
+    flex-wrap: wrap;
+    gap: 40px;
+}
+
+.footer-brand {
+    max-width: 320px;
+}
+
+.footer-tagline {
+    margin-top: 16px;
+    color: var(--color-text-muted);
+    font-size: 0.92rem;
+    line-height: 1.5;
+}
+
+.footer-contact-info {
+    margin-top: 16px;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+}
+
+.footer-contact-info a {
+    color: var(--color-green);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.footer-contact-info a:hover {
+    text-decoration: underline;
+}
+
+.footer-links-group {
+    display: flex;
+    gap: 60px;
+    flex-wrap: wrap;
+}
+
+.footer-column {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 140px;
+}
+
+.footer-column h4 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin-bottom: 4px;
+}
+
+.footer-column a {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    transition: var(--transition-fast, all 0.2s ease);
+}
+
+.footer-column a:hover {
+    color: var(--color-green);
+}
+
+.footer-bottom {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 30px;
+}
+
+.footer-bottom-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-size: 0.88rem;
+    color: var(--color-text-muted);
+}
+
+.footer-bottom-left {
+    color: var(--color-text-muted);
+}
+
+.footer-bottom-center a {
+    color: var(--color-green);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.footer-bottom-center a:hover {
+    text-decoration: underline;
+}
+
+.footer-bottom-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.footer-bottom-right a {
+    color: var(--color-text-muted);
+    transition: var(--transition-fast, all 0.2s ease);
+}
+
+.footer-bottom-right a:hover {
+    color: var(--color-violet);
+}
+
+.dot-sep {
+    color: rgba(255, 255, 255, 0.2);
 }

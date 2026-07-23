@@ -23,43 +23,59 @@ body {
   height: 70px;
 }
 
+body.auth-loading {
+  overflow: hidden !important;
+}
+
 /* Auth State Spinner Gate */
-#authGate {
+#authGate, .auth-gate {
   position: fixed;
   inset: 0;
-  background: #06040A;
-  z-index: 999;
+  background: #06040a;
+  z-index: 9999;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   transition: opacity 0.4s ease;
 }
 
-#authGate.fade-out {
+#authGate.fade-out, .auth-gate.fade-out {
   opacity: 0;
   pointer-events: none;
 }
 
-.spinner {
-  width: 50px;
-  height: 50px;
-  border: 3px solid rgba(83, 252, 24, 0.15);
+.auth-gate-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.auth-gate-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-gate-spinner, .spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
   border-top-color: #53FC18;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 20px;
+  animation: spin 0.7s linear infinite;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-#authGateMsg {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.1rem;
-  color: #fff;
-  text-shadow: 0 0 10px rgba(83, 252, 24, 0.3);
+#authGateMsg, .auth-gate-msg {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Content Area */
@@ -75,6 +91,7 @@ body {
 .welcome-section {
   text-align: center;
   margin-bottom: 40px;
+  padding: 0;
 }
 
 .welcome-title {
@@ -106,6 +123,7 @@ body {
 /* Module Grid */
 .module-grid {
   display: grid;
+  padding: 0;
   grid-template-columns: 1fr;
   gap: 24px;
   margin-top: 20px;

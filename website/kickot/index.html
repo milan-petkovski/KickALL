@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title data-i18n="meta.title">Kickot | Bot za Kick platformu</title>
-  <meta name="description" data-i18n="meta.desc" content="Kickot je moćan chat bot za Kick platformu. Komande, moderacija, watchtime, leaderboard i mini igre." />
+  <meta name="description" data-i18n="meta.desc" content="Kickot je moćan chatbot za Kick platformu. Komande, moderacija, watchtime, leaderboard i mini igre." />
   <meta name="keywords" content="Kickot, Kick bot, Kick chatbot, watchtime, leaderboard, Kick moderacija" />
   <meta name="theme-color" content="#0b0716" />
 
@@ -19,17 +19,20 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Kickot" />
   <meta property="og:title" content="Kickot - Bot za Kick platformu" />
-  <meta property="og:description" content="Moćan chat bot za Kick platformu sa komandama, moderacijom, watchtime sistemom i igrama." />
-  <meta property="og:image" content="assets/logo.png" />
+  <meta property="og:description" content="Kickot je moćan chatbot za Kick platformu. Komande, moderacija, watchtime, leaderboard i mini igre." />
+  <meta property="og:image" content="assets/kickot.png" />
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Kickot - Bot za Kick platformu" />
-  <meta name="twitter:description" content="Moćan chat bot za Kick platformu sa komandama, moderacijom, watchtime sistemom i igrama." />
-  <meta name="twitter:image" content="assets/logo.png" />
+  <meta name="twitter:description" content="Kickot je moćan chatbot za Kick platformu. Komande, moderacija, watchtime, leaderboard i mini igre." />
+  <meta name="twitter:image" content="assets/kickot.png" />
 
   <!-- Fontovi -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Lenis Smooth Scroll -->
+  <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
 
   <!-- Favicon i Stilovi -->
   <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
@@ -48,7 +51,7 @@
   </style>
 </head>
 
-<body class="lang-sr"> <!-- Default lang class -->
+<body class="lang-sr">
 
     <!-- Pozadinski svetlosni efekti -->
     <div class="glow-bg">
@@ -70,10 +73,25 @@
                     </span>
                     <span data-i18n="nav.back">KickAll</span>
                 </a>
-                <div class="logo">
-                    <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 48px;">
-                </div>
+                <a href="#" class="logo" id="navLogo">
+                    <img src="assets/kickot.png" alt="Kickot Logo" class="logo-img" style="height: 48px;">
+                </a>
             </div>
+
+            <nav class="nav-menu" id="navMenu">
+                <a href="#features" class="nav-link">
+                    <span class="lang-sr">Funkcije</span>
+                    <span class="lang-en">Features</span>
+                </a>
+                <a href="#commands" class="nav-link">
+                    <span class="lang-sr">Isprobaj</span>
+                    <span class="lang-en">Try Now</span>
+                </a>
+                <a href="#pricing" class="nav-link">
+                    <span class="lang-sr">Cene</span>
+                    <span class="lang-en">Pricing</span>
+                </a>
+            </nav>
 
             <div class="nav-actions">
                 <div class="lang-switcher">
@@ -83,11 +101,10 @@
 
                 <!-- Guest Nav -->
                 <div class="auth-nav-btns" id="guestNav">
-                    <button class="btn btn-primary" onclick="openModal('login')" data-i18n="nav.login">Prijavi
-                        se</button>
+                    <button class="btn btn-primary" onclick="openModal('login')" data-i18n="nav.login">Prijavi se</button>
                 </div>
 
-                <!-- User Nav (hidden when not logged in) -->
+                <!-- User Nav -->
                 <div class="user-menu" id="userMenu">
                     <button class="user-menu-trigger" id="userMenuTrigger" onclick="toggleUserDropdown()">
                         <div class="user-avatar" id="userAvatar">U</div>
@@ -105,8 +122,7 @@
                                 <rect x="14" y="12" width="7" height="9"></rect>
                                 <rect x="3" y="16" width="7" height="5"></rect>
                             </svg>
-                            <span class="lang-sr">Dashboard</span>
-                            <span class="lang-en">Dashboard</span>
+                            <span data-i18n="nav.dashboard">Dashboard</span>
                         </a>
                         <a href="index.html?action=logout" class="dropdown-item danger">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
@@ -114,8 +130,7 @@
                                 <polyline points="16 17 21 12 16 7" />
                                 <line x1="21" y1="12" x2="9" y2="12" />
                             </svg>
-                            <span class="lang-sr">Odjavi se</span>
-                            <span class="lang-en">Log Out</span>
+                            <span data-i18n="nav.logout">Odjavi se</span>
                         </a>
                     </div>
                 </div>
@@ -124,7 +139,7 @@
     </header>
 
     <main>
-        <!-- ══════════════ HERO SEKCIJA (100vh) ══════════════ -->
+        <!-- ══════════════ HERO SEKCIJA ══════════════ -->
         <section class="hero-section" id="hero">
             <div class="container hero-container">
                 <div class="hero-content">
@@ -135,7 +150,7 @@
                                 <path
                                     d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
                             </svg>
-                            <span>Kick Platforma</span>
+                            <span data-i18n="hero.badge.platform">Kick Platforma</span>
                         </span>
                         <span class="badge badge-live">
                             <span class="live-status-dot"></span>
@@ -145,16 +160,12 @@
                     <h1 class="hero-title">
                         <span class="kickbot-title-styled gradient-text">Kick<span class="b-anchor"><span
                                     class="elevated-b">b</span></span>ot</span>
-                        <span class="hero-title-rest">
-                            <span class="lang-sr">za <span class="text-green-flat">KICK</span> koji radi dok ti
-                                strimuješ</span>
-                            <span class="lang-en">for <span class="text-green-flat">KICK</span> that works while you
-                                stream</span>
+                        <span class="hero-title-rest" data-i18n="hero.title.rest">
+                            za <span class="text-green-flat">KICK</span> koji radi dok ti strimuješ
                         </span>
                     </h1>
                     <p class="hero-description" data-i18n="hero.subtitle">
-                        Moćan chat bot za Kick platformu sa prilagođenim komandama, automatskom moderacijom, watchtime
-                        sistemom, mini-igrama i leaderboard-om. Na srpskom i engleskom.
+                        Moćan chatbot za Kick platformu sa prilagođenim komandama, automatskom moderacijom, watchtime sistemom, mini-igrama i leaderboard-om. Na srpskom i engleskom.
                     </p>
                     <div class="hero-actions">
                         <button class="btn btn-primary btn-large" onclick="openModal('login')" id="heroPrimaryBtn"
@@ -165,8 +176,7 @@
                             </svg>
                             <span data-i18n="hero.cta.primary" id="heroPrimaryBtnText">Počni besplatno</span>
                         </button>
-                        <a href="#features" class="btn btn-secondary btn-large" data-i18n="hero.cta.secondary">Vidi
-                            funkcionalnosti</a>
+                        <a href="#features" class="btn btn-secondary btn-large" data-i18n="hero.cta.secondary">Vidi funkcionalnosti</a>
                     </div>
                     <p class="hero-note"
                         style="margin-top: 20px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--color-text-muted);">
@@ -178,44 +188,34 @@
                     </p>
                 </div>
 
-                <!-- Streamerski Dashboard Panel u Herou (Isto kao KickAll) -->
+                <!-- Streamerski Dashboard Panel u Herou -->
                 <div class="hero-visual">
                     <div class="dashboard-preview-card" id="heroDashboardCard">
                         <div class="card-header">
                             <span class="dot red pulse-dot"></span>
                             <span class="status-text font-bold text-green"
-                                style="font-size: 0.82rem; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 0.05em;">
-                                <span class="lang-sr">Strimer • UŽIVO</span>
-                                <span class="lang-en">Streamer • LIVE</span>
+                                style="font-size: 0.82rem; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 0.05em;"
+                                data-i18n="hero.preview.status">
+                                Strimer • UŽIVO
                             </span>
                             <span class="window-title" style="margin-left: auto;">KICKOT</span>
                         </div>
                         <div class="card-body dashboard-layout">
                             <div class="db-row">
                                 <div class="db-col">
-                                    <span class="db-label">
-                                        <span class="lang-sr">Gledaoci</span>
-                                        <span class="lang-en">Viewers</span>
-                                    </span>
+                                    <span class="db-label" data-i18n="hero.preview.viewers">Gledaoci</span>
                                     <span class="db-value text-green">1,248</span>
                                 </div>
                                 <div class="db-col">
-                                    <span class="db-label">
-                                        <span class="lang-sr">Status bota</span>
-                                        <span class="lang-en">Bot Status</span>
-                                    </span>
-                                    <span class="db-value text-violet">
-                                        <span class="lang-sr">AKTIVAN</span>
-                                        <span class="lang-en">ACTIVE</span>
-                                    </span>
+                                    <span class="db-label" data-i18n="hero.preview.botstatus">Status bota</span>
+                                    <span class="db-value text-violet" data-i18n="hero.preview.active">AKTIVAN</span>
                                 </div>
                             </div>
 
                             <!-- Mini Graph Preview -->
                             <div class="db-mini-chart">
-                                <div class="mini-chart-header">
-                                    <span class="lang-sr">Aktivnost komandi (Proteklih 6h)</span>
-                                    <span class="lang-en">Command Activity (Last 6h)</span>
+                                <div class="mini-chart-header" data-i18n="hero.preview.charttitle">
+                                    Aktivnost komandi (Proteklih 6h)
                                 </div>
                                 <div class="mini-chart-bars">
                                     <div class="bar" style="height: 35%"></div>
@@ -240,11 +240,8 @@
                                     </svg>
                                 </div>
                                 <div class="db-alert-content">
-                                    <span class="db-alert-title">
-                                        <span class="lang-sr">NOVI PRATILAC!</span>
-                                        <span class="lang-en">NEW FOLLOWER!</span>
-                                    </span>
-                                    <span class="db-alert-desc">@milan je upravo zapratio kanal! Dobro Došao!</span>
+                                    <span class="db-alert-title" data-i18n="hero.preview.alerttitle">NOVI PRATILAC!</span>
+                                    <span class="db-alert-desc" data-i18n="hero.preview.alertdesc">@milan je upravo zapratio kanal! Dobro Došao!</span>
                                 </div>
                             </div>
 
@@ -253,10 +250,7 @@
                                 <div class="db-chat-msg"><span class="chat-user">Milan</span>: !love @kickot</div>
                                 <div class="db-chat-msg bot">
                                     <span class="chat-user bot-tag">Kickot</span>:
-                                    <span class="lang-sr">❤️ Ljubavni Kalkulator: @milan + @kickot = 100% | Komentar:
-                                        Savršen par, čista hemija i večna ljubav! ❤️🔥</span>
-                                    <span class="lang-en">❤️ Love Calculator: @milan + @kickot = 100% | Comment: Perfect
-                                        match, pure chemistry and eternal love! ❤️🔥</span>
+                                    <span data-i18n="hero.preview.chatresponse">❤️ Ljubavni Kalkulator: @milan + @kickot = 100% | Komentar: Savršen par, čista hemija i večna ljubav! ❤️🔥</span>
                                 </div>
                             </div>
                         </div>
@@ -269,13 +263,13 @@
         <section class="ekosistem-section" id="features">
             <div class="container">
                 <div class="section-header" data-reveal>
-                    <div class="section-label" data-i18n="features.label">Funkcionalnosti</div>
-                    <h2 class="section-title">
-                        <span class="lang-sr">Sve što jedan <span class="gradient-text">Kick bot treba</span></span>
-                        <span class="lang-en">Everything a <span class="gradient-text">Kick Bot Needs</span></span>
+                    <span class="glow-tag" data-i18n="features.label">Funkcionalnosti</span>
+                    <h2 class="section-title" data-i18n="features.maintitle">
+                        Sve što jedan <span class="gradient-text">Kick bot treba</span>
                     </h2>
-                    <p class="section-subtitle" data-i18n="features.subtitle">Kickot dolazi sa bogatim setom
-                        funkcionalnosti koje možeš koristiti odmah, bez ikakve konfiguracije.</p>
+                    <p class="section-subtitle" data-i18n="features.subtitle">
+                        Kickot dolazi sa moćnim setom modula koji osiguravaju potpunu kontrolu nad tvojim strimom, od moderacije do ekonomije u chatbotu.
+                    </p>
                 </div>
 
                 <div class="features-grid">
@@ -288,9 +282,9 @@
                             </svg>
                         </div>
                         <h3 class="feature-title" data-i18n="feat.cmd.title">Prilagođene Komande</h3>
-                        <p class="feature-description" data-i18n="feat.cmd.desc">Definiši vlastite komande sa
-                            odgovorima, varijablama i cool-down-om. Sistem komandi radi u realnom vremenu.</p>
+                        <p class="feature-description" data-i18n="feat.cmd.desc">Definiši vlastite komande sa custom odgovorima, cooldown-om i dozvolama za rankove. Sistem radi u realnom vremenu.</p>
                     </div>
+
                     <!-- Feature 2: Moderacija -->
                     <div class="feature-card" data-reveal data-delay="2">
                         <div class="feature-icon-wrapper icon-green">
@@ -299,11 +293,11 @@
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                             </svg>
                         </div>
-                        <h3 class="feature-title" data-i18n="feat.mod.title">Automatska Moderacija</h3>
-                        <p class="feature-description" data-i18n="feat.mod.desc">Anti-spam, filter reči, timeout i ban
-                            sistem. Bot pazi na chat dok ti uživaš u streamu.</p>
+                        <h3 class="feature-title" data-i18n="feat.mod.title">Napredna Moderacija</h3>
+                        <p class="feature-description" data-i18n="feat.mod.desc">Zaštita od velikih slova (Caps), linkova, emotikona, simbola, zabranjenih reči i spama sa fleksibilnim kaznenim merama.</p>
                     </div>
-                    <!-- Feature 3: Watchtime -->
+
+                    <!-- Feature 3: Watchtime & Leaderboard -->
                     <div class="feature-card" data-reveal data-delay="3">
                         <div class="feature-icon-wrapper icon-green-violet">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -313,53 +307,50 @@
                             </svg>
                         </div>
                         <h3 class="feature-title" data-i18n="feat.wt.title">Watchtime & Leaderboard</h3>
-                        <p class="feature-description" data-i18n="feat.wt.desc">Automatsko praćenje watchtime-a svakog
-                            gledalaca. Rangovi, top liste i nagrade za lojalne fanove.</p>
+                        <p class="feature-description" data-i18n="feat.wt.desc">Automatsko praćenje vremena gledanja i poruka u četu. Mesečna rang lista sa mogućnošću izvoza u CSV i automatskim arhiviranjem.</p>
                     </div>
-                    <!-- Feature 4: Igre -->
+
+                    <!-- Feature 4: Ranking Sistem & Koins -->
                     <div class="feature-card" data-reveal data-delay="4">
                         <div class="feature-icon-wrapper icon-violet-green">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
+                                <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
+                                <path d="M4 22h16"></path>
+                                <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title" data-i18n="feat.eco.title">Ranking Sistem i Koins</h3>
+                        <p class="feature-description" data-i18n="feat.eco.desc">Prilagodi naziv valute, podesi nagrade za gledanje, subskripcije i KICKs donacije. Uključi prodavnicu nagrada i kazino igre.</p>
+                    </div>
+
+                    <!-- Feature 5: Mini-igre i Ljubav -->
+                    <div class="feature-card" data-reveal data-delay="5">
+                        <div class="feature-icon-wrapper icon-violet">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="2" y="6" width="20" height="12" rx="3" />
                                 <line x1="6" y1="12" x2="10" y2="12" />
                                 <line x1="8" y1="10" x2="8" y2="14" />
-                                <line x1="15" y1="13" x2="15.01" y2="13" />
-                                <line x1="18" y1="11" x2="18.01" y2="11" />
                             </svg>
                         </div>
-                        <h3 class="feature-title" data-i18n="feat.games.title">Mini-igre za Chat</h3>
-                        <p class="feature-description" data-i18n="feat.games.desc">!duel, !8ball, !love, !brak, !roll —
-                            igre koje drže chat aktivan i zabavnim tokom celog streama.</p>
+                        <h3 class="feature-title" data-i18n="feat.games.title">Mini-igre i Brakovi</h3>
+                        <p class="feature-description" data-i18n="feat.games.desc">Zabavi chat sa !duel, !roll, !iq, !rulet, ili pokreni ljubavni sistem sa sklapanjem brakova i praćenjem kompatibilnosti.</p>
                     </div>
-                    <!-- Feature 5: Jezici -->
-                    <div class="feature-card" data-reveal data-delay="5">
-                        <div class="feature-icon-wrapper icon-violet">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="2" y1="12" x2="22" y2="12" />
-                                <path
-                                    d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                            </svg>
-                        </div>
-                        <h3 class="feature-title" data-i18n="feat.lang.title">Srpski i Engleski</h3>
-                        <p class="feature-description" data-i18n="feat.lang.desc">Bot odgovara na srpskom ili engleskom,
-                            u zavisnosti od podešavanja kanala. Potpuna podrška za oba jezika.</p>
-                    </div>
-                    <!-- Feature 6: Analitika -->
+
+                    <!-- Feature 6: Song Request & Spotify -->
                     <div class="feature-card" data-reveal data-delay="6">
                         <div class="feature-icon-wrapper icon-green">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="18" y1="20" x2="18" y2="10" />
-                                <line x1="12" y1="20" x2="12" y2="4" />
-                                <line x1="6" y1="20" x2="6" y2="14" />
+                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9 18V5l12-2v13" />
+                                <circle cx="6" cy="18" r="3" />
+                                <circle cx="18" cy="16" r="3" />
                             </svg>
                         </div>
-                        <h3 class="feature-title" data-i18n="feat.stats.title">Statistike uživo</h3>
-                        <p class="feature-description" data-i18n="feat.stats.desc">Dashboard sa svim statistikama
-                            kanala, aktivnim korisnicima, top komandama i aktivnošću chata.</p>
+                        <h3 class="feature-title" data-i18n="feat.song.title">Song Request & Spotify</h3>
+                        <p class="feature-description" data-i18n="feat.song.desc">Poveži Spotify nalog, omogući gledaocima da naručuju pesme preko chata i upravljaj redom reprodukcije direktno iz dashboarda.</p>
                     </div>
                 </div>
             </div>
@@ -369,95 +360,80 @@
         <section class="playground-section" id="commands">
             <div class="container">
                 <div class="section-header" data-reveal>
-                    <div class="glow-tag" data-i18n="cmds.label">Komande</div>
-                    <h2 class="section-title">
-                        <span class="lang-sr">Bogata biblioteka <span class="gradient-text">komandi</span></span>
-                        <span class="lang-en">Rich library of <span class="gradient-text">commands</span></span>
+                    <span class="glow-tag" data-i18n="cmds.label">Komande</span>
+                    <h2 class="section-title" data-i18n="cmds.maintitle">
+                        Bogata biblioteka <span class="gradient-text">komandi</span>
                     </h2>
-                    <p class="section-subtitle" data-i18n="cmds.subtitle">Klikni na komandu da vidiš kako izgleda u
-                        chatu.</p>
+                    <p class="section-subtitle" data-i18n="cmds.subtitle">
+                        Klikni na komandu da vidiš kako odgovara u chatu u realnom vremenu.
+                    </p>
                 </div>
 
                 <div class="commands-showcase" data-reveal>
                     <div style="display: flex; flex-direction: column; gap: 4px;">
                         <div class="commands-categories">
-                            <button class="category-btn active" data-category="stats">Statistika</button>
-                            <button class="category-btn" data-category="fun">Zabava</button>
-                            <button class="category-btn" data-category="tools">Alati</button>
+                            <button class="category-btn active" data-category="stats" data-i18n="cmds.cat.stats">Statistika</button>
+                            <button class="category-btn" data-category="fun" data-i18n="cmds.cat.fun">Zabava</button>
+                            <button class="category-btn" data-category="tools" data-i18n="cmds.cat.tools">Alati & Muzika</button>
                         </div>
                         <div class="commands-list" id="commandsList">
                             <!-- Statistika i rangiranje -->
-                            <div class="cmd-item active" data-cmd="top-watchtime" data-cat="stats">
-                                <span class="cmd-name">!top watchtime [broj]</span>
-                                <span class="cmd-desc">Top lista po satima gledanja</span>
+                            <div class="cmd-item active" data-cmd="top-watchtime" data-cat="stats" data-reply="👑 Top gledaoci po watchtime-u: 1. VIP_Stefan (48h) 2. Chat_Queen (36h) 3. Milan (24h)">
+                                <span class="cmd-name">!topwatchtime</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.topwt">Top lista po satima gledanja strima</span>
                             </div>
-                            <div class="cmd-item" data-cmd="top-chat" data-cat="stats">
-                                <span class="cmd-name">!top chat [broj]</span>
-                                <span class="cmd-desc">Top lista najaktivnijih u četu</span>
+                            <div class="cmd-item" data-cmd="top-chat" data-cat="stats" data-reply="💬 Top lista po broju poruka u četu: 1. Marko (1,420) 2. Ana (1,150) 3. Stefan (980)">
+                                <span class="cmd-name">!topchat</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.topchat">Top lista najaktivnijih korisnika u četu</span>
                             </div>
-                            <div class="cmd-item" data-cmd="watchtime" data-cat="stats">
-                                <span class="cmd-name">!watchtime</span>
-                                <span class="cmd-desc">Tvoje vreme gledanja strima</span>
+                            <div class="cmd-item" data-cmd="rank" data-cat="stats" data-reply="⭐ @Milan — Rang: VIP | Watchtime: 24h 30m | Poruke: 842 | Koins: 3,450">
+                                <span class="cmd-name">!rank / !me</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.rank">Prikaz tvog ranga, watchtime-a i stanja koina</span>
                             </div>
-                            <div class="cmd-item" data-cmd="chat" data-cat="stats">
-                                <span class="cmd-name">!chat</span>
-                                <span class="cmd-desc">Tvoj broj poslatih poruka</span>
-                            </div>
-                            <div class="cmd-item" data-cmd="me" data-cat="stats">
-                                <span class="cmd-name">!me</span>
-                                <span class="cmd-desc">Prikaz tvoje kompletne statistike</span>
+                            <div class="cmd-item" data-cmd="koins" data-cat="stats" data-reply="🪙 @Milan na računu trenutno ima 3,450 Koins-a i nalazi se na 3. mestu rang liste!">
+                                <span class="cmd-name">!koins</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.koins">Provera stanja poena / koina na kanalu</span>
                             </div>
 
                             <!-- Zabava i interakcija -->
-                            <div class="cmd-item" data-cmd="iq" data-cat="fun" style="display: none;">
-                                <span class="cmd-name">!iq [@korisnik]</span>
-                                <span class="cmd-desc">Izmeri nasumičan IQ</span>
-                            </div>
-                            <div class="cmd-item" data-cmd="samar" data-cat="fun" style="display: none;">
-                                <span class="cmd-name">!samar @korisnik</span>
-                                <span class="cmd-desc">Ošamari korisnika uz šalu</span>
-                            </div>
-                            <div class="cmd-item" data-cmd="duel" data-cat="fun" style="display: none;">
+                            <div class="cmd-item" data-cmd="duel" data-cat="fun" data-reply="⚔️ @Milan izaziva @Stefan na dvoboj! Borba je bila žestoka, a pobednik je @Stefan uz 15 HP-a viška!" style="display: none;">
                                 <span class="cmd-name">!duel @korisnik</span>
-                                <span class="cmd-desc">Pokreni simulaciju borbe</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.duel">Pokreni epsku simulaciju borbe u četu</span>
                             </div>
-                            <div class="cmd-item" data-cmd="roll" data-cat="fun" style="display: none;">
-                                <span class="cmd-name">!roll @korisnik</span>
-                                <span class="cmd-desc">Baci kockicu za nekoga</span>
+                            <div class="cmd-item" data-cmd="roll" data-cat="fun" data-reply="🎲 @Milan baca kockicu i dobija 87! (Raspon 1-100)" style="display: none;">
+                                <span class="cmd-name">!roll</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.roll">Bacanje kockice (67 donosi automatsku pobedu)</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="iq" data-cat="fun" data-reply="🧠 IQ test za @Milan: 142! (Genije, vreme je za kvizove!)" style="display: none;">
+                                <span class="cmd-name">!iq [@korisnik]</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.iq">Meri koeficijent inteligencije u četu</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="vencaj" data-cat="fun" data-reply="💍 @Milan prosdiše @Ana! Kompatibilnost je 98%! @Ana ima 60 sekundi da ukuca !prihvati ili !odbij." style="display: none;">
+                                <span class="cmd-name">!vencaj @korisnik</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.vencaj">Započni venčanje sa nekim u četu</span>
                             </div>
 
-                            <!-- Informacije i alati -->
-                            <div class="cmd-item" data-cmd="vreme" data-cat="tools" style="display: none;">
-                                <span class="cmd-name">!vreme [grad]</span>
-                                <span class="cmd-desc">Vremenski podaci za grad</span>
+                            <!-- Alati i muzika -->
+                            <div class="cmd-item" data-cmd="pesma" data-cat="tools" data-reply="🎵 Uspešno naručena pesma: The Weeknd - Blinding Lights (Zatražio: @Milan)" style="display: none;">
+                                <span class="cmd-name">!pesma [link/naziv]</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.song">Naruči pesmu za red reprodukcije</span>
                             </div>
-                            <div class="cmd-item" data-cmd="info" data-cat="tools" style="display: none;">
-                                <span class="cmd-name">!info</span>
-                                <span class="cmd-desc">Osnovne informacije o botu</span>
-                            </div>
-                            <div class="cmd-item" data-cmd="cinjenica" data-cat="tools" style="display: none;">
-                                <span class="cmd-name">!cinjenica</span>
-                                <span class="cmd-desc">Ispiši nasumičnu činjenicu</span>
-                            </div>
-                            <div class="cmd-item" data-cmd="followage" data-cat="tools" style="display: none;">
-                                <span class="cmd-name">!followage</span>
-                                <span class="cmd-desc">Proveri koliko dugo pratiš</span>
-                            </div>
-                            <div class="cmd-item" data-cmd="uptime" data-cat="tools" style="display: none;">
+                            <div class="cmd-item" data-cmd="uptime" data-cat="tools" data-reply="⏱️ Kanal je uživo već 3 sata i 42 minuta!" style="display: none;">
                                 <span class="cmd-name">!uptime</span>
-                                <span class="cmd-desc">Koliko dugo strim traje</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.uptime">Proveri koliko dugo traje trenutni strim</span>
+                            </div>
+                            <div class="cmd-item" data-cmd="followage" data-cat="tools" data-reply="⏰ @Milan prati ovaj kanal već 4 meseca i 12 dana." style="display: none;">
+                                <span class="cmd-name">!followage</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.followage">Proveri tačno vreme praćenja kanala</span>
                             </div>
                         </div>
                     </div>
 
                     <div class="cmd-preview" id="mainPlayground">
-                        <div class="cp-header" data-i18n="cmd.preview">// Preview — live chat simulacija</div>
+                        <div class="cp-header" data-i18n="cmd.preview">// Live chat simulacija bota</div>
                         <div id="cmdPreviewContent" class="cp-messages-container">
-                            <div class="cp-line"><span class="cp-user">milan_fan:</span> <span class="cp-msg">!top
-                                    watchtime</span></div>
-                            <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg"
-                                    style="color:var(--color-green)">👑 Top gledaoci: 1. VIP_stefan (48h) 2. chat_queen
-                                    (36h) 3. milan_fan (24h) 4. gamer_marko (18h) 5. novak99 (15h)</span></div>
+                            <div class="cp-line"><span class="cp-user">Gledalac:</span> <span class="cp-msg">!topwatchtime</span></div>
+                            <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">👑 Top gledaoci po watchtime-u: 1. VIP_Stefan (48h) 2. Chat_Queen (36h) 3. Milan (24h)</span></div>
                         </div>
                     </div>
                 </div>
@@ -468,140 +444,218 @@
         <section class="pricing-section" id="pricing">
             <div class="container">
                 <div class="section-header" data-reveal>
-                    <div class="section-label" data-i18n="pricing.label">Cene</div>
-                    <h2 class="section-title">
-                        <span class="lang-sr">Poštene cene za <span class="gradient-text">pravi alat</span></span>
-                        <span class="lang-en">Fair pricing for <span class="gradient-text">the right tool</span></span>
+                    <span class="glow-tag" data-i18n="pricing.tag">PRILAGOĐENO SVIMA</span>
+                    <h2 class="section-title" data-i18n="pricing.title">
+                        Transparentni i fleksibilni paketi
                     </h2>
-                    <p class="section-subtitle" data-i18n="pricing.subtitle">Počni besplatno. Nadogradi se kada budeš
-                        spreman.</p>
+                    <p class="section-subtitle" data-i18n="pricing.subtitle">
+                        Izaberi paket koji najbolje odgovara tvojim strimerskim potrebama i veličini tvoje zajednice.
+                    </p>
                 </div>
 
                 <div class="pricing-grid">
-                    <!-- FREE PLAN -->
-                    <div class="pricing-card" data-reveal data-delay="1">
+                    <!-- BESPLATNO -->
+                    <div class="pricing-card" id="pricing-free">
                         <div class="p-card-header">
-                            <div class="p-title">Free</div>
-                            <div class="p-price"><span class="p-currency">€</span>0<span class="p-period"
-                                    data-i18n="pricing.forever">Zauvek besplatno</span></div>
-                            <p class="p-desc" data-i18n="pricing.free.desc">Sve što treba za početak.</p>
+                            <h3 class="p-title" data-i18n="pricing.free.title">
+                                BESPLATNO
+                            </h3>
+                            <div class="p-price">
+                                <span class="p-currency">€</span>0
+                                <span class="p-period" data-i18n="pricing.period">/ mesečno</span>
+                            </div>
+                            <p class="p-desc" data-i18n="pricing.free.desc">
+                                Idealno za nove strimere koji tek počinju i žele osnovnu automatizaciju chata.
+                            </p>
                         </div>
                         <div class="p-card-body">
                             <ul class="p-features-list">
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pf.f1">Bot uvek
-                                            aktivan</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.f1">Osnovni <strong>Kickot</strong> chatbot</span>
+                                    </span>
+                                    <span class="p-tag-active" data-i18n="modules.active">AKTIVNO</span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pf.f2">Do 10
-                                            komandi</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.f2">Svih 8 <strong>Kickot</strong> modula</span>
+                                    </span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pf.f3">Watchtime
-                                            tracking</span></span>
-                                </li>
-                                <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pf.f4">Osnovna
-                                            moderacija</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.f3">Do 50 prilagođenih komandi</span>
+                                    </span>
                                 </li>
                                 <li class="p-disabled">
-                                    <span><span class="p-cross">✕</span> <span data-i18n="pf.f5">Napredna
-                                            moderacija</span></span>
+                                    <span>
+                                        <span class="p-cross">✕</span>
+                                        <span data-i18n="pricing.free.f4"><strong>Kickov</strong> overlayevi (uskoro)</span>
+                                    </span>
                                 </li>
                                 <li class="p-disabled">
-                                    <span><span class="p-cross">✕</span> <span data-i18n="pf.f6">Prioritetna
-                                            podrška</span></span>
+                                    <span>
+                                        <span class="p-cross">✕</span>
+                                        <span data-i18n="pricing.free.f5"><strong>Kickaj</strong> giveaway sistem (uskoro)</span>
+                                    </span>
+                                </li>
+                                <li class="p-disabled">
+                                    <span>
+                                        <span class="p-cross">✕</span>
+                                        <span data-i18n="pricing.free.f6"><strong>Kickan</strong> napredna analitika (uskoro)</span>
+                                    </span>
+                                </li>
+                                <li class="p-disabled">
+                                    <span>
+                                        <span class="p-cross">✕</span>
+                                        <span data-i18n="pricing.free.f7">Prioritetna podrška</span>
+                                    </span>
                                 </li>
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-secondary btn-full" onclick="openModal('signup')"
-                                data-i18n="pricing.cta.free">Počni besplatno</button>
+                            <button class="btn btn-secondary w-full" id="pricingFreeBtn" onclick="openModal('login')" data-i18n="pricing.free.btn">
+                                Započni besplatno
+                            </button>
                         </div>
                     </div>
 
-                    <!-- PRO PLAN -->
-                    <div class="pricing-card popular" data-reveal data-delay="2">
-                        <div class="popular-ribbon" data-i18n="pricing.popular">Najpopularniji</div>
+                    <!-- PRO BOOSTER -->
+                    <div class="pricing-card popular" id="pricing-pro">
+                        <div class="popular-ribbon" data-i18n="pricing.popular">
+                            POPULARNO
+                        </div>
                         <div class="p-card-header">
-                            <div class="p-title">Pro</div>
-                            <div class="p-price"><span class="p-currency">€</span>5<span class="p-period"
-                                    data-i18n="pricing.per.month">/mesec</span></div>
-                            <p class="p-desc" data-i18n="pricing.pro.desc">Za ozbiljne streamere.</p>
+                            <h3 class="p-title">PRO</h3>
+                            <div class="p-price">
+                                <span class="p-currency">€</span>5
+                                <span class="p-period" data-i18n="pricing.period">/ mesečno</span>
+                            </div>
+                            <p class="p-desc" data-i18n="pricing.pro.desc">
+                                Sve što je potrebno ozbiljnom strimeru za brzi rast kanala i punu interakciju.
+                            </p>
                         </div>
                         <div class="p-card-body">
                             <ul class="p-features-list">
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pp.f1">Neograničene
-                                            komande</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.f1">Napredni <strong>kickot</strong> bot</span>
+                                    </span>
+                                    <span class="p-tag-active" data-i18n="modules.active">AKTIVNO</span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pp.f2">Napredna
-                                            moderacija</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.f2">Sve čet mini igre i komande</span>
+                                    </span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pp.f3">Sve
-                                            mini-igre</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.f3"><strong>kickaj</strong> giveaway sistem</span>
+                                    </span>
+                                    <span class="p-tag-soon" data-i18n="modules.soon">USKORO</span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pp.f4">Analytics
-                                            dashboard</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.f4"><strong>kickov</strong> overleji</span>
+                                    </span>
+                                    <span class="p-tag-soon" data-i18n="modules.soon">USKORO</span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pp.f5">Prilagođeni
-                                            prefix</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.f5">Osnovna mesečna analitika</span>
+                                    </span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pp.f6">Prioritetna
-                                            podrška</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.f6">Prioritetna imejl podrška</span>
+                                    </span>
+                                </li>
+                                <li class="p-disabled">
+                                    <span>
+                                        <span class="p-cross">✕</span>
+                                        <span data-i18n="pricing.pro.f7">Namenski VIP bot</span>
+                                    </span>
                                 </li>
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-primary btn-full" onclick="openModal('signup')"
-                                data-i18n="pricing.cta.pro">Uzmi Pro plan</button>
+                            <button class="btn btn-primary w-full" id="pricingProBtn" onclick="openModal('login')" data-i18n="pricing.pro.btn">
+                                Izaberi Pro paket
+                            </button>
                         </div>
                     </div>
 
-                    <!-- BUSINESS PLAN -->
-                    <div class="pricing-card" data-reveal data-delay="3">
+                    <!-- ELITE VIP -->
+                    <div class="pricing-card" id="pricing-elite">
                         <div class="p-card-header">
-                            <div class="p-title">Business</div>
-                            <div class="p-price"><span class="p-currency">€</span>15<span class="p-period"
-                                    data-i18n="pricing.per.month">/mesec</span></div>
-                            <p class="p-desc" data-i18n="pricing.biz.desc">Za više kanala i organizacije.</p>
+                            <h3 class="p-title">ELITE</h3>
+                            <div class="p-price">
+                                <span class="p-currency">€</span>15
+                                <span class="p-period" data-i18n="pricing.period">/ mesečno</span>
+                            </div>
+                            <p class="p-desc" data-i18n="pricing.elite.desc">
+                                Za profesionalne strimere koji traže apsolutno najbolju tehnologiju i podršku.
+                            </p>
                         </div>
                         <div class="p-card-body">
                             <ul class="p-features-list">
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pb.f1">Sve iz Pro
-                                            plana</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.elite.f1">Ceo ekosistem uključen</span>
+                                    </span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pb.f2">Do 5 Kick
-                                            kanala</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.elite.f2"><strong>kickan</strong> detaljna analitika</span>
+                                    </span>
+                                    <span class="p-tag-soon" data-i18n="modules.soon">USKORO</span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pb.f3">API
-                                            pristup</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.elite.f3">Namenski VIP bot sa tvojim imenom</span>
+                                    </span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pb.f4">Prilagođeni
-                                            branding</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.elite.f4">Neograničen broj vidžeta i alertova</span>
+                                    </span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pb.f5">Webhooks
-                                            integracija</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.elite.f5">VIP imejl status podrške</span>
+                                    </span>
                                 </li>
                                 <li>
-                                    <span><span class="p-check">✓</span> <span data-i18n="pb.f6">Dedikovan
-                                            support</span></span>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <strong data-i18n="pricing.elite.f6">Neprekidna podrška uz brzi odziv</strong>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.elite.f7">Individualne sesije podešavanja strima</span>
+                                    </span>
                                 </li>
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-secondary btn-full" onclick="openModal('signup')"
-                                data-i18n="pricing.cta.biz">Uzmi Business</button>
+                            <button class="btn btn-secondary w-full" id="pricingEliteBtn" onclick="openModal('login')" data-i18n="pricing.elite.btn">
+                                Izaberi Elite VIP
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -624,18 +678,18 @@
                                 <line x1="8" y1="16" x2="8.01" y2="16" />
                                 <line x1="16" y1="16" x2="16.01" y2="16" />
                             </svg>
-                            <span>kickot Bot</span>
+                            <span>Kickot Bot</span>
                         </div>
-                        <h2>Spreman da poboljšaš chat?</h2>
-                        <p data-i18n="cta.desc">Registruj se i povezi KickOt sa svojim Kick kanalom. Za manje od 5
-                            minuta.</p>
+                        <h2 data-i18n="cta.title">Spreman da poboljšaš chat?</h2>
+                        <p data-i18n="cta.desc">Prijavi se i poveži Kickot sa svojim Kick kanalom. Za manje od 5 minuta.</p>
                         <div class="cta-actions">
-                            <button class="btn btn-primary btn-large" onclick="openModal('signup')">
-                                <!-- Emojiji se povlače iz prevoda, izbacujemo inline SVG koji se duplirao -->
-                                <span data-i18n="cta.primary">Kreiraj nalog</span>
+                            <button class="btn btn-primary btn-large" onclick="openModal('login')" id="ctaPrimaryBtn"
+                                style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
+                                </svg>
+                                <span data-i18n="cta.login" id="ctaPrimaryBtnText">Prijavi se</span>
                             </button>
-                            <button class="btn btn-secondary btn-large" onclick="openModal('login')"
-                                data-i18n="cta.login">Prijavi se</button>
                         </div>
                     </div>
                 </div>
@@ -645,82 +699,84 @@
 
     <!-- ══════════════ FOOTER ══════════════ -->
     <footer class="footer">
-        <div class="container">
-            <div class="footer-container">
-                <div class="footer-brand">
-                    <div class="logo" style="font-size:1.125rem">
-                        <img src="logo.png" alt="Kickot Logo" class="logo-img" style="height: 36px;">
-                    </div>
-                    <p class="footer-tagline" data-i18n="footer.desc">Moćan chat bot za Kick platformu. Deo KickAll
-                        ekosistema.</p>
+        <div class="container footer-container">
+            <div class="footer-brand">
+                <a href="#" class="logo" id="footerLogo">
+                    <img src="assets/kickot.png" alt="Kickot Logo" class="footer-logo-img" style="height: 38px;">
+                </a>
+                <p class="footer-tagline" data-i18n="footer.tagline">
+                    Moćan i pouzdan chatbot za Kick platformu. Deo kompletnog KickALL ekosistema alata za strimere.
+                </p>
+                <p class="footer-contact-info">
+                    <span>Kontakt email:</span> <a href="mailto:contact@milanwebportal.com">contact@milanwebportal.com</a>
+                </p>
+            </div>
+            <div class="footer-links-group">
+                <div class="footer-column">
+                    <h4 data-i18n="footer.productsTitle">Proizvodi</h4>
+                    <a href="index.html">Kickot</a>
+                    <a href="../index.html#playground">Kickaj</a>
+                    <a href="../index.html#playground">Kickan</a>
+                    <a href="../index.html#playground">Kickov</a>
                 </div>
-
-                <div class="footer-links-group">
-                    <div class="footer-column">
-                        <h4 data-i18n="footer.product">Produkt</h4>
-                        <a href="#features" data-i18n="footer.features">Funkcionalnosti</a>
-                        <a href="#commands" data-i18n="footer.commands">Komande</a>
-                        <a href="#pricing" data-i18n="footer.pricing">Cene</a>
-                    </div>
-                    <div class="footer-column">
-                        <h4 data-i18n="footer.ecosystem">Ekosistem</h4>
-                        <a href="../index.html">KickAll</a>
-                        <span
-                            style="opacity:0.4; cursor: default; font-size: 0.9rem; color: var(--color-text-muted);">KickAn
-                            — <span class="lang-sr">Uskoro</span><span class="lang-en">Soon</span></span>
-                        <span
-                            style="opacity:0.4; cursor: default; font-size: 0.9rem; color: var(--color-text-muted);">KickAj
-                            — <span class="lang-sr">Uskoro</span><span class="lang-en">Soon</span></span>
-                        <span
-                            style="opacity:0.4; cursor: default; font-size: 0.9rem; color: var(--color-text-muted);">KickOv
-                            — <span class="lang-sr">Uskoro</span><span class="lang-en">Soon</span></span>
-                    </div>
+                <div class="footer-column">
+                    <h4 data-i18n="footer.socialTitle">Socijalne mreže</h4>
+                    <a href="https://milanwebportal.com" target="_blank" rel="noopener">Website</a>
+                    <a href="https://instagram.com" target="_blank" rel="noopener">Instagram</a>
+                    <a href="https://tiktok.com" target="_blank" rel="noopener">TikTok</a>
+                    <a href="https://youtube.com" target="_blank" rel="noopener">YouTube</a>
+                </div>
+                <div class="footer-column">
+                    <h4 data-i18n="footer.shortcutsTitle">Prečice</h4>
+                    <a href="#features">Funkcije</a>
+                    <a href="#commands">Isprobaj</a>
+                    <a href="#pricing">Cene</a>
+                    <a href="#faq">FAQ</a>
                 </div>
             </div>
-
-            <div class="footer-bottom">
-                <div class="footer-bottom-container">
-                    <p data-i18n="footer.copy">© 2026 KickAll / Kickot. Sva prava zadržana.</p>
-                    <div class="footer-bottom-links">
-                        <a href="#" data-i18n="footer.privacy">Privatnost</a>
-                        <a href="#" data-i18n="footer.terms">Uslovi</a>
-                        <a href="https://kick.com" target="_blank" rel="noopener">kick.com</a>
-                    </div>
+        </div>
+        <div class="footer-bottom">
+            <div class="container footer-bottom-container">
+                <div class="footer-bottom-left">
+                    &copy; 2026 KickALL / Kickot. Sva prava zadržana.
+                </div>
+                <div class="footer-bottom-center">
+                    Napravio <a href="https://milanwebportal.com" target="_blank" rel="noopener">milanwebportal.com</a>
+                </div>
+                <div class="footer-bottom-right">
+                    <a href="#">Privatnost</a>
+                    <span class="dot-sep">•</span>
+                    <a href="#">Uslovi</a>
                 </div>
             </div>
         </div>
     </footer>
+
     <div class="modal-backdrop" id="authModal" onclick="handleModalBackdropClick(event)">
         <div class="auth-modal" id="authModalInner">
             <button class="modal-close" onclick="closeModal()" aria-label="Close">✕</button>
 
             <div class="modal-logo">
-                <img src="assets/logo.png" alt="Kickot Logo" class="logo-img" style="height: 38px;">
+                <img src="assets/kickot.png" alt="Kickot Logo" class="logo-img" style="height: 38px;">
             </div>
 
             <!-- LOGIN FORM -->
-            <div id="loginForm" class="auth-form"
-                style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 0;">
+            <div id="loginForm" class="auth-form" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 0;">
                 <div class="form-alert form-alert-error" id="loginError" style="width: 100%;"></div>
 
-                <p
-                    style="text-align: center; margin-bottom: 24px; color: var(--color-text-muted); font-size: 0.95rem; line-height: 1.5;">
+                <p style="text-align: center; margin-bottom: 24px; color: var(--color-text-muted); font-size: 0.95rem; line-height: 1.5;" data-i18n="auth.login.desc">
                     Prijavi se preko svog Kick naloga da započneš.
                 </p>
 
-                <button class="btn-kick-login" onclick="openKickLogin()"
-                    style="width: 100%; max-width: 320px; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 16px;">
+                <button class="btn-kick-login" onclick="openKickLogin()" style="width: 100%; max-width: 320px; display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 16px;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                        <path
-                            d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
+                        <path d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
                     </svg>
-                    <span>Prijavi se preko Kicka</span>
+                    <span data-i18n="auth.login.kick">Prijavi se preko Kicka</span>
                 </button>
 
                 <p style="text-align: center; font-size: 0.85rem; color: var(--color-text-muted);">
-                    Nemaš Kick nalog? <a href="https://kick.com" target="_blank" rel="noopener"
-                        style="color: #53fc18; text-decoration: none; font-weight: 600; transition: color 0.2s;">Napravi
-                        nalog na Kick-u</a>
+                    <span data-i18n="auth.login.nonaccount">Nemaš Kick nalog?</span> <a href="https://kick.com" target="_blank" rel="noopener" style="color: #53fc18; text-decoration: none; font-weight: 600; transition: color 0.2s;" data-i18n="auth.login.createkick">Napravi nalog na Kicku</a>
                 </p>
             </div>
 
@@ -735,24 +791,23 @@
                 <div class="form-alert form-alert-success" id="signupSuccess"></div>
 
                 <div class="form-group">
-                    <label class="form-label" for="signupName">Korisničko ime</label>
-                    <input type="text" id="signupName" class="form-input" placeholder="npr. milan-567" />
+                    <label class="form-label" for="signupName" data-i18n="auth.signup.name">Korisničko ime</label>
+                    <input type="text" id="signupName" class="form-input" placeholder="npr. milan567" />
                     <span class="field-error" id="signupNameErr"></span>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="signupEmail">Email adresa</label>
+                    <label class="form-label" for="signupEmail" data-i18n="auth.signup.email">Email adresa</label>
                     <input type="email" id="signupEmail" class="form-input" placeholder="npr. ime@email.com" />
                     <span class="field-error" id="signupEmailErr"></span>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="signupPassword">Lozinka (min. 8 karaktera)</label>
+                    <label class="form-label" for="signupPassword" data-i18n="auth.signup.password">Lozinka (min. 8 karaktera)</label>
                     <div class="form-input-wrapper">
                         <input type="password" id="signupPassword" class="form-input" placeholder="••••••••" />
                         <button type="button" class="pw-toggle" onclick="togglePw('signupPassword', this)">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                                 <circle cx="12" cy="12" r="3" />
                             </svg>
@@ -763,7 +818,7 @@
 
                 <button class="auth-submit" id="signupBtn" onclick="handleSignup()">
                     <span class="auth-spinner"></span>
-                    <span class="btn-text">Registruj se</span>
+                    <span class="btn-text" data-i18n="auth.signup.submit">Registruj se</span>
                 </button>
             </div>
 
@@ -772,164 +827,37 @@
                 <div class="form-alert form-alert-error" id="forgotError"></div>
                 <div class="form-alert form-alert-success" id="forgotSuccess"></div>
 
-                <p style="font-size: 0.85rem; color: var(--color-text-muted); line-height: 1.4; margin-bottom: 8px;">
+                <p style="font-size: 0.85rem; color: var(--color-text-muted); line-height: 1.4; margin-bottom: 8px;" data-i18n="auth.forgot.desc">
                     Unesi svoju email adresu i poslaćemo ti link za resetovanje lozinke.
                 </p>
 
                 <div class="form-group">
-                    <label class="form-label" for="forgotEmail">Email adresa</label>
+                    <label class="form-label" for="forgotEmail" data-i18n="auth.forgot.email">Email adresa</label>
                     <input type="email" id="forgotEmail" class="form-input" placeholder="npr. ime@email.com" />
                     <span class="field-error" id="forgotEmailErr"></span>
                 </div>
 
                 <button class="auth-submit" id="forgotBtn" onclick="handleForgot()">
                     <span class="auth-spinner"></span>
-                    <span class="btn-text">Pošalji link</span>
+                    <span class="btn-text" data-i18n="auth.forgot.submit">Pošalji link</span>
                 </button>
 
                 <div style="text-align: center; margin-top: 8px;">
-                    <a href="#" onclick="switchTab('login')"
-                        style="font-size: 0.85rem; color: var(--color-violet); text-decoration: none;">← Nazad na
-                        prijavu</a>
+                    <a href="#" onclick="switchTab('login')" style="font-size: 0.85rem; color: var(--color-violet); text-decoration: none;" data-i18n="auth.forgot.back">← Nazad na prijavu</a>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ══════════════ SETTINGS MODAL ══════════════ -->
-    <div class="modal-backdrop" id="settingsModal" onclick="handleSettingsModalBackdropClick(event)">
-        <div class="auth-modal" style="max-width: 440px; padding: 32px; display: flex; flex-direction: column; gap: 15px;">
-            <div class="modal-head"
-                style="margin-bottom: 15px; border-bottom: none; padding-bottom: 0; display: flex; justify-content: space-between; align-items: center; position: relative;">
-                <h3
-                    style="font-family: var(--font-heading); font-size: 1.25rem; font-weight: 800; color: #fff; margin: 0;">
-                    Podešavanja Naloga</h3>
-                <button class="modal-close" onclick="closeSettingsModal()" aria-label="Zatvori">✕</button>
-            </div>
-
-            <!-- Tab Selectors -->
-            <div class="settings-tabs"
-                style="display: flex; background: rgba(6, 4, 10, 0.4); border: 1px solid rgba(255, 255, 255, 0.04); border-radius: 10px; padding: 4px; margin-bottom: 20px;">
-                <button class="settings-tab active" id="setTabProfile" onclick="switchSettingsTab('profile')"
-                    style="flex: 1; background: none; border: none; color: var(--color-text-muted, #94a3b8); padding: 8px; font-family: var(--font-heading); font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Profil</button>
-                <button class="settings-tab" id="setTabChannels" onclick="switchSettingsTab('channels')"
-                    style="flex: 1; background: none; border: none; color: var(--color-text-muted, #94a3b8); padding: 8px; font-family: var(--font-heading); font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Kick
-                    Kanali</button>
-            </div>
-
-            <div class="modal-body" style="padding: 0; display: flex; flex-direction: column; gap: 12px;">
-
-                <!-- PANEL 1: PROFIL & BEZBEDNOST -->
-                <div id="settingsProfilePanel" style="display: block;">
-                    <div class="settings-avatar-section">
-                        <div class="avatar-preview-container" onclick="triggerSettingsAvatarUpload()">
-                            <div class="avatar-preview-overlay">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2.5">
-                                    <path
-                                        d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                                    <circle cx="12" cy="13" r="4" />
-                                </svg>
-                            </div>
-                            <div class="avatar-preview-img" id="settingsAvatarPreviewImg">U</div>
-                        </div>
-                        <input type="file" id="settingsAvatarFileInput" accept="image/*" style="display:none;"
-                            onchange="handleSettingsAvatarFileSelect(event)" />
-
-                        <div class="settings-avatar-presets">
-                            <div class="preset-title">Izaberi avatar:</div>
-                            <div class="presets-grid">
-                                <div class="preset-option" onclick="selectSettingsPresetAvatar('robot')">🤖</div>
-                                <div class="preset-option" onclick="selectSettingsPresetAvatar('ninja')">🥷</div>
-                                <div class="preset-option" onclick="selectSettingsPresetAvatar('gamepad')">🎮</div>
-                                <div class="preset-option" onclick="selectSettingsPresetAvatar('star')">⭐</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group"
-                        style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-                        <label
-                            style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); text-transform: uppercase;">Email
-                            adresa</label>
-                        <input type="email" id="settingsEmail" class="form-control" disabled
-                            style="opacity: 0.5; cursor: not-allowed; width: 100%;" />
-                    </div>
-
-                    <div class="form-group"
-                        style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-                        <label
-                            style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); text-transform: uppercase;">Ime
-                            / Nadimak</label>
-                        <input type="text" id="settingsName" class="form-control" placeholder="Tvoje ime"
-                            style="width: 100%;" />
-                    </div>
-
-                    <div style="border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 12px; margin-top: 15px;">
-                        <div class="form-group"
-                            style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-                            <label
-                                style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); text-transform: uppercase;">Nova
-                                Lozinka</label>
-                            <input type="password" id="settingsPassword" class="form-control"
-                                placeholder="Ostavi prazno ako ne menjaš" autocomplete="new-password"
-                                style="width: 100%;" />
-                        </div>
-
-                        <div class="form-group"
-                            style="margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-                            <label
-                                style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); text-transform: uppercase;">Potvrdi
-                                Lozinku</label>
-                            <input type="password" id="settingsConfirmPassword" class="form-control"
-                                placeholder="Ponovi lozinku" autocomplete="new-password" style="width: 100%;" />
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PANEL 2: UPRAVLJANJE KANALIMA -->
-                <div id="settingsChannelsPanel" style="display: none;">
-                    <div class="form-group" style="margin-bottom: 16px; display: flex; flex-direction: column; gap: 8px;">
-                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); text-transform: uppercase;">Dodaj Kick kanal</label>
-                        <p style="font-size: 0.82rem; color: var(--color-text-muted); line-height: 1.4; margin: 0;">
-                            Prijavi se sa još jednim Kick nalogom da dodaš taj kanal na ovaj profil.
-                        </p>
-                        <button class="btn btn-primary" onclick="openKickLoginForChannel()" id="settingsAddChannelBtn" style="gap: 10px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
-                                <path d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z"/>
-                            </svg>
-                            Prijavi se sa Kickom i dodaj kanal
-                        </button>
-                    </div>
-
-                    <div style="max-height: 240px; overflow-y: auto; margin-top: 5px;">
-                        <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--color-text-muted, #94a3b8); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">Povezani kanali</label>
-                        <div id="settingsChannelList" style="display: flex; flex-direction: column; gap: 8px;">
-                            <!-- Populated dynamically -->
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- Footer Action Buttons (in one single row, side-by-side) -->
-            <div class="modal-foot"
-                style="border-top: none; padding-top: 15px; margin-top: 15px; padding-bottom: 0; display: flex; gap: 12px; width: 100%;">
-                <button class="btn btn-secondary" onclick="closeSettingsModal()"
-                    style="flex: 1; margin: 0; justify-content: center; height: 46px;">
-                    Otkaži
-                </button>
-                <button class="btn btn-primary" id="settingsSaveBtn" onclick="handleSaveSettings()"
-                    style="flex: 1; margin: 0; justify-content: center; height: 46px;">
-                    <span class="auth-spinner" id="settingsSpinner"></span>
-                    Sačuvaj
-                </button>
             </div>
         </div>
     </div>
 
     <!-- ══════════════ TOAST CONTAINER ══════════════ -->
     <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Back to Top Floating Button -->
+    <button type="button" class="back-to-top-btn" id="backToTopBtn" aria-label="Nazad na vrh">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+    </button>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/app.js"></script>

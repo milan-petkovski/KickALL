@@ -1,9 +1,0 @@
-[[redirects]]
-  from = "/api/kick/exchange"
-  to = "/.netlify/functions/kick-exchange"
-  status = 200
-
-[[redirects]]
-  from = "/api/kick/me"
-  to = "/.netlify/functions/kick-me"
-  status = 200

@@ -2937,29 +2937,38 @@ async function disconnectCustomBot() {
 
 function updateCustomBotStatusUI(botName, isActive) {
   const badgeContainer = document.getElementById('customBotStatusBadge');
-  if (!badgeContainer) return;
 
   const formattedName = botName ? (botName.startsWith('@') ? botName : `@${botName}`) : '';
+  if (currentChannelConfig) {
+    currentChannelConfig.custom_bot_name = botName || null;
+  }
 
-  if (isActive && formattedName) {
-    window.currentCustomBotActive = true;
-    badgeContainer.innerHTML = `
-      <span style="font-size: 0.8rem; font-weight: 700; padding: 5px 12px; border-radius: 20px; background: rgba(83, 252, 24, 0.12); border: 1px solid rgba(83, 252, 24, 0.3); color: #53FC18; display: flex; align-items: center; gap: 6px;">
-        <span style="width: 8px; height: 8px; border-radius: 50%; background: #53FC18; box-shadow: 0 0 8px #53FC18;"></span>
-        Aktivan Custom Bot (${formattedName})
-      </span>
-      <button type="button" onclick="disconnectCustomBot()" class="btn btn-sm btn-outline" style="padding: 3px 8px; font-size: 0.75rem; color: #EF4444; border-color: rgba(239,68,68,0.3);" title="Odveži custom bot nalog">
-        Odveži
-      </button>
-    `;
-  } else {
-    window.currentCustomBotActive = false;
-    badgeContainer.innerHTML = `
-      <span style="font-size: 0.8rem; font-weight: 600; padding: 5px 12px; border-radius: 20px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle); color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-        <span style="width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF;"></span>
-        Koristi se podrazumevani @KickotBot
-      </span>
-    `;
+  if (badgeContainer) {
+    if (isActive && formattedName) {
+      window.currentCustomBotActive = true;
+      badgeContainer.innerHTML = `
+        <span style="font-size: 0.8rem; font-weight: 700; padding: 5px 12px; border-radius: 20px; background: rgba(83, 252, 24, 0.12); border: 1px solid rgba(83, 252, 24, 0.3); color: #53FC18; display: flex; align-items: center; gap: 6px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #53FC18; box-shadow: 0 0 8px #53FC18;"></span>
+          Aktivan Custom Bot (${formattedName})
+        </span>
+        <button type="button" onclick="disconnectCustomBot()" class="btn btn-sm btn-outline" style="padding: 3px 8px; font-size: 0.75rem; color: #EF4444; border-color: rgba(239,68,68,0.3);" title="Odveži custom bot nalog">
+          Odveži
+        </button>
+      `;
+    } else {
+      window.currentCustomBotActive = false;
+      badgeContainer.innerHTML = `
+        <span style="font-size: 0.8rem; font-weight: 600; padding: 5px 12px; border-radius: 20px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle); color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF;"></span>
+          Koristi se podrazumevani @KickotBot
+        </span>
+      `;
+    }
+  }
+
+  const toggle = document.getElementById('botActiveToggle');
+  if (typeof updateBotStatusUI === 'function') {
+    updateBotStatusUI(toggle ? toggle.checked : false);
   }
 }
 
@@ -3209,12 +3218,21 @@ function updateBotStatusUI(active) {
   if (toggle && toggle.checked !== active) { toggle.checked = active; }
 
   // Control Center updates
+  const ctrlStatusLabel = document.getElementById('ctrlBotStatusLabel');
   const ctrlStatus = document.getElementById('ctrlBotStatus');
   const ctrlBtn = document.getElementById('ctrlBotToggleBtn');
+
+  const rawBotName = currentChannelConfig?.custom_bot_name;
+  const botNameStr = rawBotName ? (rawBotName.startsWith('@') ? rawBotName : `@${rawBotName}`) : '@KickotBot';
+
+  if (ctrlStatusLabel) {
+    ctrlStatusLabel.textContent = `Status bota ${botNameStr}`;
+  }
+
   if (ctrlStatus) {
     ctrlStatus.innerHTML = active
-      ? '<span style="color: var(--kick-green); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-on" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--kick-green); box-shadow:0 0 8px var(--kick-green);"></span> Bot je pokrenut</span>'
-      : '<span style="color: var(--text-muted); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-off" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#EF4444; box-shadow:0 0 8px #EF4444;"></span> Bot je zaustavljen</span>';
+      ? '<span style="color: var(--kick-green); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-on" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--kick-green); box-shadow:0 0 8px var(--kick-green);"></span> Bot je Pokrenut</span>'
+      : '<span style="color: var(--text-muted); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-off" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#EF4444; box-shadow:0 0 8px #EF4444;"></span> Bot je Zaustavljen</span>';
   }
   if (ctrlBtn) {
     ctrlBtn.textContent = active ? 'Zaustavi bota' : 'Pokreni bota';
@@ -3679,7 +3697,7 @@ async function toggleCommand(id, currentEnabled, isDefault) {
     if (error) { showToast('error', 'Greška', 'error'); return; }
   }
 
-  showToast('info', !currentEnabled ? 'Komanda uključena' : 'Komanda isključena', !currentEnabled ? 'check' : 'pause');
+  showToast('info', !currentEnabled ? 'Komanda je uključena' : 'Komanda je isključena', !currentEnabled ? 'check' : 'pause');
   notifyBotToReload();
   await loadCommands();
 }
@@ -3693,11 +3711,14 @@ function deleteCommandConfirm(id, cmd) {
     await loadCommands();
   };
 
+  const titleEl = document.getElementById('confirmModalTitle');
+  if (titleEl) titleEl.textContent = 'Potvrdi brisanje komande';
+
   const confirmMsgEl = document.getElementById('confirmMsg');
   if (confirmMsgEl) {
     confirmMsgEl.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 14px; text-align: left;">
-        <div style="font-size: 0.92rem; color: var(--text-main); font-weight: 500;">
+        <div style="font-size: 0.92rem; color: var(--text-main); font-weight: 600;">
           Da li sigurno želiš da obrišeš ovu komandu?
         </div>
         <div style="background: rgba(239, 68, 68, 0.08); border: 1px dashed rgba(239, 68, 68, 0.35); padding: 12px 16px; border-radius: var(--radius-md); font-family: var(--font-mono); font-weight: 700; color: #F87171; font-size: 1.05rem; word-break: break-all; display: flex; align-items: center; justify-content: space-between;">
@@ -3713,6 +3734,7 @@ function deleteCommandConfirm(id, cmd) {
 
   const confirmBtn = document.getElementById('confirmDeleteBtn');
   if (confirmBtn) {
+    confirmBtn.style.whiteSpace = 'nowrap';
     confirmBtn.innerHTML = `
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
@@ -3859,14 +3881,46 @@ function toggleUserMenu() {
   document.getElementById('userMenuSm').classList.toggle('open');
 }
 async function handleSignOut() {
-  localStorage.removeItem('active-dashboard-panel');
-  sessionStorage.removeItem('dashboard-session-active');
-  await sb.auth.signOut();
-  notifyGlobalLogout();
-  window.location.href = 'index.html';
+  try {
+    let userId = null;
+    if (typeof sb !== 'undefined' && sb && sb.auth) {
+      const { data } = await sb.auth.getSession();
+      userId = data?.session?.user?.id;
+    }
+
+    if (userId) {
+      notifyGlobalLogout(userId);
+    }
+
+    localStorage.removeItem('active-dashboard-panel');
+    localStorage.removeItem('kick_access_token');
+    localStorage.removeItem('kick_token_type');
+    localStorage.removeItem('kick_session_active');
+    localStorage.removeItem('kick_oauth_state');
+    localStorage.removeItem('kick_code_verifier');
+    sessionStorage.clear();
+
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.startsWith('kick_'))) {
+        localStorage.removeItem(key);
+      }
+    }
+
+    if (typeof sb !== 'undefined' && sb && sb.auth) {
+      await Promise.race([
+        sb.auth.signOut(),
+        new Promise(resolve => setTimeout(resolve, 400))
+      ]);
+    }
+  } catch (e) {
+    console.error("KickOT signOut error:", e);
+  } finally {
+    window.location.replace('index.html');
+  }
 }
 
-function notifyGlobalLogout() {
+function notifyGlobalLogout(userId) {
   const domains = [
     'https://kickall.netlify.app',
     'https://kickall.milanwebportal.com',
@@ -3886,37 +3940,30 @@ function notifyGlobalLogout() {
 
   localStorage.setItem('kickbot_global_logout', Date.now().toString());
 
-  // Notify bot server for global logout
-  const { data: { session } } = sb.auth.getSession();
-  if (session?.user?.id) {
+  if (userId) {
     fetch('https://kickbot-ihzb.onrender.com/api/global-logout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: session.user.id })
+      body: JSON.stringify({ userId: userId })
     }).catch(() => { });
   }
 }
 
 window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
-    sb.auth.signOut().then(() => {
-      window.location.reload();
-    });
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.replace('index.html');
   }
 });
 
-setInterval(async () => {
-  const logoutTime = localStorage.getItem('kickbot_global_logout');
-  if (logoutTime && Date.now() - parseInt(logoutTime) < 5000) {
-    const { data: sessionData } = await sb.auth.getSession();
-    if (sessionData?.session) {
-      sb.auth.signOut().then(() => {
-        window.location.reload();
-      });
-    }
-    localStorage.removeItem('kickbot_global_logout');
+window.addEventListener('storage', (event) => {
+  if (event.key === 'kickbot_global_logout') {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.replace('index.html');
   }
-}, 1000);
+});
 
 async function checkServerLogoutStatus() {
   try {
@@ -4192,6 +4239,50 @@ function setSettingsAvatarPreview(urlOrEmoji) {
   } else {
     imgEl.style.backgroundImage = 'none';
     imgEl.textContent = urlOrEmoji;
+  }
+}
+
+async function syncLatestKickAvatar() {
+  let channelName = activeChannel?.username || activeChannel?.slug || activeChannel?.name || null;
+
+  if (!channelName) {
+    const { data: { user } } = await sb.auth.getUser();
+    if (user) {
+      channelName = user.user_metadata?.display_name || user.user_metadata?.custom_claims?.global_name || user.email?.split('@')[0] || null;
+    }
+  }
+
+  if (!channelName) {
+    showToast('error', 'Nije moguće identifikovati vaš Kick nalog za preuzimanje slike.');
+    return;
+  }
+
+  const cleanChannel = channelName.trim().replace(/^@+/, '');
+
+  const btn = document.getElementById('syncKickAvatarBtn');
+  const origHTML = btn ? btn.innerHTML : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span style="display:inline-block; animation: spin 1s linear infinite;">⏳</span> Preuzimanje sa Kicka...`;
+  }
+
+  try {
+    const avatarUrl = await fetchKickAvatar(cleanChannel);
+    if (avatarUrl) {
+      setSettingsAvatarPreview(avatarUrl);
+      settingsUploadedAvatarBase64 = avatarUrl;
+      showToast('success', `Profilna slika za @${cleanChannel} je uspešno preuzeta! Klikni na "Sačuvaj Promene".`);
+    } else {
+      showToast('error', `Nije bilo moguće preuzeti profilnu sliku sa Kicka za @${cleanChannel}.`);
+    }
+  } catch (err) {
+    console.error('syncLatestKickAvatar error:', err);
+    showToast('error', 'Greška prilikom preuzimanja profilne slike sa Kicka.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = origHTML;
+    }
   }
 }
 
@@ -4590,7 +4681,28 @@ async function deleteConnectedChannel(channelId) {
     showToast('success', 'Kanal je uspešno uklonjen.', '🗑️');
   };
 
-  document.getElementById('confirmMsg').textContent = `Da li ste sigurni da želite da uklonite kanal @${channelToDelete.username}? Ovo se ne može poništiti.`;
+  const titleEl = document.getElementById('confirmModalTitle');
+  if (titleEl) titleEl.textContent = 'Potvrdi uklanjanje kanala';
+
+  const confirmBtn = document.getElementById('confirmDeleteBtn');
+  if (confirmBtn) {
+    confirmBtn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+      </svg>
+      Ukloni Kanal
+    `;
+  }
+
+  document.getElementById('confirmMsg').innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+      <div>Da li ste sigurni da želite da uklonite kanal <strong style="color: #fff;">@${channelToDelete.username}</strong>?</div>
+      <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: flex-start; gap: 8px; background: rgba(255,255,255,0.02); padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5" style="flex-shrink:0; margin-top: 1px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Ova radnja se ne može poništiti. Sva podešavanja za ovaj kanal će biti obrisana.</span>
+      </div>
+    </div>
+  `;
   document.getElementById('confirmDeleteBtn').onclick = () => { closeModal('confirmModal'); confirmCallback(); };
   openModal('confirmModal');
 }
@@ -4831,8 +4943,6 @@ async function addNewChannel() {
         const prevState = toggle.checked;
         const newState = !prevState;
         const name = moduleNames[toggleId] || 'Modul';
-        const badgeId = moduleToOvId[toggleId];
-        const badgeEl = badgeId ? document.getElementById(badgeId) : null;
 
         // OPTIMISTIČNI UPDATE — odmah primeni novu vrednost u UI
         toggle.checked = newState;
@@ -4846,72 +4956,39 @@ async function addNewChannel() {
           if (master) master.checked = newState;
         }
 
-        // Prikaži loading stanje na badge-u
-        if (badgeEl) {
-          const prevClass = badgeEl.className;
-          const prevHTML = badgeEl.innerHTML;
-          badgeEl.className = 'module-status-badge loading';
-          badgeEl.innerHTML = `<span>${name}</span>`;
+        // Odmah osveži izgled znački (on/off) bez loading stanja
+        updateOverviewModulesUI();
 
-          try {
-            // Sačuvaj u bazu
-            if (toggleId === 'cfgSongRequestEnabled') {
-              await saveSongRequestConfig(true);
-              await saveBotConfig(true);
-            } else if (toggleId === 'cfgGambleEnabled') {
-              await saveEconomyConfig(true);
-              await saveBotConfig(true);
-            } else if (toggleId === 'cfgModeration') {
-              if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
-              await saveModerationSettings(true);
-              await saveBotConfig(true);
-            } else {
-              await saveBotConfig(true);
-            }
-
-            // Uspeh — osvezi UI
-            updateOverviewModulesUI();
-            showToast(newState ? 'success' : 'info', `Modul "${name}" je ${newState ? 'uključen' : 'isključen'}.`);
-
-          } catch (err) {
-            // Greška — vrati prethodni state
-            toggle.checked = prevState;
-            if (toggleId === 'cfgAutoresponse') {
-              const master = document.getElementById('cfgFeatureAutoresponseMaster');
-              if (master) master.checked = prevState;
-            } else if (toggleId === 'cfgSongRequestEnabled') {
-              const master = document.getElementById('cfgFeatureSongRequestMaster');
-              if (master) master.checked = prevState;
-            }
-            badgeEl.className = prevClass;
-            badgeEl.innerHTML = prevHTML;
-            updateOverviewModulesUI();
-            showToast('error', `Greška pri promeni modula "${name}". Pokušaj ponovo.`);
-            console.error('toggleModuleFromOverview error:', err);
+        try {
+          // Sačuvaj u bazu u pozadini
+          if (toggleId === 'cfgSongRequestEnabled') {
+            await saveSongRequestConfig(true);
+            await saveBotConfig(true);
+          } else if (toggleId === 'cfgGambleEnabled') {
+            await saveEconomyConfig(true);
+            await saveBotConfig(true);
+          } else if (toggleId === 'cfgModeration') {
+            if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
+            await saveModerationSettings(true);
+            await saveBotConfig(true);
+          } else {
+            await saveBotConfig(true);
           }
-        } else {
-          // Nema badge-a — klasicna sinhronizacija
-          try {
-            if (toggleId === 'cfgSongRequestEnabled') {
-              await saveSongRequestConfig(true);
-              await saveBotConfig(true);
-            } else if (toggleId === 'cfgGambleEnabled') {
-              await saveEconomyConfig(true);
-              await saveBotConfig(true);
-            } else if (toggleId === 'cfgModeration') {
-              toggleModerationPanelState();
-              await saveModerationSettings(true);
-              await saveBotConfig(true);
-            } else {
-              await saveBotConfig(true);
-            }
-            updateOverviewModulesUI();
-            showToast(newState ? 'success' : 'info', `Modul "${name}" je ${newState ? 'uključen' : 'isključen'}.`);
-          } catch (err) {
-            toggle.checked = prevState;
-            updateOverviewModulesUI();
-            showToast('error', `Greška pri promeni modula "${name}". Pokušaj ponovo.`);
+
+          showToast(newState ? 'success' : 'info', `Modul "${name}" je ${newState ? 'uključen' : 'isključen'}.`);
+
+        } catch (err) {
+          toggle.checked = prevState;
+          if (toggleId === 'cfgAutoresponse') {
+            const master = document.getElementById('cfgFeatureAutoresponseMaster');
+            if (master) master.checked = prevState;
+          } else if (toggleId === 'cfgSongRequestEnabled') {
+            const master = document.getElementById('cfgFeatureSongRequestMaster');
+            if (master) master.checked = prevState;
           }
+          updateOverviewModulesUI();
+          showToast('error', `Greška pri promeni modula "${name}". Pokušaj ponovo.`);
+          console.error('toggleModuleFromOverview error:', err);
         }
       }
 
@@ -5522,6 +5599,11 @@ async function addNewChannel() {
       document.addEventListener('DOMContentLoaded', initNotificationCenter);
 
       function openFeedbackModal() {
+        const typeSelect = document.getElementById('feedbackType');
+        if (typeSelect) {
+          typeSelect.value = 'predlog';
+          onFeedbackTypeChange('predlog');
+        }
         openModal('feedbackModal');
       }
 
@@ -5533,25 +5615,85 @@ async function addNewChannel() {
         openModal('docsModal');
       }
 
-      function submitFeedback() {
-        const type = document.getElementById('feedbackType')?.value;
+      function onFeedbackTypeChange(type) {
+        const titleLbl = document.getElementById('lblFeedbackTitle');
+        const titleInput = document.getElementById('feedbackTitle');
+        const usageGroup = document.getElementById('groupCmdUsage');
+        const textLbl = document.getElementById('lblFeedbackText');
+        const textInput = document.getElementById('feedbackText');
+
+        if (type === 'predlog') {
+          if (titleLbl) titleLbl.textContent = 'Naziv komande / opcije';
+          if (titleInput) titleInput.placeholder = '!kokice';
+          if (usageGroup) usageGroup.style.display = 'block';
+          if (textLbl) textLbl.textContent = 'Kako komanda funkcioniše?';
+          if (textInput) textInput.placeholder = 'Opis komande...';
+        } else if (type === 'utisak') {
+          if (titleLbl) titleLbl.textContent = 'Naslov utiska / Ocena';
+          if (titleInput) titleInput.placeholder = 'Odličan bot';
+          if (usageGroup) usageGroup.style.display = 'none';
+          if (textLbl) textLbl.textContent = 'Tvoji utisci i sugestije';
+          if (textInput) textInput.placeholder = 'Napiši utiske...';
+        } else if (type === 'prijavabuga') {
+          if (titleLbl) titleLbl.textContent = 'Gde se greška pojavila?';
+          if (titleInput) titleInput.placeholder = 'Komanda !top ne radi';
+          if (usageGroup) usageGroup.style.display = 'none';
+          if (textLbl) textLbl.textContent = 'Opis greške';
+          if (textInput) textInput.placeholder = 'Opis problema...';
+        }
+      }
+
+      function handleFeedbackFormSubmit(event) {
+        event.preventDefault();
+
+        const form = document.getElementById('feedbackForm');
+        const typeSelect = document.getElementById('feedbackType');
+        const typeText = typeSelect?.options[typeSelect.selectedIndex]?.text || 'Predlog';
         const title = document.getElementById('feedbackTitle')?.value.trim();
         const text = document.getElementById('feedbackText')?.value.trim();
 
         if (!title || !text) {
-          showToast('error', 'Molimo popunite sva polja pre slanja.', '⚠️');
-          return;
+          showToast('error', 'Molimo popunite sva obavezna polja pre slanja.');
+          return false;
         }
 
-        showToast('success', 'Hvala na povratnim informacijama! Milan će to pregledati što pre.', '✅');
+        const channelInput = document.getElementById('feedbackFormChannel');
+        if (channelInput) {
+          channelInput.value = window.activeChannel || 'Nepoznat kanal';
+        }
 
-        // Clear fields
-        const titleInput = document.getElementById('feedbackTitle');
-        const textInput = document.getElementById('feedbackText');
-        if (titleInput) titleInput.value = '';
-        if (textInput) textInput.value = '';
+        const subjectInput = document.getElementById('feedbackFormSubject');
+        if (subjectInput) {
+          subjectInput.value = `[Kickot Bot - ${typeText}] ${title}`;
+        }
 
-        closeModal('feedbackModal');
+        const btn = document.getElementById('feedbackSubmitBtn');
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = 'Slanje...';
+        }
+
+        // Submit form via background iframe
+        form.submit();
+
+        showToast('success', 'Hvala ti! Tvoj predlog je uspešno poslat Milanu.');
+
+        setTimeout(() => {
+          // Reset form fields
+          const titleInput = document.getElementById('feedbackTitle');
+          const usageInput = document.getElementById('feedbackCmdUsage');
+          const textInput = document.getElementById('feedbackText');
+          if (titleInput) titleInput.value = '';
+          if (usageInput) usageInput.value = '';
+          if (textInput) textInput.value = '';
+
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Pošalji`;
+          }
+
+          closeModal('feedbackModal');
+        }, 800);
       }
 
       // ── Song Request & Music Player Logic ──────────────────────────────────────
@@ -6277,6 +6419,12 @@ async function addNewChannel() {
       window.renderEconomyLeaderboard = renderEconomyLeaderboard;
       window.openEditUserPointsModal = openEditUserPointsModal;
       window.divorceConfirm = divorceConfirm;
+      window.openFeedbackModal = openFeedbackModal;
+      window.openHelpModal = openHelpModal;
+      window.openDocsModal = openDocsModal;
+      window.onFeedbackTypeChange = onFeedbackTypeChange;
+      window.handleFeedbackFormSubmit = handleFeedbackFormSubmit;
+      window.syncLatestKickAvatar = syncLatestKickAvatar;
       window.toggleModuleFromOverview = toggleModuleFromOverview;
       window.handleCustomBotNameInput = handleCustomBotNameInput;
       window.copyCustomBotModCmd = copyCustomBotModCmd;
@@ -6411,9 +6559,13 @@ async function addNewChannel() {
         const type = document.getElementById('simGameType')?.value || 'slots';
         const bet = parseInt(document.getElementById('simBetAmount')?.value, 10) || 100;
         const resEl = document.getElementById('simGameResult');
-        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Poena';
 
         if (!resEl) return;
+
+        // Osiguravamo da container prikazuje tekst kao normalan blok
+        resEl.style.display = 'block';
+        resEl.style.textAlign = 'center';
 
         if (type === 'slots') {
           const simboli = ['🍒', '🍋', '🔔', '🍇', '💎', '🎰'];
@@ -6421,37 +6573,48 @@ async function addNewChannel() {
           const s2 = simboli[Math.floor(Math.random() * simboli.length)];
           const s3 = simboli[Math.floor(Math.random() * simboli.length)];
 
-          let resText = `<strong>@Strimer</strong> je zavrteo slot: ${s1} ${s2} ${s3} — `;
+          let resText = `<strong>@Strimer</strong> je zavrteo slot: [ ${s1} | ${s2} | ${s3} ] — `;
           if (s1 === s2 && s2 === s3) {
-            if (s1 === '🎰' || s1 === '💎') resText += `<span style="color:#53fc18;"><strong>JACKPOT 50x!</strong> Osvojio si +${(bet * 50).toLocaleString()} ${valuta}!</span>`;
-            else resText += `<span style="color:#53fc18;"><strong>3 u nizu 10x!</strong> Osvojio si +${(bet * 10).toLocaleString()} ${valuta}!</span>`;
+            if (s1 === '🎰' || s1 === '💎') {
+              resText += `<span style="color:#eab308; font-weight:700;">JACKPOT 50x! Osvojio si +${(bet * 50).toLocaleString()} ${valuta}!</span>`;
+            } else {
+              resText += `<span style="color:#53fc18; font-weight:700;">3 u nizu 10x! Osvojio si +${(bet * 10).toLocaleString()} ${valuta}!</span>`;
+            }
           } else if (s1 === s2 || s2 === s3 || s1 === s3) {
-            resText += `<span style="color:#eab308;"><strong>2 u nizu 2x!</strong> Vraćeno +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
+            resText += `<span style="color:#eab308;">2 u nizu 2x! Vraćeno +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
           } else {
-            resText += `<span style="color:#ef4444;">Nisi pogodio kombo! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
+            resText += `<span style="color:#ef4444;">Nema pogotka! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
           }
           resEl.innerHTML = resText;
+
         } else if (type === 'roulette') {
           const loptica = Math.floor(Math.random() * 37);
           const crveniBrojevi = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
-          const boja = loptica === 0 ? 'zelena' : (crveniBrojevi.includes(loptica) ? 'crvena' : 'crna');
-          resEl.innerHTML = `Loptica je pala na broj <strong>${loptica}</strong> (${boja})! <span style="color:#53fc18;">Dobitak: +${(bet * 2).toLocaleString()} ${valuta} za boju ili +${(bet * 36).toLocaleString()} ${valuta} za tačan broj!</span>`;
+          const boja = loptica === 0 ? 'ZELENA' : (crveniBrojevi.includes(loptica) ? 'CRVENA' : 'CRNA');
+          
+          resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo rulet! Loptica je pala na <strong>${loptica} (${boja})</strong>! <span style="color:#53fc18;">Isplata: +${(bet * 2).toLocaleString()} ${valuta} (Boja/Par) ili +${(bet * 36).toLocaleString()} ${valuta} (Tačan broj)!</span>`;
+
         } else if (type === 'coinflip') {
           const ishod = Math.random() < 0.5 ? 'PISMO' : 'GLAVA';
           const isWin = Math.random() < 0.5;
+
           if (isWin) {
-            resEl.innerHTML = `Novčić je pao na <strong>${ishod}</strong>! <span style="color:#53fc18;">Pogodak! Osvojio si +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
+            resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#53fc18; font-weight:700;">Dupliranje 2x! Osvojio si +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
           } else {
-            resEl.innerHTML = `Novčić je pao na <strong>${ishod}</strong>! <span style="color:#ef4444;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
+            resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#ef4444;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
           }
+
         } else if (type === 'wheel') {
-          const mults = [0, 0.5, 1.5, 2, 3, 5];
+          const mults = [0, 0.5, 1, 2, 3, 5];
           const m = mults[Math.floor(Math.random() * mults.length)];
-          const win = Math.floor(bet * m);
-          if (m >= 1) {
-            resEl.innerHTML = `Točak sreće staje na <strong>${m}x</strong>! <span style="color:#53fc18;">Osvojio si +${win.toLocaleString()} ${valuta}!</span>`;
+          const dobitak = Math.floor(bet * m);
+
+          if (m > 1) {
+            resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#53fc18; font-weight:700;">Profit! Osvojio si +${dobitak.toLocaleString()} ${valuta}!</span>`;
+          } else if (m === 1 || m === 0.5) {
+            resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#eab308;">Vraćeno ${dobitak.toLocaleString()} ${valuta}.</span>`;
           } else {
-            resEl.innerHTML = `Točak sreće staje na <strong>${m}x</strong>! <span style="color:#ef4444;">Vraćeno samo ${win.toLocaleString()} ${valuta}.</span>`;
+            resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>0x</strong>! <span style="color:#ef4444;">Nula! Izgubio si ulog od ${bet.toLocaleString()} ${valuta}.</span>`;
           }
         }
       }
@@ -6960,13 +7123,13 @@ async function addNewChannel() {
             await navigator.clipboard.writeText(textToCopy);
             btn.textContent = 'Kopirano!';
             btn.style.background = '#10B981';
-            showToast('Referral link uspešno kopiran!', 'success');
+            showToast('success', 'Referral link je uspešno kopiran!');
             setTimeout(() => {
               btn.textContent = 'Kopiraj Link';
               btn.style.background = '';
             }, 2000);
           } catch (e) {
-            showToast('Greška pri kopiranju!', 'error');
+            showToast('error', 'Greška pri kopiranju!');
           }
         };
       }
@@ -6975,17 +7138,17 @@ async function addNewChannel() {
         const email = 'contact@milanwebportal.com';
         navigator.clipboard.writeText(email).then(() => {
           const origHTML = btn.innerHTML;
-          btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg> <span>Kopirano!</span>`;
+          btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
           btn.style.color = '#53fc18';
           btn.style.borderColor = '#53fc18';
-          showToast('Mejl adresa uspešno kopirana!', 'success');
+          showToast('success', 'Mejl adresa je uspešno kopirana!');
           setTimeout(() => {
             btn.innerHTML = origHTML;
             btn.style.color = '';
             btn.style.borderColor = '';
           }, 2000);
         }).catch(() => {
-          showToast('Greška pri kopiranju mejla.', 'error');
+          showToast('error', 'Greška pri kopiranju mejla.');
         });
       }
 
@@ -7011,66 +7174,87 @@ async function addNewChannel() {
   `).join('');
       }
 
-      function openWithdrawalModal() {
-        closeModal('referralModal');
-        const balEl = document.getElementById('modalAvailableBalance');
-        if (balEl) balEl.textContent = `€${(window.currentAvailableBalance || 0).toFixed(2)}`;
-        openModal('withdrawalModal');
-      }
+ function openWithdrawalModal() {
+  closeModal('referralModal');
+  const balEl = document.getElementById('modalAvailableBalance');
+  if (balEl) balEl.textContent = `€${(window.currentAvailableBalance || 0).toFixed(2)}`;
+  openModal('withdrawalModal');
+}
 
-      function updatePaymentDetailsLabel(method) {
-        const label = document.getElementById('paymentDetailsLabel');
-        const input = document.getElementById('paymentDetails');
-        if (!label || !input) return;
+function updatePaymentDetailsLabel(method) {
+  const label = document.getElementById('paymentDetailsLabel');
+  const input = document.getElementById('paymentDetails');
+  if (!label || !input) return;
 
-        if (method === 'paypal') {
-          label.textContent = 'PayPal Email Adresa';
-          input.placeholder = 'tvoj@email.com';
-        } else if (method === 'bank_transfer') {
-          label.textContent = 'Broj računa (IBAN)';
-          input.placeholder = 'RS00 0000 0000 0000 0000 00';
-        } else if (method === 'crypto') {
-          label.textContent = 'Crypto Wallet Adresa (USDT / BTC)';
-          input.placeholder = '0x... ili bc1...';
-        }
-      }
+  if (method === 'paypal') {
+    label.textContent = 'PayPal Email Adresa';
+    input.placeholder = 'tvoj@email.com';
+  } else if (method === 'bank_transfer') {
+    label.textContent = 'Broj računa (IBAN)';
+    input.placeholder = 'RS00 0000 0000 0000 0000 00';
+  } else if (method === 'crypto') {
+    label.textContent = 'Crypto Wallet Adresa (USDT / BTC)';
+    input.placeholder = '0x... ili bc1...';
+  }
+}
 
-      async function handleWithdrawalSubmit(e) {
-        e.preventDefault();
-        const amount = parseFloat(document.getElementById('withdrawalAmount').value);
-        const method = document.getElementById('paymentMethod').value;
-        const details = document.getElementById('paymentDetails').value.trim();
+async function handleWithdrawalSubmit(e) {
+  e.preventDefault();
+  const amount = parseFloat(document.getElementById('withdrawalAmount').value);
+  const method = document.getElementById('paymentMethod').value;
+  const details = document.getElementById('paymentDetails').value.trim();
 
-        if (!amount || amount < 5) {
-          showToast('Minimalni iznos za isplatu je €5.00', 'warning');
-          return;
-        }
-        if (amount > (window.currentAvailableBalance || 0)) {
-          showToast('Nedovoljno sredstava za isplatu!', 'error');
-          return;
-        }
-        if (!details) {
-          showToast('Unesi podatke za isplatu!', 'warning');
-          return;
-        }
+  if (!amount || amount < 5) {
+    showToast('Minimalni iznos za isplatu je €5.00', 'warning');
+    return;
+  }
+  if (amount > (window.currentAvailableBalance || 0)) {
+    showToast('Nedovoljno sredstava za isplatu!', 'error');
+    return;
+  }
+  if (!details) {
+    showToast('Unesi podatke za isplatu!', 'warning');
+    return;
+  }
 
-        try {
-          const { error } = await sb.rpc('create_withdrawal_request', {
-            p_user_id: currentUser.id,
-            p_amount: amount,
-            p_payment_method: method,
-            p_payment_details: details
-          });
+  try {
+    // 1. Upis u Supabase bazu preko RPC-a
+    const { error } = await sb.rpc('create_withdrawal_request', {
+      p_user_id: currentUser?.id,
+      p_amount: amount,
+      p_payment_method: method,
+      p_payment_details: details
+    });
 
-          if (error) throw error;
+    if (error) throw error;
 
-          showToast('Zahtev za isplatu je uspešno poslat! Bićete obavešteni o isplati.', 'success');
-          closeModal('withdrawalModal');
-        } catch (err) {
-          console.error('Withdrawal error:', err);
-          showToast('success', 'Uspešno poslat zahtev za isplatu!', '✅');
-          closeModal('withdrawalModal');
-        }
-      }
+    // 2. Slanje notifikacije na mejl preko FormSubmit AJAX-a
+    fetch('https://formsubmit.co/ajax/contact@milanwebportal.com', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        _subject: 'Novi Zahtev za Isplatu Sredstava - Kick Bot',
+        Korisnik_ID: currentUser?.id || 'Nije definisan',
+        Korisnicko_Ime: currentUser?.user_metadata?.username || 'Gost',
+        Iznos: `€${amount.toFixed(2)}`,
+        Nacin_Isplate: method,
+        Detalji_Isplate: details
+      })
+    }).catch(err => console.error('FormSubmit mail error:', err));
+
+    showToast('Zahtev za isplatu je uspešno poslat! Bićete obavešteni o isplati.', 'success');
+    
+    // Resetuj formu i zatvori modal
+    document.getElementById('withdrawalForm')?.reset();
+    closeModal('withdrawalModal');
+
+  } catch (err) {
+    console.error('Withdrawal error:', err);
+    showToast('Došlo je do greške prilikom slanja zahteva.', 'error');
+  }
+}
 
       initAuth();

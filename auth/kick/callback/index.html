@@ -5,24 +5,31 @@
   <meta charset="UTF-8" />
   <script>
     (function() {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const baseRedirectPath = isLocalhost ? '/Website' : '';
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       const error = params.get('error');
+
       if (code || error) {
-        const baseRedirectPath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/Website' : '';
-        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
-        const targetPage = fromKickAll ? 'dashboard.html' : 'kickot/dashboard.html';
+        const originSite = sessionStorage.getItem('kick_origin_site') || 
+                          (sessionStorage.getItem('from_kickall') === 'true' ? 'kickall' : 'kickot');
+
+        let targetPage = 'dashboard.html';
+        if (originSite === 'kickot') targetPage = 'kickot/dashboard.html';
+        else if (originSite === 'kickaj') targetPage = 'kickaj/dashboard.html';
+        else if (originSite === 'kickan') targetPage = 'kickan/dashboard.html';
+        else if (originSite === 'kickov') targetPage = 'kickov/dashboard.html';
+
         window.location.replace(`${baseRedirectPath}/${targetPage}` + window.location.search);
       }
     })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kickot — OAuth autorizacija</title>
-  <link rel="icon" href="/Website/kickot/assets/favicon.ico" type="image/x-icon">
+  <title>Kickot | OAuth autorizacija</title>
+  <link rel="icon" href="../../../Website/assets/favicon.ico" type="image/x-icon">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap"
-    rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <style>
     *,
     *::before,
@@ -184,24 +191,28 @@
 
   <div class="card" id="card">
     <div class="logo-wrap">
-      <img src="/Website/kickot/assets/logo.png" alt="Kickot Logo" onerror="this.style.display='none'">
+      <img src="../../../Website/assets/kickall.png" alt="KickAll Logo" onerror="this.style.display='none'">
     </div>
 
     <div id="loadingState">
       <div class="spinner"></div>
       <h1>Autorizacija u toku...</h1>
-      <p>Molimo sačekaj.</p>
+      <p>Molimo sačekaj dok obradimo prijavu.</p>
     </div>
 
     <div id="errorState" style="display:none;">
-      <div class="status-icon" id="errorIcon">❌</div>
+      <div class="status-icon" id="errorIcon" style="display:none; color: #ef4444; margin-bottom: 16px;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </div>
       <h1 class="status-msg" id="errorTitle">Greška pri autorizaciji</h1>
       <p class="status-sub" id="errorDetail">Pokušaj ponovo.</p>
-      <a href="/Website/kickot/index.html" class="btn-retry" id="retryBtn">← Nazad na prijavu</a>
+      <a href="/index.html" class="btn-retry" id="retryBtn">← Nazad na prijavu</a>
     </div>
 
     <div id="successState" style="display:none;">
-      <div class="status-icon" id="successIcon">✅</div>
+      <div class="status-icon" id="successIcon" style="display:none; color: #53FC18; margin-bottom: 16px;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
       <h1 class="status-msg">Uspešna prijava!</h1>
       <p class="status-sub">Preusmerjavanje na dashboard...</p>
     </div>
@@ -209,7 +220,8 @@
 
   <script>
     (async function kickOAuthCallback() {
-      const baseRedirectPath = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/Website' : '';
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const baseRedirectPath = isLocalhost ? '/Website' : '';
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       const state = params.get('state');
@@ -231,24 +243,19 @@
       }
 
       const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       if (!isLocalhost && (!state || state !== savedState)) {
         showError('Nevalidan state parametar', 'State parametar se ne podudara. Moguća CSRF prevara.');
         return;
       }
 
       if (!code) {
-        showError('Nedostaje autorizacioni kod', `Kick nije vratio code parametar. Trenutni URL: ${window.location.href}`);
+        showError('Nedostaje autorizacioni kod', 'Kick nije vratio autorizacioni kod.');
         return;
       }
 
       const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
-      const redirectUri = (() => {
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          return `${window.location.origin}/auth/kick/callback/`;
-        }
-        return `${window.location.origin}/auth/kick/callback`;
-      })();
+      const redirectUri = isLocalhost ? `${window.location.origin}/auth/kick/callback/` : `${window.location.origin}/auth/kick/callback`;
+      
       const kickApiBase = (() => {
         const fromGlobal = (window.KICK_API_BASE || '').trim();
         if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
@@ -257,11 +264,10 @@
             window.location.hostname === '127.0.0.1') {
           return 'https://kickbot-ihzb.onrender.com';
         }
-        return `${window.location.origin}`;
+        return window.location.origin;
       })();
 
       try {
-        // Pozivamo bot server (port 3000) koji drži CLIENT_SECRET bezbedno
         const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -274,7 +280,7 @@
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
-          showError('Greška pri razmeni tokena', err.detail || err.error || 'Bot server nije dostupan. Proveri da li je pokrenut.');
+          showError('Greška pri razmeni tokena', err.detail || err.error || 'Server nije dostupan.');
           return;
         }
 
@@ -285,28 +291,45 @@
           return;
         }
 
-        // Sačuvaj token u sessionStorage (vidljiv samo u ovoj sesiji, nije ekspozovan serveru)
+        // Store tokens globally in session and local storage
         sessionStorage.setItem('kick_access_token', tokenData.access_token);
-        sessionStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
-        sessionStorage.setItem('kick_expires_in', String(tokenData.expires_in || 3600));
-        sessionStorage.setItem('kick_token_ts', String(Date.now()));
-        sessionStorage.setItem('kick_oauth_scope', tokenData.scope || '');
+        localStorage.setItem('kick_access_token', tokenData.access_token);
+        localStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
+        localStorage.setItem('kick_session_active', 'true');
 
-        // Očisti OAuth privremene vrednosti
         sessionStorage.removeItem('kick_oauth_state');
         sessionStorage.removeItem('kick_code_verifier');
         localStorage.removeItem('kick_oauth_state');
         localStorage.removeItem('kick_code_verifier');
 
-        // Preusmeri odmah na dashboard bez prikazivanja success ekrana i čekanja
-        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
-        const targetPage = fromKickAll ? 'dashboard.html' : 'kickot/dashboard.html';
-        window.location.href = `${baseRedirectPath}/${targetPage}?kick_oauth=1`;
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('successState').style.display = 'block';
+        document.getElementById('successIcon').style.display = 'block';
+
+        // Ecosystem site routing: KickALL, KickOT, KickAJ, KickAN, KickOV
+        const originSite = sessionStorage.getItem('kick_origin_site') || 
+                          (sessionStorage.getItem('from_kickall') === 'true' ? 'kickall' : 'kickot');
+
+        let targetPage = 'dashboard.html';
+        if (originSite === 'kickot') {
+          targetPage = 'kickot/dashboard.html';
+        } else if (originSite === 'kickaj') {
+          targetPage = 'kickaj/dashboard.html';
+        } else if (originSite === 'kickan') {
+          targetPage = 'kickan/dashboard.html';
+        } else if (originSite === 'kickov') {
+          targetPage = 'kickov/dashboard.html';
+        }
+
+        const fullTarget = `${baseRedirectPath}/${targetPage}?kick_oauth=1`;
+        setTimeout(() => {
+          window.location.replace(fullTarget);
+        }, 500);
 
       } catch (fetchErr) {
         showError(
-          'Nije moguće kontaktirati bot server',
-          'Proveri da li je bot.js pokrenut na portu 3000. ' + fetchErr.message
+          'Nije moguće kontaktirati server',
+          'Proveri mrežnu konekciju ili konfiguraciju API-ja. ' + fetchErr.message
         );
       }
     })();

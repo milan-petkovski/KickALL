@@ -1,0 +1,98 @@
+{
+  "nav": {
+    "ecosystem": "Ekosistem",
+    "tryOut": "Isprobaj",
+    "faq": "FAQ",
+    "support": "Podrška",
+    "pricing": "Cene",
+    "reviews": "Utisci",
+    "logIn": "Prijavi se",
+    "dashboard": "Dashboard",
+    "logOut": "Odjavi se",
+    "features": "Funkcije"
+  },
+  "hero": {
+    "badge": "Kompletan Ekosistem za Streamere",
+    "title": "Zavladaj <span class=\"gradient-text\">Kick</span> Scenom Na Svetskom Nivou",
+    "description": "Poveži svoj kanal sa najmoćnijim chatbotom! <br><strong>Kickot</strong> je dostupan odmah i donosi automatizaciju chata, poene i igre. Tvoj strim ekosistem uskoro postaje kompletan uz module <strong>kickaj</strong>, <strong>kickov</strong> i <strong>kickan</strong> koji stižu uskoro.",
+    "btnStart": "Počni besplatno",
+    "btnPricing": "Pogledaj cene",
+    "fastOAuth": "Brza Kick OAuth Prijava"
+  },
+  "stats": {
+    "msgs": "Obrađenih Čat Poruka",
+    "streams": "Aktivnih Strimova",
+    "widgets": "Prilagođenih Komandi",
+    "uptime": "Dostupnost Mreže (%)"
+  },
+  "ecosystem": {
+    "label": "POVEŽI SVE NA JEDNOM MESTU",
+    "title": "Kompletan Ekosistem Za Kick",
+    "subtitle": "Modularni alati dizajnirani za maksimalnu interakciju i rast kanala.",
+    "statusActive": "AKTIVAN ODMAH",
+    "statusSoon": "DOLAZI USKORO",
+    "descKickot": "Ultimativni chatbot sa naprednom moderacijom, prilagođenim komandama, mini igrama i sistemom poena.",
+    "descKickaj": "Najlakši način za kreiranje i vođenje zanimljivih darivanja direktno kroz chat.",
+    "descKickan": "Najmoćnija analitika za Kick streamere. Prati rast gledalaca, aktivnost u čatu i još mnogo toga.",
+    "descKickov": "Moderni i potpuno prilagodljivi strim overleji, čet boksovi, alerti i ciljevi u realnom vremenu.",
+    "connectKickot": "Poveži kickot →",
+    "startSim": "Pokreni simulaciju"
+  },
+  "pricing": {
+    "tag": "PRILAGOĐENO SVIMA",
+    "title": "Transparentni i fleksibilni paketi",
+    "subtitle": "Izaberi paket koji najbolje odgovara tvojim strimerskim potrebama i veličini tvoje zajednice.",
+    "popular": "POPULARNO",
+    "period": "/ mesečno",
+    "free": {
+      "title": "BESPLATNO",
+      "desc": "Idealno za nove strimere koji tek počinju i žele osnovnu automatizaciju chata.",
+      "f1": "Osnovni <strong>Kickot</strong> chatbot",
+      "f2": "Svih 8 <strong>Kickot</strong> modula",
+      "f3": "Do 50 prilagođenih komandi",
+      "f4": "<strong>Kickov</strong> overlayevi (uskoro)",
+      "f5": "<strong>Kickaj</strong> giveaway sistem (uskoro)",
+      "f6": "<strong>Kickan</strong> napredna analitika (uskoro)",
+      "f7": "Prioritetna podrška",
+      "btn": "Započni besplatno"
+    },
+    "pro": {
+      "desc": "Sve što je potrebno ozbiljnom strimeru za brzi rast kanala i punu interakciju.",
+      "f1": "Napredni <strong>kickot</strong> bot",
+      "f2": "Sve čet mini igre i komande",
+      "f3": "<strong>kickaj</strong> giveaway sistem",
+      "f4": "<strong>kickov</strong> overleji",
+      "f5": "Osnovna mesečna analitika",
+      "f6": "Prioritetna imejl podrška",
+      "f7": "Namenski VIP bot",
+      "btn": "Izaberi Pro paket"
+    },
+    "elite": {
+      "desc": "Za profesionalne strimere koji traže apsolutno najbolju tehnologiju i podršku.",
+      "f1": "Ceo ekosistem uključen",
+      "f2": "<strong>kickan</strong> detaljna analitika",
+      "f3": "Namenski VIP bot sa tvojim imenom",
+      "f4": "Neograničen broj vidžeta i alertova",
+      "f5": "VIP imejl status podrške",
+      "f6": "<strong>Neprekidna podrška uz brzi odziv</strong>",
+      "f7": "Individualne sesije podešavanja strima",
+      "btn": "Kupi Elite paket"
+    }
+  },
+  "modules": {
+    "active": "AKTIVNO",
+    "soon": "USKORO",
+    "live": "UŽIVO"
+  },
+  "footer": {
+    "tagline": "Moćan i pouzdan chatbot za Kick platformu. Deo kompletnog KickALL ekosistema alata za strimere.",
+    "contact": "Kontakt email:",
+    "productsTitle": "Proizvodi",
+    "socialTitle": "Socijalne mreže",
+    "shortcutsTitle": "Prečice",
+    "rights": "Sva prava zadržana.",
+    "createdBy": "Napravio",
+    "privacy": "Privatnost",
+    "terms": "Uslovi"
+  }
+}

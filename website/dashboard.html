@@ -28,7 +28,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body class="lang-sr">
+<body class="lang-sr auth-loading">
 
   <!-- Grid background glows -->
   <div class="glow-bg">
@@ -37,16 +37,21 @@
   </div>
 
   <!-- Fullscreen Loading Gate -->
-  <div id="authGate">
-    <div class="spinner"></div>
-    <div id="authGateMsg">Proveravamo sesiju...</div>
+  <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
+    <div class="auth-gate-card">
+      <div class="auth-gate-logo">
+        <img src="assets/kickall.png" alt="KickAll Logo" class="logo-img" style="height: 52px; width: auto;" />
+      </div>
+      <div class="auth-gate-spinner"></div>
+      <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju...</p>
+    </div>
   </div>
 
   <!-- Header / Navigation -->
   <header class="dashboard-header">
     <div class="container dashboard-container">
       <a href="index.html" class="logo" id="navLogo" style="display: flex; align-items: center;">
-        <img src="assets/logo.png" alt="KickAll Logo" class="logo-img" style="height: 48px;" />
+        <img src="assets/kickall.png" alt="KickAll Logo" class="logo-img" style="height: 48px;" />
       </a>
 
       <div class="header-actions">
@@ -219,12 +224,19 @@
 
       </section>
 
-      <!-- Referral Section -->
+<!-- Referral Section -->
       <section class="referral-section">
         <div class="referral-header">
           <h2 class="referral-title">
-            <span class="lang-sr">🎁 Referral Program</span>
-            <span class="lang-en">🎁 Referral Program</span>
+            <svg class="title-icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 12v10H4V12"/>
+              <path d="M2 7h20v5H2z"/>
+              <path d="M12 22V7"/>
+              <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+              <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+            </svg>
+            <span class="lang-sr">Referral Program</span>
+            <span class="lang-en">Referral Program</span>
           </h2>
           <p class="referral-subtitle">
             <span class="lang-sr">Pozovi prijatelje i zaradi 20% od njihove kupovine!</span>
@@ -234,31 +246,57 @@
 
         <div class="referral-stats-grid">
           <div class="referral-stat-card">
-            <div class="referral-stat-icon">👥</div>
+            <div class="referral-stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
             <div class="referral-stat-value" id="totalReferrals">0</div>
             <div class="referral-stat-label">
               <span class="lang-sr">Ukupno referala</span>
               <span class="lang-en">Total Referrals</span>
             </div>
           </div>
+
           <div class="referral-stat-card">
-            <div class="referral-stat-icon">✅</div>
+            <div class="referral-stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                <polyline points="22 4 12 14.01 9 11.01"/>
+              </svg>
+            </div>
             <div class="referral-stat-value" id="successfulReferrals">0</div>
             <div class="referral-stat-label">
               <span class="lang-sr">Uspešnih referala</span>
               <span class="lang-en">Successful Referrals</span>
             </div>
           </div>
+
           <div class="referral-stat-card">
-            <div class="referral-stat-icon">💰</div>
+            <div class="referral-stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="6" width="20" height="12" rx="2"/>
+                <circle cx="12" cy="12" r="2"/>
+                <path d="M6 12h.01M18 12h.01"/>
+              </svg>
+            </div>
             <div class="referral-stat-value" id="totalEarned">€0.00</div>
             <div class="referral-stat-label">
               <span class="lang-sr">Ukupno zaradjeno</span>
               <span class="lang-en">Total Earned</span>
             </div>
           </div>
+
           <div class="referral-stat-card">
-            <div class="referral-stat-icon">🎟️</div>
+            <div class="referral-stat-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2z"/>
+                <path d="M13 5v2M13 11v2M13 17v2"/>
+              </svg>
+            </div>
             <div class="referral-stat-value" id="availableRewards">€0.00</div>
             <div class="referral-stat-label">
               <span class="lang-sr">Dostupne nagrade</span>
@@ -275,9 +313,9 @@
           <div class="referral-link-row">
             <input type="text" id="referralCodeInput" readonly class="referral-link-input" value="LOADING...">
             <button class="btn btn-primary referral-copy-btn" id="copyReferralBtn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
               </svg>
               <span class="lang-sr">Kopiraj</span>
               <span class="lang-en">Copy</span>
@@ -292,8 +330,16 @@
 
         <div class="referral-rewards-list">
           <h3 class="referral-rewards-title">
-            <span class="lang-sr">🏆 Tvoje nagrade</span>
-            <span class="lang-en">🏆 Your Rewards</span>
+            <svg class="title-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+              <path d="M4 22h16"/>
+              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
+              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
+              <path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/>
+            </svg>
+            <span class="lang-sr">Tvoje nagrade</span>
+            <span class="lang-en">Your Rewards</span>
           </h3>
           <div id="rewardsList" class="rewards-list-container">
             <div class="no-rewards">
@@ -305,12 +351,18 @@
 
         <div class="referral-withdrawal-section">
           <h3 class="referral-withdrawal-title">
-            <span class="lang-sr">💸 Zatraži isplatu</span>
-            <span class="lang-en">💸 Request Withdrawal</span>
+            <svg class="title-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+              <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+              <path d="M18 12a2 2 0 0 0 0 4h4v-4h-4z"/>
+            </svg>
+            <span class="lang-sr">Zatraži isplatu</span>
+            <span class="lang-en">Request Withdrawal</span>
           </h3>
           <button class="btn btn-primary withdrawal-btn" id="withdrawalBtn">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
             </svg>
             <span class="lang-sr">Zatraži isplatu</span>
             <span class="lang-en">Request Withdrawal</span>
@@ -436,7 +488,7 @@
       <!-- Mock Screen representation of stream -->
       <div style="position:relative; width:100%; height:200px; background:#18142c; border:2px solid #2e284c; border-radius:12px; overflow:hidden; margin:20px 0; box-shadow:inset 0 0 20px rgba(0,0,0,0.8);">
         <!-- Mock Video Feed background placeholder -->
-        <div style="position:absolute; inset:0; background:linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)), url('assets/logo.png') no-repeat center; opacity:0.1; background-size:contain;"></div>
+        <div style="position:absolute; inset:0; background:linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)), url('assets/kickall.png') no-repeat center; opacity:0.1; background-size:contain;"></div>
         
         <!-- Live Badge -->
         <div style="position:absolute; top:12px; left:12px; background:#EF4444; color:#fff; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px;">LIVE</div>
