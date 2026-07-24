@@ -3,6 +3,13 @@
    Supabase Auth + Language Switcher + UI Logic
    ═══════════════════════════════════════════════════════════ */
 
+// ── Global Variables ───────────────────────────────────────
+let currentLang = 'sr';
+const translations = {
+  sr: {},
+  en: {}
+};
+
 // ── Supabase Init ──────────────────────────────────────────
 const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
@@ -31,6 +38,19 @@ let currentUser = null;
 
 // ── Translations ─�async function setLang(lang) {
 // ── Translations ──
+function t(key) {
+  const keys = key.split('.');
+  let value = translations[currentLang];
+  for (const k of keys) {
+    if (value && typeof value === 'object') {
+      value = value[k];
+    } else {
+      return key;
+    }
+  }
+  return value || key;
+}
+
 async function setLang(lang) {
   currentLang = lang;
   localStorage.setItem('kickall-lang', lang);
@@ -72,7 +92,9 @@ async function setLang(lang) {
   const heroPrimaryBtn = document.getElementById('heroPrimaryBtn');
   const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
   if (heroPrimaryBtn && heroPrimaryBtnText && currentUser) {
-    heroPrimaryBtnText.textContent = lang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard';
+    const t = window.translations || {};
+    const userProfile = t.userProfile || {};
+    heroPrimaryBtnText.textContent = userProfile.goToDashboard || (lang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard');
   }
 
   const btnSr = document.getElementById('btn-sr');
@@ -101,21 +123,18 @@ function applyJsonTranslations(obj, prefix = '') {
       });
     }
   }
-  const btnSr = document.getElementById('btn-sr');
-  const btnEn = document.getElementById('btn-en');
-  if (btnSr) btnSr.classList.toggle('active', lang === 'sr');
-  if (btnEn) btnEn.classList.toggle('active', lang === 'en');
-
-  document.title = t('meta.title');
-  const metaDesc = document.querySelector('meta[name="description"]');
-  if (metaDesc) metaDesc.content = t('meta.desc');
 }
 
 // ── Navbar Scroll ──────────────────────────────────────────
 const navbar = document.getElementById('navbar');
 if (navbar) {
+  let scrollThrottle = null;
   window.addEventListener('scroll', () => {
-    navbar.classList.toggle('scrolled', window.scrollY > 20);
+    if (scrollThrottle) return;
+    scrollThrottle = requestAnimationFrame(() => {
+      navbar.classList.toggle('scrolled', window.scrollY > 20);
+      scrollThrottle = null;
+    });
   }, { passive: true });
 }
 
@@ -623,7 +642,9 @@ function onUserChange(user) {
     const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
     if (heroPrimaryBtn && heroPrimaryBtnText) {
       heroPrimaryBtn.onclick = () => { window.location.href = 'dashboard.html'; };
-      heroPrimaryBtnText.textContent = currentLang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard';
+      const t = window.translations || {};
+      const userProfile = t.userProfile || {};
+      heroPrimaryBtnText.textContent = userProfile.goToDashboard || (currentLang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard');
       heroPrimaryBtnText.removeAttribute('data-i18n');
     }
   } else {
@@ -645,7 +666,9 @@ function onUserChange(user) {
     if (ctaPrimaryBtn && ctaPrimaryBtnText) {
       if (user) {
         ctaPrimaryBtn.onclick = () => { window.location.href = 'dashboard.html'; };
-        ctaPrimaryBtnText.textContent = currentLang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard';
+        const t = window.translations || {};
+        const userProfile = t.userProfile || {};
+        ctaPrimaryBtnText.textContent = userProfile.goToDashboard || (currentLang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard');
         ctaPrimaryBtnText.removeAttribute('data-i18n');
       } else {
         ctaPrimaryBtn.onclick = () => { openModal('login'); };
@@ -692,12 +715,17 @@ sb.auth.onAuthStateChange((event, session) => {
 
 const cards = document.querySelectorAll('.feature-card, .pricing-card');
 cards.forEach(card => {
+  let cardTimeout = null;
   card.addEventListener('mousemove', e => {
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    card.style.setProperty('--mouse-x', `${x}px`);
-    card.style.setProperty('--mouse-y', `${y}px`);
+    if (cardTimeout) return;
+    cardTimeout = setTimeout(() => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      card.style.setProperty('--mouse-x', `${x}px`);
+      card.style.setProperty('--mouse-y', `${y}px`);
+      cardTimeout = null;
+    }, 16); // ~60fps max
   });
 });
 
@@ -774,17 +802,36 @@ async function handleLogout() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Cursor Glow / Mouse Spotlight Effect (Global - Debounced for performance)
+// ─────────────────────────────────────────────────────────────
+(function initCursorSpotlight() {
+    let spotlightTimeout = null;
+    window.addEventListener('mousemove', (e) => {
+        if (spotlightTimeout) return;
+        spotlightTimeout = setTimeout(() => {
+            document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
+            document.body.style.setProperty('--mouse-y', `${e.clientY}px`);
+            spotlightTimeout = null;
+        }, 16); // ~60fps max
+    });
+})();
+
+// ─────────────────────────────────────────────────────────────
 // Lenis Smooth Scroll & Spotlight Glow & Back To Top Integration
 // ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
     let lenis = null;
     if (typeof window.Lenis !== 'undefined') {
         lenis = new window.Lenis({
-            duration: 1.2,
+            duration: 1.0,
             easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
             direction: 'vertical',
             gestureDirection: 'vertical',
-            smoothTouch: false
+            smoothTouch: false,
+            smoothWheel: true,
+            wheelMultiplier: 1,
+            touchMultiplier: 2,
+            infinite: false
         });
         window.lenisInstance = lenis;
 
@@ -802,12 +849,6 @@ document.addEventListener('DOMContentLoaded', () => {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }
-
-    // Cursor Glow / Mouse Spotlight
-    window.addEventListener('mousemove', (e) => {
-        document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
-        document.body.style.setProperty('--mouse-y', `${e.clientY}px`);
-    });
 
     // Smooth scroll za sve navigacione linkove
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {

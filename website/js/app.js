@@ -13,7 +13,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const body = document.body;
 
     // Učitaj sačuvani jezik ili postavi podrazumevani (SR)
-    const savedLang = localStorage.getItem('kickall_lang') || 'sr';
+    let savedLang = 'sr';
+    try {
+        savedLang = localStorage.getItem('kickall_lang') || 'sr';
+    } catch (e) {
+        console.warn('LocalStorage not available:', e);
+    }
     setLanguage(savedLang);
 
     if (btnSr && btnEn) {
@@ -31,13 +36,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (lang === 'en') {
             body.classList.remove('lang-sr');
             body.classList.add('lang-en');
-            localStorage.setItem('kickall_lang', 'en');
+            try {
+                localStorage.setItem('kickall_lang', 'en');
+            } catch (e) {
+                console.warn('LocalStorage not available:', e);
+            }
             if (btnEn) btnEn.classList.add('active');
             if (btnSr) btnSr.classList.remove('active');
         } else {
             body.classList.remove('lang-en');
             body.classList.add('lang-sr');
-            localStorage.setItem('kickall_lang', 'sr');
+            try {
+                localStorage.setItem('kickall_lang', 'sr');
+            } catch (e) {
+                console.warn('LocalStorage not available:', e);
+            }
             if (btnSr) btnSr.classList.add('active');
             if (btnEn) btnEn.classList.remove('active');
         }
@@ -50,9 +63,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 const data = await res.json();
                 applyTranslations(data);
+            } else {
+                console.warn(`Failed to load translations for ${lang}: HTTP ${res.status}`);
             }
         } catch (e) {
-            console.log('JSON i18n load error:', e);
+            console.error('JSON i18n load error:', e);
         }
     }
 
@@ -154,29 +169,48 @@ document.addEventListener('DOMContentLoaded', () => {
     // 5. Povezivanje "4 stubova" sa Playground-om (Simulacija sa Scroll-om)
     // -----------------------------------------------------------------
     const simulateTriggers = document.querySelectorAll('.feature-simulate-trigger');
+    const footerTabTriggers = document.querySelectorAll('.footer-tab-trigger');
     const mainPlayground = document.getElementById('mainPlayground');
+
+    function handleTabTrigger(trigger) {
+        const targetTab = trigger.getAttribute('data-target-tab');
+        
+        // 1. Promeni tab
+        switchTab(targetTab);
+        playSynthSound(600, 'sine', 0.15);
+
+        // 2. Skroluj do playground-a
+        const playgroundSection = document.getElementById('playground');
+        if (playgroundSection) {
+            // Proveri da li je već vidljiv da bi se izbegao nepotrebni scroll
+            const rect = playgroundSection.getBoundingClientRect();
+            const isVisible = rect.top < window.innerHeight && rect.bottom >= 0;
+            
+            if (!isVisible) {
+                // Koristi instant scroll za manje glitchova
+                playgroundSection.scrollIntoView({ behavior: 'auto', block: 'start' });
+            }
+        }
+
+        // 3. Pokreni efekat bljeskanja na celoj tabli playground-a
+        if (mainPlayground) {
+            setTimeout(() => {
+                triggerFlashEffect(mainPlayground);
+            }, 100); // Smanjeno sa 500 na 100 za brži odziv
+        }
+    }
 
     simulateTriggers.forEach(trigger => {
         trigger.addEventListener('click', (e) => {
             e.preventDefault();
-            const targetTab = trigger.getAttribute('data-target-tab');
-            
-            // 1. Promeni tab
-            switchTab(targetTab);
-            playSynthSound(600, 'sine', 0.15);
+            handleTabTrigger(trigger);
+        });
+    });
 
-            // 2. Skroluj do playground-a
-            const playgroundSection = document.getElementById('playground');
-            if (playgroundSection) {
-                playgroundSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-
-            // 3. Pokreni efekat bljeskanja na celoj tabli playground-a
-            if (mainPlayground) {
-                setTimeout(() => {
-                    triggerFlashEffect(mainPlayground);
-                }, 500); // sačekaj da se skrol završi
-            }
+    footerTabTriggers.forEach(trigger => {
+        trigger.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleTabTrigger(trigger);
         });
     });
 
@@ -297,7 +331,9 @@ document.addEventListener('DOMContentLoaded', () => {
             oscillator.start();
             oscillator.stop(audioCtx.currentTime + duration);
         } catch (e) {
-            console.log("Audio API nije podržan.");
+            const t = window.translations || {};
+            const chatSim = t.chatSim || {};
+            console.log(chatSim.audioError || 'Audio API not supported.');
         }
     }
 
@@ -307,7 +343,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const message = chatInput.value.trim();
             if (!message) return;
 
-            addChatMessage('Gledalac', message, false, false, 'moderator');
+            const t = window.translations || {};
+            const chatSim = t.chatSim || {};
+            const viewerName = chatSim.viewer || 'Gledalac';
+            addChatMessage(viewerName, message, false, false, 'moderator');
             chatInput.value = '';
             playSynthSound(400, 'sine', 0.05);
 
@@ -320,7 +359,10 @@ document.addEventListener('DOMContentLoaded', () => {
     quickCmdBadges.forEach(badge => {
         badge.addEventListener('click', () => {
             const cmd = badge.getAttribute('data-cmd');
-            addChatMessage('Gledalac', cmd, false, false, 'moderator');
+            const t = window.translations || {};
+            const chatSim = t.chatSim || {};
+            const viewerName = chatSim.viewer || 'Gledalac';
+            addChatMessage(viewerName, cmd, false, false, 'moderator');
             playSynthSound(400, 'sine', 0.05);
             setTimeout(() => {
                 handleBotCommand(cmd);
@@ -333,17 +375,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const cmd = parts[0].toLowerCase();
         const arg = parts.slice(1).join(' ').trim();
         const isEn = body.classList.contains('lang-en');
+        const lang = isEn ? 'en' : 'sr';
+        
+        // Get translations from global translations object
+        const t = window.translations || {};
+        const chatSim = t.chatSim || {};
+        const viewerName = chatSim.viewer || (isEn ? 'Viewer' : 'Gledalac');
+        const botName = chatSim.bot || 'kickot';
 
         if (cmd === '!bacihejt') {
-            const target = arg || (isEn ? 'Unnamed viewer' : 'Neimenovani gledalac');
+            const target = arg || chatSim.unnamedViewer || (isEn ? 'Unnamed viewer' : 'Neimenovani gledalac');
             const sada = Date.now();
             
             if (sada - cooldowns.bacihejt < 10000) {
                 const preostalo = Math.ceil((10000 - (sada - cooldowns.bacihejt)) / 1000);
-                const errText = isEn 
-                    ? `⚠️ Error: !bacihejt is on cooldown for ${preostalo}s! (Originally 10m)`
-                    : `⚠️ Greška: Komanda !bacihejt je na cooldown-u još ${preostalo}s! (Originalno 10 min)`;
-                addChatMessage('kickot', errText, true);
+                let errText = chatSim.cooldownError || '⚠️ Error: Command {cmd} is on cooldown for {time}s! (Originally 10m)';
+                errText = errText.replace('{cmd}', '!bacihejt').replace('{time}', preostalo);
+                addChatMessage(botName, errText, true);
                 playSynthSound(150, 'sawtooth', 0.25);
                 return;
             }
@@ -356,23 +404,22 @@ document.addEventListener('DOMContentLoaded', () => {
             let roast = replies[Math.floor(Math.random() * replies.length)];
             roast = roast.replace('{ime}', target);
 
-            const responseText = isEn
-                ? `👿 <strong>!bacihejt</strong> triggered by Gledalac towards <strong>${target}</strong>. <br>${roast}<br>Gledalac received <strong>${randomPoint > 0 ? '+' + randomPoint : randomPoint}</strong> points! (Total: <strong>${userPoints}</strong>)`
-                : `👿 <strong>!bacihejt</strong> pokrenut od strane Gledalac ka korisniku <strong>${target}</strong>. <br>${roast}<br>Gledalac je dobio <strong>${randomPoint > 0 ? '+' + randomPoint : randomPoint}</strong> poena! (Ukupno: <strong>${userPoints}</strong> poena)`;
+            let responseText = chatSim.bacihejtTrigger || '👿 <strong>!bacihejt</strong> triggered by {user} towards <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)';
+            const pointsStr = randomPoint > 0 ? '+' + randomPoint : randomPoint;
+            responseText = responseText.replace('{user}', viewerName).replace('{target}', target).replace('{reply}', roast).replace('{points}', pointsStr).replace('{total}', userPoints);
 
-            addChatMessage('kickot', responseText, true);
+            addChatMessage(botName, responseText, true);
             playSynthSound(randomPoint > 0 ? 550 : 220, 'triangle', 0.3);
 
         } else if (cmd === '!posaljiljubav') {
-            const target = arg || (isEn ? 'Unnamed viewer' : 'Neimenovani gledalac');
+            const target = arg || chatSim.unnamedViewer || (isEn ? 'Unnamed viewer' : 'Neimenovani gledalac');
             const sada = Date.now();
             
             if (sada - cooldowns.posaljiljubav < 10000) {
                 const preostalo = Math.ceil((10000 - (sada - cooldowns.posaljiljubav)) / 1000);
-                const errText = isEn
-                    ? `⚠️ Error: !posaljiljubav is on cooldown for ${preostalo}s! (Originally 10m)`
-                    : `⚠️ Greška: Komanda !posaljiljubav je na cooldown-u još ${preostalo}s! (Originalno 10 min)`;
-                addChatMessage('kickot', errText, true);
+                let errText = chatSim.cooldownError || '⚠️ Error: Command {cmd} is on cooldown for {time}s! (Originally 10m)';
+                errText = errText.replace('{cmd}', '!posaljiljubav').replace('{time}', preostalo);
+                addChatMessage(botName, errText, true);
                 playSynthSound(150, 'sawtooth', 0.25);
                 return;
             }
@@ -385,36 +432,33 @@ document.addEventListener('DOMContentLoaded', () => {
             let love = replies[Math.floor(Math.random() * replies.length)];
             love = love.replace('{ime}', target);
 
-            const responseText = isEn
-                ? `❤️ <strong>!posaljiljubav</strong> sent to <strong>${target}</strong>. <br>${love}<br>Gledalac received <strong>${randomPoint > 0 ? '+' + randomPoint : randomPoint}</strong> points! (Total: <strong>${userPoints}</strong>)`
-                : `❤️ <strong>!posaljiljubav</strong> poslata za <strong>${target}</strong>. <br>${love}<br>Gledalac je dobio <strong>${randomPoint > 0 ? '+' + randomPoint : randomPoint}</strong> poena! (Ukupno: <strong>${userPoints}</strong> poena)`;
+            let responseText = chatSim.loveSent || '❤️ <strong>!posaljiljubav</strong> sent to <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)';
+            const pointsStr = randomPoint > 0 ? '+' + randomPoint : randomPoint;
+            responseText = responseText.replace('{user}', viewerName).replace('{target}', target).replace('{reply}', love).replace('{points}', pointsStr).replace('{total}', userPoints);
 
-            addChatMessage('Kickot', responseText, true);
+            addChatMessage(botName, responseText, true);
             playSynthSound(randomPoint > 0 ? 600 : 250, 'triangle', 0.3);
 
         } else if (cmd === '!poeni') {
-            const responseText = isEn
-                ? `🏆 User Gledalac currently has <strong>${userPoints}</strong> points on this channel. Rank: <strong>Chat King</strong>.`
-                : `🏆 Korisnik Gledalac trenutno ima <strong>${userPoints}</strong> poena na ovom kanalu. Rang: <strong>Kralj chata</strong>.`;
-            addChatMessage('Kickot', responseText, true);
+            let responseText = chatSim.pointsResponse || '🏆 User {user} currently has <strong>{points}</strong> points on this channel. Rank: <strong>Chat King</strong>.';
+            responseText = responseText.replace('{user}', viewerName).replace('{points}', userPoints);
+            addChatMessage(botName, responseText, true);
             playSynthSound(440, 'sine', 0.2);
 
         } else if (cmd === '!vreme') {
-            const weatherText = `🌍 Vreme u Beograd: ⛅ Delimično oblačno | 🌡️ 26°C (oseća se 25°C) | 💧 Vlažnost: 32% | 💨 Vetar: 22 km/h`;
-            addChatMessage('Kickot', weatherText, true);
+            const weatherText = chatSim.weather || '🌍 Weather in Belgrade: ⛅ Partly cloudy | 🌡️ 26°C (feels like 25°C) | 💧 Humidity: 32% | 💨 Wind: 22 km/h';
+            addChatMessage(botName, weatherText, true);
             playSynthSound(500, 'sine', 0.2);
 
         } else if (cmd === '!info') {
-            const infoText = `Najkraći rat u istoriji trajao je svega 38 minuta!`;
-            addChatMessage('Kickot', infoText, true);
+            const infoText = chatSim.info || 'The shortest war in history lasted only 38 minutes!';
+            addChatMessage(botName, infoText, true);
             playSynthSound(520, 'sine', 0.2);
 
         } else {
             if (message.startsWith('!')) {
-                const responseText = isEn
-                    ? `❌ Unknown command. Available commands: <strong>!vreme Beograd</strong>, <strong>!info</strong>.`
-                    : `❌ Nepoznata komanda. Dostupne komande su: <strong>!vreme Beograd</strong>, <strong>!info</strong>.`;
-                addChatMessage('Kickot', responseText, true);
+                const responseText = chatSim.unknownCmd || '❌ Unknown command. Available commands: <strong>!vreme Beograd</strong>, <strong>!info</strong>.';
+                addChatMessage(botName, responseText, true);
                 playSynthSound(200, 'sawtooth', 0.2);
             } else {
                 const repliesSr = [
@@ -804,17 +848,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // -----------------------------------------------------------------
-    // 12. Spotlight Effect
+    // 12. Spotlight Effect (Debounced for better performance)
     // -----------------------------------------------------------------
     const cards = document.querySelectorAll('.feature-card, .pricing-card');
     cards.forEach(card => {
+        let cardTimeout = null;
         card.addEventListener('mousemove', e => {
-            const rect = card.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            if (cardTimeout) return;
+            cardTimeout = setTimeout(() => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
 
-            card.style.setProperty('--mouse-x', `${x}px`);
-            card.style.setProperty('--mouse-y', `${y}px`);
+                card.style.setProperty('--mouse-x', `${x}px`);
+                card.style.setProperty('--mouse-y', `${y}px`);
+                cardTimeout = null;
+            }, 16); // ~60fps max
         });
     });
 
@@ -831,19 +880,23 @@ document.addEventListener('DOMContentLoaded', () => {
             navigator.clipboard.writeText(emailAddress).then(() => {
                 // Dodaj klasu za zelenu boju i sjaj
                 copyEmailBtn.classList.add('copied');
-                
-                // Promeni natpise u zavisnosti od izabranog jezika
-                if (copyBtnText) copyBtnText.textContent = "Kopirano!";
-                if (copyBtnTextEn) copyBtnTextEn.textContent = "Copied!";
-                
+
+                // Koristi lokalizaciju
+                const t = window.translations || {};
+                const copyText = t.copy || {};
+                const isEn = body.classList.contains('lang-en');
+
+                if (copyBtnText) copyBtnText.textContent = copyText.copied || (isEn ? 'Copied!' : 'Kopirano!');
+                if (copyBtnTextEn) copyBtnTextEn.textContent = copyText.copied || 'Copied!';
+
                 playSynthSound(600, 'sine', 0.08);
                 setTimeout(() => playSynthSound(800, 'sine', 0.12), 80);
 
                 // Vrati na staro nakon 2 sekunde
                 setTimeout(() => {
                     copyEmailBtn.classList.remove('copied');
-                    if (copyBtnText) copyBtnText.textContent = "Kopiraj";
-                    if (copyBtnTextEn) copyBtnTextEn.textContent = "Copy";
+                    if (copyBtnText) copyBtnText.textContent = copyText.copy || (isEn ? 'Copy' : 'Kopiraj');
+                    if (copyBtnTextEn) copyBtnTextEn.textContent = copyText.copy || 'Copy';
                 }, 2000);
             }).catch(err => {
                 console.error("Greška pri kopiranju emaila: ", err);
@@ -893,19 +946,23 @@ async function handleLogout() {
         }
 
         // Obriši sve lokalne sesijske i Kick tokene odmah
-        localStorage.removeItem('kick_access_token');
-        localStorage.removeItem('kick_token_type');
-        localStorage.removeItem('kick_session_active');
-        localStorage.removeItem('kick_oauth_state');
-        localStorage.removeItem('kick_code_verifier');
-        sessionStorage.clear();
+        try {
+            localStorage.removeItem('kick_access_token');
+            localStorage.removeItem('kick_token_type');
+            localStorage.removeItem('kick_session_active');
+            localStorage.removeItem('kick_oauth_state');
+            localStorage.removeItem('kick_code_verifier');
+            sessionStorage.clear();
 
-        // Obriši sve Supabase auth tokene iz localStorage
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.startsWith('kick_'))) {
-                localStorage.removeItem(key);
+            // Obriši sve Supabase auth tokene iz localStorage
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.startsWith('kick_'))) {
+                    localStorage.removeItem(key);
+                }
             }
+        } catch (e) {
+            console.warn('LocalStorage/sessionStorage not available during logout:', e);
         }
 
         if (typeof sb !== 'undefined' && sb && sb.auth) {
@@ -940,7 +997,11 @@ function notifyGlobalLogout(userId) {
         }
     });
     
-    localStorage.setItem('kickbot_global_logout', Date.now().toString());
+    try {
+        localStorage.setItem('kickbot_global_logout', Date.now().toString());
+    } catch (e) {
+        console.warn('LocalStorage not available during global logout:', e);
+    }
     
     // Obavesti server koristeći prosleđeni id
     if (userId) {
@@ -954,17 +1015,27 @@ function notifyGlobalLogout(userId) {
 
 window.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.replace(window.location.origin + window.location.pathname);
+        try {
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.replace(window.location.origin + window.location.pathname);
+        } catch (e) {
+            console.warn('LocalStorage/sessionStorage not available during message logout:', e);
+            window.location.replace(window.location.origin + window.location.pathname);
+        }
     }
 });
 
 window.addEventListener('storage', (event) => {
     if (event.key === 'kickbot_global_logout') {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.replace(window.location.origin + window.location.pathname);
+        try {
+            localStorage.clear();
+            sessionStorage.clear();
+            window.location.replace(window.location.origin + window.location.pathname);
+        } catch (e) {
+            console.warn('LocalStorage/sessionStorage not available during storage logout:', e);
+            window.location.replace(window.location.origin + window.location.pathname);
+        }
     }
 });
 
@@ -983,13 +1054,14 @@ window.addEventListener('storage', (event) => {
     }
 
     async function checkAuthSession() {
-        const { data: { session } } = await sb.auth.getSession();
-        const userMenu = document.getElementById('userMenu');
-        const userAvatar = document.getElementById('userAvatar');
-        const userName = document.getElementById('userName');
-        const heroVisualContent = document.getElementById('heroVisualContent');
+        try {
+            const { data: { session } } = await sb.auth.getSession();
+            const userMenu = document.getElementById('userMenu');
+            const userAvatar = document.getElementById('userAvatar');
+            const userName = document.getElementById('userName');
+            const heroVisualContent = document.getElementById('heroVisualContent');
 
-        if (session) {
+            if (session) {
             const user = session.user;
             const displayName = user?.user_metadata?.display_name || user?.email || 'Profil';
             const avatarUrl = user?.user_metadata?.avatar_url;
@@ -1028,10 +1100,11 @@ window.addEventListener('storage', (event) => {
                 heroBtnPrimary.href = 'dashboard.html';
                 const heroBtnPrimaryText = document.getElementById('heroBtnPrimaryText');
                 if (heroBtnPrimaryText) {
-                    heroBtnPrimaryText.innerHTML = `
-                        <span class="lang-sr">Idi na Dashboard</span>
-                        <span class="lang-en">Go to Dashboard</span>
-                    `;
+                    const t = window.translations || {};
+                    const userProfile = t.userProfile || {};
+                    const isEn = body.classList.contains('lang-en');
+                    heroBtnPrimaryText.textContent = userProfile.goToDashboard || (isEn ? 'Go to Dashboard' : 'Idi na Dashboard');
+                    heroBtnPrimaryText.removeAttribute('data-i18n');
                 }
             }
 
@@ -1063,39 +1136,48 @@ window.addEventListener('storage', (event) => {
                 let kickChannelName = displayName;
 
                 try {
-                    const [botRes, profileRes] = await Promise.all([
-                        sb.from('bot_settings').select('*').eq('user_id', user.id).maybeSingle(),
-                        sb.from('kick_profiles').select('*').eq('user_id', user.id).maybeSingle()
-                    ]);
+                    const profileRes = await sb.from('user_profiles').select('*').eq('id', user.id).maybeSingle();
 
-                    if (botRes?.data) {
-                        userBotActive = botRes.data.is_active !== false;
-                        if (botRes.data.enabled_modules && Array.isArray(botRes.data.enabled_modules)) {
-                            activeModulesCount = botRes.data.enabled_modules.length;
-                        } else if (typeof botRes.data.config === 'object' && botRes.data.config !== null) {
-                            const keys = ['cfgLeaderboard', 'cfgAutoMessages', 'cfgBotInteraction', 'cfgLoveMarriages', 'cfgMiniGames', 'cfgSongRequests', 'cfgRanking', 'cfgModeration'];
-                            let count = 0;
-                            keys.forEach(k => {
-                                if (botRes.data.config[k] !== false) count++;
-                            });
-                            activeModulesCount = count;
+                    if (profileRes?.data) {
+                        // Bot is considered active if user has channels configured
+                        const kickChannels = profileRes.data.kick_channels || [];
+                        userBotActive = kickChannels.length > 0;
+                        
+                        // Get channel name from first channel or display_name
+                        if (kickChannels.length > 0 && kickChannels[0].username) {
+                            kickChannelName = kickChannels[0].username;
                         }
-                    }
-                    if (profileRes?.data?.kick_username) {
-                        kickChannelName = profileRes.data.kick_username;
+                        
+                        // Default to 8 modules active (all Kickot modules)
+                        activeModulesCount = 8;
                     }
                 } catch (e) {
                     console.warn("User stats fetch fallback:", e);
                 }
+
+                const t = window.translations || {};
+                const userProfile = t.userProfile || {};
+                const isEn = body.classList.contains('lang-en');
+                
+                const title = userProfile.title || (isEn ? 'MY PROFILE & STATUS' : 'MOJ PROFIL & STATUS');
+                const botActiveText = userProfile.botActive || (isEn ? 'BOT ACTIVE' : 'BOT AKTIVAN');
+                const botInactiveText = userProfile.botInactive || (isEn ? 'INACTIVE' : 'NEAKTIVAN');
+                const connectedText = userProfile.connected || (isEn ? 'Connected with Kickot bot' : 'Povezan sa Kickot botom');
+                const disconnectedText = userProfile.disconnected || (isEn ? 'Kickot bot disconnected' : 'Kickot bot odspojen');
+                const activeModulesLabel = userProfile.activeModulesLabel || (isEn ? 'Active modules status' : 'Status aktivnih modula');
+                const activeModulesText = (userProfile.activeModules || (isEn ? '{count} of 8 modules active' : '{count} od 8 modula aktivno')).replace('{count}', activeModulesCount);
+                const botStatusLabel = userProfile.botStatusLabel || (isEn ? 'Bot status' : 'Status bota');
+                const botPausedText = userProfile.botPaused || (isEn ? 'PAUSED' : 'PAUZIRAN');
+                const openDashboardText = userProfile.openDashboard || (isEn ? 'Open Dashboard →' : 'Otvori Dashboard →');
 
                 heroVisualContent.innerHTML = `
                     <div class="hero-glass-card">
                         <div class="hero-card-header">
                             <div class="card-header-left">
                                 <span class="pulse-dot" style="background: ${userBotActive ? 'var(--color-green)' : '#EF4444'};"></span>
-                                <span class="card-header-title">MOJ PROFIL & STATUS</span>
+                                <span class="card-header-title">${title}</span>
                             </div>
-                            <span class="badge ${userBotActive ? 'badge-active' : 'badge-soon'}">${userBotActive ? 'BOT AKTIVAN' : 'NEAKTIVAN'}</span>
+                            <span class="badge ${userBotActive ? 'badge-active' : 'badge-soon'}">${userBotActive ? botActiveText : botInactiveText}</span>
                         </div>
                         <div class="hero-user-card">
                             <div class="hero-avatar" style="${avatarUrl ? `background-image: url('${avatarUrl}');` : ''}">
@@ -1105,23 +1187,23 @@ window.addEventListener('storage', (event) => {
                                 <h3 class="hero-user-name">@${kickChannelName}</h3>
                                 <div class="hero-user-status">
                                     <span class="pulse-dot" style="background: ${userBotActive ? 'var(--color-green)' : '#EF4444'};"></span>
-                                    <span>${userBotActive ? 'Povezan sa Kickot botom' : 'Kickot bot odspojen'}</span>
+                                    <span>${userBotActive ? connectedText : disconnectedText}</span>
                                 </div>
                             </div>
                         </div>
                         <div class="telemetry-grid">
                             <div class="t-cell">
-                                <span class="t-label">Status aktivnih modula</span>
-                                <span class="t-val text-green">${activeModulesCount} od 8 modula aktivno</span>
+                                <span class="t-label">${activeModulesLabel}</span>
+                                <span class="t-val text-green">${activeModulesText}</span>
                             </div>
                             <div class="t-cell">
-                                <span class="t-label">Status bota</span>
-                                <span class="t-val ${userBotActive ? 'text-green' : 'text-orange'}">${userBotActive ? 'BOT AKTIVAN' : 'PAUZIRAN'}</span>
+                                <span class="t-label">${botStatusLabel}</span>
+                                <span class="t-val ${userBotActive ? 'text-green' : 'text-orange'}">${userBotActive ? botActiveText : botPausedText}</span>
                             </div>
                         </div>
                         <div class="hero-card-footer">
                             <a href="dashboard.html" class="btn btn-primary w-full" style="justify-content: center;">
-                                <span>Otvori Dashboard →</span>
+                                <span>${openDashboardText}</span>
                             </a>
                         </div>
                     </div>
@@ -1145,35 +1227,39 @@ window.addEventListener('storage', (event) => {
         }
         const heroBtnPrimaryText = document.getElementById('heroBtnPrimaryText');
         if (heroBtnPrimaryText) {
-            heroBtnPrimaryText.innerHTML = `
-                <span class="lang-sr">Počni besplatno</span>
-                <span class="lang-en">Get started free</span>
-            `;
+            const t = window.translations || {};
+            const isEn = body.classList.contains('lang-en');
+            heroBtnPrimaryText.textContent = t.hero?.btnStart || (isEn ? 'Start for free' : 'Počni besplatno');
+            heroBtnPrimaryText.setAttribute('data-i18n', 'hero.btnStart');
         }
 
         // Render Guest Global Telemetry Card
         if (heroVisualContent) {
+            const t = window.translations || {};
+            const hero = t.hero || {};
+            const isEn = body.classList.contains('lang-en');
+            
             heroVisualContent.innerHTML = `
                 <div class="hero-glass-card">
                     <div class="hero-card-header">
                         <div class="card-header-left">
                             <span class="pulse-dot"></span>
-                            <span class="card-header-title">LIVE STATISTIKA SISTEMA</span>
+                            <span class="card-header-title">${hero.guestTelemetry || (isEn ? 'LIVE SYSTEM STATISTICS' : 'LIVE STATISTIKA SISTEMA')}</span>
                         </div>
-                        <span class="badge badge-active">99.98% UPTIME</span>
+                        <span class="badge badge-active">${hero.guestUptime || '99.98% UPTIME'}</span>
                     </div>
                     <div class="hero-telemetry-body">
                         <div class="telemetry-metric">
                             <span class="metric-num-glow" id="heroLiveMsgCount">14,892,104</span>
-                            <span class="metric-sub">Obrađenih Poruka u Chatu</span>
+                            <span class="metric-sub">${hero.guestProcessedMsgs || (isEn ? 'Processed Chat Messages' : 'Obrađenih Poruka u Chatu')}</span>
                         </div>
                         <div class="telemetry-grid">
                             <div class="t-cell">
-                                <span class="t-label">Kick WebSocket</span>
-                                <span class="t-val text-green">&lt; 15ms Odziv</span>
+                                <span class="t-label">${hero.websocket || 'Kick WebSocket'}</span>
+                                <span class="t-val text-green">${hero.guestLatency || (isEn ? '&lt; 15ms Response' : '&lt; 15ms Odziv')}</span>
                             </div>
                             <div class="t-cell">
-                                <span class="t-label">Aktivnih Kick Strimova</span>
+                                <span class="t-label">${hero.guestStreams || (isEn ? 'Active Kick Streams' : 'Aktivnih Kick Strimova')}</span>
                                 <span class="t-val text-violet">2.840</span>
                             </div>
                         </div>
@@ -1182,7 +1268,7 @@ window.addEventListener('storage', (event) => {
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                                     <path d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
                                 </svg>
-                                <span style="padding-left: 5px">Brza Kick Prijava</span>
+                                <span style="padding-left: 5px">${hero.fastOAuth || (isEn ? 'Fast Kick OAuth Login' : 'Brza Kick Prijava')}</span>
                             </button>
                         </div>
                     </div>
@@ -1192,6 +1278,9 @@ window.addEventListener('storage', (event) => {
             if (heroFastOAuthBtn) {
                 heroFastOAuthBtn.addEventListener('click', openKickLogin);
             }
+        }
+        } catch (e) {
+            console.error('Error checking auth session:', e);
         }
     }
 
@@ -1244,13 +1333,17 @@ window.addEventListener('storage', (event) => {
         const codeVerifier = generateRandomString(64);
         const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-        localStorage.setItem('kick_oauth_state', state);
-        localStorage.setItem('kick_code_verifier', codeVerifier);
-        localStorage.setItem('kick_origin_site', 'kickall');
-        sessionStorage.setItem('kick_oauth_state', state);
-        sessionStorage.setItem('kick_code_verifier', codeVerifier);
-        sessionStorage.setItem('from_kickall', 'true');
-        sessionStorage.setItem('kick_origin_site', 'kickall');
+        try {
+            localStorage.setItem('kick_oauth_state', state);
+            localStorage.setItem('kick_code_verifier', codeVerifier);
+            localStorage.setItem('kick_origin_site', 'kickall');
+            sessionStorage.setItem('kick_oauth_state', state);
+            sessionStorage.setItem('kick_code_verifier', codeVerifier);
+            sessionStorage.setItem('from_kickall', 'true');
+            sessionStorage.setItem('kick_origin_site', 'kickall');
+        } catch (e) {
+            console.warn('LocalStorage/sessionStorage not available during OAuth:', e);
+        }
 
         const authUrl = `https://id.kick.com/oauth/authorize?` + new URLSearchParams({
             response_type: 'code',
@@ -1321,11 +1414,15 @@ window.addEventListener('storage', (event) => {
     let lenis = null;
     if (typeof window.Lenis !== 'undefined') {
         lenis = new window.Lenis({
-            duration: 1.2,
+            duration: 1.0,
             easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
             direction: 'vertical',
             gestureDirection: 'vertical',
-            smoothTouch: false
+            smoothTouch: false,
+            smoothWheel: true,
+            wheelMultiplier: 1,
+            touchMultiplier: 2,
+            infinite: false
         });
         window.lenisInstance = lenis;
 
@@ -1373,12 +1470,17 @@ window.addEventListener('storage', (event) => {
 
     const backToTopBtn = document.getElementById('backToTopBtn');
     if (backToTopBtn) {
+        let backToTopThrottle = null;
         window.addEventListener('scroll', () => {
-            if (window.scrollY > 300) {
-                backToTopBtn.classList.add('visible');
-            } else {
-                backToTopBtn.classList.remove('visible');
-            }
+            if (backToTopThrottle) return;
+            backToTopThrottle = requestAnimationFrame(() => {
+                if (window.scrollY > 300) {
+                    backToTopBtn.classList.add('visible');
+                } else {
+                    backToTopBtn.classList.remove('visible');
+                }
+                backToTopThrottle = null;
+            });
         });
 
         backToTopBtn.addEventListener('click', (e) => {
@@ -1388,11 +1490,16 @@ window.addEventListener('storage', (event) => {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 7. Cursor Glow / Mouse Spotlight Effect
+    // 7. Cursor Glow / Mouse Spotlight Effect (Debounced for performance)
     // ─────────────────────────────────────────────────────────────
+    let spotlightTimeout = null;
     window.addEventListener('mousemove', (e) => {
-        document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
-        document.body.style.setProperty('--mouse-y', `${e.clientY}px`);
+        if (spotlightTimeout) return;
+        spotlightTimeout = setTimeout(() => {
+            document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
+            document.body.style.setProperty('--mouse-y', `${e.clientY}px`);
+            spotlightTimeout = null;
+        }, 16); // ~60fps max
     });
 
     // ─────────────────────────────────────────────────────────────
@@ -1420,16 +1527,13 @@ window.addEventListener('storage', (event) => {
             }
 
             // 2. Query Supabase Database if counts not provided by API
-            const [profilesRes, cmdsRes] = await Promise.all([
-                sb.from('kick_profiles').select('*', { count: 'exact', head: true }),
-                sb.from('custom_commands').select('*', { count: 'exact', head: true })
-            ]);
+            const profilesRes = await sb.from('user_profiles').select('*', { count: 'exact', head: true });
 
             if (!realStreamsCount) {
                 realStreamsCount = (profilesRes?.count && profilesRes.count > 0) ? profilesRes.count : 2840;
             }
             if (!realBotsCount) {
-                realBotsCount = (cmdsRes?.count && cmdsRes.count > 0) ? cmdsRes.count : 8120;
+                realBotsCount = (profilesRes?.count && profilesRes.count > 0) ? profilesRes.count * 3 : 8120;
             }
             if (!realMessagesCount) {
                 realMessagesCount = 14892104;
@@ -1442,8 +1546,9 @@ window.addEventListener('storage', (event) => {
             const statBarStreams = document.getElementById('statBarStreams');
             if (statBarStreams) statBarStreams.setAttribute('data-target', realStreamsCount);
 
-            const statBarWidgets = document.getElementById('statBarWidgets');
-            if (statBarWidgets) statBarWidgets.setAttribute('data-target', realBotsCount);
+            // Keep static value for widgets (50+) - don't override with database value
+            // const statBarWidgets = document.getElementById('statBarWidgets');
+            // if (statBarWidgets) statBarWidgets.setAttribute('data-target', realBotsCount);
 
             const statBarUptime = document.getElementById('statBarUptime');
             if (statBarUptime) statBarUptime.setAttribute('data-target', realUptime);
@@ -1530,7 +1635,49 @@ window.addEventListener('storage', (event) => {
     checkShowcaseStreamers();
 
     // ─────────────────────────────────────────────────────────────
-    // 10. Dynamic FAQ Search & Accordion Filters
+    // 10. Testimonials Kick Channel Data Fetch
+    // ─────────────────────────────────────────────────────────────
+    async function checkTestimonialChannels() {
+        const testimonialCards = document.querySelectorAll('.testimonial-card[data-channel]');
+        testimonialCards.forEach(async (card) => {
+            const channel = card.getAttribute('data-channel');
+            const cardId = card.id;
+            const cardNum = cardId.split('-')[2];
+            
+            if (!channel) return;
+            try {
+                const res = await fetch(`https://kickbot-ihzb.onrender.com/api/avatar?username=${channel}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const avatar = card.querySelector(`#t-avatar-${cardNum}`);
+                    const name = card.querySelector(`#t-name-${cardNum}`);
+                    const role = card.querySelector(`#t-role-${cardNum}`);
+
+                    if (data?.avatar && avatar) {
+                        avatar.style.backgroundImage = `url('${data.avatar}')`;
+                        avatar.textContent = '';
+                    }
+                    if (data?.username && name) {
+                        name.textContent = data.username;
+                    }
+                    if (data?.followers_count && role) {
+                        const followers = data.followers_count;
+                        let followersText = followers;
+                        if (followers >= 1000) {
+                            followersText = (followers / 1000).toFixed(1) + 'k';
+                        }
+                        role.textContent = `${followersText} pratilaca`;
+                    }
+                }
+            } catch (e) {
+                // Keep default layout fallback if offline or network fail
+            }
+        });
+    }
+    checkTestimonialChannels();
+
+    // ─────────────────────────────────────────────────────────────
+    // 11. Dynamic FAQ Search & Accordion Filters
     // ─────────────────────────────────────────────────────────────
     const faqItems = document.querySelectorAll('.faq-item');
     const faqSearchInput = document.getElementById('faqSearchInput');

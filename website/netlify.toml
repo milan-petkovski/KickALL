@@ -1,0 +1,35 @@
+[[redirects]]
+  from = "/api/kick/exchange"
+  to = "/.netlify/functions/kick-exchange"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/kick/me"
+  to = "/.netlify/functions/kick-me"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/auth/kick/callback"
+  to = "/auth/kick/callback/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/auth/kick/callback/"
+  to = "/auth/kick/callback/index.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
+[[redirects]]
+  from = "/kickot/*"
+  to = "/kickot/index.html"
+  status = 200
+  force = false

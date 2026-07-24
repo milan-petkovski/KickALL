@@ -7,6 +7,7 @@
     "pricing": "Pricing",
     "reviews": "Reviews",
     "logIn": "Log In",
+    "profil": "Profile",
     "dashboard": "Dashboard",
     "logOut": "Log Out",
     "features": "Features"
@@ -17,12 +18,25 @@
     "description": "Connect your channel with the most powerful chatbot! <br><strong>Kickot</strong> is available immediately and brings chat automation, points, and games. Your stream ecosystem will soon be complete with modules <strong>kickaj</strong>, <strong>kickov</strong>, and <strong>kickan</strong> coming soon.",
     "btnStart": "Start for free",
     "btnPricing": "View pricing",
-    "fastOAuth": "Fast Kick OAuth Login"
+    "fastOAuth": "Fast Kick OAuth Login",
+    "telemetry": "LIVE TELEMETRY",
+    "systemOn": "SYSTEM ON",
+    "processedMsgs": "Processed Messages",
+    "websocket": "Kick WebSocket",
+    "latency": "&lt; 12ms Latency",
+    "activeWidgets": "Active Widgets",
+    "widgetsCount": "8,120 Widgets",
+    "fastOAuthBtn": "Fast Kick OAuth Login",
+    "guestTelemetry": "LIVE SYSTEM STATISTICS",
+    "guestUptime": "99.98% UPTIME",
+    "guestProcessedMsgs": "Processed Chat Messages",
+    "guestLatency": "&lt; 15ms Response",
+    "guestStreams": "Active Kick Streams"
   },
-  "stats": {
-    "msgs": "Processed Chat Messages",
-    "streams": "Active Streams",
-    "widgets": "Custom Commands",
+  "statsBar": {
+    "msgs": "Processed Messages",
+    "streams": "Active Kick Streams",
+    "widgets": "Built-in Commands",
     "uptime": "Network Uptime (%)"
   },
   "ecosystem": {
@@ -31,6 +45,7 @@
     "subtitle": "Modular tools designed for maximum interaction and channel growth.",
     "statusActive": "ACTIVE NOW",
     "statusSoon": "COMING SOON",
+    "activeNow": "ACTIVE NOW",
     "descKickot": "Ultimate chatbot with advanced moderation, custom commands, mini-games, and points system.",
     "descKickaj": "Easiest way to create and manage engaging giveaways directly through chat.",
     "descKickan": "Most powerful analytics for Kick streamers. Track viewer growth, chat activity, and more.",
@@ -65,6 +80,48 @@
     "live": "LIVE",
     "soon": "SOON"
   },
+  "playground": {
+    "tag": "INTERACTIVE TEST",
+    "title": "Try tool capabilities",
+    "subtitle": "Below you can test all four tools before trying them on Kick."
+  },
+  "sim": {
+    "status": "IN DEVELOPMENT"
+  },
+  "kickaj": {
+    "heading": "Giveaway Simulation",
+    "desc": "Set a prize and start the draw. Viewers enter the giveaway by simply typing a word in chat.",
+    "prizeLabel": "Prize:",
+    "keywordLabel": "Keyword for entry:",
+    "startBtn": "Start Draw",
+    "waiting": "Waiting to start...",
+    "winnerLabel": "WINNER!",
+    "wonText": "Won: <span id='winnerPrize'>Subscribe</span>"
+  },
+  "kickov": {
+    "heading": "Beautiful Stream Overlays",
+    "desc": "Try how our modern and smooth alerts look on screen during your stream. Change themes and styles live.",
+    "themeLabel": "Select Widget Theme:",
+    "themeGreen": "Neon Green",
+    "themeViolet": "Cyber Violet",
+    "themeDark": "Obsidian Dark",
+    "themeGold": "Gold Ember",
+    "gameTitle": "GTA VI LIVE",
+    "btnFollow": "Simulate Follow",
+    "btnSub": "Simulate Sub",
+    "btnDonation": "Simulate Donation"
+  },
+  "kickan": {
+    "heading": "Statistics & Analytics",
+    "desc": "Track channel growth with a modern control panel. Choose period for chart analysis.",
+    "periodToday": "Today",
+    "periodWeek": "This week",
+    "periodMonth": "This month",
+    "avgViewers": "Average viewers",
+    "totalFollowers": "Total followers",
+    "chartTitle": "Viewer Growth In Real Time",
+    "chartUpdate": "Updated 2 min ago"
+  },
   "kickot": {
     "status": "ACTIVE & AVAILABLE",
     "heading": "Interactive chatbot",
@@ -81,17 +138,17 @@
   "performanse": {
     "label": "PERFORMANCE WITHOUT COMPROMISE",
     "title": "World-Class Technology",
-    "subtitle": "Built for highest load and 100% compatibility with streaming software.",
+    "subtitle": "Built for maximum load and 100% compatibility with streaming software.",
     "card1": {
-      "title": "< 15ms WebSockets Speed",
-      "desc": "Direct WebSocket connection to Kick servers ensures instant chatbot response and on-screen notifications."
+      "title": "&lt; 15ms WebSockets Speed",
+      "desc": "Direct WebSocket connection with Kick servers ensures instant chatbot response and on-screen notifications."
     },
     "card2": {
       "title": "100% OBS Support",
-      "desc": "Fully compatible with all standards without GPU or CPU performance overhead."
+      "desc": "Fully compatible with all standards without CPU or GPU load."
     },
     "card3": {
-      "title": "Zero-Downtime Reliability",
+      "title": "Uptime Without Interruption",
       "desc": "Servers guarantee 99.98% uptime without interruption even during massive streams."
     },
     "card4": {
@@ -102,8 +159,13 @@
   "faq": {
     "label": "FREQUENTLY ASKED QUESTIONS",
     "title": "Everything you need to know",
-    "subtitle": "Have questions? Find quick answers to the most common questions.",
+    "subtitle": "Find quick answers or search specific questions.",
     "placeholder": "Search questions...",
+    "catAll": "All",
+    "catChatbot": "Chatbot",
+    "catOverlay": "Overlay",
+    "catOauth": "OAuth & Security",
+    "catPricing": "Pricing",
     "q1": {
       "question": "How do I connect Kickot chatbot to my Kick channel?",
       "answer": "Simply click on \"Log in via Kick\", authorize your account, and activate Kickot bot in your Dashboard. The bot will join your chat automatically."
@@ -121,17 +183,21 @@
       "answer": "Absolutely. We use official Kick OAuth 2.0 authentication with S256 PKCE encryption standard. We never have access to your passwords or private keys."
     },
     "q5": {
-      "question": "Can I create custom commands and responses?",
-      "answer": "Yes! Through an intuitive Dashboard, you can create an unlimited number of commands, timers, and automated messages sent at set time intervals."
+      "question": "Can I create custom commands and alerts?",
+      "answer": "Yes! Through the Dashboard you can create up to 50 commands on the free plan, while on others you can create unlimited. Just visit the commands panel within the Dashboard!"
     }
   },
   "support": {
     "label": "SUPPORT THAT CARES",
     "title": "Support that responds fast",
     "desc": "We know how important it is for your stream and chatbot to run flawlessly. That's why we provide direct and fast technical support exclusively via email. For any issues, questions, or feedback, our team is ready to respond immediately.",
-    "featureTitle": "Direct Technical Email Support",
-    "featureDesc": "No waiting for bots and automated responses. Our developers directly solve your issue.",
+    "featureTitle": "Direct Email Support",
+    "featureDesc": "Write to us via email. We guarantee ultra-fast responses within a few hours!",
     "statusActive": "EMAIL SUPPORT IS ACTIVE",
+    "copyLabel": "Click to copy email address:",
+    "copyBtn": "Copy",
+    "responseTime": "Response time",
+    "resolvedTickets": "Resolved tickets",
     "log1": "Viewer: \"How do I activate kickot?\"",
     "log2": "\"Just click the Start kickot button and connect channel.\"",
     "log3": "Support ticket successfully resolved. ⭐⭐⭐⭐⭐",
@@ -139,11 +205,11 @@
     "tagResolved": "RESOLVED"
   },
   "pricing": {
-    "tag": "TAILORED FOR EVERYONE",
-    "title": "Transparent and flexible plans",
-    "subtitle": "Choose the plan that best fits your streaming needs and community size.",
-    "popular": "POPULAR",
+    "tag": "GET READY FOR SUCCESS",
+    "title": "Choose your power package",
+    "subtitle": "<strong>kickot</strong> is available immediately in all plans. Other tools are coming soon as a free upgrade to your subscription!",
     "period": "/ month",
+    "popular": "POPULAR",
     "free": {
       "title": "FREE",
       "desc": "Ideal for new streamers just starting out and wanting basic chat automation.",
@@ -182,28 +248,38 @@
   "modules": {
     "active": "ACTIVE",
     "soon": "SOON",
-    "live": "LIVE"
+    "live": "LIVE",
+    "comingSoon": "COMING SOON"
   },
   "testimonials": {
-    "tag": "USER REVIEWS",
+    "tag": "STREAMER WORDS",
     "title": "What our streamers say",
-    "subtitle": "Join streamers who have already connected <strong>Kickall</strong> and elevated their chat fun.",
+    "subtitle": "Join streamers who have already connected <strong>KickALL</strong> and elevated their chat fun.",
     "card1": {
-      "text": "\"I connected kickot in less than a minute. My audience loves the !bacihejt and !posaljiljubav commands, points fly everywhere. Can't wait for other modules!\""
+      "text": "\"I set up the bot in literally a minute. People on the stream were excited about the !bacihejt and !posaljiljubav commands, and the ranking system is a hit. Can't wait for you to release new modules!\"",
+      "role": "Kick Partner (2.5k followers)"
     },
     "card2": {
-      "text": "\"Currently using just the kickot bot and it works perfectly. Chat engagement is great. Email support is extremely fast.\""
+      "text": "\"The bot works perfectly, stream interaction has jumped to the max. Special plus for support, they reply to emails at the speed of light!\"",
+      "role": "Kick Streamer (50+ viewers)"
     },
     "card3": {
-      "text": "\"The support team helped me configure the bot at 2 AM via email! Best support ever. Can't wait for alerts!\""
+      "text": "\"I couldn't believe someone replied to my email at 2 AM and set up the bot with me. All credit to the team, support rocks!\"",
+      "role": "Pro User"
     }
   },
   "cta": {
     "title": "Ready to level up your Kick stream?",
-    "desc": "Connect your Kick account in just three clicks and activate Kickot chatbot and overlay tools completely free.",
+    "desc": "Connect your Kick account in just three clicks and activate Kickot chatbot completely free!",
+    "badge": "READY TO LAUNCH",
     "btnPrimary": "Connect Kick Account Now",
     "btnSecondary": "Try live",
     "login": "Log in"
+  },
+  "stats": {
+    "streams": "Active streams",
+    "uptime": "System availability (%)",
+    "messages": "Processed chat messages"
   },
   "footer": {
     "tagline": "Everything your Kick stream will ever need in one place. Complete ecosystem of tools and automation.",
@@ -215,5 +291,66 @@
     "createdBy": "Created by",
     "privacy": "Privacy",
     "terms": "Terms"
+  },
+  "modal": {
+    "close": "Close"
+  },
+  "copy": {
+    "copy": "Copy",
+    "copied": "Copied!"
+  },
+  "dashboard": {
+    "referralCode": "My referral code",
+    "referralLink": "Referral link",
+    "referralLinkCopied": "Referral link successfully copied!",
+    "copyLink": "Copy Link",
+    "copyError": "Error copying!",
+    "emailCopied": "Email address successfully copied!",
+    "emailCopyError": "Error copying email.",
+    "noRewards": "No rewards yet. Invite friends to get started!",
+    "minWithdrawal": "Minimum withdrawal amount is €5.00",
+    "insufficientFunds": "Insufficient funds for withdrawal!",
+    "enterWithdrawalDetails": "Enter withdrawal details!",
+    "withdrawalSuccess": "Withdrawal request successfully sent! You will be notified about the payment.",
+    "withdrawalError": "An error occurred while submitting the request.",
+    "paypalEmail": "PayPal Email Address",
+    "paypalEmailPlaceholder": "your@email.com",
+    "iban": "Account Number (IBAN)",
+    "ibanPlaceholder": "RS00 0000 0000 0000 0000 00",
+    "cryptoWallet": "Crypto Wallet Address (USDT / BTC)",
+    "cryptoWalletPlaceholder": "0x... or bc1...",
+    "payPalEmail": "PayPal Email",
+    "payPalEmailHint": "Enter your PayPal email address",
+    "bankAccount": "Bank Account Number (IBAN)",
+    "bankAccountHint": "Enter your IBAN account number",
+    "cryptoAddress": "Crypto Wallet Address",
+    "cryptoAddressHint": "Enter your crypto wallet address"
+  },
+  "backToTop": "Back to top",
+  "chatSim": {
+    "viewer": "Viewer",
+    "bot": "kickot",
+    "unnamedViewer": "Unnamed viewer",
+    "cooldownError": "⚠️ Error: Command {cmd} is on cooldown for {time}s! (Originally 10m)",
+    "bacihejtTrigger": "👿 <strong>!bacihejt</strong> triggered by {user} towards <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)",
+    "loveSent": "❤️ <strong>!posaljiljubav</strong> sent to <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)",
+    "pointsResponse": "🏆 User {user} currently has <strong>{points}</strong> points on this channel. Rank: <strong>Chat King</strong>.",
+    "weather": "🌍 Weather in Belgrade: ⛅ Partly cloudy | 🌡️ 26°C (feels like 25°C) | 💧 Humidity: 32% | 💨 Wind: 22 km/h",
+    "info": "The shortest war in history lasted only 38 minutes!",
+    "unknownCmd": "❌ Unknown command. Available commands: <strong>!vreme Beograd</strong>, <strong>!info</strong>.",
+    "audioError": "Audio API not supported."
+  },
+  "userProfile": {
+    "title": "MY PROFILE & STATUS",
+    "botActive": "BOT ACTIVE",
+    "botInactive": "INACTIVE",
+    "connected": "Connected with Kickot bot",
+    "disconnected": "Kickot bot disconnected",
+    "activeModulesLabel": "Active modules status",
+    "activeModules": "{count} of 8 modules active",
+    "botStatusLabel": "Bot status",
+    "botPaused": "PAUSED",
+    "openDashboard": "Open Dashboard →",
+    "goToDashboard": "Go to Dashboard"
   }
 }

@@ -6,7 +6,7 @@
   <script>
     (function() {
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const baseRedirectPath = isLocalhost ? '/Website' : '';
+      const baseRedirectPath = '';
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       const error = params.get('error');
@@ -27,7 +27,7 @@
     })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kickot | OAuth autorizacija</title>
+  <title>KickALL | OAuth autorizacija</title>
   <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -192,7 +192,7 @@
 
   <div class="card" id="card">
     <div class="logo-wrap">
-      <img src="/assets/kickall.png" alt="KickAll Logo" onerror="this.style.display='none'">
+      <img src="/assets/kickall.png" alt="KickALL Logo" onerror="this.style.display='none'">
     </div>
 
     <div id="loadingState">
@@ -222,7 +222,7 @@
   <script>
     (async function kickOAuthCallback() {
       const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const baseRedirectPath = isLocalhost ? '/Website' : '';
+      const baseRedirectPath = '';
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       const state = params.get('state');

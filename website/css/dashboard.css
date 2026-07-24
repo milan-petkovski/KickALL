@@ -36,7 +36,7 @@ body.auth-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.4s ease;
+  transition: opacity var(--transition-normal);
 }
 
 #authGate.fade-out, .auth-gate.fade-out {
@@ -168,7 +168,7 @@ body.auth-loading {
   -webkit-mask-composite: xor;
   mask-composite: exclude;
   pointer-events: none;
-  transition: background 0.3s;
+  transition: background var(--transition-normal);
 }
 
 /* Card Glow Hover Effects */
@@ -268,7 +268,7 @@ body.auth-loading {
   font-weight: 700;
   color: #fff;
   margin-bottom: 10px;
-  transition: color 0.3s;
+  transition: color var(--transition-normal);
 }
 
 .module-dashboard-card:hover .card-title {
@@ -376,7 +376,7 @@ body.auth-loading {
   justify-content: center;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity var(--transition-normal);
 }
 
 .modal-backdrop.open {
@@ -436,7 +436,7 @@ body.auth-loading {
   gap: 8px;
   padding: 8px 16px;
   border-radius: 20px;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
   opacity: 0.7;
 }
 
@@ -486,7 +486,7 @@ body.auth-loading {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
   flex-shrink: 0;
 }
 
@@ -571,7 +571,7 @@ body.auth-loading {
   border-radius: 12px;
   padding: 14px 10px;
   text-align: center;
-  transition: border-color 0.2s;
+  transition: border-color var(--transition-fast);
 }
 
 .pm-ref-stat:hover {
@@ -675,7 +675,7 @@ body.auth-loading {
   border: 1px solid rgba(139, 92, 246, 0.35) !important;
   color: #a78bfa !important;
   border-radius: 12px;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .pm-ref-email-btn:hover {
@@ -690,7 +690,7 @@ body.auth-loading {
   color: var(--app-primary);
   font-weight: 600;
   text-decoration: underline;
-  transition: color 0.15s;
+  transition: color var(--transition-fast);
 }
 
 .pm-link:hover {
@@ -1002,7 +1002,7 @@ body.auth-loading {
   border-radius: 16px;
   padding: 20px;
   text-align: center;
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal);
 }
 
 .referral-stat-card:hover {
@@ -1084,7 +1084,7 @@ body.auth-loading {
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal);
   box-shadow: 0 4px 15px rgba(83, 252, 24, 0.25);
 }
 
@@ -1144,7 +1144,7 @@ body.auth-loading {
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 12px;
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal);
 }
 
 .reward-item:hover {
@@ -1263,7 +1263,7 @@ body.auth-loading {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal);
   box-shadow: 0 4px 15px rgba(83, 252, 24, 0.25);
 }
 
@@ -1319,7 +1319,7 @@ body.auth-loading {
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
 }
 
 .amount-preset-btn:hover {
@@ -1342,7 +1342,7 @@ body.auth-loading {
   padding: 12px 16px;
   color: #fff;
   font-size: 0.95rem;
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal);
 }
 
 .form-input:focus,
@@ -1373,7 +1373,7 @@ body.auth-loading {
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all var(--transition-normal);
   box-shadow: 0 4px 15px rgba(83, 252, 24, 0.25);
 }
 

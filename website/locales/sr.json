@@ -7,6 +7,7 @@
     "pricing": "Cene",
     "reviews": "Utisci",
     "logIn": "Prijavi se",
+    "profil": "Profil",
     "dashboard": "Dashboard",
     "logOut": "Odjavi se",
     "features": "Funkcije"
@@ -17,12 +18,25 @@
     "description": "Poveži svoj kanal sa najmoćnijim chatbotom! <br><strong>Kickot</strong> je dostupan odmah i donosi automatizaciju chata, poene i igre. Tvoj strim ekosistem uskoro postaje kompletan uz module <strong>kickaj</strong>, <strong>kickov</strong> i <strong>kickan</strong> koji stižu uskoro.",
     "btnStart": "Počni besplatno",
     "btnPricing": "Pogledaj cene",
-    "fastOAuth": "Brza Kick Prijava"
+    "fastOAuth": "Brza Kick Prijava",
+    "telemetry": "LIVE TELEMETRIJA",
+    "systemOn": "SISTEM UKLJUČEN",
+    "processedMsgs": "Obrađenih Poruka",
+    "websocket": "Kick WebSocket",
+    "latency": "&lt; 12ms Latencija",
+    "activeWidgets": "Aktivni Vidžeti",
+    "widgetsCount": "8,120 Vidžeta",
+    "fastOAuthBtn": "Brza Kick OAuth Prijava",
+    "guestTelemetry": "LIVE STATISTIKA SISTEMA",
+    "guestUptime": "99.98% UPTIME",
+    "guestProcessedMsgs": "Obrađenih Poruka u Chatu",
+    "guestLatency": "&lt; 15ms Odziv",
+    "guestStreams": "Aktivnih Kick Strimova"
   },
-  "stats": {
-    "msgs": "Obrađenih Čat Poruka",
-    "streams": "Aktivnih Strimova",
-    "widgets": "Prilagođenih Komandi",
+  "statsBar": {
+    "msgs": "Obrađenih Chat Poruka",
+    "streams": "Aktivnih Kick Strimova",
+    "widgets": "Ugrađenih komandi",
     "uptime": "Dostupnost Mreže (%)"
   },
   "ecosystem": {
@@ -31,6 +45,7 @@
     "subtitle": "Modularni alati dizajnirani za maksimalnu interakciju i rast kanala.",
     "statusActive": "AKTIVAN ODMAH",
     "statusSoon": "DOLAZI USKORO",
+    "activeNow": "AKTIVAN ODMAH",
     "descKickot": "Ultimativni chatbot sa naprednom moderacijom, prilagođenim komandama, mini igrama i sistemom poena.",
     "descKickaj": "Najlakši način za kreiranje i vođenje zanimljivih darivanja direktno kroz chat.",
     "descKickan": "Najmoćnija analitika za Kick streamere. Prati rast gledalaca, aktivnost u čatu i još mnogo toga.",
@@ -65,6 +80,48 @@
     "live": "UŽIVO",
     "soon": "USKORO"
   },
+  "playground": {
+    "tag": "INTERAKTIVNI TEST",
+    "title": "Isprobaj mogućnosti alata",
+    "subtitle": "Ispod možete testirati sva četiri alata pre nego što ih isprobate na Kicku."
+  },
+  "sim": {
+    "status": "U RAZVOJU"
+  },
+  "kickaj": {
+    "heading": "Simulacija Nagradne Igre",
+    "desc": "Postavi nagradu i pokreni izvlačenje. Gledaoci ulaze u giveaway jednostavnim kucanjem reči u chat.",
+    "prizeLabel": "Nagrada:",
+    "keywordLabel": "Ključna reč za ulaz:",
+    "startBtn": "Pokreni Izvlačenje",
+    "waiting": "Čeka se pokretanje...",
+    "winnerLabel": "POBEDNIK!",
+    "wonText": "Osvojio je: <span id='winnerPrize'>Subscribe</span>"
+  },
+  "kickov": {
+    "heading": "Prelepi Strim Overlayi",
+    "desc": "Isprobaj kako izgledaju naši moderni i tečni alerti na ekranu tokom tvog streama. Promeni teme i stilove uživo.",
+    "themeLabel": "Izaberi Temu Vidžeta:",
+    "themeGreen": "Neon Green",
+    "themeViolet": "Cyber Violet",
+    "themeDark": "Obsidian Dark",
+    "themeGold": "Gold Ember",
+    "gameTitle": "GTA VI UŽIVO",
+    "btnFollow": "Simuliraj Follow",
+    "btnSub": "Simuliraj Sub",
+    "btnDonation": "Simuliraj Donaciju"
+  },
+  "kickan": {
+    "heading": "Statistika & Analitika",
+    "desc": "Prati rast kanala uz modernu kontrolnu tablu. Izaberi period za analizu grafikona.",
+    "periodToday": "Danas",
+    "periodWeek": "Ove nedelje",
+    "periodMonth": "Ovaj mesec",
+    "avgViewers": "Prosečno gledalaca",
+    "totalFollowers": "Ukupno pratilaca",
+    "chartTitle": "Rast Gledalaca U Realnom Vremenu",
+    "chartUpdate": "Ažurirano pre 2 min"
+  },
   "kickot": {
     "status": "AKTIVAN I DOSTUPAN",
     "heading": "Interaktivni chatbot",
@@ -83,7 +140,7 @@
     "title": "Tehnologija svetskog nivoa",
     "subtitle": "Stvoreno za najveće opterećenje i 100% kompatibilnost sa striming softverom.",
     "card1": {
-      "title": "< 15ms WebSockets Brzina",
+      "title": "&lt; 15ms WebSockets Brzina",
       "desc": "Direktna WebSocket veza sa Kick serverima obezbeđuje trenutno reagovanje chatbota i obaveštenja na ekranu."
     },
     "card2": {
@@ -102,15 +159,20 @@
   "faq": {
     "label": "ČESTA PITANJA",
     "title": "Sve što treba da znaš",
-    "subtitle": "Imate pitanja? Pronađite brze odgovore na najčešće postavljana pitanja.",
+    "subtitle": "Pronađi brze odgovore ili pretraži specifična pitanja.",
     "placeholder": "Pretraži pitanja...",
+    "catAll": "Sve",
+    "catChatbot": "Chatbot",
+    "catOverlay": "Overlay",
+    "catOauth": "OAuth & Bezbednost",
+    "catPricing": "Cene",
     "q1": {
-      "question": "Kako da povežem Kickot četbot sa mojim Kick kanalom?",
+      "question": "Kako da povežem Kickot chatbot sa mojim Kick kanalom?",
       "answer": "Dovoljno je da klikneš na dugme \"Prijavi se preko Kicka\", autorizuješ nalog i u Dashboard-u aktiviraš Kickot bota. Bot će se automatski pridružiti tvom chatu."
     },
     "q2": {
       "question": "Da li je KickALL besplatan za korišćenje?",
-      "answer": "Da! Osnovni Kickot četbot sa komandama i moderacijom je potpuno besplatan zauvek. Za napredne alate i neograničenu prilagodljivost dostupni su Pro i Elite paketi."
+      "answer": "Da! Osnovni Kickot chatbot sa komandama i moderacijom je potpuno besplatan zauvek. Za napredne alate i neograničenu prilagodljivost dostupni su Pro i Elite paketi."
     },
     "q3": {
       "question": "Kako ubacujem alertove i vidžete u OBS ili Streamlabs?",
@@ -121,17 +183,21 @@
       "answer": "Apsolutno. Koristimo zvaničnu Kick OAuth 2.0 autentifikaciju sa S256 PKCE standardom za enkripciju. Mi nikada nemamo pristup tvojim lozinkama niti privatnim pristupnim ključevima."
     },
     "q5": {
-      "question": "Mogu li praviti sopstvene komande i odzive?",
-      "answer": "Da! Kroz intuitivni Dashboard možete kreirati neograničen broj komandi, tajmera i automatskih poruka koje se šalju u određenim vremenskim intervalima."
+      "question": "Mogu li praviti sopstvene komande i alertove?",
+      "answer": "Da! Kroz Dashboard možete kreirati do 50 komandi na besplatnom planu, dok na ostalima možete neograničeno. Samo posetite komandePanel u okviru Dashboard-a!"
     }
   },
   "support": {
     "label": "PODRŠKA KOJA BRINE",
     "title": "Podrška koja brzo odgovara",
     "desc": "Znamo koliko je važno da ti strim i chatbot rade bez greške. Zato obezbeđujemo direktnu i brzu tehničku podršku isključivo putem email-a. Za sve probleme, pitanja ili predloge, naš tim je spreman da reaguje odmah.",
-    "featureTitle": "Direktna Tehnička Email Podrška",
-    "featureDesc": "Bez čekanja na botove i automatske odgovore. Naši developeri direktno rešavaju tvoj problem.",
+    "featureTitle": "Direktna email Podrška",
+    "featureDesc": "Piši nam na email. Garantujemo ultra brze odgovore u roku od par sati!",
     "statusActive": "EMAIL PODRŠKA JE AKTIVNA",
+    "copyLabel": "Klikni da kopiraš email adresu:",
+    "copyBtn": "Kopiraj",
+    "responseTime": "Vreme odgovora",
+    "resolvedTickets": "Rešeni tiketi",
     "log1": "Gledalac: \"Kako da aktiviram kickot?\"",
     "log2": "\"Samo klikni na dugme Pokreni kickot i poveži kanal.\"",
     "log3": "Podrška uspešno zatvorena. ⭐⭐⭐⭐⭐",
@@ -139,11 +205,11 @@
     "tagResolved": "REŠENO"
   },
   "pricing": {
-    "tag": "PRILAGOĐENO SVIMA",
-    "title": "Transparentni i fleksibilni paketi",
-    "subtitle": "Izaberi paket koji najbolje odgovara tvojim strimerskim potrebama i veličini tvoje zajednice.",
-    "popular": "POPULARNO",
+    "tag": "PRIPREMI SE ZA USPEH",
+    "title": "Izaberi svoj paket snage",
+    "subtitle": "<strong>kickot</strong> je dostupan odmah u svim paketima. Ostali alati stižu uskoro kao besplatna nadogradnja tvoje pretplate!",
     "period": "/ mesečno",
+    "popular": "POPULARNO",
     "free": {
       "title": "BESPLATNO",
       "desc": "Idealno za nove strimere koji tek počinju i žele osnovnu automatizaciju chata.",
@@ -163,7 +229,7 @@
       "f3": "<strong>kickaj</strong> giveaway sistem",
       "f4": "<strong>kickov</strong> overleji",
       "f5": "Osnovna mesečna analitika",
-      "f6": "Prioritetna imejl podrška",
+      "f6": "Prioritetna email podrška",
       "f7": "Namenski VIP bot",
       "btn": "Izaberi Pro paket"
     },
@@ -173,7 +239,7 @@
       "f2": "<strong>kickan</strong> detaljna analitika",
       "f3": "Namenski VIP bot sa tvojim imenom",
       "f4": "Neograničen broj vidžeta i alertova",
-      "f5": "VIP imejl status podrške",
+      "f5": "VIP email status podrške",
       "f6": "<strong>Neprekidna podrška uz brzi odziv</strong>",
       "f7": "Individualne sesije podešavanja strima",
       "btn": "Kupi Elite paket"
@@ -182,28 +248,38 @@
   "modules": {
     "active": "AKTIVNO",
     "soon": "USKORO",
-    "live": "UŽIVO"
+    "live": "UŽIVO",
+    "comingSoon": "DOLAZI USKORO"
   },
   "testimonials": {
-    "tag": "RECENZIJE KORISNIKA",
+    "tag": "REČ STRIMERA",
     "title": "Šta kažu naši strimeri",
-    "subtitle": "Pridruži se strimerima koji su već povezali <strong>Kickall</strong> i podigli nivo zabave u četu.",
+    "subtitle": "Pridruži se strimerima koji su već povezali <strong>KickALL</strong> i podigli nivo zabave u chat.",
     "card1": {
-      "text": "\"Povezao sam kickot za manje od minut. Moja publika obožava komande !bacihejt i !posaljiljubav, poeni lete na sve strane. Čekam ostale module!\""
+      "text": "\"Bota sam podesio bukvalno za minut. Ljudi na strimu su se oduševili komandama !bacihejt i !posaljiljubav, a ranking sistem je pun pogodak. Jedva čekam da izbacite nove module!\"",
+      "role": "Kick Partner (2.5k pratilaca)"
     },
     "card2": {
-      "text": "\"Trenutno koristim samo kickot bota i radi savršeno. Čet ima odličnu interakciju. Podrška na imejl je ekstremno brza.\""
+      "text": "\"Bot radi savršeno, interakcija na strimu je skočila maksimalno. Poseban plus za podršku, na mejl odgovaraju brzinom svetlosti!\"",
+      "role": "Kick Streamer (50+ gledalaca)"
     },
     "card3": {
-      "text": "\"Momci na podršci su mi pomogli da podesim bot u dva sata ujutru preko imejla! Najbolja podrška ikada. Jedva čekam da ubace i alertove!\""
+      "text": "\"Nisam mogla da verujem da mi neko odgovara na mejl u 2h ujutru i namešta bota sa mnom. Svaka čast za ekipu, podrška kida!\"",
+      "role": "Pro Korisnik"
     }
   },
   "cta": {
     "title": "Spreman da podigneš svoj Kick strim?",
-    "desc": "Poveži svoj Kick nalog u samo tri klika i potpuno besplatno aktiviraj Kickot četbot i overlay alate.",
+    "desc": "Poveži svoj Kick nalog u samo tri klika i potpuno besplatno aktiviraj Kickot chatbot!",
+    "badge": "SPREMAN ZA POKRETANJE",
     "btnPrimary": "Poveži Kick Nalog Odmah",
     "btnSecondary": "Isprobaj uživo",
     "login": "Prijavi se"
+  },
+  "stats": {
+    "streams": "Aktivnih strimova",
+    "uptime": "Dostupnost sistema (%)",
+    "messages": "Obrađenih poruka u četu"
   },
   "footer": {
     "tagline": "Sve što tvoj Kick strim ikada treba na jednom mestu. Kompletan ekosistem alata i automatizacije.",
@@ -215,5 +291,66 @@
     "createdBy": "Napravio",
     "privacy": "Privatnost",
     "terms": "Uslovi"
+  },
+  "modal": {
+    "close": "Zatvori"
+  },
+  "copy": {
+    "copy": "Kopiraj",
+    "copied": "Kopirano!"
+  },
+  "dashboard": {
+    "referralCode": "Moj referral kod",
+    "referralLink": "Referral link",
+    "referralLinkCopied": "Referral link je uspešno kopiran!",
+    "copyLink": "Kopiraj Link",
+    "copyError": "Greška pri kopiranju!",
+    "emailCopied": "Mejl adresa je uspešno kopirana!",
+    "emailCopyError": "Greška pri kopiranju mejla.",
+    "noRewards": "Još uvek nemaš nagrade. Pozovi prijatelje da započneš!",
+    "minWithdrawal": "Minimalni iznos za isplatu je €5.00",
+    "insufficientFunds": "Nedovoljno sredstava za isplatu!",
+    "enterWithdrawalDetails": "Unesi podatke za isplatu!",
+    "withdrawalSuccess": "Zahtev za isplatu je uspešno poslat! Bićete obavešteni o isplati.",
+    "withdrawalError": "Došlo je do greške prilikom slanja zahteva.",
+    "paypalEmail": "PayPal Email Adresa",
+    "paypalEmailPlaceholder": "tvoj@email.com",
+    "iban": "Broj računa (IBAN)",
+    "ibanPlaceholder": "RS00 0000 0000 0000 0000 00",
+    "cryptoWallet": "Crypto Wallet Adresa (USDT / BTC)",
+    "cryptoWalletPlaceholder": "0x... ili bc1...",
+    "payPalEmail": "PayPal Email",
+    "payPalEmailHint": "Unesi svoj PayPal email adresu",
+    "bankAccount": "Broj računa (IBAN)",
+    "bankAccountHint": "Unesi svoj IBAN broj računa",
+    "cryptoAddress": "Crypto Wallet Adresa",
+    "cryptoAddressHint": "Unesi svoju crypto wallet adresu"
+  },
+  "backToTop": "Nazad na vrh",
+  "chatSim": {
+    "viewer": "Gledalac",
+    "bot": "kickot",
+    "unnamedViewer": "Neimenovani gledalac",
+    "cooldownError": "⚠️ Greška: Komanda {cmd} je na cooldown-u još {time}s! (Originalno 10 min)",
+    "bacihejtTrigger": "👿 <strong>!bacihejt</strong> pokrenut od strane {user} ka korisniku <strong>{target}</strong>. <br>{reply}<br>{user} je dobio <strong>{points}</strong> poena! (Ukupno: <strong>{total}</strong> poena)",
+    "loveSent": "❤️ <strong>!posaljiljubav</strong> poslata za <strong>{target}</strong>. <br>{reply}<br>{user} je dobio <strong>{points}</strong> poena! (Ukupno: <strong>{total}</strong> poena)",
+    "pointsResponse": "🏆 Korisnik {user} trenutno ima <strong>{points}</strong> poena na ovom kanalu. Rang: <strong>Kralj chata</strong>.",
+    "weather": "🌍 Vreme u Beograd: ⛅ Delimično oblačno | 🌡️ 26°C (oseća se 25°C) | 💧 Vlažnost: 32% | 💨 Vetar: 22 km/h",
+    "info": "Najkraći rat u istoriji trajao je svega 38 minuta!",
+    "unknownCmd": "❌ Nepoznata komanda. Dostupne komande su: <strong>!vreme Beograd</strong>, <strong>!info</strong>.",
+    "audioError": "Audio API nije podržan."
+  },
+  "userProfile": {
+    "title": "MOJ PROFIL & STATUS",
+    "botActive": "BOT AKTIVAN",
+    "botInactive": "NEAKTIVAN",
+    "connected": "Povezan sa Kickot botom",
+    "disconnected": "Kickot bot odspojen",
+    "activeModulesLabel": "Status aktivnih modula",
+    "activeModules": "{count} od 8 modula aktivno",
+    "botStatusLabel": "Status bota",
+    "botPaused": "PAUZIRAN",
+    "openDashboard": "Otvori Dashboard →",
+    "goToDashboard": "Idi na Dashboard"
   }
 }

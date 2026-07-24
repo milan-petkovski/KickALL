@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Kickot | Bot za Kick platformu",
+    "desc": "Kickot je moćan chatbot za Kick platformu. Komande, moderacija, watchtime, leaderboard i mini igre."
+  },
   "nav": {
     "ecosystem": "Ekosistem",
     "tryOut": "Isprobaj",

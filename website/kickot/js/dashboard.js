@@ -219,7 +219,10 @@ async function initAuth() {
         if (intent === 'add_channel' && addChannelUid) {
           document.getElementById('authGateMsg').textContent = 'Dodavanje kanala...';
 
-          const { data: { session } } = await sb.auth.getSession();
+          const { data: { session } } = await Promise.race([
+            sb.auth.getSession(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Session check timeout')), 10000))
+          ]);
           if (session) {
             currentUser = session.user;
           } else {
@@ -315,7 +318,10 @@ async function initAuth() {
     }
 
     // ── Standardna Supabase sesija ─────────────────────────────────────
-    const { data: { session } } = await sb.auth.getSession();
+    const { data: { session } } = await Promise.race([
+      sb.auth.getSession(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Session check timeout')), 10000))
+    ]);
     if (!session) {
       document.getElementById('authGateMsg').textContent = 'Preusmeravanje na prijavu...';
       setTimeout(() => { window.location.href = 'index.html?login=1'; }, 1200);
@@ -597,10 +603,13 @@ async function initApp() {
 
 // ── User Profile ──────────────────────────────────────────
 async function loadUserProfile() {
-  const { data, error } = await sb.from('user_profiles')
-    .select('display_name, plan, kick_channels')
-    .eq('id', currentUser.id)
-    .maybeSingle();
+  const { data, error } = await Promise.race([
+    sb.from('user_profiles')
+      .select('display_name, plan, kick_channels')
+      .eq('id', currentUser.id)
+      .maybeSingle(),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Profile load timeout')), 10000))
+  ]);
 
   let myUsername = '';
   if (data) {
@@ -4180,7 +4189,10 @@ window.addEventListener('storage', (event) => {
 
 async function checkServerLogoutStatus() {
   try {
-    const { data: sessionData } = await sb.auth.getSession();
+    const { data: sessionData } = await Promise.race([
+      sb.auth.getSession(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Session check timeout')), 10000))
+    ]);
     const session = sessionData?.session;
     if (session?.user?.id) {
       const res = await fetch(`https://kickbot-ihzb.onrender.com/api/check-logout?userId=${session.user.id}`);

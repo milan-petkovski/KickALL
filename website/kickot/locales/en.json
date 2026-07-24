@@ -1,4 +1,8 @@
 {
+  "meta": {
+    "title": "Kickot | Bot for Kick Platform",
+    "desc": "Kickot is a powerful chatbot for Kick platform. Commands, moderation, watchtime, leaderboard and mini games."
+  },
   "nav": {
     "ecosystem": "Ecosystem",
     "tryOut": "Try Out",
