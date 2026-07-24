@@ -72,50 +72,102 @@ const RANK_LABELS_SR = {
 };
 
 const defaultBuiltinRanks = {
-    'vreme': 'everyone',
-    'vrijeme': 'everyone',
-    'uptime': 'everyone',
-    'igra': 'everyone',
-    'watchtime': 'everyone',
-    'topwatchtime': 'everyone',
-    'topwatch': 'everyone',
-    'duel': 'everyone',
-    'roll': 'everyone',
+    // Zabava
     'iq': 'everyone',
     'samar': 'everyone',
+    'roll': 'everyone',
+    'duel': 'everyone',
     'rulet': 'everyone',
-    'permit': 'moderator',
-    'dozvoli': 'moderator',
-    'info': 'everyone',
+    'cinjenica': 'everyone',
+    
+    // Ljubav & Brak
     'love': 'everyone',
+    'vencaj': 'everyone',
+    'razvod': 'everyone',
+    'brakovi': 'everyone',
+    'brak': 'everyone',
+    'vencani': 'everyone',
     'posaljiljubav': 'everyone',
     'odbijljubav': 'everyone',
     'mrzim': 'everyone',
-    'cooldown': 'everyone',
-    'coldown': 'everyone',
+    'bacihejt': 'everyone',
     'prihvati': 'everyone',
     'da': 'everyone',
     'pristajem': 'everyone',
     'odbij': 'everyone',
     'ne': 'everyone',
     'odbijam': 'everyone',
-    'vencaj': 'everyone',
-    'razvod': 'everyone',
-    'brakovi': 'everyone',
-    'brak': 'everyone',
-    'vencani': 'everyone',
+    'cooldown': 'everyone',
+    'coldown': 'everyone',
+    
+    // Strim Info
+    'vreme': 'everyone',
+    'vrijeme': 'everyone',
+    'uptime': 'everyone',
+    'igra': 'everyone',
+    'info': 'everyone',
+    
+    // Moderacija
+    'permit': 'moderator',
+    'dozvoli': 'moderator',
+    'osvezi': 'broadcaster',
+    'pin': 'moderator',
+    'unpin': 'broadcaster',
+    'setlive': 'broadcaster',
+    'setgame': 'broadcaster',
+    
+    // Statistika
+    'watchtime': 'everyone',
+    'topwatchtime': 'everyone',
+    'topwatch': 'everyone',
     'top': 'everyone',
     'leaderboard': 'everyone',
     'aktivnost': 'everyone',
     'stats': 'everyone',
+    'me': 'everyone',
+    'followage': 'everyone',
+    'resetleaderboard': 'broadcaster',
+    
+    // Ekonomija
+    'rank': 'everyone',
+    'level': 'everyone',
+    'xp': 'everyone',
     'points': 'everyone',
     'poeni': 'everyone',
-    'resetleaderboard': 'broadcaster',
-    'osvezi': 'broadcaster',
-    'pin': 'moderator',
-    'unpin': 'moderator',
-    'setlive': 'broadcaster',
-    'setgame': 'broadcaster'
+    'bal': 'everyone',
+    'coins': 'everyone',
+    'daily': 'everyone',
+    'givepoints': 'everyone',
+    'dajpoene': 'everyone',
+    'pay': 'everyone',
+    'toplevel': 'everyone',
+    'topxp': 'everyone',
+    'topcoins': 'everyone',
+    'toppoeni': 'everyone',
+    
+    // Kockanje
+    'slots': 'everyone',
+    'slot': 'everyone',
+    'roulette': 'everyone',
+    'rulet': 'everyone',
+    'coinflip': 'everyone',
+    'piskoglava': 'everyone',
+    'gamble': 'everyone',
+    'kockaj': 'everyone',
+    'tocak': 'everyone',
+    'wheel': 'everyone',
+    'dvoboj': 'everyone',
+    'accept': 'everyone',
+    
+    // Prodavnica
+    'store': 'everyone',
+    'prodavnica': 'everyone',
+    'shop': 'everyone',
+    'redeem': 'everyone',
+    'kupi': 'everyone',
+    
+    // Muzika
+    'pesma': 'everyone'
 };
 
 function getUserRankLevel(username, senderObj, channelUsername) {
@@ -1146,12 +1198,16 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const ALLOWED_KICK_REDIRECT_URIS = new Set([
-    'https://kickall.netlify.app/auth/kick/callback',
-    'https://kickall.netlify.app/auth/kick/callback/',
-    'https://kickall.milanwebportal.com/auth/kick/callback',
-    'https://kickall.milanwebportal.com/auth/kick/callback/',
     'http://localhost:5500/auth/kick/callback',
-    'http://localhost:5500/auth/kick/callback/'
+    'http://localhost:5500/auth/kick/callback/',
+    'http://127.0.0.1:5500/auth/kick/callback',
+    'http://127.0.0.1:5500/auth/kick/callback/',
+    'http://localhost:8888/auth/kick/callback',
+    'http://localhost:8888/auth/kick/callback/',
+    'http://127.0.0.1:8888/auth/kick/callback',
+    'http://127.0.0.1:8888/auth/kick/callback/',
+    'https://kickall.app/auth/kick/callback',
+    'https://kickall.app/auth/kick/callback/'
 ]);
 
 function normalizeKickRedirectUri(uri) {
@@ -1167,17 +1223,21 @@ function normalizeKickRedirectUri(uri) {
 }
 
 function resolveKickRedirectUri(candidate) {
+    if (candidate && (ALLOWED_KICK_REDIRECT_URIS.has(candidate) || ALLOWED_KICK_REDIRECT_URIS.has(normalizeKickRedirectUri(candidate)))) {
+        return candidate;
+    }
+
     const normalizedCandidate = normalizeKickRedirectUri(candidate);
     if (normalizedCandidate && ALLOWED_KICK_REDIRECT_URIS.has(normalizedCandidate)) {
         return candidate;
     }
 
-    const normalizedEnv = normalizeKickRedirectUri(process.env.KICK_REDIRECT_URI);
-    if (normalizedEnv && ALLOWED_KICK_REDIRECT_URIS.has(normalizedEnv)) {
-        return process.env.KICK_REDIRECT_URI;
+    const envUri = process.env.KICK_REDIRECT_URI;
+    if (envUri && (ALLOWED_KICK_REDIRECT_URIS.has(envUri) || ALLOWED_KICK_REDIRECT_URIS.has(normalizeKickRedirectUri(envUri)))) {
+        return envUri;
     }
 
-    return 'https://kickall.milanwebportal.com/auth/kick/callback';
+    return 'https://kickall.app/auth/kick/callback/';
 }
 
 // ─── HTTP SERVER (Uptime / Render Service fallback) ───────────────────────────

@@ -136,6 +136,12 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   z-index: 9999;
+  transition: opacity 0.4s ease-out;
+}
+
+.auth-gate.fade-out {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .auth-gate-card {
@@ -190,6 +196,12 @@ button:focus-visible {
   grid-template-columns: var(--sidebar-w) 1fr;
   height: 100vh;
   overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.4s ease-in;
+}
+
+.app.fade-in {
+  opacity: 1;
 }
 
 /* ══════════ SIDEBAR ══════════ */
@@ -3996,3 +4008,117 @@ input[type="number"]::-webkit-inner-spin-button {
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+
+/* ── Utility Classes for Inline Styles ── */
+.d-flex { display: flex; }
+.d-flex-col { display: flex; flex-direction: column; }
+.d-none { display: none; }
+.d-block { display: block; }
+.d-inline-flex { display: inline-flex; }
+.d-grid { display: grid; }
+
+.items-center { align-items: center; }
+.items-start { align-items: flex-start; }
+.items-end { align-items: flex-end; }
+
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.justify-start { justify-content: flex-start; }
+.justify-end { justify-content: flex-end; }
+
+.gap-1 { gap: 4px; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.gap-6 { gap: 24px; }
+.gap-8 { gap: 32px; }
+
+.p-1 { padding: 4px; }
+.p-2 { padding: 8px; }
+.p-3 { padding: 12px; }
+.p-4 { padding: 16px; }
+.p-6 { padding: 24px; }
+
+.px-2 { padding-left: 8px; padding-right: 8px; }
+.px-3 { padding-left: 12px; padding-right: 12px; }
+.px-4 { padding-left: 16px; padding-right: 16px; }
+.px-6 { padding-left: 24px; padding-right: 24px; }
+
+.py-2 { padding-top: 8px; padding-bottom: 8px; }
+.py-3 { padding-top: 12px; padding-bottom: 12px; }
+.py-4 { padding-top: 16px; padding-bottom: 16px; }
+
+.m-0 { margin: 0; }
+.mt-2 { margin-top: 8px; }
+.mt-3 { margin-top: 12px; }
+.mt-4 { margin-top: 16px; }
+.mt-6 { margin-top: 24px; }
+.mb-2 { margin-bottom: 8px; }
+.mb-3 { margin-bottom: 12px; }
+.mb-4 { margin-bottom: 16px; }
+
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+.text-white { color: #fff; }
+.text-purple { color: var(--app-primary); }
+.text-green { color: var(--kick-green); }
+.text-red { color: #EF4444; }
+
+.font-xs { font-size: 0.75rem; }
+.font-sm { font-size: 0.8125rem; }
+.font-base { font-size: 0.875rem; }
+.font-lg { font-size: 1rem; }
+.font-xl { font-size: 1.125rem; }
+
+.font-normal { font-weight: 400; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.font-extrabold { font-weight: 800; }
+
+.bg-surface { background: var(--bg-surface); }
+.bg-elevated { background: var(--bg-elevated); }
+.bg-card { background: var(--bg-card); }
+.bg-sidebar { background: var(--bg-sidebar); }
+
+.border { border: 1px solid var(--border-subtle); }
+.border-subtle { border: 1px solid var(--border-subtle); }
+.border-normal { border: 1px solid var(--border-normal); }
+.border-accent { border: 1px solid var(--border-accent); }
+.border-none { border: none; }
+
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-full { border-radius: var(--radius-full); }
+
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.flex-1 { flex: 1; }
+.flex-shrink-0 { flex-shrink: 0; }
+.flex-grow-0 { flex-grow: 0; }
+
+.overflow-hidden { overflow: hidden; }
+.overflow-auto { overflow: auto; }
+.overflow-x-auto { overflow-x: auto; }
+.overflow-y-auto { overflow-y: auto; }
+
+.relative { position: relative; }
+.absolute { position: absolute; }
+.fixed { position: fixed; }
+.sticky { position: sticky; }
+
+.cursor-pointer { cursor: pointer; }
+.cursor-not-allowed { cursor: not-allowed; }
+
+.opacity-50 { opacity: 0.5; }
+.opacity-100 { opacity: 1; }
+
+.transition-fast { transition: var(--transition-fast); }
+.transition-base { transition: var(--transition-base); }
+
+.z-10 { z-index: 10; }
+.z-50 { z-index: 50; }
+.z-100 { z-index: 100; }
+.z-9999 { z-index: 9999; }

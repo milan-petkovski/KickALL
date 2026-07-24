@@ -352,7 +352,7 @@ function getKickRedirectUri() {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     return `${window.location.origin}/auth/kick/callback/`;
   }
-  return `${window.location.origin}/auth/kick/callback`;
+  return 'https://kickall.app/auth/kick/callback/';
 }
 
 function generateRandomString(length) {
@@ -388,7 +388,7 @@ async function generateCodeChallenge(v) {
 async function openKickLogin() {
   const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
   const KICK_REDIRECT_URI = getKickRedirectUri();
-  const KICK_SCOPE = 'user:read';
+  const KICK_SCOPE = 'user:read channel:read chat:read chat:write moderation:read moderation:write';
 
   const state = generateRandomString(16);
   const codeVerifier = generateRandomString(64);
@@ -396,6 +396,9 @@ async function openKickLogin() {
 
   localStorage.setItem('kick_oauth_state', state);
   localStorage.setItem('kick_code_verifier', codeVerifier);
+  localStorage.setItem('kick_origin_site', 'kickot');
+  sessionStorage.setItem('kick_oauth_state', state);
+  sessionStorage.setItem('kick_code_verifier', codeVerifier);
   sessionStorage.setItem('kick_origin_site', 'kickot');
 
   const authUrl = `https://id.kick.com/oauth/authorize?` + new URLSearchParams({

@@ -116,7 +116,7 @@ async function checkAuth() {
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         return `${window.location.origin}/auth/kick/callback/`;
       }
-      return `${window.location.origin}/auth/kick/callback`;
+      return 'https://kickall.app/auth/kick/callback/';
     })();
     
     const kickApiBase = (() => {
@@ -1051,6 +1051,293 @@ setLang(currentLang);
 
 // Run Auth Verification
 checkAuth();
+
+// ── Modal Helpers ─────────────────────────────────────
+function openModal(id) {
+  const modalEl = document.getElementById(id);
+  if (!modalEl) return;
+  modalEl.classList.remove('closing');
+  modalEl.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  const body = modalEl.querySelector('.modal-body');
+  if (body) body.scrollTop = 0;
+}
+
+function closeModal(id) {
+  const modalEl = document.getElementById(id);
+  if (!modalEl) return;
+  modalEl.style.pointerEvents = 'none';
+  modalEl.classList.add('closing');
+  setTimeout(() => {
+    modalEl.classList.remove('open', 'closing');
+    modalEl.style.pointerEvents = '';
+    document.body.style.overflow = '';
+  }, 220);
+}
+
+function handleModalBg(e, id) {
+  if (e.target.id === id) closeModal(id);
+}
+
+const ALL_MODAL_IDS = ['modalKickaj', 'modalKickov', 'modalKickan', 'referralModal', 'withdrawalModal', 'closeWithdrawalModal'];
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    ALL_MODAL_IDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.classList.contains('open')) closeModal(id);
+    });
+    document.body.style.overflow = '';
+  }
+});
+
+// ── Referral Modal Functions ─────────────────────────────
+async function openReferralModal() {
+  openModal('referralModal');
+
+  if (currentUser && currentUser.id) {
+    try {
+      await ensureUserHasReferralCode(currentUser.id);
+      await loadReferralData(currentUser.id);
+    } catch (err) {
+      console.error('Referral load error:', err);
+    }
+  }
+}
+
+async function ensureUserHasReferralCode(userId) {
+  try {
+    const { data: stats } = await sb.from('referral_stats').select('referral_code').eq('user_id', userId).single();
+    if (!stats || !stats.referral_code) {
+      await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: null });
+    }
+  } catch (err) {
+    console.error('Referral code check error:', err);
+  }
+}
+
+async function loadReferralData(userId) {
+  try {
+    const { data: stats } = await sb.from('referral_stats').select('*').eq('user_id', userId).single();
+    if (stats) updateReferralStats(stats);
+
+    const { data: rewards } = await sb.from('referral_rewards').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    updateRewardsList(rewards || []);
+  } catch (err) {
+    console.error('Error loading referral data:', err);
+  }
+}
+
+function generateReferralLink(referralCode) {
+  const baseUrl = window.location.origin;
+  return `${baseUrl}/index.html?ref=${referralCode}`;
+}
+
+function updateReferralStats(stats) {
+  const totalReferrals = document.getElementById('totalReferrals');
+  const successfulReferrals = document.getElementById('successfulReferrals');
+  const totalEarned = document.getElementById('totalEarned');
+  const availableRewards = document.getElementById('availableRewards');
+  const referralCodeInput = document.getElementById('referralCodeInput');
+  const referralLinkText = document.getElementById('referralLinkText');
+  const withdrawalBtn = document.getElementById('withdrawalBtn');
+
+  if (totalReferrals) totalReferrals.textContent = stats.total_referrals || 0;
+  if (successfulReferrals) successfulReferrals.textContent = stats.successful_referrals || 0;
+  if (totalEarned) totalEarned.textContent = `€${(stats.total_earned || 0).toFixed(2)}`;
+
+  const available = stats.available_balance || 0;
+  if (availableRewards) availableRewards.textContent = `€${available.toFixed(2)}`;
+
+  if (withdrawalBtn) {
+    withdrawalBtn.disabled = available < 5;
+  }
+
+  if (stats.referral_code) {
+    if (referralCodeInput) referralCodeInput.value = stats.referral_code;
+    const refLink = generateReferralLink(stats.referral_code);
+    if (referralLinkText) referralLinkText.textContent = refLink;
+
+    setupReferralCopyBtn(stats.referral_code, refLink);
+  }
+
+  window.currentAvailableBalance = available;
+}
+
+function setupReferralCopyBtn(code, link) {
+  const btn = document.getElementById('copyReferralBtn');
+  if (!btn) return;
+
+  btn.onclick = async () => {
+    try {
+      const textToCopy = `Moj referral kod: ${code}\nReferral link: ${link}`;
+      await navigator.clipboard.writeText(textToCopy);
+      btn.textContent = 'Kopirano!';
+      btn.style.background = '#10B981';
+      showToast('success', 'Referral link je uspešno kopiran!');
+      setTimeout(() => {
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg> Kopiraj Link`;
+        btn.style.background = '';
+      }, 2000);
+    } catch (e) {
+      showToast('error', 'Greška pri kopiranju!');
+    }
+  };
+}
+
+function copyCustomRefEmail(btn) {
+  const email = 'contact@milanwebportal.com';
+  navigator.clipboard.writeText(email).then(() => {
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    btn.style.color = '#53fc18';
+    btn.style.borderColor = '#53fc18';
+    showToast('success', 'Mejl adresa je uspešno kopirana!');
+    setTimeout(() => {
+      btn.innerHTML = origHTML;
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  }).catch(() => {
+    showToast('error', 'Greška pri kopiranju mejla.');
+  });
+}
+
+function updateRewardsList(rewards) {
+  const container = document.getElementById('rewardsList');
+  if (!container) return;
+
+  if (!rewards || rewards.length === 0) {
+    container.innerHTML = `<div class="pm-ref-empty">Još uvek nemaš nagrade. Pozovi prijatelje da započneš!</div>`;
+    return;
+  }
+
+  container.innerHTML = rewards.map(r => `
+    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); padding:10px 14px; border-radius:12px;">
+      <div>
+        <div style="font-weight:600; color:#fff; font-size:0.85rem;">${r.reward_description || 'Provizija od kupovine'}</div>
+        <div style="color:#53fc18; font-weight:700; font-size:0.9rem;">€${(r.reward_value || 0).toFixed(2)}</div>
+      </div>
+      <span style="padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700; background:rgba(83,252,24,0.15); color:#53fc18; border:1px solid rgba(83,252,24,0.3);">
+        ${r.status || 'Dostupno'}
+      </span>
+    </div>
+  `).join('');
+}
+
+function openWithdrawalModal() {
+  closeModal('referralModal');
+  const balEl = document.getElementById('modalAvailableBalance');
+  if (balEl) balEl.textContent = `€${(window.currentAvailableBalance || 0).toFixed(2)}`;
+  openModal('withdrawalModal');
+}
+
+function updatePaymentDetailsLabel(method) {
+  const label = document.getElementById('paymentDetailsLabel');
+  const input = document.getElementById('paymentDetails');
+  if (!label || !input) return;
+
+  if (method === 'paypal') {
+    label.innerHTML = '<span class="lang-sr">PayPal Email Adresa</span><span class="lang-en">PayPal Email Address</span>';
+    input.placeholder = 'tvoj@email.com';
+  } else if (method === 'bank_transfer') {
+    label.innerHTML = '<span class="lang-sr">Broj računa (IBAN)</span><span class="lang-en">Bank Account Number (IBAN)</span>';
+    input.placeholder = 'RS00 0000 0000 0000 0000 00';
+  } else if (method === 'crypto') {
+    label.innerHTML = '<span class="lang-sr">Crypto Wallet Adresa (USDT / BTC)</span><span class="lang-en">Crypto Wallet Address (USDT / BTC)</span>';
+    input.placeholder = '0x... ili bc1...';
+  }
+}
+
+async function handleWithdrawalSubmit(e) {
+  e.preventDefault();
+  const amount = parseFloat(document.getElementById('withdrawalAmount').value);
+  const method = document.getElementById('paymentMethod').value;
+  const details = document.getElementById('paymentDetails').value.trim();
+
+  if (!amount || amount < 5) {
+    showToast('Minimalni iznos za isplatu je €5.00', 'warning');
+    return;
+  }
+  if (amount > (window.currentAvailableBalance || 0)) {
+    showToast('Nedovoljno sredstava za isplatu!', 'error');
+    return;
+  }
+  if (!details) {
+    showToast('Unesi podatke za isplatu!', 'warning');
+    return;
+  }
+
+  try {
+    const { error } = await sb.rpc('create_withdrawal_request', {
+      p_user_id: currentUser?.id,
+      p_amount: amount,
+      p_payment_method: method,
+      p_payment_details: details
+    });
+
+    if (error) throw error;
+
+    showToast('Zahtev za isplatu je uspešno poslat! Bićete obavešteni o isplati.', 'success');
+
+    document.getElementById('withdrawalForm')?.reset();
+    closeModal('withdrawalModal');
+
+  } catch (err) {
+    console.error('Withdrawal error:', err);
+    showToast('Došlo je do greške prilikom slanja zahteva.', 'error');
+  }
+}
+
+// Setup withdrawal modal
+document.addEventListener('DOMContentLoaded', () => {
+  const withdrawalBtn = document.getElementById('withdrawalBtn');
+  const withdrawalModal = document.getElementById('withdrawalModal');
+  const closeWithdrawalModal = document.getElementById('closeWithdrawalModal');
+  const withdrawalForm = document.getElementById('withdrawalForm');
+  const amountPresets = document.querySelectorAll('.amount-preset-btn');
+  const paymentMethod = document.getElementById('paymentMethod');
+  const withdrawalAmount = document.getElementById('withdrawalAmount');
+
+  if (withdrawalBtn && withdrawalModal) {
+    withdrawalBtn.addEventListener('click', openWithdrawalModal);
+  }
+
+  if (closeWithdrawalModal && withdrawalModal) {
+    closeWithdrawalModal.addEventListener('click', () => {
+      closeModal('withdrawalModal');
+      withdrawalForm.reset();
+    });
+  }
+
+  if (withdrawalModal) {
+    withdrawalModal.addEventListener('click', (e) => {
+      if (e.target === withdrawalModal) {
+        closeModal('withdrawalModal');
+        withdrawalForm.reset();
+      }
+    });
+  }
+
+  amountPresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const amount = parseFloat(btn.dataset.amount);
+      if (amount <= window.currentAvailableBalance) {
+        withdrawalAmount.value = amount;
+      }
+    });
+  });
+
+  if (paymentMethod) {
+    paymentMethod.addEventListener('change', updatePaymentDetailsLabel);
+  }
+
+  if (withdrawalForm) {
+    withdrawalForm.addEventListener('submit', handleWithdrawalSubmit);
+  }
+});
 
 // ── Interactive Sneak Peek Previews ─────────────────────
 function openSneakPeek(module) {

@@ -41,7 +41,7 @@
   </div>
 
   <!-- ══════════ APP SHELL ══════════ -->
-  <div id="app" class="app" style="display:none">
+  <div id="app" class="app">
 
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
@@ -68,7 +68,7 @@
 
       <!-- Channel Switcher -->
       <div class="channel-switcher" id="channelSwitcher">
-        <div class="channel-current" id="channelCurrent" onclick="toggleChannelMenu()">
+        <div class="channel-current" id="channelCurrent" onclick="toggleChannelMenu(event)">
           <div class="channel-avatar" id="channelAvatar">K</div>
           <div class="channel-info">
             <div class="channel-name" id="channelNameDisplay">Nema kanala</div>
@@ -83,7 +83,7 @@
         </div>
         <div class="channel-menu" id="channelMenu">
           <div id="channelList"></div>
-          <button class="channel-add-btn" onclick="openAddChannelModal()">
+          <button class="channel-add-btn" onclick="showAddChannelModal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M12 5v14M5 12h14" />
             </svg>
@@ -95,14 +95,14 @@
       <!-- Navigation -->
       <nav class="sidebar-nav">
         <div class="nav-section-label">Pregled</div>
-        <button class="nav-item active" data-panel="overview" onclick="switchPanel('overview')">
+        <button class="nav-item active" data-panel="overview" tabindex="0" onclick="switchPanel('overview')" aria-current="page">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             <polyline points="9 22 9 12 15 12 15 22" />
           </svg>
           Overview
         </button>
-        <button class="nav-item" data-panel="leaderboard" onclick="switchPanel('leaderboard'); setLeaderboardType('combined')">
+        <button class="nav-item" data-panel="leaderboard" tabindex="0" onclick="switchPanel('leaderboard'); setLeaderboardType('combined')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
           </svg>
@@ -110,14 +110,14 @@
         </button>
 
         <div class="nav-section-label">Chat funkcije</div>
-        <button class="nav-item" data-panel="commands" onclick="switchPanel('commands')">
+        <button class="nav-item" data-panel="commands" tabindex="0" onclick="switchPanel('commands')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="16 18 22 12 16 6" />
             <polyline points="8 6 2 12 8 18" />
           </svg>
           Komande
         </button>
-        <button class="nav-item" data-panel="games" onclick="switchPanel('games')">
+        <button class="nav-item" data-panel="games" tabindex="0" onclick="switchPanel('games')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="4 17 10 11 4 5" />
             <line x1="12" y1="19" x2="20" y2="19" />
@@ -125,14 +125,14 @@
           Ugrađene komande
         </button>
 
-        <button class="nav-item" data-panel="announces" onclick="switchPanel('announces')">
+        <button class="nav-item" data-panel="announces" tabindex="0" onclick="switchPanel('announces')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
             <polyline points="12 6 12 12 16 14"></polyline>
           </svg>
           Automatske poruke
         </button>
-        <button class="nav-item" data-panel="autoresponse" onclick="switchPanel('autoresponse')">
+        <button class="nav-item" data-panel="autoresponse" tabindex="0" onclick="switchPanel('autoresponse')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="10" rx="2" />
             <circle cx="12" cy="5" r="2" />
@@ -144,13 +144,13 @@
         </button>
 
         <div class="nav-section-label">Zabava</div>
-        <button class="nav-item" data-panel="marriages" onclick="switchPanel('marriages')">
+        <button class="nav-item" data-panel="marriages" tabindex="0" onclick="switchPanel('marriages')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
           </svg>
           Ljubav i brakovi
         </button>
-        <button class="nav-item" data-panel="minigames" onclick="switchPanel('minigames')">
+        <button class="nav-item" data-panel="minigames" tabindex="0" onclick="switchPanel('minigames')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="6" width="20" height="12" rx="3"></rect>
             <line x1="6" y1="12" x2="10" y2="12"></line>
@@ -160,7 +160,7 @@
           </svg>
           Mini igre
         </button>
-        <button class="nav-item" data-panel="songs" onclick="switchPanel('songs')">
+        <button class="nav-item" data-panel="songs" tabindex="0" onclick="switchPanel('songs')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 18V5l12-2v13" />
             <circle cx="6" cy="18" r="3" />
@@ -168,7 +168,7 @@
           </svg>
           Song Request
         </button>
-        <button class="nav-item" data-panel="economy" onclick="switchPanel('economy')">
+        <button class="nav-item" data-panel="economy" tabindex="0" onclick="switchPanel('economy')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
@@ -181,14 +181,14 @@
         </button>
 
         <div class="nav-section-label">Upravljanje</div>
-        <button class="nav-item" data-panel="config" onclick="switchPanel('config')">
+        <button class="nav-item" data-panel="config" tabindex="0" onclick="switchPanel('config')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3" />
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
           </svg>
           Bot Config
         </button>
-        <button class="nav-item" data-panel="moderation" onclick="switchPanel('moderation')">
+        <button class="nav-item" data-panel="moderation" tabindex="0" onclick="switchPanel('moderation')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
@@ -276,7 +276,7 @@
           <!-- Bot Active Master Switch Pill -->
           <div class="bot-toggle-wrap" style="display: flex; align-items: center; gap: 8px; padding: 5px 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; transition: all 0.2s ease;">
             <span class="bot-toggle-label" id="botToggleLabel" style="padding-top: 2px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-muted); white-space: nowrap;">Bot: OFF</span>
-            <label class="toggle-switch" style="transform: scale(0.85); transform-origin: center; margin: 0; cursor: pointer;">
+            <label class="toggle-switch" style="transform: scale(0.85); transform-origin: center; margin: 0; cursor: pointer;" role="switch" aria-checked="false">
               <input type="checkbox" id="botActiveToggle" onchange="toggleBotActive()">
               <span class="toggle-track"></span>
             </label>
@@ -802,6 +802,22 @@
             <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Statistika', this)">Statistika</button>
             <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Strim Info', this)">Strim Info</button>
             <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Moderacija', this)">Moderacija</button>
+            <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Ekonomija', this)">Ekonomija</button>
+            <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Kockanje', this)">Kockanje</button>
+            <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Prodavnica', this)">Prodavnica</button>
+            <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Muzika', this)">Muzika</button>
+          </div>
+
+          <!-- Napomena -->
+          <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #FBBF24; flex-shrink: 0; margin-top: 2px;">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+              <strong style="color: #FBBF24;">Napomena:</strong> Neke komande mogu imati moguće razlike između opisa i stvarne funkcionalnosti. Takođe postoji mogućnost da ima još neke komande koja se ne ovde ne prikazuje.
+            </div>
           </div>
 
           <div class="builtin-commands-grid" id="builtinCommandsGrid"
@@ -2083,7 +2099,7 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.5"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>
                   <span>Naziv Valute & Poruke u Četu</span>
                 </h4>
-                <div class="config-fields" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-fields" style="display: flex; flex-direction: column; gap: 16px;">
                   <div class="config-field">
                     <label class="config-label">Naziv valute (npr. Koins, Poeni):</label>
                     <input type="text" id="cfgCurrencyName" class="form-input" value="Koins" oninput="updateEconomyPreviews(); saveEconomyConfig(true);">
@@ -2092,7 +2108,7 @@
                     <label class="config-label">Koins po poruci u četu:</label>
                     <input type="number" id="cfgPointsPerMsg" class="form-input" min="0" value="5" oninput="saveEconomyConfig(true);" onchange="saveEconomyConfig(true);">
                   </div>
-                  <div class="config-field" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 12px;">
+                  <div class="config-field" style="display: flex; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 12px;">
                     <div style="flex: 1;">
                       <label class="config-label" style="margin: 0;">Pametna Anti-Spam Validacija Poruka</label>
                       <span class="config-hint" style="display: block; margin-top: 2px;">Nagrađuje samo smislene poruke i bez spama</span>
@@ -2111,7 +2127,7 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                   <span>Watchtime</span>
                 </h4>
-                <div class="config-fields" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-fields" style="display: flex; flex-direction: column; gap: 16px;">
                   <div class="config-field">
                     <label class="config-label">Bonus za prvu interakciju gledaoca (Prvi Ulazak):</label>
                     <input type="number" id="cfgFirstInteractionBonus" class="form-input" min="0" value="100" oninput="updateEconomyPreviews(); saveEconomyConfig(true);" onchange="saveEconomyConfig(true);">
@@ -2120,7 +2136,7 @@
                     <label class="config-label">Koins na svakih 5 minuta gledanja strima:</label>
                     <input type="number" id="cfgPointsPerWatchtime" class="form-input" min="0" value="20" oninput="updateEconomyPreviews(); saveEconomyConfig(true);" onchange="saveEconomyConfig(true);">
                   </div>
-                  <div class="config-field" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 12px;">
+                  <div class="config-field" style="display: flex; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 12px;">
                     <div style="flex: 1;">
                       <label class="config-label" style="margin: 0;">Najavi Level-Up u četu</label>
                       <span class="config-hint" style="display: block; margin-top: 2px;">Pošalji čestitku kada gledalac pređe na novi rang</span>
@@ -2139,7 +2155,7 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                   <span>Subscriber Bonus</span>
                 </h4>
-                <div class="config-fields" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-fields" style="display: flex; flex-direction: column; gap: 16px;">
                   <div class="config-field">
                     <label class="config-label">Sub Multiplikator Koina (npr. 2 = duplo):</label>
                     <input type="number" step="0.1" id="cfgSubMultiplier" class="form-input" min="1.0" value="2.0" oninput="updateEconomyPreviews(); saveEconomyConfig(true);" onchange="saveEconomyConfig(true);">
@@ -2157,7 +2173,7 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/></svg>
                   <span>Sub & Gift Subs</span>
                 </h4>
-                <div class="config-fields" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-fields" style="display: flex; flex-direction: column; gap: 16px;">
                   <div class="config-field">
                     <label class="config-label">Koins za novu subskripciju:</label>
                     <input type="number" id="cfgPointsPerSub" class="form-input" min="0" value="1000" oninput="updateEconomyPreviews(); saveEconomyConfig(true);" onchange="saveEconomyConfig(true);">
@@ -2175,7 +2191,7 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                   <span>KICKs Donacije</span>
                 </h4>
-                <div class="config-fields" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-fields" style="display: flex; flex-direction: column; gap: 16px;">
                   <div class="config-field">
                     <label class="config-label">Koins na svakih 100 poslatih KICK-ova:</label>
                     <input type="number" id="cfgPointsPer100Kicks" class="form-input" min="0" value="500" oninput="updateEconomyPreviews(); saveEconomyConfig(true);" onchange="saveEconomyConfig(true);">
@@ -2189,7 +2205,7 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2.5"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 3.5z"/></svg>
                   <span>Daily Streak & Host/Raid Bonus</span>
                 </h4>
-                <div class="config-fields" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-fields" style="display: flex; flex-direction: column; gap: 16px;">
                   <div class="config-field">
                     <label class="config-label">Bonus za pisanje svakog novog dana:</label>
                     <input type="number" id="cfgPointsDailyStreak" class="form-input" min="0" value="150" oninput="updateEconomyPreviews(); saveEconomyConfig(true);" onchange="saveEconomyConfig(true);">
@@ -2207,12 +2223,12 @@
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><rect x="2" y="6" width="20" height="12" rx="3"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
                   <span>Kazino & Kockanje</span>
                 </h4>
-                <div class="config-fields" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+                <div class="config-fields" style="display: flex; flex-direction: column; gap: 16px;">
                   <div class="config-field">
                     <label class="config-label">Maksimalni dozvoljeni ulog po igri (Max Bet):</label>
                     <input type="number" id="cfgMaxGambleAmount" class="form-input" min="10" value="5000" oninput="saveEconomyConfig(true)" onchange="saveEconomyConfig(true);">
                   </div>
-                  <div class="config-field" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 12px;">
+                  <div class="config-field" style="display: flex; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 12px;">
                     <div style="flex: 1;">
                       <label class="config-label" style="margin: 0;">Omogući kockanje u četu</label>
                       <span class="config-hint" style="display: block; margin-top: 2px;">Dozvoljava gledaocima <code>!slots</code>, <code>!roulette</code>, <code>!coinflip</code></span>
@@ -3262,7 +3278,7 @@
           <label class="form-label" style="font-size: 0.85rem; margin: 0;">Komanda i aliasi</label>
           <div class="cmd-input-wrap" style="display: flex; align-items: center; width: 100%;">
             <span class="cmd-prefix-badge" id="cmdPrefixBadge">!</span>
-            <input type="text" class="form-input" id="cmdName" placeholder="npr. instagram, insta, ig" oninput="updateModalPreview()" style="width: 100%;" />
+            <input type="text" class="form-input" id="cmdName" placeholder="npr. instagram, insta, ig" oninput="updateModalPreview()" style="width: 100%;" aria-describedby="cmdModalError" />
           </div>
           <span class="config-hint" id="cmdNameHint" style="margin: 0;">Možeš uneti više aliasa odvojenih zarezom</span>
         </div>
@@ -3271,7 +3287,7 @@
         <div class="form-group" style="display: flex; flex-direction: column; gap: 6px; margin-top: 10px;">
           <label class="form-label" style="font-size: 0.85rem; margin: 0;">Odgovor bota</label>
           <textarea class="form-input form-textarea" id="cmdResponse" rows="4" maxlength="500" style="width: 100%; resize: vertical; margin-top: 4px;"
-            placeholder="Bot će poslati ovaj tekst kada neko ukuca komandu..." oninput="updateModalPreview()"></textarea>
+            placeholder="Bot će poslati ovaj tekst kada neko ukuca komandu..." oninput="updateModalPreview()" aria-describedby="cmdModalError"></textarea>
           <div class="char-count" style="text-align: right; font-size: 0.75rem; color: var(--text-muted);"><span id="cmdCharCount">0</span>/500</div>
         </div>
 
@@ -3528,44 +3544,208 @@
           <div class="pm-docs-step">
             <div class="pm-docs-step-num">1</div>
             <div class="pm-docs-step-content">
-              <div class="pm-docs-step-title">Kako pokrenuti bota</div>
+              <div class="pm-docs-step-title">🚀 Prvo pokretanje bota</div>
               <p class="pm-docs-text">Da bi bot mogao da reaguje na chat poruke, <strong>morate postaviti bota za moderatora</strong> na kanalu:</p>
               <div class="pm-code-block">/mod kickot</div>
-              <p class="pm-docs-text" style="margin-top: 8px;">Ukoliko bot nije moderator ili strim nije pokrenut, bot se neće povezati na chat.</p>
+              <p class="pm-docs-text" style="margin-top: 8px;">Ukoliko bot nije moderator ili strim nije pokrenut, bot se neće povezati na chat. Takođe uključite bot preko toggle dugmeta u gornjem desnom uglu.</p>
             </div>
           </div>
           <div class="pm-docs-step">
             <div class="pm-docs-step-num">2</div>
             <div class="pm-docs-step-content">
-              <div class="pm-docs-step-title">Ugrađene komande i podešavanja</div>
-              <p class="pm-docs-text">Sve ugrađene mini igre i komande možeš prilagoditi u sekciji <strong>Ugrađene komande</strong> klikom na edit ikonicu:</p>
+              <div class="pm-docs-step-title">📊 Overview Panel</div>
+              <p class="pm-docs-text">Pregled panel prikazuje:</p>
               <ul class="pm-docs-list">
-                <li>Minimalni rang za korišćenje (Svi, VIP, Sub, Mod, Broadcaster)</li>
-                <li>Cooldown u milisekundama</li>
-                <li>Uključivanje / isključivanje komande</li>
+                <li><strong>Bot status</strong> - Da li je bot aktivan i online</li>
+                <li><strong>Moduli</strong> - Brzo uključivanje/isključivanje funkcija (Leaderboard, Komande, Ljubav, Igre, Song Request)</li>
+                <li><strong>Statistika</strong> - Ukupno poruka, gledalaca, vreme gledanja</li>
+                <li><strong>Mini leaderboard</strong> - Top 3 korisnika po četu i watchtime-u</li>
               </ul>
             </div>
           </div>
           <div class="pm-docs-step">
             <div class="pm-docs-step-num">3</div>
             <div class="pm-docs-step-content">
-              <div class="pm-docs-step-title">Automatska moderacija</div>
-              <p class="pm-docs-text">Svaki filter moderacije (Velika slova, Linkovi, Emotikoni...) ima sopstvene kaznene mere. Upotrebi opciju <strong>Globalne kaznene mere</strong> da primeniš iste mere na sve filtere odjednom.</p>
+              <div class="pm-docs-step-title">🏆 Leaderboard</div>
+              <p class="pm-docs-text">Rang lista prikazuje najaktivnije korisnike:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Combined</strong> - Kombinovana lista (poruke + watchtime)</li>
+                <li><strong>Chatters</strong> - Lista po broju poruka</li>
+                <li><strong>Watchtime</strong> - Lista po vremenu gledanja</li>
+                <li><strong>Mesečni filter</strong> - Izaberi mesec za prikaz</li>
+                <li><strong>Export</strong> - Preuzmi leaderboard kao CSV fajl</li>
+              </ul>
+              <p class="pm-docs-text" style="margin-top: 8px;">Reset leaderboard komanda: <code>!resetleaderboard</code> (samo za strimera)</p>
             </div>
           </div>
           <div class="pm-docs-step">
             <div class="pm-docs-step-num">4</div>
             <div class="pm-docs-step-content">
-              <div class="pm-docs-step-title">Leaderboard i poeni</div>
-              <p class="pm-docs-text">Poeni se skupljaju automatski gledanjem strima. Rang lista se resetuje svakog meseca, ili ručno komandom:</p>
-              <div class="pm-code-block">!resetleaderboard</div>
+              <div class="pm-docs-step-title">💬 Prilagođene Komande</div>
+              <p class="pm-docs-text">Kreiraj svoje komande:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Komanda i aliasi</strong> - npr. <code>!instagram, !insta, !ig</code></li>
+                <li><strong>Odgovor bota</strong> - Šta bot šalje kada se koristi komanda</li>
+                <li><strong>Cooldown</strong> - Vreme čekanja u milisekundama (default: 5000ms)</li>
+                <li><strong>Rang</strong> - Ko može koristiti (Svi, VIP, Sub, Mod, Strimer)</li>
+              </ul>
             </div>
           </div>
           <div class="pm-docs-step">
             <div class="pm-docs-step-num">5</div>
             <div class="pm-docs-step-content">
-              <div class="pm-docs-step-title">Prodavnica (Store)</div>
-              <p class="pm-docs-text">U sekciji <strong>Prodavnica</strong> možeš kreirati artikle koje gledaoci mogu kupiti potrošnjom skupljenih poena. Svaki artikal ima naziv, cenu u poenima i opis.</p>
+              <div class="pm-docs-step-title">🎮 Ugrađene Komande</div>
+              <p class="pm-docs-text">Sistem komande koje su već ugrađene:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Zabava</strong> - !iq, !samar, !8ball, !roll, !coinflip</li>
+                <li><strong>Statistika</strong> - !top, !watchtime, !me, !followage</li>
+                <li><strong>Ekonomija</strong> - !rank, !points, !give, !bet</li>
+                <li><strong>Socijalno</strong> - !marry, !divorce, !love</li>
+              </ul>
+              <p class="pm-docs-text" style="margin-top: 8px;">Sve ugrađene komande možeš editovati - promeniti cooldown, rang ili isključiti.</p>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">6</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">📢 Automatske Poruke</div>
+              <p class="pm-docs-text">Postavi automatske poruke:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Na vremenski interval</strong> - npr. svakih 10 minuta</li>
+                <li><strong>Na broj poruka</strong> - npr. svakih 100 poruka</li>
+                <li><strong>Više poruka</strong> - Dodaj koliko god želiš</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">7</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">🤖 Bot Interakcija</div>
+              <p class="pm-docs-text">Automatski odgovori na ključne reči:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Trigger</strong> - Reč ili fraza koja aktivira odgovor</li>
+                <li><strong>Odgovor</strong> - Šta bot šalje</li>
+                <li><strong>Case sensitive</strong> - Razlikuje mala/velika slova</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">8</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">❤️ Ljubav i Brakovi</div>
+              <p class="pm-docs-text">Sistem za brakove:</p>
+              <ul class="pm-docs-list">
+                <li><strong>!marry @user</strong> - Zatraži brak</li>
+                <li><strong>!accept</strong> - Prihvati brak</li>
+                <li><strong>!divorce</strong> - Razvod</li>
+                <li><strong>!love @user</strong> - Proveri ljubavni status</li>
+              </ul>
+              <p class="pm-docs-text" style="margin-top: 8px;">Admin može ručno da rastavlja parove kroz dashboard.</p>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">9</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">🎲 Mini Igre</div>
+              <p class="pm-docs-text">Ugrađene mini igre:</p>
+              <ul class="pm-docs-list">
+                <li><strong>!duel @user [iznos]</strong> - Duel za poene</li>
+                <li><strong>!slots [iznos]</strong> - Slot mašina</li>
+                <li><strong>!roulette [crvena/crna] [iznos]</strong> - Rulet</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">10</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">🎵 Song Request</div>
+              <p class="pm-docs-text">Sistem za zahtevanje pesama:</p>
+              <ul class="pm-docs-list">
+                <li><strong>!sr [pesma]</strong> - Zatraži pesmu</li>
+                <li><strong>!songqueue</strong> - Pogledaj red čekanja</li>
+                <li><strong>!skipsong</strong> - Preskoči trenutnu (mod)</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">11</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">📈 Ranking Sistem</div>
+              <p class="pm-docs-text">XP i nivoi:</p>
+              <ul class="pm-docs-list">
+                <li><strong>!rank</strong> - Prikazi tvoj nivo i XP</li>
+                <li><strong>!points</strong> - Prikazi tvoje poene</li>
+                <li><strong>!give @user [iznos]</strong> - Daj poene drugom</li>
+                <li><strong>!leaderboard</strong> - Rang lista po poenima</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">12</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">⚙️ Bot Config</div>
+              <p class="pm-docs-text">Globalna podešavanja:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Prefix</strong> - Komandni prefix (default: !)</li>
+                <li><strong>Language</strong> - Jezik bota</li>
+                <li><strong>Cooldown</strong> - Globalni cooldown</li>
+                <li><strong>Moduli</strong> - Uključi/isključi funkcije</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">13</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">🛡️ Moderacija</div>
+              <p class="pm-docs-text">Automatska moderacija:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Velika slova</strong> - Caps lock filter</li>
+                <li><strong>Linkovi</strong> - URL filter</li>
+                <li><strong>Emotikoni</strong> - Emoji spam filter</li>
+                <li><strong>Dužina poruke</strong> - Long message filter</li>
+                <li><strong>Globalne kazne</strong> - Isti penalty za sve filtere</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">14</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">⚠️ Alerti</div>
+              <p class="pm-docs-text">Automatski alerti za događaje:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Dobrodošlica</strong> - Novi gledaoci</li>
+                <li><strong>Follow</strong> - Novi pratioci</li>
+                <li><strong>Subscribe</strong> - Novi subovi</li>
+                <li><strong>Resubscribe</strong> - Resubovi</li>
+                <li><strong>Gift sub</strong> - Gift subscripcije</li>
+                <li><strong>KICKs donacija</strong> - Donacije</li>
+                <li><strong>Raid/Host</strong> - Raidovi i hostovi</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">15</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">👥 Podešavanja Naloga</div>
+              <p class="pm-docs-text">Upravljanje nalogom:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Profil</strong> - Promeni display name</li>
+                <li><strong>Kick Kanali</strong> - Dodaj/ukloni kanale</li>
+                <li><strong>Menadžeri</strong> - Dodaj menadžere za pristup</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">16</div>
+            <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">💡 Korisni Saveti</div>
+              <ul class="pm-docs-list">
+                <li>Koristi <strong>Tab</strong> i <strong>Shift+Tab</strong> za navigaciju tastaturom</li>
+                <li><strong>Escape</strong> zatvara sve modalne prozore</li>
+                <li>Sve promene se automatski čuvaju</li>
+                <li>Bot se automatski reload-uje nakon promena config-a</li>
+                <li>Leaderboard se resetuje svakog 1. u mesecu</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -3724,7 +3904,7 @@
             <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; margin-bottom: 10px;">
               Autorizuj još jedan autorizovani kanal preko zvanične Kick prijave.
             </p>
-            <button type="button" class="btn btn-primary" onclick="openKickLoginForChannel()" id="settingsAddChannelBtn" style="gap: 10px; width: 100%; display: flex; justify-content: center; align-items: center; padding: 10px;">
+            <button type="button" class="btn btn-primary" onclick="openKickLoginForChannel()" id="settingsAddChannelBtn" style="gap: 10px; width: 100%; display: flex; justify-content: center; align-items: center;" aria-describedby="settingsAddChannelError">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0;">
                 <path d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z"/>
               </svg>
@@ -3747,7 +3927,7 @@
             <div class="pm-form-group" style="margin-bottom: 14px;">
               <label class="pm-label">Dodaj menadžera za aktivni kanal</label>
               <div style="display: flex; gap: 8px;">
-                <input type="text" id="settingsNewManagerInput" class="form-input" placeholder="Kick korisničko ime" style="flex: 1;" />
+                <input type="text" id="settingsNewManagerInput" class="form-input" placeholder="Kick korisničko ime" style="flex: 1;" aria-describedby="settingsAddManagerError" />
                 <button type="button" class="btn btn-primary btn-sm" onclick="addNewManager()" id="settingsAddManagerBtn" style="white-space: nowrap; padding: 0 16px;">Dodaj</button>
               </div>
               <div class="ch-error-msg" id="settingsAddManagerError" style="color: #f87171; font-size: 0.8rem; margin-top: 6px; display: none;"></div>
@@ -3845,10 +4025,10 @@
           </div>
         </div>
 
-        <div class="config-field" style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
-          <div>
+        <div class="config-field" style="display: flex; flex-direction: row !important; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px;">
+          <div style="flex: 1;">
             <label class="config-label" style="margin: 0;">Automatsko Odobrenje Kupovine</label>
-            <span class="config-hint" style="display: block;">Odmah označava kupovinu kao završenu umesto slanja na čekanje</span>
+            <span class="config-hint" style="display: block; margin-top: 2px;">Odmah označava kupovinu kao završenu umesto slanja na čekanje</span>
           </div>
           <label class="toggle-switch">
             <input type="checkbox" id="storeItemAutoApprove">
@@ -4082,7 +4262,7 @@
   </div>
 
   <!-- Toast Container -->
-  <div class="toast-container" id="toastContainer"></div>
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
   <script src="js/dashboard.js"></script>
 </body>

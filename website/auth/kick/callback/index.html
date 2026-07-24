@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="sr">
+
+<head>
+  <meta charset="UTF-8" />
+  <script>
+    (function() {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const baseRedirectPath = isLocalhost ? '/Website' : '';
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const error = params.get('error');
+
+      if (code || error) {
+        const originSite = sessionStorage.getItem('kick_origin_site') || 
+                          localStorage.getItem('kick_origin_site') ||
+                          (sessionStorage.getItem('from_kickall') === 'true' ? 'kickall' : 'kickot');
+
+        let targetPage = 'dashboard.html';
+        if (originSite === 'kickot') targetPage = 'kickot/dashboard.html';
+        else if (originSite === 'kickaj') targetPage = 'kickaj/dashboard.html';
+        else if (originSite === 'kickan') targetPage = 'kickan/dashboard.html';
+        else if (originSite === 'kickov') targetPage = 'kickov/dashboard.html';
+
+        window.location.replace(`${baseRedirectPath}/${targetPage}` + window.location.search);
+      }
+    })();
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kickot | OAuth autorizacija</title>
+  <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #06040A;
+      font-family: 'Inter', sans-serif;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    .glow-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.15;
+      animation: blobFloat 8s ease-in-out infinite alternate;
+    }
+
+    .blob-violet {
+      width: 500px;
+      height: 500px;
+      background: #7C3AED;
+      top: -100px;
+      left: -100px;
+    }
+
+    .blob-green {
+      width: 400px;
+      height: 400px;
+      background: #53FC18;
+      bottom: -80px;
+      right: -80px;
+      animation-delay: -4s;
+    }
+
+    @keyframes blobFloat {
+      0% {
+        transform: translate(0, 0) scale(1);
+      }
+
+      100% {
+        transform: translate(40px, 30px) scale(1.06);
+      }
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 48px 40px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+    }
+
+    .logo-wrap {
+      margin-bottom: 28px;
+    }
+
+    .logo-wrap img {
+      height: 52px;
+    }
+
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(83, 252, 24, 0.15);
+      border-top-color: #53FC18;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #fff;
+    }
+
+    p {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.5);
+      line-height: 1.5;
+    }
+
+    .status-icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+
+    .status-msg {
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.75);
+      margin-bottom: 8px;
+    }
+
+    .status-sub {
+      font-size: 0.82rem;
+      color: rgba(255, 255, 255, 0.35);
+    }
+
+    .btn-retry {
+      display: none;
+      margin-top: 20px;
+      padding: 10px 24px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
+      color: #fff;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      text-decoration: none;
+    }
+
+    .btn-retry:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="glow-bg">
+    <div class="blob blob-violet"></div>
+    <div class="blob blob-green"></div>
+  </div>
+
+  <div class="card" id="card">
+    <div class="logo-wrap">
+      <img src="/assets/kickall.png" alt="KickAll Logo" onerror="this.style.display='none'">
+    </div>
+
+    <div id="loadingState">
+      <div class="spinner"></div>
+      <h1>Autorizacija u toku...</h1>
+      <p>Molimo sačekaj dok obradimo prijavu.</p>
+    </div>
+
+    <div id="errorState" style="display:none;">
+      <div class="status-icon" id="errorIcon" style="display:none; color: #ef4444; margin-bottom: 16px;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      </div>
+      <h1 class="status-msg" id="errorTitle">Greška pri autorizaciji</h1>
+      <p class="status-sub" id="errorDetail">Pokušaj ponovo.</p>
+      <a href="/index.html" class="btn-retry" id="retryBtn">← Nazad na prijavu</a>
+    </div>
+
+    <div id="successState" style="display:none;">
+      <div class="status-icon" id="successIcon" style="display:none; color: #53FC18; margin-bottom: 16px;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      </div>
+      <h1 class="status-msg">Uspešna prijava!</h1>
+      <p class="status-sub">Preusmerjavanje na dashboard...</p>
+    </div>
+  </div>
+
+  <script>
+    (async function kickOAuthCallback() {
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const baseRedirectPath = isLocalhost ? '/Website' : '';
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const state = params.get('state');
+      const error = params.get('error');
+
+      function showError(title, detail) {
+        document.getElementById('loadingState').style.display = 'none';
+        const errState = document.getElementById('errorState');
+        errState.style.display = 'block';
+        document.getElementById('errorIcon').style.display = 'block';
+        document.getElementById('errorTitle').textContent = title || 'Greška pri autorizaciji';
+        document.getElementById('errorDetail').textContent = detail || 'Pokušaj ponovo.';
+        document.getElementById('retryBtn').style.display = 'inline-block';
+      }
+
+      if (error) {
+        showError('Kick odbio autorizaciju', `Razlog: ${error}`);
+        return;
+      }
+
+      const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
+      if (!isLocalhost && (!state || state !== savedState)) {
+        showError('Nevalidan state parametar', 'State parametar se ne podudara. Moguća CSRF prevara.');
+        return;
+      }
+
+      if (!code) {
+        showError('Nedostaje autorizacioni kod', 'Kick nije vratio autorizacioni kod.');
+        return;
+      }
+
+      const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
+      const redirectUri = isLocalhost ? `${window.location.origin}/auth/kick/callback/` : `${window.location.origin}/auth/kick/callback/`;
+      
+      const kickApiBase = (() => {
+        const fromGlobal = (window.KICK_API_BASE || '').trim();
+        if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
+        if (window.location.hostname.endsWith('netlify.app') || 
+            window.location.hostname === 'localhost' || 
+            window.location.hostname === '127.0.0.1') {
+          return 'https://kickbot-ihzb.onrender.com';
+        }
+        return window.location.origin;
+      })();
+
+      try {
+        const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: redirectUri
+          }).toString()
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
+          showError('Greška pri razmeni tokena', err.detail || err.error || 'Server nije dostupan.');
+          return;
+        }
+
+        const tokenData = await res.json();
+
+        if (!tokenData.access_token) {
+          showError('Token nije dobijen', 'Kick server nije vratio access_token.');
+          return;
+        }
+
+        // Store tokens globally in session and local storage
+        sessionStorage.setItem('kick_access_token', tokenData.access_token);
+        localStorage.setItem('kick_access_token', tokenData.access_token);
+        localStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
+        localStorage.setItem('kick_session_active', 'true');
+
+        sessionStorage.removeItem('kick_oauth_state');
+        sessionStorage.removeItem('kick_code_verifier');
+        localStorage.removeItem('kick_oauth_state');
+        localStorage.removeItem('kick_code_verifier');
+
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('successState').style.display = 'block';
+        document.getElementById('successIcon').style.display = 'block';
+
+        // Ecosystem site routing: KickALL, KickOT, KickAJ, KickAN, KickOV
+        const originSite = sessionStorage.getItem('kick_origin_site') || 
+                          localStorage.getItem('kick_origin_site') ||
+                          (sessionStorage.getItem('from_kickall') === 'true' ? 'kickall' : 'kickot');
+
+        let targetPage = 'dashboard.html';
+        if (originSite === 'kickot') {
+          targetPage = 'kickot/dashboard.html';
+        } else if (originSite === 'kickaj') {
+          targetPage = 'kickaj/dashboard.html';
+        } else if (originSite === 'kickan') {
+          targetPage = 'kickan/dashboard.html';
+        } else if (originSite === 'kickov') {
+          targetPage = 'kickov/dashboard.html';
+        }
+
+        const fullTarget = `${baseRedirectPath}/${targetPage}?kick_oauth=1`;
+        setTimeout(() => {
+          window.location.replace(fullTarget);
+        }, 500);
+
+      } catch (fetchErr) {
+        showError(
+          'Nije moguće kontaktirati server',
+          'Proveri mrežnu konekciju ili konfiguraciju API-ja. ' + fetchErr.message
+        );
+      }
+    })();
+  </script>
+</body>
+
+</html>

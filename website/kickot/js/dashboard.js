@@ -34,7 +34,7 @@ let allMarriages = [];   // cached marriages
 let allLoveStatuses = [];  // cached love modifiers
 const avatarCache = {};
 let currentModFiltersSettings = {};
-let currentEconomyTab = 'config';
+let currentEconomyTab = localStorage.getItem('active-economy-tab') || 'config';
 
 async function getOrFetchAvatar(username, elementId) {
   if (!username) return;
@@ -162,7 +162,7 @@ async function initAuth() {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           return `${window.location.origin}/auth/kick/callback/`;
         }
-        return `${window.location.origin}/auth/kick/callback`;
+        return 'https://kickall.app/auth/kick/callback/';
       })();
 
       const kickApiBase = (() => {
@@ -249,7 +249,8 @@ async function initAuth() {
             .maybeSingle();
 
           const existingChannels = profile?.kick_channels || [];
-          const channelId = String(kickUser.chatroom_id || kickUser.id);
+          const channelId = String(kickUser.id); // Always use user_id as channel id
+          const chatroomId = kickUser.chatroom_id ? String(kickUser.chatroom_id) : null;
           const channelSlug = kickUser.slug || kickUser.username || channelId;
 
           if (existingChannels.some(c => c.id === channelId)) {
@@ -262,6 +263,7 @@ async function initAuth() {
 
           const newChannel = {
             id: channelId,
+            chatroom_id: chatroomId,
             username: channelSlug,
             avatar: kickUser.avatar || kickUser.profile_pic || null,
             is_primary: existingChannels.length === 0,
@@ -419,15 +421,16 @@ async function handleKickOAuthSession(accessToken) {
   currentUser = user;
 
   // Kreiraj profil u user_profiles tabeli
-  // Dohvati chatroom_id sa Kick API-ja umesto user_id
-  let channelId = kickUserId;
+  // Dohvati chatroom_id sa Kick API-ja
+  let channelId = String(kickUserId); // Always use user_id as channel id
+  let chatroomId = null;
   try {
-    const channelData = await fetchKickChannelData(kickUsername);
-    if (channelData && channelData.chatroom_id) {
-      channelId = String(channelData.chatroom_id);
+    const channelData = await resolveChatroomId(kickUsername);
+    if (channelData && channelData.id) {
+      chatroomId = channelData.id;
     }
   } catch (e) {
-    channelId = String(kickUserId || `kick_${kickUsername.toLowerCase()}`);
+    // Ignore error, chatroomId will remain null
   }
   const { error: profileError } = await sb.from('user_profiles').upsert({
     id: user.id,
@@ -436,6 +439,7 @@ async function handleKickOAuthSession(accessToken) {
     plan: 'free',
     kick_channels: [{
       id: channelId,
+      chatroom_id: chatroomId,
       username: kickUsername,
       avatar: kickAvatar || null,
       is_primary: true,
@@ -476,24 +480,27 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
     const existingChannels = (profile?.kick_channels) || [];
     const usernameLC = kickUsername.toLowerCase();
 
-    // Dohvati chatroom_id sa Kick API-ja umesto user_id
-    let channelId = kickUserId;
+    // Always use user_id as channel id, fetch chatroom_id separately
+    let channelId = String(kickUserId);
+    let chatroomId = null;
     try {
-      const channelData = await fetchKickChannelData(kickUsername);
-      if (channelData && channelData.chatroom_id) {
-        channelId = String(channelData.chatroom_id);
+      const channelData = await resolveChatroomId(kickUsername);
+      if (channelData && channelData.id) {
+        chatroomId = channelData.id;
       }
     } catch (e) {
-      channelId = String(kickUserId || `kick_${usernameLC}`);
+      // Ignore error, chatroomId will remain null
     }
 
     const idx = existingChannels.findIndex(ch => (ch.username || '').toLowerCase() === usernameLC);
     if (idx >= 0) {
       existingChannels[idx].avatar = kickAvatar || existingChannels[idx].avatar;
       existingChannels[idx].kick_access_token = accessToken;
+      existingChannels[idx].chatroom_id = chatroomId || existingChannels[idx].chatroom_id;
     } else {
       existingChannels.push({
         id: channelId,
+        chatroom_id: chatroomId,
         username: kickUsername,
         avatar: kickAvatar || null,
         is_primary: existingChannels.length === 0,
@@ -521,10 +528,6 @@ async function initApp() {
   // Load user profile + channels
   await loadUserProfile();
 
-  // Show app
-  document.getElementById('authGate').style.display = 'none';
-  document.getElementById('app').style.display = 'grid';
-
   // Sidebar avatar/name
   const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || 'User';
   const avatarVal = currentUser.user_metadata?.avatar_url || name.charAt(0).toUpperCase();
@@ -543,9 +546,9 @@ async function initApp() {
   // Set initial leaderboard tab from state (loaded from localStorage)
   setLeaderboardType(activeLeaderboardType);
 
-  // Load initial panel
+  // Load initial panel and all data BEFORE showing app
   if (activeChannel) {
-    loadAllData();
+    await loadAllData();
     let lastPanel = 'overview';
     const sessionActive = sessionStorage.getItem('dashboard-session-active');
     if (sessionActive) {
@@ -569,15 +572,25 @@ async function initApp() {
   const urlParams = new URLSearchParams(window.location.search);
   const refCode = urlParams.get('ref');
   if (refCode) {
-    localStorage.setItem('kickot_referral_code', refCode.trim().toUpperCase());
+    localStorage.setItem('kick_referral_code', refCode);
+  }
+  const settingsParam = urlParams.get('settings');
+  if (settingsParam === 'channels') {
+    setTimeout(() => openSettingsModal('channels'), 500);
   }
 
-  if (urlParams.get('settings') === 'channels') {
-    openSettingsModal('channels');
-    // Ukloni parametre iz URL-a
-    const cleanUrl = window.location.pathname;
-    window.history.replaceState({}, '', cleanUrl);
-  }
+  // Show app AFTER all data is loaded with smooth fade transition
+  const authGate = document.getElementById('authGate');
+  const app = document.getElementById('app');
+
+  // Start fade out of auth gate and fade in of app
+  authGate.classList.add('fade-out');
+  app.classList.add('fade-in');
+
+  // Wait for transition to complete, then hide auth gate
+  setTimeout(() => {
+    authGate.style.display = 'none';
+  }, 400);
 
   setupAutosave();
 }
@@ -596,6 +609,25 @@ async function loadUserProfile() {
       (data.plan || 'free').charAt(0).toUpperCase() + (data.plan || 'free').slice(1);
 
     currentChannels = data.kick_channels || [];
+
+    // Deduplicate channels by username (keep the first occurrence)
+    const seenUsernames = new Set();
+    const deduplicatedChannels = [];
+    for (const ch of currentChannels) {
+      const usernameLC = (ch.username || '').toLowerCase();
+      if (!seenUsernames.has(usernameLC)) {
+        seenUsernames.add(usernameLC);
+        deduplicatedChannels.push(ch);
+      }
+    }
+
+    // If deduplication removed channels, update the database
+    if (deduplicatedChannels.length !== currentChannels.length) {
+      currentChannels = deduplicatedChannels;
+      await sb.from('user_profiles')
+        .update({ kick_channels: currentChannels })
+        .eq('id', currentUser.id);
+    }
 
     // Fetch avatars for channels that don't have one yet
     const needsAvatar = currentChannels.filter(c => !c.avatar);
@@ -855,12 +887,12 @@ function renderChannelList() {
 
 async function selectChannel(ch) {
   if (activeChannel && activeChannel.id === ch.id) {
-    toggleChannelMenu();
+    toggleChannelMenu(null);
     return;
   }
   setActiveChannel(ch);
   renderChannelList();
-  toggleChannelMenu();
+  toggleChannelMenu(null);
   showToast('info', `Prebačeno na kanal @${ch.username}`, '🔄');
   await loadAllData();
 }
@@ -920,9 +952,10 @@ async function resolveChatroomId(username) {
     const localRes = await fetch(`${getBotApiBase()}/api/avatar?username=${username}`);
     if (localRes.ok) {
       const localData = await localRes.json();
-      if (localData && localData.chatroom_id) {
+      if (localData && localData.id) {
         return {
-          id: localData.chatroom_id.toString(),
+          id: localData.id.toString(), // user_id as channel id
+          chatroom_id: localData.chatroom_id ? localData.chatroom_id.toString() : null,
           username: localData.slug || username,
           avatar: localData.avatar || null,
           bio: localData.bio || ''
@@ -937,9 +970,10 @@ async function resolveChatroomId(username) {
     const res = await fetch(proxyUrl);
     if (res.ok) {
       const data = await res.json();
-      if (data && data.chatroom && data.chatroom.id) {
+      if (data && data.user && data.chatroom) {
         return {
-          id: data.chatroom.id.toString(),
+          id: data.user.id.toString(), // user_id as channel id
+          chatroom_id: data.chatroom.id.toString(),
           username: data.slug || username,
           avatar: data.user?.profile_pic || null,
           bio: data.user?.bio || ''
@@ -958,9 +992,10 @@ async function resolveChatroomId(username) {
       const resData = await res.json();
       if (resData && resData.contents) {
         const data = JSON.parse(resData.contents);
-        if (data && data.chatroom && data.chatroom.id) {
+        if (data && data.user && data.chatroom) {
           return {
-            id: data.chatroom.id.toString(),
+            id: data.user.id.toString(), // user_id as channel id
+            chatroom_id: data.chatroom.id.toString(),
             username: data.slug || username,
             avatar: data.user?.profile_pic || null,
             bio: data.user?.bio || ''
@@ -1155,6 +1190,67 @@ async function addChannel() {
 // ═══════════════════════════════════════════════════════════
 // DATA LOADERS
 // ═══════════════════════════════════════════════════════════
+async function loadNotifications() {
+  try {
+    const { data, error } = await sb
+      .from('notifications')
+      .select('id, created_at, title, description, type')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Greška pri učitavanju obaveštenja:', error);
+      return;
+    }
+
+    if (data) {
+      notifications = data.map(item => ({
+        id: item.id,
+        title: item.title,
+        desc: item.description,
+        timestamp: item.created_at,
+        type: item.type || 'info'
+      }));
+      updateNotifBadgeUI();
+      renderNotifContent();
+    }
+  } catch (err) {
+    console.error('Izuzetak pri učitavanju obaveštenja:', err);
+  }
+}
+
+async function loadChangelogs() {
+  try {
+    const { data, error } = await sb
+      .from('changelog')
+      .select('id, created_at, version, title, details')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Greška pri učitavanju changeloga:', error);
+      return;
+    }
+
+    if (data) {
+      changelogs = data.map(item => {
+        const d = new Date(item.created_at);
+        const formattedDate = !isNaN(d.getTime()) ? d.toLocaleDateString('sr-RS') : item.created_at;
+        return {
+          id: item.id,
+          version: item.version,
+          title: item.title,
+          details: item.details,
+          date: formattedDate
+        };
+      });
+      renderNotifContent();
+    }
+  } catch (err) {
+    console.error('Izuzetak pri učitavanju changeloga:', err);
+  }
+}
+
 async function loadAllData() {
   if (!activeChannel) return;
 
@@ -1167,7 +1263,9 @@ async function loadAllData() {
     loadLoveStatuses(),
     loadBotConfig(),
     loadBotStatus(),
-    loadChannelLiveStatus()
+    loadChannelLiveStatus(),
+    loadNotifications(),
+    loadChangelogs()
   ]);
 
   setupRealtimeChannels();
@@ -1214,34 +1312,79 @@ async function refreshAllData() {
 
 // ── Commands ──────────────────────────────────────────────
 // ── Commands ──────────────────────────────────────────────
+// ⚠️ NAPOMENA: Neke komande imaju višestruku upotrebu ili moguće razlike između opisa i stvarne funkcionalnosti.
+// - Komande kao što su 'prihvati', 'odbij', 'points', 'poeni' se koriste u više konteksta (brak/ljubav, kockanje, ekonomija, statistika)
+// - Komanda 'duel' postoji u dva oblika: zabavni (bez uloga) i kockaški (sa ulogom)
+// - Neki opisi mogu se promeniti u budućnosti kako se bot razvija
+// - Uvek proverite stvarnu implementaciju u bot.js pre nego što se oslonite na opis komande
 const defaultBuiltinCommands = [
+  // Zabava
   { id: 'builtin-iq', command: 'iq, iq @user', response: 'Prikazuje inteligenciju (IQ) korisnika ili ciljanog člana chata.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'iq', category: 'Zabava' },
   { id: 'builtin-samar', command: 'samar @user', response: 'Šalje zabavan šamar odabranom korisniku sa nasumičnim predmetom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'samar', category: 'Zabava' },
   { id: 'builtin-roll', command: 'roll @user', response: 'Pokreće roll dvoboj (kockice 1-100) protiv tagovanog protivnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'roll', category: 'Zabava' },
-  { id: 'builtin-duel', command: 'duel @user', response: 'Izazovi drugog člana na pravi ruski rulet dvoboj.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'duel', category: 'Zabava' },
-  { id: 'builtin-rulet', command: 'rulet @user', response: 'Igraj ruski rulet sa botom — rizikuj timeout od 10 minuta.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rulet', category: 'Zabava' },
+  { id: 'builtin-duelfun', command: 'duel @user', response: 'Izazovi drugog člana na zabavni dvoboj (bez uloga).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'duel', category: 'Zabava' },
+  { id: 'builtin-rulet', command: 'rulet', response: 'Igraj ruski rulet sa botom — rizikuj timeout od 10 minuta.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rulet', category: 'Zabava' },
+  { id: 'builtin-cinjenica', command: 'cinjenica', response: 'Ispisuje nasumičnu zanimljivu činjenicu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'cinjenica', category: 'Zabava' },
+  
+  // Ljubav & Brak
   { id: 'builtin-love', command: 'love @user, love @user @user', response: 'Izračunaj ljubavnu kompatibilnost sa drugim korisnikom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'love', category: 'Ljubav & Brak' },
   { id: 'builtin-marry', command: 'vencaj @user', response: 'Pošalji bračnu ponudu drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vencaj', category: 'Ljubav & Brak' },
   { id: 'builtin-razvod', command: 'razvod @user', response: 'Razvedi se od trenutnog bračnog partnera.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'razvod', category: 'Ljubav & Brak' },
   { id: 'builtin-brakovi', command: 'brakovi, brak, vencani', response: 'Prikazuje sve venčane parove na ovom kanalu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'brakovi', category: 'Ljubav & Brak' },
-  { id: 'builtin-posaljiljubav', command: 'posaljiljubav @user', response: 'Pošalji ljubavnu ponudu nekom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'posaljiljubav', category: 'Ljubav & Brak' },
+  { id: 'builtin-posaljiljubav', command: 'posaljiljubav @user', response: 'Pošalji ljubavnu ponudu nekom korisniku (povećava ljubav).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'posaljiljubav', category: 'Ljubav & Brak' },
   { id: 'builtin-odbijljubav', command: 'odbijljubav @user', response: 'Odbij ljubavnu ponudu od nekog korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbijljubav', category: 'Ljubav & Brak' },
   { id: 'builtin-mrzim', command: 'mrzim @user', response: 'Izračunaj procenat mržnje prema drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'mrzim', category: 'Ljubav & Brak' },
-  { id: 'builtin-prihvati', command: 'prihvati, da, pristajem', response: 'Prihvati bračnu ili ljubavnu ponudu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'prihvati', category: 'Ljubav & Brak' },
-  { id: 'builtin-odbij', command: 'odbij, ne, odbijam', response: 'Odbij bračnu ili ljubavnu ponudu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbij', category: 'Ljubav & Brak' },
+  { id: 'builtin-bacihejt', command: 'bacihejt @user', response: 'Smanji ljubav prema korisniku (hejt).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'bacihejt', category: 'Ljubav & Brak' },
+  { id: 'builtin-prihvati', command: 'prihvati, da, pristajem', response: 'Prihvati bračnu ili ljubavnu ponudu (takođe prihvata kockaški dvoboj).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'prihvati', category: 'Ljubav & Brak' },
+  { id: 'builtin-odbij', command: 'odbij, ne, odbijam', response: 'Odbij bračnu ili ljubavnu ponudu (takođe odbija kockaški dvoboj).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbij', category: 'Ljubav & Brak' },
+  { id: 'builtin-cooldown', command: 'cooldown, coldown', response: 'Proveri cooldown za ljubavne komande (posaljiljubav, bacihejt).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'cooldown', category: 'Ljubav & Brak' },
+  
+  // Strim Info
   { id: 'builtin-igra', command: 'igra', response: 'Prikazuje trenutnu igru na strimu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'igra', category: 'Strim Info' },
   { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje koliko vremena je strim online.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'uptime', category: 'Strim Info' },
-  { id: 'builtin-vreme', command: 'vreme [grad]', response: 'Prikazuje trenutnu vremensku prognozu za uneti grad.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vreme', category: 'Strim Info' },
+  { id: 'builtin-vreme', command: 'vreme [grad], vrijeme [grad]', response: 'Prikazuje trenutnu vremensku prognozu za uneti grad.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vreme', category: 'Strim Info' },
   { id: 'builtin-info', command: 'info', response: 'Prikazuje osnovne informacije o botu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'info', category: 'Strim Info' },
-  { id: 'builtin-permit', command: 'permit @user', response: 'Dozvoljava korisniku slanje jednog linka.', cooldown_ms: 5000, min_rank: 'moderator', enabled: true, is_default: true, uses_count: 0, db_match_key: 'permit', category: 'Moderacija' },
+  
+  // Moderacija
+  { id: 'builtin-permit', command: 'permit @user, dozvoli @user', response: 'Dozvoljava korisniku slanje jednog linka.', cooldown_ms: 5000, min_rank: 'moderator', enabled: true, is_default: true, uses_count: 0, db_match_key: 'permit', category: 'Moderacija' },
   { id: 'builtin-osvezi', command: 'osvezi', response: 'Osvežava sve podatke iz baze podataka.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'osvezi', category: 'Moderacija' },
-  { id: 'builtin-topwatchtime', command: 'top watchtime [broj]', response: 'Prikazuje top listu gledalaca po vremenu gledanja.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top watchtime', category: 'Statistika' },
-  { id: 'builtin-topchat', command: 'top chat [broj]', response: 'Prikazuje top listu najaktivnijih korisnika u četu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top chat', category: 'Statistika' },
-  { id: 'builtin-watchtime', command: 'watchtime', response: 'Prikazuje vreme gledanja korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'watchtime', category: 'Statistika' },
-  { id: 'builtin-chat', command: 'chat', response: 'Prikazuje broj poslatih poruka korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'chat', category: 'Statistika' },
+  { id: 'builtin-pin', command: 'pin [tekst]', response: 'Pinuje poruku u chat (moderatori/strimer).', cooldown_ms: 5000, min_rank: 'moderator', enabled: true, is_default: true, uses_count: 0, db_match_key: 'pin', category: 'Moderacija' },
+  { id: 'builtin-unpin', command: 'unpin', response: 'Odpinuje trenutno pinovanu poruku (strimer).', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'unpin', category: 'Moderacija' },
+  { id: 'builtin-setlive', command: 'setlive [true/false]', response: 'Ručno postavlja status strima na live/offline.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'setlive', category: 'Moderacija' },
+  { id: 'builtin-setgame', command: 'setgame [naziv]', response: 'Ručno postavlja naziv igre na strimu.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'setgame', category: 'Moderacija' },
+  
+  // Statistika
+  { id: 'builtin-topwatchtime', command: 'top watchtime [broj], topwatch [broj]', response: 'Prikazuje top listu gledalaca po vremenu gledanja.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top watchtime', category: 'Statistika' },
+  { id: 'builtin-topchat', command: 'top chat [broj], top [broj], leaderboard [broj]', response: 'Prikazuje top listu najaktivnijih korisnika u četu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top', category: 'Statistika' },
+  { id: 'builtin-watchtime', command: 'watchtime [@user]', response: 'Prikazuje vreme gledanja korisnika (ako se taguje drugi korisnik).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'watchtime', category: 'Statistika' },
+  { id: 'builtin-chat', command: 'chat, aktivnost, stats', response: 'Prikazuje broj poslatih poruka korisnika (takođe se koristi !points i !poeni).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'aktivnost', category: 'Statistika' },
   { id: 'builtin-me', command: 'me', response: 'Prikazuje tvoju ličnu chat i watchtime statistiku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'me', category: 'Statistika' },
-  { id: 'builtin-cinjenica', command: 'cinjenica', response: 'Ispisuje nasumičnu zanimljivu činjenicu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'cinjenica', category: 'Zabava' },
-  { id: 'builtin-followage', command: 'followage', response: 'Pokazuje koliko dugo pratiš strimera.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'followage', category: 'Statistika' }
+  { id: 'builtin-followage', command: 'followage', response: 'Pokazuje koliko dugo pratiš strimera.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'followage', category: 'Statistika' },
+  { id: 'builtin-resetleaderboard', command: 'resetleaderboard', response: 'Resetuje leaderboard za trenut mesec (strimer).', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'resetleaderboard', category: 'Statistika' },
+  { id: 'builtin-leaderboard', command: 'leaderboard [broj]', response: 'Prikazuje top listu najaktivnijih korisnika u četu (alternativa za !top).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'leaderboard', category: 'Statistika' },
+  
+  // Ekonomija
+  { id: 'builtin-rank', command: 'rank, level, xp [@user]', response: 'Prikazuje tvoj nivo, XP i titulu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rank', category: 'Ekonomija' },
+  { id: 'builtin-points-eco', command: 'points, poeni, bal, coins [@user]', response: 'Prikazuje tvoj balans poena (takođe prikazuje aktivnost u četu).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'points', category: 'Ekonomija' },
+  { id: 'builtin-daily', command: 'daily', response: 'Preuzmi dnevni bonus poena i XP.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'daily', category: 'Ekonomija' },
+  { id: 'builtin-givepoints', command: 'givepoints, dajpoene, pay @user [iznos]', response: 'Pošalji poene drugom korisniku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'givepoints', category: 'Ekonomija' },
+  { id: 'builtin-toplevel', command: 'toplevel, topxp [broj]', response: 'Prikazuje top listu po nivoima i XP-u.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'toplevel', category: 'Ekonomija' },
+  { id: 'builtin-topcoins', command: 'topcoins, toppoeni [broj]', response: 'Prikazuje top listu najbogatijih korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'topcoins', category: 'Ekonomija' },
+  
+  // Kockanje
+  { id: 'builtin-slots', command: 'slots, slot [iznos]', response: 'Igraj slot mašinu i osvoji ili izgubi poene.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'slots', category: 'Kockanje' },
+  { id: 'builtin-roulette', command: 'roulette, rulet [opcija] [iznos]', response: 'Igraj rulet (crvena/crna/zelena/par/nepar/broj).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'roulette', category: 'Kockanje' },
+  { id: 'builtin-coinflip', command: 'coinflip, piskoglava, gamble, kockaj [pismo/glava] [iznos]', response: 'Baci novčić (pismo/glava) za duplo ili ništa.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'coinflip', category: 'Kockanje' },
+  { id: 'builtin-wheel', command: 'tocak, wheel [iznos]', response: 'Zavrti točak sreće za multiplikatore.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'tocak', category: 'Kockanje' },
+  { id: 'builtin-duelgamble', command: 'duel, dvoboj @user [iznos]', response: 'Izazovi korisnika na kockaški dvoboj za poene (zahteva iznos).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'duel', category: 'Kockanje' },
+  { id: 'builtin-acceptgamble', command: 'accept', response: 'Prihvati poziv na kockaški dvoboj (različito od prihvati za brak).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'accept', category: 'Kockanje' },
+  
+  // Prodavnica
+  { id: 'builtin-store', command: 'store, prodavnica, shop', response: 'Prikazuje listu dostupnih nagrada u prodavnici.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'store', category: 'Prodavnica' },
+  { id: 'builtin-redeem', command: 'redeem, kupi [naziv]', response: 'Kupi nagradu iz prodavnice za poene.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'redeem', category: 'Prodavnica' },
+  
+  // Muzika
+  { id: 'builtin-pesma', command: 'pesma [naziv]', response: 'Zatraži pesmu za puštanje na strimu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'pesma', category: 'Muzika' }
 ];
 
 let activeBuiltinCategory = 'all';
@@ -1325,7 +1468,6 @@ async function loadCommands() {
 
   const { data, error } = await sb.from('custom_commands')
     .select('*')
-    .eq('user_id', getChannelOwnerId())
     .eq('channel_id', activeChannel.id)
     .order('created_at', { ascending: false });
 
@@ -1830,11 +1972,14 @@ function setLeaderboardType(type) {
   if (type === 'watchtime' && tabWatchtime) tabWatchtime.classList.add('active');
   if (type === 'combined' && tabCombined) tabCombined.classList.add('active');
 
-  // Izmeni klase u sidebar navigaciji
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const navItem = document.querySelector(`[data-panel="leaderboard"]`);
-  if (navItem) navItem.classList.add('active');
-  updateBreadcrumbs('leaderboard');
+  // Izmeni klase u sidebar navigaciji samo ako je trenutno na leaderboard panelu
+  const currentPanel = localStorage.getItem('active-dashboard-panel');
+  if (currentPanel === 'leaderboard') {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const navItem = document.querySelector(`[data-panel="leaderboard"]`);
+    if (navItem) navItem.classList.add('active');
+    updateBreadcrumbs('leaderboard');
+  }
 
   // Izmeni zaglavlje tabele
   const header = document.getElementById('leaderboardTableHeader');
@@ -1879,7 +2024,13 @@ function setLeaderboardType(type) {
 function buildCombinedRows() {
   const map = {};
 
+  const sel = document.getElementById('lbMonthSelect');
+  const selectedMonth = sel?.value || getCurrentMonth();
+
   allLeaderboard.forEach(r => {
+    // Filtriraj leaderboard po izabranom mesecu koristeći month polje
+    if (r.month && r.month !== selectedMonth) return;
+
     const key = (r.username || '').toLowerCase();
     if (!map[key]) {
       map[key] = {
@@ -1887,16 +2038,13 @@ function buildCombinedRows() {
         display_name: r.display_name || r.username,
         points: 0,
         minutes: 0,
-        month: r.month,
+        month: r.month || selectedMonth,
         updated_at: r.updated_at
       };
     }
     map[key].points += r.points || 0;
-    if (!map[key].month) map[key].month = r.month;
+    if (!map[key].month) map[key].month = r.month || selectedMonth;
   });
-
-  const sel = document.getElementById('lbMonthSelect');
-  const selectedMonth = sel?.value || getCurrentMonth();
 
   allWatchtime.forEach(r => {
     // Profiltriši watchtime po izabranom mesecu koristeći updated_at
@@ -2469,13 +2617,13 @@ async function loadBotConfig() {
 
   const { data, error } = await sb.from('bot_config')
     .select('*')
-    .eq('user_id', getChannelOwnerId())
     .eq('channel_id', activeChannel.id)
     .maybeSingle();
 
   if (error) { console.error('Config:', error); return; }
 
   if (data) {
+    currentChannelConfig = data;
     if (document.getElementById('cfgPrefix')) document.getElementById('cfgPrefix').value = data.prefix || '!';
     if (document.getElementById('cfgLanguage')) document.getElementById('cfgLanguage').value = data.language || 'sr';
     if (document.getElementById('cfgCooldown')) document.getElementById('cfgCooldown').value = data.cooldown_ms ?? 3000;
@@ -2542,28 +2690,32 @@ async function loadBotConfig() {
     document.getElementById('cfgAnnounceTimeEnabled').checked = data.announce_time_enabled ?? true;
     document.getElementById('cfgAnnounceMsgEnabled').checked = data.announce_msg_enabled ?? true;
 
-    // Load economy settings
+    // Load economy settings (check top-level columns first, then fallback to nested economy_settings if any)
     const ecoSettings = data.economy_settings || {};
-    if (document.getElementById('cfgCurrencyName')) document.getElementById('cfgCurrencyName').value = ecoSettings.currency_name || 'Koins';
-    if (document.getElementById('cfgPointsPerMsg')) document.getElementById('cfgPointsPerMsg').value = ecoSettings.points_per_msg ?? 5;
-    if (document.getElementById('cfgSmartChatValidation')) document.getElementById('cfgSmartChatValidation').checked = ecoSettings.smart_chat_validation ?? true;
-    if (document.getElementById('cfgFirstInteractionBonus')) document.getElementById('cfgFirstInteractionBonus').value = ecoSettings.first_interaction_bonus ?? 100;
-    if (document.getElementById('cfgPointsPerWatchtime')) document.getElementById('cfgPointsPerWatchtime').value = ecoSettings.points_per_watchtime ?? 20;
-    if (document.getElementById('cfgLevelUpAnnounce')) document.getElementById('cfgLevelUpAnnounce').checked = ecoSettings.level_up_announce ?? true;
-    if (document.getElementById('cfgSubMultiplier')) document.getElementById('cfgSubMultiplier').value = ecoSettings.sub_multiplier ?? 2.0;
-    if (document.getElementById('cfgSubBonusPerMsg')) document.getElementById('cfgSubBonusPerMsg').value = ecoSettings.sub_bonus_per_msg ?? 10;
-    if (document.getElementById('cfgPointsPerSub')) document.getElementById('cfgPointsPerSub').value = ecoSettings.points_per_sub ?? 1000;
-    if (document.getElementById('cfgPointsPerGiftSub')) document.getElementById('cfgPointsPerGiftSub').value = ecoSettings.points_per_gift_sub ?? 2000;
-    if (document.getElementById('cfgPointsPer100Kicks')) document.getElementById('cfgPointsPer100Kicks').value = ecoSettings.points_per_100_kicks ?? 500;
-    if (document.getElementById('cfgPointsDailyStreak')) document.getElementById('cfgPointsDailyStreak').value = ecoSettings.points_daily_streak ?? 150;
-    if (document.getElementById('cfgPointsPerRaid')) document.getElementById('cfgPointsPerRaid').value = ecoSettings.points_per_raid ?? 300;
-    if (document.getElementById('cfgGambleEnabled')) document.getElementById('cfgGambleEnabled').checked = ecoSettings.gamble_enabled ?? true;
-    if (document.getElementById('cfgMaxGambleAmount')) document.getElementById('cfgMaxGambleAmount').value = ecoSettings.max_gamble_amount ?? 5000;
+    if (document.getElementById('cfgCurrencyName')) document.getElementById('cfgCurrencyName').value = data.currency_name || ecoSettings.currency_name || 'Koins';
+    if (document.getElementById('cfgPointsPerMsg')) document.getElementById('cfgPointsPerMsg').value = data.points_per_msg ?? ecoSettings.points_per_msg ?? 5;
+    if (document.getElementById('cfgSmartChatValidation')) document.getElementById('cfgSmartChatValidation').checked = data.smart_chat_validation ?? ecoSettings.smart_chat_validation ?? true;
+    if (document.getElementById('cfgFirstInteractionBonus')) document.getElementById('cfgFirstInteractionBonus').value = data.first_interaction_bonus ?? ecoSettings.first_interaction_bonus ?? 100;
+    if (document.getElementById('cfgPointsPerWatchtime')) document.getElementById('cfgPointsPerWatchtime').value = data.points_per_watchtime ?? ecoSettings.points_per_watchtime ?? 20;
+    if (document.getElementById('cfgLevelUpAnnounce')) document.getElementById('cfgLevelUpAnnounce').checked = data.level_up_announce ?? ecoSettings.level_up_announce ?? true;
+    if (document.getElementById('cfgSubMultiplier')) document.getElementById('cfgSubMultiplier').value = data.sub_multiplier ?? ecoSettings.sub_multiplier ?? 2.0;
+    if (document.getElementById('cfgSubBonusPerMsg')) document.getElementById('cfgSubBonusPerMsg').value = data.sub_bonus_per_msg ?? ecoSettings.sub_bonus_per_msg ?? 10;
+    if (document.getElementById('cfgPointsPerSub')) document.getElementById('cfgPointsPerSub').value = data.points_per_sub ?? ecoSettings.points_per_sub ?? 1000;
+    if (document.getElementById('cfgPointsPerGiftSub')) document.getElementById('cfgPointsPerGiftSub').value = data.points_per_gift_sub ?? ecoSettings.points_per_gift_sub ?? 2000;
+    if (document.getElementById('cfgPointsPer100Kicks')) document.getElementById('cfgPointsPer100Kicks').value = data.points_per_100_kicks ?? ecoSettings.points_per_100_kicks ?? 500;
+    if (document.getElementById('cfgPointsDailyStreak')) document.getElementById('cfgPointsDailyStreak').value = data.points_daily_streak ?? ecoSettings.points_daily_streak ?? 150;
+    if (document.getElementById('cfgPointsPerRaid')) document.getElementById('cfgPointsPerRaid').value = data.points_per_raid ?? ecoSettings.points_per_raid ?? 300;
+    if (document.getElementById('cfgGambleEnabled')) document.getElementById('cfgGambleEnabled').checked = data.gamble_enabled ?? ecoSettings.gamble_enabled ?? true;
+    if (document.getElementById('cfgMaxGambleAmount')) document.getElementById('cfgMaxGambleAmount').value = data.max_gamble_amount ?? ecoSettings.max_gamble_amount ?? 5000;
     updateEconomyPreviews();
 
     // Load auto announce list
     localAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
     renderAnnounceList();
+
+    // Render store items and redemptions after config is loaded
+    renderStoreItems();
+    renderStoreRedemptions();
 
     // Load moderation settings
     const modSettings = data.moderation_settings || {};
@@ -2779,6 +2931,23 @@ async function saveBotConfig(silent = false) {
       max_duration_seconds: parseInt(document.getElementById('cfgSongRequestMaxDuration')?.value) || 360,
       queue: localSongQueue
     },
+    currency_name: document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins',
+    points_per_msg: parseInt(document.getElementById('cfgPointsPerMsg')?.value, 10) || 5,
+    smart_chat_validation: document.getElementById('cfgSmartChatValidation')?.checked ?? true,
+    first_interaction_bonus: parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100,
+    points_per_watchtime: parseInt(document.getElementById('cfgPointsPerWatchtime')?.value, 10) || 20,
+    level_up_announce: document.getElementById('cfgLevelUpAnnounce')?.checked ?? true,
+    sub_multiplier: parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0,
+    sub_bonus_per_msg: parseInt(document.getElementById('cfgSubBonusPerMsg')?.value, 10) || 10,
+    points_per_sub: parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000,
+    points_per_gift_sub: parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000,
+    points_per_100_kicks: parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500,
+    points_daily_streak: parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150,
+    points_per_raid: parseInt(document.getElementById('cfgPointsPerRaid')?.value, 10) || 300,
+    gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
+    max_gamble_amount: parseInt(document.getElementById('cfgMaxGambleAmount')?.value, 10) || 5000,
+    store_items: (currentChannelConfig && currentChannelConfig.store_items) ? currentChannelConfig.store_items : [],
+    store_redemptions: (currentChannelConfig && currentChannelConfig.store_redemptions) ? currentChannelConfig.store_redemptions : [],
     auto_announces: localAnnounces,
     announce_interval_mins: parseInt(document.getElementById('cfgAnnounceInterval')?.value) || 15,
     announce_message_threshold: parseInt(document.getElementById('cfgAnnounceThreshold')?.value) || 30,
@@ -2820,6 +2989,32 @@ async function saveBotConfig(silent = false) {
   }
   notifyBotToReload();
   updateOverviewModulesUI();
+}
+
+async function saveBotConfigFields(fieldsToUpdate) {
+  if (!activeChannel) {
+    showToast('error', 'Nema izabranog kanala', '❌');
+    return { error: 'No active channel' };
+  }
+
+  const { error } = await sb.from('bot_config')
+    .update(fieldsToUpdate, { 
+      channel_id: activeChannel.id,
+      user_id: getChannelOwnerId()
+    })
+    .eq('channel_id', activeChannel.id)
+    .eq('user_id', getChannelOwnerId());
+
+  if (error) {
+    console.error('Error updating bot config fields:', error);
+    return { error };
+  }
+
+  // Update local cache
+  if (!currentChannelConfig) currentChannelConfig = {};
+  Object.assign(currentChannelConfig, fieldsToUpdate);
+
+  return { error: null };
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -3210,12 +3405,14 @@ async function loadBotStatus() {
 function updateBotStatusUI(active) {
   const label = document.getElementById('botToggleLabel');
   const toggle = document.getElementById('botActiveToggle');
+  const toggleLabel = toggle?.parentElement;
 
   if (label) {
     label.innerHTML = `<span id="botToggleDot" style="width: 7px; height: 7px; border-radius: 50%; background: ${active ? '#53FC18' : '#EF4444'}; box-shadow: 0 0 8px ${active ? '#53FC18' : '#EF4444'}; transition: all 0.3s;"></span> Bot: ${active ? 'ON' : 'OFF'}`;
     label.style.color = active ? '#53FC18' : 'var(--text-muted)';
   }
   if (toggle && toggle.checked !== active) { toggle.checked = active; }
+  if (toggleLabel) { toggleLabel.setAttribute('aria-checked', active); }
 
   // Control Center updates
   const ctrlStatusLabel = document.getElementById('ctrlBotStatusLabel');
@@ -3812,14 +4009,25 @@ function loadEconomyPanelData() {
 }
 
 function switchPanel(panelId) {
+  // Prevent switching if already on this panel
+  const currentPanel = localStorage.getItem('active-dashboard-panel');
+  if (currentPanel === panelId) return;
+
   document.body.style.overflow = '';
   const mainContent = document.getElementById('mainContent');
   if (mainContent) mainContent.scrollTop = 0;
 
   localStorage.setItem('active-dashboard-panel', panelId);
 
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  // Reset scroll for all panels
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.remove('active');
+    p.scrollTop = 0;
+  });
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.remove('active');
+    n.removeAttribute('aria-current');
+  });
 
   const panel = document.getElementById(`panel-${panelId}`);
   const navItem = document.querySelector(`[data-panel="${panelId}"]`);
@@ -3828,7 +4036,10 @@ function switchPanel(panelId) {
     panel.style.overflow = 'visible';
     panel.style.height = 'auto';
   }
-  if (navItem) navItem.classList.add('active');
+  if (navItem) {
+    navItem.classList.add('active');
+    navItem.setAttribute('aria-current', 'page');
+  }
 
   updateBreadcrumbs(panelId);
 
@@ -3860,8 +4071,10 @@ function toggleSidebar() {
 }
 
 // ── Channel Menu ───────────────────────────────────────────
-function toggleChannelMenu() {
+function toggleChannelMenu(e) {
+  if (e) e.stopPropagation();
   const menu = document.getElementById('channelMenu');
+  if (!menu) return;
   menu.classList.toggle('open');
 }
 
@@ -4021,7 +4234,7 @@ function handleModalBg(e, id) {
   if (e.target.id === id) closeModal(id);
 }
 
-const ALL_MODAL_IDS = ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'helpModal', 'modFilterPenaltyModal', 'docsModal', 'settingsModal', 'storeItemModal', 'referralModal'];
+const ALL_MODAL_IDS = ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'helpModal', 'modFilterPenaltyModal', 'docsModal', 'settingsModal', 'storeItemModal', 'referralModal', 'customBotAuthModal', 'withdrawalModal'];
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     ALL_MODAL_IDS.forEach(id => {
@@ -4779,6 +4992,7 @@ async function addNewChannel() {
 
   const newCh = {
     id: resolved.id,
+    chatroom_id: resolved.chatroom_id || null,
     username: resolved.username,
     avatar: resolved.avatar || null,
     is_primary: currentChannels.length === 0
@@ -5243,14 +5457,14 @@ async function addNewChannel() {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           return `${window.location.origin}/auth/kick/callback/`;
         }
-        return `${window.location.origin}/auth/kick/callback`;
+        return `${window.location.origin}/auth/kick/callback/`;
       }
 
       async function openKickLoginForChannel() {
         if (!currentUser) return;
         const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
         const KICK_REDIRECT_URI = getKickRedirectUri();
-        const KICK_SCOPE = 'user:read';
+        const KICK_SCOPE = 'user:read channel:read chat:read chat:write moderation:read moderation:write';
 
         const state = generateRandomString(16);
         const codeVerifier = generateRandomString(64);
@@ -5261,6 +5475,11 @@ async function addNewChannel() {
         sessionStorage.setItem('kick_oauth_intent', 'add_channel');
         sessionStorage.setItem('kick_add_channel_uid', currentUser.id);
         sessionStorage.setItem('kick_oauth_source', 'dashboard');
+        sessionStorage.setItem('kick_origin_site', 'kickot');
+
+        localStorage.setItem('kick_oauth_state', state);
+        localStorage.setItem('kick_code_verifier', codeVerifier);
+        localStorage.setItem('kick_origin_site', 'kickot');
 
         const authUrl = 'https://id.kick.com/oauth/authorize?' + new URLSearchParams({
           response_type: 'code',
@@ -5357,32 +5576,11 @@ async function addNewChannel() {
       let readNotifIds = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
       let activeNotifTab = 'obaveštenja';
 
-      // Primer realnih podataka sa ISO datumima za dinamički proračun
-      let notifications = [
-        { 
-          id: 2, 
-          title: 'Novo obaveštenje', 
-          desc: 'Ovo je najnovija poruka', 
-          timestamp: new Date().toISOString(), 
-          type: 'info' 
-        },
-        { 
-          id: 1, 
-          title: 'Starije obaveštenje', 
-          desc: 'Ovo je starija poruka', 
-          timestamp: new Date(Date.now() - 3600000).toISOString(), 
-          type: 'success' 
-        }
-      ];
+      // Notifications will be loaded from database
+      let notifications = [];
 
-      let changelogs = [
-        { 
-          version: 'v0.5', 
-          date: '01. avgust 2026.', 
-          title: 'Lansiranje KickALL platforme', 
-          details: 'KickALL platforma je lansirana sa Kickot botom!' 
-        }
-      ];
+      // Changelogs will be loaded from database
+      let changelogs = [];
 
       // Pomoćna funkcija za prirodno relativno vreme
       function formatRelativeTime(isoString) {
@@ -5493,6 +5691,15 @@ async function addNewChannel() {
             `;
           }).join('');
         } else {
+          if (changelogs.length === 0) {
+            list.innerHTML = `
+              <div style="color: var(--text-muted); text-align: center; padding: 32px 16px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.5;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                <span>Trenutno nema novih changelog informacija.</span>
+              </div>`;
+            return;
+          }
+
           list.innerHTML = changelogs.map(c => `
             <div style="padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); transition: all 0.2s;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -6449,6 +6656,7 @@ async function addNewChannel() {
       // ── Economy & Ranking System Logic ──
       function switchEconomyTab(tabName) {
         currentEconomyTab = tabName;
+        localStorage.setItem('active-economy-tab', tabName);
         const configTab = document.getElementById('ecoSubPanelConfig');
         const storeTab = document.getElementById('ecoSubPanelStore');
         const lbTab = document.getElementById('ecoSubPanelLeaderboard');
@@ -6522,8 +6730,28 @@ async function addNewChannel() {
         if (!currentChannelConfig) currentChannelConfig = {};
         currentChannelConfig.currency_name = ecoSettings.currency_name;
         currentChannelConfig.economy_settings = ecoSettings;
+        Object.assign(currentChannelConfig, ecoSettings);
 
-        const { error } = await saveBotConfigFields({ economy_settings: ecoSettings });
+        const fieldsToSave = {
+          currency_name: ecoSettings.currency_name,
+          points_per_msg: ecoSettings.points_per_msg,
+          smart_chat_validation: ecoSettings.smart_chat_validation,
+          first_interaction_bonus: ecoSettings.first_interaction_bonus,
+          points_per_watchtime: ecoSettings.points_per_watchtime,
+          level_up_announce: ecoSettings.level_up_announce,
+          sub_multiplier: ecoSettings.sub_multiplier,
+          sub_bonus_per_msg: ecoSettings.sub_bonus_per_msg,
+          points_per_sub: ecoSettings.points_per_sub,
+          points_per_gift_sub: ecoSettings.points_per_gift_sub,
+          points_per_100_kicks: ecoSettings.points_per_100_kicks,
+          points_daily_streak: ecoSettings.points_daily_streak,
+          points_per_raid: ecoSettings.points_per_raid,
+          gamble_enabled: ecoSettings.gamble_enabled,
+          max_gamble_amount: ecoSettings.max_gamble_amount,
+          economy_settings: ecoSettings
+        };
+
+        const { error } = await saveBotConfigFields(fieldsToSave);
 
         if (error) {
           if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ranking sistema!');
@@ -6537,16 +6765,15 @@ async function addNewChannel() {
       async function saveMinigamesConfig() {
         if (!activeChannel) return;
 
-        const payload = {
-          user_id: getChannelOwnerId(),
-          channel_id: activeChannel.id,
-          channel_name: activeChannel.username,
+        const ecoSettings = {
           gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
-          max_gamble_amount: parseInt(document.getElementById('cfgMinigamesMaxBet')?.value, 10) || 5000,
-          updated_at: new Date().toISOString()
+          max_gamble_amount: parseInt(document.getElementById('cfgMinigamesMaxBet')?.value, 10) || 5000
         };
 
-        const { error } = await sb.from('bot_config').upsert(payload, { onConflict: 'channel_id' });
+        if (!currentChannelConfig) currentChannelConfig = {};
+        currentChannelConfig.economy_settings = { ...currentChannelConfig.economy_settings, ...ecoSettings };
+
+        const { error } = await saveBotConfigFields({ economy_settings: currentChannelConfig.economy_settings });
 
         if (error) {
           showToast('error', 'Greška pri čuvanju podešavanja mini igara!');
@@ -6637,11 +6864,7 @@ async function addNewChannel() {
       }
 
       function getStoreItems() {
-        return (currentChannelConfig && currentChannelConfig.store_items) ? currentChannelConfig.store_items : [
-          { id: 'item_1', name: 'VIP Rola u četu', description: 'Specijalan status i ikonica u četu', cost: 1000, icon: 'vip', stock: -1, min_rank: 'everyone', auto_approve: false },
-          { id: 'item_2', name: 'Naruči Pesmu (Priority SR)', description: 'Pesma po tvom izboru se pušta odmah sledeća', cost: 300, icon: 'song', stock: -1, min_rank: 'everyone', auto_approve: true },
-          { id: 'item_3', name: 'Voda Challenge za strimera', description: 'Strimer mora popiti čašu vode na strimu', cost: 500, icon: 'water', stock: -1, min_rank: 'everyone', auto_approve: false }
-        ];
+        return (currentChannelConfig && currentChannelConfig.store_items) ? currentChannelConfig.store_items : [];
       }
 
       function renderStoreItems() {
@@ -6765,9 +6988,9 @@ async function addNewChannel() {
         const { error } = await saveBotConfigFields({ store_items: items });
 
         if (error) {
-          showToast('Greška pri čuvanju artikla!', 'error');
+          showToast('error', 'Greška pri čuvanju artikla!');
         } else {
-          showToast(editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!', 'success');
+          showToast('success', editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!', '✅');
           closeModal('storeItemModal');
           renderStoreItems();
         }
@@ -6781,9 +7004,9 @@ async function addNewChannel() {
         const { error } = await saveBotConfigFields({ store_items: items });
 
         if (error) {
-          showToast('Greška pri brisanju artikla!', 'error');
+          showToast('error', 'Greška pri brisanju artikla!');
         } else {
-          showToast('Artikal obrisan!', 'success');
+          showToast('success', 'Artikal obrisan!', '✅');
           renderStoreItems();
         }
       }
@@ -6851,7 +7074,7 @@ async function addNewChannel() {
 
       async function simulirajKupovinuArtikla() {
         const itemId = document.getElementById('simStoreItemSelect')?.value;
-        const username = (document.getElementById('simStoreUser')?.value || 'TestGledalac').replace(/^@/, '').trim();
+        const username = (document.getElementById('simStoreUser')?.value || 'Korisnik').replace(/^@/, '').trim();
         const items = getStoreItems();
         const item = items.find(i => i.id === itemId);
 
