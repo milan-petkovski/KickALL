@@ -21,7 +21,7 @@
         // Get the appropriate redirect URI based on current page
         getRedirectUri: function() {
             // Match exact format from Kick Dashboard (with trailing slash)
-            // Include /Website/ path since site is served from there
+            // Use /Website/ path since site is served from there and it's in Kick OAuth app
             if (this.isLocalhost()) {
                 return 'http://localhost:5500/Website/auth/kick/callback/';
             }
@@ -30,7 +30,7 @@
         
         // Get the API base URL for token exchange
         getApiBase: function() {
-            // For localhost, use Render backend (has all environment variables)
+            // For localhost, use Render backend
             if (this.isLocalhost()) {
                 return 'https://kickbot-ihzb.onrender.com';
             }
