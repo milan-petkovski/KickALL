@@ -49,7 +49,12 @@ exports.handler = async (event) => {
       };
     }
 
-    const redirectUri = `https://kickall.app/auth/kick/callback/`;
+    const redirectUri = (() => {
+      const host = event.headers.host || '';
+      const protocol = event.headers['x-forwarded-proto'] || 'https';
+      const origin = `${protocol}://${host}`;
+      return `${origin}/auth/kick/callback/`;
+    })();
 
     const upstream = await fetch(`${base}/api/kick/exchange`, {
       method: 'POST',

@@ -215,7 +215,7 @@
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       </div>
       <h1 class="status-msg">Uspešna prijava!</h1>
-      <p class="status-sub">Preusmerjavanje na dashboard...</p>
+      <p class="status-sub">Preusmeravanje na dashboard...</p>
     </div>
   </div>
 
@@ -260,8 +260,8 @@
       const kickApiBase = (() => {
         const fromGlobal = (window.KICK_API_BASE || '').trim();
         if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-        if (window.location.hostname.endsWith('netlify.app') || 
-            window.location.hostname === 'localhost' || 
+        // Lokalno koristi Render backend direktno, produkcija koristi origin (sa Netlify redirect-ima)
+        if (window.location.hostname === 'localhost' || 
             window.location.hostname === '127.0.0.1') {
           return 'https://kickbot-ihzb.onrender.com';
         }

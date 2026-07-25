@@ -135,15 +135,23 @@ async function initAuth() {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     const oauthError = urlParams.get('error');
+    
+    // Check if coming from kickall (multiple sources with fallbacks)
+    const fromKickAll = sessionStorage.getItem('from_kickall') === 'true' || 
+                        localStorage.getItem('kick_origin_site') === 'kickall' ||
+                        (document.referrer && document.referrer.includes('kickall.app')) ||
+                        (document.referrer && document.referrer.includes('localhost:5500/dashboard.html')) ||
+                        (document.referrer && document.referrer.includes('localhost:5500/index.html'));
 
     if (oauthError) {
       document.getElementById('authGateMsg').textContent = 'Kick odbio autorizaciju...';
       showToast('error', `Kick odbio autorizaciju: ${oauthError}`, '❌');
-      setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+      setTimeout(() => { window.location.href = '../index.html'; }, 2000);
       return;
     }
 
-    if (code) {
+    // Skip OAuth code exchange if coming from kickall (already authenticated via Supabase)
+    if (code && !fromKickAll) {
       document.getElementById('authGateMsg').textContent = 'Autorizacija u toku...';
 
       const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
@@ -153,7 +161,7 @@ async function initAuth() {
       if (!isLocalhost && (!stateParam || stateParam !== savedState)) {
         document.getElementById('authGateMsg').textContent = 'Nevalidan state parametar...';
         showToast('error', 'State parametar se ne podudara.', '❌');
-        setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+        setTimeout(() => { window.location.href = '../index.html'; }, 2000);
         return;
       }
 
@@ -168,8 +176,8 @@ async function initAuth() {
       const kickApiBase = (() => {
         const fromGlobal = (window.KICK_API_BASE || '').trim();
         if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-        if (window.location.hostname.endsWith('netlify.app') ||
-          window.location.hostname === 'localhost' ||
+        // Lokalno koristi Render backend direktno, produkcija koristi origin (sa Netlify redirect-ima)
+        if (window.location.hostname === 'localhost' ||
           window.location.hostname === '127.0.0.1') {
           return 'https://kickbot-ihzb.onrender.com';
         }
@@ -177,21 +185,24 @@ async function initAuth() {
       })();
 
       try {
-        const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            code,
-            code_verifier: codeVerifier,
-            redirect_uri: redirectUri
-          }).toString()
-        });
+        const res = await Promise.race([
+          fetch(`${kickApiBase}/api/kick/exchange`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+              code,
+              code_verifier: codeVerifier,
+              redirect_uri: redirectUri
+            }).toString()
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('OAuth exchange timeout')), 15000))
+        ]);
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
           document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
           showToast('error', err.detail || err.error || 'Server nedostupan', '❌');
-          setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+          setTimeout(() => { window.location.href = '../index.html'; }, 3000);
           return;
         }
 
@@ -199,7 +210,7 @@ async function initAuth() {
         if (!tokenData.access_token) {
           document.getElementById('authGateMsg').textContent = 'Token nije primljen...';
           showToast('error', 'Nije primljen access_token', '❌');
-          setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+          setTimeout(() => { window.location.href = '../index.html'; }, 3000);
           return;
         }
 
@@ -298,7 +309,7 @@ async function initAuth() {
       } catch (err) {
         document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
         showToast('error', err.message, '❌');
-        setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+        setTimeout(() => { window.location.href = '../index.html'; }, 3000);
         return;
       }
     }
@@ -307,7 +318,7 @@ async function initAuth() {
     const kickAccessToken = localStorage.getItem('kick_access_token');
     const urlParamsOAuth = urlParams.get('kick_oauth') === '1';
 
-    if (urlParamsOAuth && kickAccessToken) {
+    if (urlParamsOAuth && kickAccessToken && !fromKickAll) {
       document.getElementById('authGateMsg').textContent = 'Učitavamo tvoj Kick profil...';
       try {
         await handleKickOAuthSession(kickAccessToken);
@@ -318,16 +329,24 @@ async function initAuth() {
     }
 
     // ── Standardna Supabase sesija ─────────────────────────────────────
+    document.getElementById('authGateMsg').textContent = 'Proveravamo sesiju...';
+    
     const { data: { session } } = await Promise.race([
       sb.auth.getSession(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Session check timeout')), 10000))
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Session check timeout')), 5000))
     ]);
+    
     if (!session) {
       document.getElementById('authGateMsg').textContent = 'Preusmeravanje na prijavu...';
-      setTimeout(() => { window.location.href = 'index.html?login=1'; }, 1200);
+      setTimeout(() => { window.location.href = '../index.html?login=1'; }, 1200);
       return;
     }
     currentUser = session.user;
+    
+    // Set origin site for cross-dashboard navigation
+    sessionStorage.setItem('kick_origin_site', 'kickot');
+    localStorage.setItem('kick_origin_site', 'kickot');
+    
     await initApp();
   } catch (err) {
     document.getElementById('authGateMsg').textContent = 'Greška pri proveri sesije.';
@@ -341,9 +360,12 @@ async function handleKickOAuthSession(accessToken) {
 
   // 1. Dohvati Kick korisnički profil koristeći access_token
   gateMsg.textContent = 'Dohvatamo podatke sa Kick platforme...';
-  const kickUserRes = await fetch('https://api.kick.com/public/v1/users', {
-    headers: { 'Authorization': `Bearer ${accessToken}` }
-  });
+  const kickUserRes = await Promise.race([
+    fetch('https://api.kick.com/public/v1/users', {
+      headers: { 'Authorization': `Bearer ${accessToken}` }
+    }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Kick API timeout')), 10000))
+  ]);
 
   let kickUsername = '';
   let kickUserId = '';
@@ -524,7 +546,7 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
 }
 
 sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_OUT') { window.location.href = 'index.html'; }
+  if (event === 'SIGNED_OUT') { window.location.href = '../index.html'; }
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -555,15 +577,10 @@ async function initApp() {
   // Load initial panel and all data BEFORE showing app
   if (activeChannel) {
     await loadAllData();
-    let lastPanel = 'overview';
-    const sessionActive = sessionStorage.getItem('dashboard-session-active');
-    if (sessionActive) {
-      lastPanel = localStorage.getItem('active-dashboard-panel') || 'overview';
-    } else {
-      sessionStorage.setItem('dashboard-session-active', 'true');
-      localStorage.setItem('active-dashboard-panel', 'overview');
-    }
-    if (lastPanel === 'no-channel') {
+    let lastPanel = localStorage.getItem('active-dashboard-panel');
+    // Default to overview if panel is unknown or invalid
+    const validPanels = ['overview', 'leaderboard', 'commands', 'games', 'announces', 'autoresponse', 'marriages', 'minigames', 'songs', 'economy', 'config', 'moderation'];
+    if (!lastPanel || !validPanels.includes(lastPanel) || lastPanel === 'no-channel') {
       lastPanel = 'overview';
     }
     switchPanel(lastPanel);
@@ -1264,18 +1281,48 @@ async function loadAllData() {
   if (!activeChannel) return;
 
   // Sačekamo sve asinhrone pozive kako bismo znali da li je osvežavanje uspešno
+  // Dodajemo timeout za svaki load da ne blokiraju ceo proces
   await Promise.all([
-    loadCommands(),
-    loadLeaderboard(),
-    loadWatchtime(),
-    loadMarriages(),
-    loadLoveStatuses(),
-    loadBotConfig(),
-    loadBotStatus(),
-    loadChannelLiveStatus(),
-    loadNotifications(),
-    loadChangelogs()
+    Promise.race([
+      loadCommands(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Commands load timeout')), 8000))
+    ]).catch(() => { console.warn('Commands load failed or timed out'); }),
+    Promise.race([
+      loadLeaderboard(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Leaderboard load timeout')), 8000))
+    ]).catch(() => { console.warn('Leaderboard load failed or timed out'); }),
+    Promise.race([
+      loadWatchtime(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Watchtime load timeout')), 8000))
+    ]).catch(() => { console.warn('Watchtime load failed or timed out'); }),
+    Promise.race([
+      loadMarriages(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Marriages load timeout')), 5000))
+    ]).catch(() => { console.warn('Marriages load failed or timed out'); }),
+    Promise.race([
+      loadLoveStatuses(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Love statuses load timeout')), 5000))
+    ]).catch(() => { console.warn('Love statuses load failed or timed out'); }),
+    Promise.race([
+      loadBotConfig(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Bot config load timeout')), 5000))
+    ]).catch(() => { console.warn('Bot config load failed or timed out'); }),
+    Promise.race([
+      loadBotStatus(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Bot status load timeout')), 5000))
+    ]).catch(() => { console.warn('Bot status load failed or timed out'); }),
+    Promise.race([
+      loadNotifications(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Notifications load timeout')), 5000))
+    ]).catch(() => { console.warn('Notifications load failed or timed out'); }),
+    Promise.race([
+      loadChangelogs(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Changelogs load timeout')), 5000))
+    ]).catch(() => { console.warn('Changelogs load failed or timed out'); })
   ]);
+
+  // Load channel live status separately (non-critical, can fail without blocking UI)
+  loadChannelLiveStatus().catch(() => { console.warn('Channel live status load failed (non-critical)'); });
 
   setupRealtimeChannels();
   startLiveActivityFeed();
@@ -3207,9 +3254,8 @@ function toggleModerationPanelState() {
 function getBotApiBase() {
   const fromGlobal = (window.KICK_API_BASE || '').trim();
   if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-  // Ako je pokrenuto na Netlify ili lokalno, koristi Render backend
-  if (window.location.hostname.endsWith('netlify.app') ||
-    window.location.hostname === 'localhost' ||
+  // Lokalno koristi Render backend direktno, produkcija koristi origin (sa Netlify redirect-ima)
+  if (window.location.hostname === 'localhost' ||
     window.location.hostname === '127.0.0.1') {
     return 'https://kickbot-ihzb.onrender.com';
   }
@@ -4019,8 +4065,8 @@ function loadEconomyPanelData() {
 
 function switchPanel(panelId) {
   // Prevent switching if already on this panel
-  const currentPanel = localStorage.getItem('active-dashboard-panel');
-  if (currentPanel === panelId) return;
+  const currentPanel = document.querySelector('.panel.active');
+  if (currentPanel && currentPanel.id === `panel-${panelId}`) return;
 
   document.body.style.overflow = '';
   const mainContent = document.getElementById('mainContent');
@@ -4064,7 +4110,7 @@ function switchPanel(panelId) {
     if (!configLoaded) loadBotConfig();
     switchEconomyTab(currentEconomyTab || 'config');
   }
-  if (panelId === 'games') renderBuiltinCommandsGrid();
+  if (panelId === 'games' || panelId === 'minigames') renderBuiltinCommandsGrid();
 
   if (window.innerWidth < 768) {
     document.getElementById('sidebar').classList.remove('mobile-open');
@@ -4138,7 +4184,7 @@ async function handleSignOut() {
   } catch (e) {
     console.error("KickOT signOut error:", e);
   } finally {
-    window.location.replace('index.html');
+    window.location.replace('../index.html');
   }
 }
 
@@ -4175,7 +4221,7 @@ window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
     localStorage.clear();
     sessionStorage.clear();
-    window.location.replace('index.html');
+    window.location.replace('../index.html');
   }
 });
 
@@ -4183,7 +4229,7 @@ window.addEventListener('storage', (event) => {
   if (event.key === 'kickbot_global_logout') {
     localStorage.clear();
     sessionStorage.clear();
-    window.location.replace('index.html');
+    window.location.replace('../index.html');
   }
 });
 
@@ -4195,7 +4241,7 @@ async function checkServerLogoutStatus() {
     ]);
     const session = sessionData?.session;
     if (session?.user?.id) {
-      const res = await fetch(`https://kickbot-ihzb.onrender.com/api/check-logout?userId=${session.user.id}`);
+      const res = await fetch(`${getBotApiBase()}/api/check-logout?userId=${session.user.id}`);
       if (res.ok) {
         const data = await res.json();
         if (data.shouldLogout) {
@@ -5469,7 +5515,7 @@ async function addNewChannel() {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
           return `${window.location.origin}/auth/kick/callback/`;
         }
-        return `${window.location.origin}/auth/kick/callback/`;
+        return 'https://kickall.app/auth/kick/callback/';
       }
 
       async function openKickLoginForChannel() {

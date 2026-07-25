@@ -136,7 +136,7 @@
             <span class="lang-sr">Tvoj glavni chatbot asistent. Komande, moderacija četa, watchtime poeni, rangovi, leaderboard i zabavne mini-igre.</span>
             <span class="lang-en">Your core chatbot assistant. Commands, chat moderation, watchtime points, ranks, leaderboard and fun mini-games.</span>
           </p>
-          <a href="kickot/dashboard.html" class="card-btn btn-green-fill" onclick="event.stopPropagation()">
+          <a href="kickot/dashboard.html" class="card-btn btn-green-fill" onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } return true;">
             <span class="lang-sr">Otvori Dashboard →</span>
             <span class="lang-en">Open Dashboard →</span>
           </a>

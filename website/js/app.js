@@ -1004,8 +1004,11 @@ function notifyGlobalLogout(userId) {
     }
     
     // Obavesti server koristeći prosleđeni id
+    const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'https://kickbot-ihzb.onrender.com'
+        : window.location.origin;
     if (userId) {
-        fetch('https://kickbot-ihzb.onrender.com/api/global-logout', {
+        fetch(`${apiBase}/api/global-logout`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: userId })
@@ -1514,7 +1517,7 @@ window.addEventListener('storage', (event) => {
 
             // 1. Try Backend Live API
             try {
-                const apiRes = await fetch('https://kickbot-ihzb.onrender.com/api/stats');
+                const apiRes = await fetch(`${window.location.origin}/api/stats`);
                 if (apiRes.ok) {
                     const apiData = await apiRes.json();
                     if (apiData.total_messages) realMessagesCount = apiData.total_messages;
@@ -1609,7 +1612,10 @@ window.addEventListener('storage', (event) => {
             const channel = card.getAttribute('data-channel');
             if (!channel) return;
             try {
-                const res = await fetch(`https://kickbot-ihzb.onrender.com/api/avatar?username=${channel}`);
+                const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                    ? 'https://kickbot-ihzb.onrender.com'
+                    : window.location.origin;
+                const res = await fetch(`${apiBase}/api/avatar?username=${channel}`);
                 if (res.ok) {
                     const data = await res.json();
                     const liveBadge = card.querySelector('.showcase-live-badge');
@@ -1646,7 +1652,10 @@ window.addEventListener('storage', (event) => {
             
             if (!channel) return;
             try {
-                const res = await fetch(`https://kickbot-ihzb.onrender.com/api/avatar?username=${channel}`);
+                const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                    ? 'https://kickbot-ihzb.onrender.com'
+                    : window.location.origin;
+                const res = await fetch(`${apiBase}/api/avatar?username=${channel}`);
                 if (res.ok) {
                     const data = await res.json();
                     const avatar = card.querySelector(`#t-avatar-${cardNum}`);

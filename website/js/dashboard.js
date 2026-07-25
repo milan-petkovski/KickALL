@@ -12,7 +12,10 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
 // ── Fetch Kick Channel Data ───────────────────────────────
 async function fetchKickChannelData(username) {
   try {
-    const localRes = await fetch(`https://kickbot-ihzb.onrender.com/api/avatar?username=${username}`);
+    const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'https://kickbot-ihzb.onrender.com'
+        : window.location.origin;
+    const localRes = await fetch(`${apiBase}/api/avatar?username=${username}`);
     if (localRes.ok) {
       const d = await localRes.json();
       if (d && d.chatroom_id !== undefined) {
@@ -152,8 +155,8 @@ async function checkAuth() {
     const kickApiBase = (() => {
       const fromGlobal = (window.KICK_API_BASE || '').trim();
       if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-      if (window.location.hostname.endsWith('netlify.app') || 
-          window.location.hostname === 'localhost' || 
+      // Lokalno koristi Render backend direktno, produkcija koristi origin (sa Netlify redirect-ima)
+      if (window.location.hostname === 'localhost' || 
           window.location.hostname === '127.0.0.1') {
         return 'https://kickbot-ihzb.onrender.com';
       }
@@ -221,6 +224,16 @@ async function checkAuth() {
     window.location.href = 'index.html';
   } else {
     currentUser = session.user;
+    
+    // Set origin site for cross-dashboard navigation (always set when authenticated)
+    try {
+      sessionStorage.setItem('kick_origin_site', 'kickall');
+      localStorage.setItem('kick_origin_site', 'kickall');
+      sessionStorage.setItem('from_kickall', 'true');
+    } catch (e) {
+      console.warn('Failed to set origin flags:', e);
+    }
+    
     initDashboard(currentUser);
   }
 }
@@ -1065,7 +1078,10 @@ function notifyGlobalLogout(userId) {
   }
 
   if (userId) {
-    fetch('https://kickbot-ihzb.onrender.com/api/global-logout', {
+    const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'https://kickbot-ihzb.onrender.com'
+        : window.location.origin;
+    fetch(`${apiBase}/api/global-logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: userId })
