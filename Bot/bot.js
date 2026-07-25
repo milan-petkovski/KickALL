@@ -1348,6 +1348,8 @@ http.createServer(async (req, res) => {
                         return;
                     }
 
+                    console.log('Token exchange debug:', { redirectUri, codeVerifier: codeVerifier.substring(0, 20) + '...', code: code.substring(0, 20) + '...' });
+
                     const tokenRes = await fetch('https://id.kick.com/oauth/token', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
