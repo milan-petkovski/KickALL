@@ -1456,13 +1456,24 @@ window.addEventListener('storage', (event) => {
     }
 
     async function openKickLogin() {
-        // Use global auth system if available
+        // 1. Jasno postavi origin site i target stranicu
+        try {
+            sessionStorage.setItem('kick_origin_site', 'kickall');
+            localStorage.setItem('kick_origin_site', 'kickall');
+            sessionStorage.setItem('from_kickall', 'true');
+            sessionStorage.setItem('kick_redirect_page', '/dashboard.html');
+            localStorage.setItem('kick_redirect_page', '/dashboard.html');
+        } catch (e) {
+            console.warn('Storage not available:', e);
+        }
+
+        // 2. Ako koristiš globalni KickAuth
         if (window.KickAuth) {
-            KickAuth.initiateOAuth('/Website/dashboard.html');
+            KickAuth.initiateOAuth('/dashboard.html'); // Uklonjeno /Website/
             return;
         }
         
-        // Fallback to old system if global auth not available
+        // 3. Fallback ako nema KickAuth-a
         const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
         const KICK_REDIRECT_URI = getKickRedirectUri();
         const KICK_SCOPE = 'user:read channel:read chat:read chat:write moderation:read moderation:write';

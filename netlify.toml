@@ -1,3 +1,4 @@
+# API i Auth preusmeravanja (najveći prioritet)
 [[redirects]]
   from = "/api/kick/exchange"
   to = "/.netlify/functions/kick-exchange"
@@ -7,6 +8,54 @@
 [[redirects]]
   from = "/api/kick/me"
   to = "/.netlify/functions/kick-me"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/kick/test-ping"
+  to = "https://kickbot-ihzb.onrender.com/api/kick/test-ping"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/kick/channel"
+  to = "https://kickbot-ihzb.onrender.com/api/kick/channel"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/kick/reload"
+  to = "https://kickbot-ihzb.onrender.com/api/kick/reload"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/kick/logs"
+  to = "https://kickbot-ihzb.onrender.com/api/kick/logs"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/avatar"
+  to = "https://kickbot-ihzb.onrender.com/api/avatar"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/global-logout"
+  to = "https://kickbot-ihzb.onrender.com/api/global-logout"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/check-logout"
+  to = "https://kickbot-ihzb.onrender.com/api/check-logout"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/stats"
+  to = "https://kickbot-ihzb.onrender.com/api/stats"
   status = 200
   force = true
 
@@ -22,14 +71,16 @@
   status = 200
   force = true
 
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  force = false
-
+# Specifične rute za pod-aplikacije (MORA IĆI PRE /*)
 [[redirects]]
   from = "/kickot/*"
   to = "/kickot/index.html"
+  status = 200
+  force = false
+
+# Catch-all za glavnu aplikaciju (MORA IĆI NA SAMOM DNU)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
   status = 200
   force = false
