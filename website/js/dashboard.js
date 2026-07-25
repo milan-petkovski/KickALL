@@ -203,7 +203,14 @@ async function checkAuth() {
   }
 
   const isOAuthRedirect = urlParams.get('kick_oauth') === '1';
-  const kickAccessToken = localStorage.getItem('kick_access_token');
+  
+  // Use global auth system if available
+  let kickAccessToken = null;
+  if (window.KickAuth) {
+    kickAccessToken = KickAuth.getAccessToken();
+  } else {
+    kickAccessToken = localStorage.getItem('kick_access_token');
+  }
 
   if (isOAuthRedirect && kickAccessToken) {
     document.getElementById('authGateMsg').textContent = currentLang === 'sr' ? 'Povezujemo tvoj Kick nalog...' : 'Connecting your Kick account...';
@@ -1020,24 +1027,29 @@ async function handleLogout() {
       notifyGlobalLogout(userId);
     }
 
-    // Obriši sve lokalne i Kick tokene odmah
-    try {
-      localStorage.removeItem('kick_access_token');
-      localStorage.removeItem('kick_token_type');
-      localStorage.removeItem('kick_session_active');
-      localStorage.removeItem('kick_oauth_state');
-      localStorage.removeItem('kick_code_verifier');
-      sessionStorage.clear();
+    // Use global auth system if available
+    if (window.KickAuth) {
+      KickAuth.logout();
+    } else {
+      // Fallback to manual cleanup
+      try {
+        localStorage.removeItem('kick_access_token');
+        localStorage.removeItem('kick_token_type');
+        localStorage.removeItem('kick_session_active');
+        localStorage.removeItem('kick_oauth_state');
+        localStorage.removeItem('kick_code_verifier');
+        sessionStorage.clear();
 
-      // Obriši sve Supabase auth tokene iz localStorage
-      for (let i = localStorage.length - 1; i >= 0; i--) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.startsWith('kick_'))) {
-          localStorage.removeItem(key);
+        // Obriši sve Supabase auth tokene iz localStorage
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.startsWith('kick_'))) {
+            localStorage.removeItem(key);
+          }
         }
+      } catch (e) {
+        console.warn('LocalStorage/sessionStorage not available during logout:', e);
       }
-    } catch (e) {
-      console.warn('LocalStorage/sessionStorage not available during logout:', e);
     }
 
     if (typeof sb !== 'undefined' && sb && sb.auth) {

@@ -18,6 +18,10 @@
   <!-- Fontovi -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
+  <!-- Global Auth Configuration -->
+  <script src="js/auth-config.js"></script>
+  <script src="js/global-auth.js"></script>
+
   <!-- Favicon i Stilovi -->
   <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
   <link rel="apple-touch-icon" href="assets/logo.png" />
@@ -28,7 +32,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
-<body class="lang-sr auth-loading">
+<body class="auth-loading">
 
   <!-- Grid background glows -->
   <div class="glow-bg">
@@ -76,8 +80,7 @@
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
-              <span class="lang-sr">Početna stranica</span>
-              <span class="lang-en">Home Page</span>
+              <span data-i18n="dashboard.homePage">Početna stranica</span>
             </a>
             <button class="dropdown-item danger" id="btnLogout">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
@@ -85,8 +88,7 @@
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-              <span class="lang-sr">Odjavi se</span>
-              <span class="lang-en">Log Out</span>
+              <span data-i18n="dashboard.logOut">Odjavi se</span>
             </button>
           </div>
         </div>
@@ -101,12 +103,10 @@
       <!-- Welcome Header -->
       <section class="welcome-section">
         <h1 class="welcome-title">
-          <span class="lang-sr">Ekosistem <span class="gradient-text">KickALL</span></span>
-          <span class="lang-en"><span class="gradient-text">KickALL</span> Ecosystem</span>
+          <span data-i18n="dashboard.ecosystem">Ekosistem <span class="gradient-text">KickALL</span></span>
         </h1>
         <p class="welcome-subtitle">
-          <span class="lang-sr">Izaberi modul sa kojim želiš da upravljaš i podesi svoj stream za nekoliko trenutaka.</span>
-          <span class="lang-en">Choose the module you wish to manage and configure your stream in a matter of moments.</span>
+          <span data-i18n="dashboard.subtitle">Izaberi modul sa kojim želiš da upravljaš i podesi svoj stream za nekoliko trenutaka.</span>
         </p>
       </section>
 
@@ -117,7 +117,8 @@
         <div class="module-dashboard-card card-kickot" onclick="location.href='kickot/dashboard.html'">
           <div class="card-header-row">
             <span class="card-status-badge status-active">
-              <span class="lang-sr">Aktivan</span>
+              <span cllssnglsng-rt">Ak</san</span>
+              <span class="lang-pnan>ce
               <span class="lang-en">Active</span>
             </span>
             <div class="card-icon-wrap">
@@ -133,12 +134,10 @@
           </div>
           <h2 class="card-title">Kickot</h2>
           <p class="card-description">
-            <span class="lang-sr">Tvoj glavni chatbot asistent. Komande, moderacija četa, watchtime poeni, rangovi, leaderboard i zabavne mini-igre.</span>
-            <span class="lang-en">Your core chatbot assistant. Commands, chat moderation, watchtime points, ranks, leaderboard and fun mini-games.</span>
+            <span data-i18n="dashboard.kickotDesc">Tvoj glavni chatbot asistent. Komande, moderacija četa, watchtime poeni, rangovi, leaderboard i zabavne mini-igre.</span>
           </p>
           <a href="kickot/dashboard.html" class="card-btn btn-green-fill" onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } return true;">
-            <span class="lang-sr">Otvori Dashboard →</span>
-            <span class="lang-en">Open Dashboard →</span>
+            <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
           </a>
         </div>
 
@@ -146,8 +145,7 @@
         <div class="module-dashboard-card card-kickaj" onclick="location.href='index.html?tab=kickaj'">
           <div class="card-header-row">
             <span class="card-status-badge status-soon">
-              <span class="lang-sr">Uskoro</span>
-              <span class="lang-en">Soon</span>
+              <span data-i18n="dashboard.soon">Uskoro</span>
             </span>
             <div class="card-icon-wrap">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -161,12 +159,10 @@
           </div>
           <h2 class="card-title">Kickaj</h2>
           <p class="card-description">
-            <span class="lang-sr">Sistem interaktivnih nagradnih igara (Giveaways). Izvlaci pobednike uživo na ekranu pomoću prelepog točka sreće.</span>
-            <span class="lang-en">Interactive giveaway system. Draw winners live on stream using a beautiful, fully customizable fortune wheel.</span>
+            <span data-i18n="dashboard.kickajDesc">Sistem interaktivnih nagradnih igara (Giveaways). Izvlaci pobednike uživo na ekranu pomoću prelepog točka sreće.</span>
           </p>
           <a href="index.html?tab=kickaj" class="card-btn btn-violet-outline" onclick="event.stopPropagation()">
-            <span class="lang-sr">Isprobaj demo →</span>
-            <span class="lang-en">Try demo →</span>
+            <span data-i18n="dashboard.tryDemo">Isprobaj demo →</span>
           </a>
         </div>
 
@@ -174,8 +170,7 @@
         <div class="module-dashboard-card card-kickan" onclick="location.href='index.html?tab=kickan'">
           <div class="card-header-row">
             <span class="card-status-badge status-soon" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B; border-color: rgba(245, 158, 11, 0.25);">
-              <span class="lang-sr">Uskoro</span>
-              <span class="lang-en">Soon</span>
+              <span data-i18n="dashboard.soon">Uskoro</span>
             </span>
             <div class="card-icon-wrap">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -187,12 +182,10 @@
           </div>
           <h2 class="card-title">Kickan</h2>
           <p class="card-description">
-            <span class="lang-sr">Napredna statistika i grafici rasta tvog kanala. Prati broj gledalaca, pratioce i pretplatnike u realnom vremenu.</span>
-            <span class="lang-en">Advanced statistics and growth charts. Monitor viewer counts, followers and subscribers in real-time.</span>
+            <span data-i18n="dashboard.kickanDesc">Napredna statistika i grafici rasta tvog kanala. Prati broj gledalaca, pratioce i pretplatnike u realnom vremenu.</span>
           </p>
           <a href="index.html?tab=kickan" class="card-btn btn-amber-outline" onclick="event.stopPropagation()">
-            <span class="lang-sr">Isprobaj demo →</span>
-            <span class="lang-en">Try demo →</span>
+            <span data-i18n="dashboard.tryDemo">Isprobaj demo →</span>
           </a>
         </div>
 
@@ -200,8 +193,7 @@
         <div class="module-dashboard-card card-kickov" onclick="location.href='index.html?tab=kickov'">
           <div class="card-header-row">
             <span class="card-status-badge status-soon">
-              <span class="lang-sr">Uskoro</span>
-              <span class="lang-en">Soon</span>
+              <span data-i18n="dashboard.soon">Uskoro</span>
             </span>
             <div class="card-icon-wrap">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -213,12 +205,10 @@
           </div>
           <h2 class="card-title">Kickov</h2>
           <p class="card-description">
-            <span class="lang-sr">Prilagodljivi vidžeti i overlay-i u realnom vremenu (chat box, ciljevi, alerti) za tvoj strim.</span>
-            <span class="lang-en">Custom real-time widgets and stream overlays (chat box, goals, alerts) for your stream.</span>
+            <span data-i18n="dashboard.kickovDesc">Prilagodljivi vidžeti i overlay-i u realnom vremenu (chat box, ciljevi, alerti) za tvoj strim.</span>
           </p>
           <a href="index.html?tab=kickov" class="card-btn btn-violet-outline" onclick="event.stopPropagation()">
-            <span class="lang-sr">Isprobaj demo →</span>
-            <span class="lang-en">Try demo →</span>
+            <span data-i18n="dashboard.tryDemo">Isprobaj demo →</span>
           </a>
         </div>
 
@@ -235,8 +225,7 @@
             <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
           </svg>
           <span class="lang-sr">Referral Program</span>
-          <span class="lang-en">Referral Program</span>
-        </button>
+          <span data-i18n="daehboand.referralProgram
       </section>
     </div>
   </main>
@@ -367,12 +356,10 @@
     <div class="modal-container withdrawal-modal">
       <button class="modal-close-btn" id="closeWithdrawalModal">✕</button>
       <h2 class="modal-title">
-        <span class="lang-sr">💸 Zatraži isplatu</span>
-        <span class="lang-en">💸 Request Withdrawal</span>
+        <span data-i18n="dashboard.requestWithdrawal">💸 Zatraži isplatu</span>
       </h2>
       <p class="modal-subtitle">
-        <span class="lang-sr">Dostupno za isplatu: <span id="modalAvailableBalance">€0.00</span></span>
-        <span class="lang-en">Available for withdrawal: <span id="modalAvailableBalance">€0.00</span></span>
+        <span data-i18n="dashboard.availableForWithdrawal">Dostupno za isplatu: <span id="modalAvailableBalance">€0.00</span></span>
       </p>
 
       <form id="withdrawalForm" class="withdrawal-form">
@@ -393,8 +380,7 @@
 
         <div class="form-group">
           <label class="form-label">
-            <span class="lang-sr">Način plaćanja</span>
-            <span class="lang-en">Payment Method</span>
+            <span data-i18n="dashboard.paymentMethod">Način plaćanja</span>
           </label>
           <select id="paymentMethod" class="form-select" required>
             <option value="">Izaberi način plaćanja / Select payment method</option>
@@ -417,8 +403,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary withdrawal-submit-btn">
-          <span class="lang-sr">Pošalji zahtev</span>
-          <span class="lang-en">Submit Request</span>
+          <span data-i18n="dashboard.submitRequest">Pošalji zahtev</span>
         </button>
       </form>
 
@@ -428,8 +413,7 @@
           <span class="lang-en">⚠️ Requests are processed manually. Usually takes 1-3 business days.</span>
         </p>
         <p class="info-text">
-          <span class="lang-sr">📌 Minimum za isplatu je €5</span>
-          <span class="lang-en">📌 Minimum withdrawal is €5</span>
+          <span data-i18n="dashboard.minimumWithdrawal">📌 Minimum za isplatu je €5</span>
         </p>
       </div>
     </div>

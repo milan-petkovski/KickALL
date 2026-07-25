@@ -369,7 +369,7 @@ window.addEventListener('keydown', e => {
 // ── Kick OAuth / Login Flow ────────────────────────────────
 function getKickRedirectUri() {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return `${window.location.origin}/auth/kick/callback/`;
+    return 'http://localhost:5500/auth/kick/callback/'; // Use fixed callback URL for consistency
   }
   return 'https://kickall.app/auth/kick/callback/';
 }
@@ -405,6 +405,13 @@ async function generateCodeChallenge(v) {
 }
 
 async function openKickLogin() {
+  // Use global auth system if available
+  if (window.KickAuth) {
+    KickAuth.initiateOAuth('kickot/dashboard.html');
+    return;
+  }
+  
+  // Fallback to old system if global auth not available
   const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
   const KICK_REDIRECT_URI = getKickRedirectUri();
   const KICK_SCOPE = 'user:read channel:read chat:read chat:write moderation:read moderation:write';

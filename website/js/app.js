@@ -6,12 +6,58 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------
+    // Element References
+    // -----------------------------------------------------------------
+    const authKickLoginBtn = document.getElementById('authKickLoginBtn');
+    
+    // -----------------------------------------------------------------
+    // 0. OAuth Callback Handling - Now managed by global-auth.js
+    // -----------------------------------------------------------------
+    
+    // Reset loading state on page visibility change (handles back button)
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && authKickLoginBtn) {
+            authKickLoginBtn.classList.remove('loading');
+            const btnText = authKickLoginBtn.querySelector('span');
+            if (btnText) {
+                btnText.textContent = btnText.getAttribute('data-i18n') ? 
+                    window.translations?.auth?.signInWithKick || 'Prijavi se preko Kicka' : 
+                    'Prijavi se preko Kicka';
+            }
+        }
+    });
+    
+    // Reset loading state on pageshow event (handles back/forward navigation)
+    window.addEventListener('pageshow', (event) => {
+        if (authKickLoginBtn) {
+            authKickLoginBtn.classList.remove('loading');
+            const btnText = authKickLoginBtn.querySelector('span');
+            if (btnText) {
+                btnText.textContent = btnText.getAttribute('data-i18n') ? 
+                    window.translations?.auth?.signInWithKick || 'Prijavi se preko Kicka' : 
+                    'Prijavi se preko Kicka';
+            }
+        }
+    });
+    
+    if (authKickLoginBtn) {
+        authKickLoginBtn.classList.remove('loading');
+        const btnText = authKickLoginBtn.querySelector('span');
+        if (btnText) {
+            btnText.textContent = btnText.getAttribute('data-i18n') ? 
+                window.translations?.auth?.signInWithKick || 'Prijavi se preko Kicka' : 
+                'Prijavi se preko Kicka';
+        }
+    }
+    
+    // -----------------------------------------------------------------
     // 1. Jezički Switcher (SR / EN)
     // -----------------------------------------------------------------
     const btnSr = document.getElementById('btn-sr');
     const btnEn = document.getElementById('btn-en');
-    const body = document.body;
-
+    
+    // Current language state
+    let currentLang = 'sr';
     // Učitaj sačuvani jezik ili postavi podrazumevani (SR)
     let savedLang = 'sr';
     try {
@@ -33,9 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setLanguage(lang) {
+        currentLang = lang;
         if (lang === 'en') {
-            body.classList.remove('lang-sr');
-            body.classList.add('lang-en');
             try {
                 localStorage.setItem('kickall_lang', 'en');
             } catch (e) {
@@ -44,8 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btnEn) btnEn.classList.add('active');
             if (btnSr) btnSr.classList.remove('active');
         } else {
-            body.classList.remove('lang-en');
-            body.classList.add('lang-sr');
             try {
                 localStorage.setItem('kickall_lang', 'sr');
             } catch (e) {
@@ -102,6 +145,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------
     const mobileToggle = document.getElementById('mobileToggle');
     const navMenu = document.getElementById('navMenu');
+    const mobileMenuClose = document.getElementById('mobileMenuClose');
+    const mobileLoginBtn = document.getElementById('mobileLoginBtn');
 
     if (mobileToggle && navMenu) {
         mobileToggle.addEventListener('click', () => {
@@ -131,6 +176,41 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    // Mobile menu close button
+    if (mobileMenuClose && navMenu && mobileToggle) {
+        mobileMenuClose.addEventListener('click', () => {
+            navMenu.classList.remove('open');
+            mobileToggle.classList.remove('active');
+            mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+            mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+        });
+    }
+
+    // Mobile login button
+    if (mobileLoginBtn) {
+        mobileLoginBtn.addEventListener('click', () => {
+            openAuthModal();
+            // Close mobile menu
+            navMenu.classList.remove('open');
+            mobileToggle.classList.remove('active');
+            mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+            mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+        });
+    }
+
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', (e) => {
+        if (navMenu && navMenu.classList.contains('open')) {
+            // Check if click is outside nav menu and mobile toggle
+            if (!navMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
+                navMenu.classList.remove('open');
+                mobileToggle.classList.remove('active');
+                mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+                mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+            }
+        }
+    });
 
     // -----------------------------------------------------------------
     // 4. Tabovi u Playground Sekciji
@@ -374,8 +454,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const parts = message.split(' ');
         const cmd = parts[0].toLowerCase();
         const arg = parts.slice(1).join(' ').trim();
-        const isEn = body.classList.contains('lang-en');
-        const lang = isEn ? 'en' : 'sr';
+        const isEn = currentLang === 'en';
+        const lang = currentLang;
         
         // Get translations from global translations object
         const t = window.translations || {};
@@ -504,7 +584,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (startGiveawayBtn) {
         startGiveawayBtn.addEventListener('click', () => {
             const prizeValue = giveawayPrize.value.trim() || 'Subscribe 🎁';
-            const isEn = body.classList.contains('lang-en');
+            const isEn = currentLang === 'en';
 
             prizeDisplay.textContent = prizeValue;
             winnerAnnouncement.style.display = 'none';
@@ -636,7 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const alertCard = document.createElement('div');
         alertCard.className = `live-alert-card ${type === 'sub' ? 'alert-sub' : ''}`;
-        const isEn = body.classList.contains('lang-en');
+        const isEn = currentLang === 'en';
 
         let icon = '⚡';
         let title = isEn ? 'New Follower!' : 'Novi Pratilac!';
@@ -854,6 +934,9 @@ document.addEventListener('DOMContentLoaded', () => {
     cards.forEach(card => {
         let cardTimeout = null;
         card.addEventListener('mousemove', e => {
+            // Disable on mobile/tablet devices (< 1024px)
+            if (window.innerWidth < 1024) return;
+            
             if (cardTimeout) return;
             cardTimeout = setTimeout(() => {
                 const rect = card.getBoundingClientRect();
@@ -884,7 +967,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Koristi lokalizaciju
                 const t = window.translations || {};
                 const copyText = t.copy || {};
-                const isEn = body.classList.contains('lang-en');
+                const isEn = currentLang === 'en';
 
                 if (copyBtnText) copyBtnText.textContent = copyText.copied || (isEn ? 'Copied!' : 'Kopirano!');
                 if (copyBtnTextEn) copyBtnTextEn.textContent = copyText.copied || 'Copied!';
@@ -907,10 +990,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Supabase Auth Session Check & UI Dynamic Update ──────
     const authModal = document.getElementById('authModal');
     const navBtnLogin = document.getElementById('navBtnLogin');
+    const mobileDashboardBtn = document.getElementById('mobileDashboardBtn');
     const navBtnPrimary = document.getElementById('navBtnPrimary');
     const heroBtnPrimary = document.getElementById('heroBtnPrimary');
     const authModalClose = document.getElementById('authModalClose');
-    const authKickLoginBtn = document.getElementById('authKickLoginBtn');
 
     // Initialize Supabase with same config as other pages
     const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
@@ -1044,15 +1127,50 @@ window.addEventListener('storage', (event) => {
 
     function openAuthModal() {
         if (authModal) {
+            // Reset loading state when opening modal
+            if (authKickLoginBtn) {
+                authKickLoginBtn.classList.remove('loading');
+                const btnText = authKickLoginBtn.querySelector('span');
+                if (btnText) {
+                    btnText.textContent = btnText.getAttribute('data-i18n') ? 
+                        window.translations?.auth?.signInWithKick || 'Prijavi se preko Kicka' : 
+                        'Prijavi se preko Kicka';
+                }
+            }
+            
+            const scrollY = window.scrollY;
             authModal.classList.add('open');
             document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            document.body.style.top = `-${scrollY}px`;
+            document.body.dataset.scrollY = scrollY;
         }
     }
 
     function closeAuthModal() {
         if (authModal) {
+            // Reset loading state when closing modal
+            if (authKickLoginBtn) {
+                authKickLoginBtn.classList.remove('loading');
+                const btnText = authKickLoginBtn.querySelector('span');
+                if (btnText) {
+                    btnText.textContent = btnText.getAttribute('data-i18n') ? 
+                        window.translations?.auth?.signInWithKick || 'Prijavi se preko Kicka' : 
+                        'Prijavi se preko Kicka';
+                }
+            }
+            
             authModal.classList.remove('open');
+            const scrollY = document.body.dataset.scrollY || '0';
             document.body.style.overflow = '';
+            document.documentElement.style.overflow = '';
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.top = '';
+            delete document.body.dataset.scrollY;
+            window.scrollTo(0, parseInt(scrollY));
         }
     }
 
@@ -1072,6 +1190,12 @@ window.addEventListener('storage', (event) => {
             // User is logged in! Update UI
             if (navBtnLogin) {
                 navBtnLogin.style.display = 'none';
+            }
+            if (mobileDashboardBtn) {
+                mobileDashboardBtn.style.display = 'inline-flex';
+            }
+            if (mobileLoginBtn) {
+                mobileLoginBtn.style.display = 'none';
             }
             if (navBtnPrimary) {
                 navBtnPrimary.style.display = 'none';
@@ -1105,7 +1229,7 @@ window.addEventListener('storage', (event) => {
                 if (heroBtnPrimaryText) {
                     const t = window.translations || {};
                     const userProfile = t.userProfile || {};
-                    const isEn = body.classList.contains('lang-en');
+                    const isEn = currentLang === 'en';
                     heroBtnPrimaryText.textContent = userProfile.goToDashboard || (isEn ? 'Go to Dashboard' : 'Idi na Dashboard');
                     heroBtnPrimaryText.removeAttribute('data-i18n');
                 }
@@ -1160,7 +1284,7 @@ window.addEventListener('storage', (event) => {
 
                 const t = window.translations || {};
                 const userProfile = t.userProfile || {};
-                const isEn = body.classList.contains('lang-en');
+                const isEn = currentLang === 'en';
                 
                 const title = userProfile.title || (isEn ? 'MY PROFILE & STATUS' : 'MOJ PROFIL & STATUS');
                 const botActiveText = userProfile.botActive || (isEn ? 'BOT ACTIVE' : 'BOT AKTIVAN');
@@ -1219,6 +1343,12 @@ window.addEventListener('storage', (event) => {
         if (navBtnLogin) {
             navBtnLogin.style.display = 'inline-flex';
         }
+        if (mobileDashboardBtn) {
+            mobileDashboardBtn.style.display = 'none';
+        }
+        if (mobileLoginBtn) {
+            mobileLoginBtn.style.display = 'inline-flex';
+        }
         if (navBtnPrimary) {
             navBtnPrimary.style.display = 'none';
         }
@@ -1231,7 +1361,7 @@ window.addEventListener('storage', (event) => {
         const heroBtnPrimaryText = document.getElementById('heroBtnPrimaryText');
         if (heroBtnPrimaryText) {
             const t = window.translations || {};
-            const isEn = body.classList.contains('lang-en');
+            const isEn = currentLang === 'en';
             heroBtnPrimaryText.textContent = t.hero?.btnStart || (isEn ? 'Start for free' : 'Počni besplatno');
             heroBtnPrimaryText.setAttribute('data-i18n', 'hero.btnStart');
         }
@@ -1240,7 +1370,7 @@ window.addEventListener('storage', (event) => {
         if (heroVisualContent) {
             const t = window.translations || {};
             const hero = t.hero || {};
-            const isEn = body.classList.contains('lang-en');
+            const isEn = currentLang === 'en';
             
             heroVisualContent.innerHTML = `
                 <div class="hero-glass-card">
@@ -1316,10 +1446,8 @@ window.addEventListener('storage', (event) => {
     }
 
     function getKickRedirectUri() {
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            return `${window.location.origin}/auth/kick/callback/`;
-        }
-        return 'https://kickall.app/auth/kick/callback/';
+        // Match exact format from Kick Dashboard (with trailing slash)
+        return 'http://localhost:5500/auth/kick/callback/';
     }
 
     async function generateCodeChallenge(v) {
@@ -1328,6 +1456,13 @@ window.addEventListener('storage', (event) => {
     }
 
     async function openKickLogin() {
+        // Use global auth system if available
+        if (window.KickAuth) {
+            KickAuth.initiateOAuth('/Website/dashboard.html');
+            return;
+        }
+        
+        // Fallback to old system if global auth not available
         const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
         const KICK_REDIRECT_URI = getKickRedirectUri();
         const KICK_SCOPE = 'user:read channel:read chat:read chat:write moderation:read moderation:write';
@@ -1339,11 +1474,8 @@ window.addEventListener('storage', (event) => {
         try {
             localStorage.setItem('kick_oauth_state', state);
             localStorage.setItem('kick_code_verifier', codeVerifier);
-            localStorage.setItem('kick_origin_site', 'kickall');
             sessionStorage.setItem('kick_oauth_state', state);
             sessionStorage.setItem('kick_code_verifier', codeVerifier);
-            sessionStorage.setItem('from_kickall', 'true');
-            sessionStorage.setItem('kick_origin_site', 'kickall');
         } catch (e) {
             console.warn('LocalStorage/sessionStorage not available during OAuth:', e);
         }
@@ -1359,6 +1491,77 @@ window.addEventListener('storage', (event) => {
         }).toString();
 
         window.location.href = authUrl;
+    }
+
+    async function handleOAuthCallback(code, state) {
+        try {
+            const savedState = localStorage.getItem('kick_oauth_state') || sessionStorage.getItem('kick_oauth_state');
+            const codeVerifier = localStorage.getItem('kick_code_verifier') || sessionStorage.getItem('kick_code_verifier');
+
+            if (!savedState || savedState !== state) {
+                console.error('OAuth state mismatch');
+                alert('Security error: Invalid OAuth state');
+                return;
+            }
+
+            if (!codeVerifier) {
+                console.error('Code verifier not found');
+                alert('Security error: Code verifier missing');
+                return;
+            }
+
+            // For localhost/demo, exchange code for token using backend API
+            const redirectUri = window.location.href.split('?')[0]; // Use current full URL
+            const kickApiBase = 'https://kickbot-ihzb.onrender.com';
+            
+            try {
+                const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        code,
+                        code_verifier: codeVerifier,
+                        redirect_uri: redirectUri
+                    }).toString()
+                });
+
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
+                    alert('Greška pri razmeni tokena: ' + (err.detail || err.error || 'Server nije dostupan.'));
+                    return;
+                }
+
+                const tokenData = await res.json();
+
+                if (!tokenData.access_token) {
+                    alert('Token nije dobijen od Kick servera.');
+                    return;
+                }
+
+                // Store tokens globally for all ecosystem services
+                sessionStorage.setItem('kick_access_token', tokenData.access_token);
+                localStorage.setItem('kick_access_token', tokenData.access_token);
+                localStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
+                localStorage.setItem('kick_session_active', 'true');
+
+                // Clean up
+                sessionStorage.removeItem('kick_oauth_state');
+                sessionStorage.removeItem('kick_code_verifier');
+                localStorage.removeItem('kick_oauth_state');
+                localStorage.removeItem('kick_code_verifier');
+
+                alert('Uspešna prijava! Preusmeravanje na dashboard...');
+                window.location.href = 'dashboard.html';
+                
+            } catch (fetchErr) {
+                alert('Greška pri konekciji sa serverom: ' + fetchErr.message);
+                console.error('Fetch error:', fetchErr);
+            }
+            
+        } catch (error) {
+            console.error('OAuth callback error:', error);
+            alert('Authentication failed: ' + error.message);
+        }
     }
 
     if (navBtnLogin) {
@@ -1389,7 +1592,16 @@ window.addEventListener('storage', (event) => {
 
     if (authKickLoginBtn) {
         authKickLoginBtn.addEventListener('click', () => {
-            openKickLogin();
+            // Add loading state
+            authKickLoginBtn.classList.add('loading');
+            const btnText = authKickLoginBtn.querySelector('span');
+            const originalText = btnText.textContent;
+            btnText.textContent = 'Preusmeravanje...';
+            
+            // Small delay to show loading state before redirect
+            setTimeout(() => {
+                openKickLogin();
+            }, 500);
         });
     }
 
@@ -1497,6 +1709,9 @@ window.addEventListener('storage', (event) => {
     // ─────────────────────────────────────────────────────────────
     let spotlightTimeout = null;
     window.addEventListener('mousemove', (e) => {
+        // Disable on mobile/tablet devices (< 1024px)
+        if (window.innerWidth < 1024) return;
+        
         if (spotlightTimeout) return;
         spotlightTimeout = setTimeout(() => {
             document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
@@ -1515,21 +1730,7 @@ window.addEventListener('storage', (event) => {
             let realMessagesCount = 0;
             let realUptime = 99.98;
 
-            // 1. Try Backend Live API
-            try {
-                const apiRes = await fetch(`${window.location.origin}/api/stats`);
-                if (apiRes.ok) {
-                    const apiData = await apiRes.json();
-                    if (apiData.total_messages) realMessagesCount = apiData.total_messages;
-                    if (apiData.active_streams) realStreamsCount = apiData.active_streams;
-                    if (apiData.active_widgets) realBotsCount = apiData.active_widgets;
-                    if (apiData.uptime) realUptime = apiData.uptime;
-                }
-            } catch (apiErr) {
-                // Fallback to Supabase
-            }
-
-            // 2. Query Supabase Database if counts not provided by API
+            // 1. Query Supabase Database for stats
             const profilesRes = await sb.from('user_profiles').select('*', { count: 'exact', head: true });
 
             if (!realStreamsCount) {

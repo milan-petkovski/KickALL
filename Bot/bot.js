@@ -1207,7 +1207,15 @@ const ALLOWED_KICK_REDIRECT_URIS = new Set([
     'http://127.0.0.1:8888/auth/kick/callback',
     'http://127.0.0.1:8888/auth/kick/callback/',
     'https://kickall.app/auth/kick/callback',
-    'https://kickall.app/auth/kick/callback/'
+    'https://kickall.app/auth/kick/callback/',
+    'http://localhost:5500/Website/auth/kick/callback',
+    'http://localhost:5500/Website/auth/kick/callback/',
+    'http://127.0.0.1:5500/Website/auth/kick/callback',
+    'http://127.0.0.1:5500/Website/auth/kick/callback/',
+    'http://localhost:8888/Website/auth/kick/callback',
+    'http://localhost:8888/Website/auth/kick/callback/',
+    'http://127.0.0.1:8888/Website/auth/kick/callback',
+    'http://127.0.0.1:8888/Website/auth/kick/callback/'
 ]);
 
 function normalizeKickRedirectUri(uri) {
@@ -1215,8 +1223,8 @@ function normalizeKickRedirectUri(uri) {
 
     try {
         const parsed = new URL(uri);
-        const cleanPath = parsed.pathname.replace(/\/+$/, '') || '/';
-        return `${parsed.origin}${cleanPath}`;
+        // Preserve trailing slash for OAuth exact matching
+        return `${parsed.origin}${parsed.pathname}`;
     } catch {
         return null;
     }
