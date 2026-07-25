@@ -1365,6 +1365,7 @@ http.createServer(async (req, res) => {
 
                     if (!tokenRes.ok) {
                         const errText = await tokenRes.text();
+                        console.log('Kick token error response:', errText);
                         res.writeHead(502, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ error: 'Token exchange failed', detail: errText }));
                         return;
