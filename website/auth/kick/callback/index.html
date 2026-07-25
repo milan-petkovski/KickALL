@@ -5,30 +5,17 @@
   <meta charset="UTF-8" />
   <script>
     (function() {
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const baseRedirectPath = '';
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       const error = params.get('error');
 
-      if (code || error) {
-        const originSite = sessionStorage.getItem('kick_origin_site') || 
-                          localStorage.getItem('kick_origin_site') ||
-                          (sessionStorage.getItem('from_kickall') === 'true' ? 'kickall' : 'kickot');
-
-        let targetPage = 'dashboard.html';
-        if (originSite === 'kickot') targetPage = 'kickot/dashboard.html';
-        else if (originSite === 'kickaj') targetPage = 'kickaj/dashboard.html';
-        else if (originSite === 'kickan') targetPage = 'kickan/dashboard.html';
-        else if (originSite === 'kickov') targetPage = 'kickov/dashboard.html';
-
-        window.location.replace(`${baseRedirectPath}/${targetPage}` + window.location.search);
-      }
+      // No longer redirect to index.html - handle callback here directly
+      // The global auth-config.js will handle the OAuth flow
     })();
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KickALL | OAuth autorizacija</title>
-  <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/Website/assets/favicon.ico" type="image/x-icon">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
   <style>
@@ -192,7 +179,7 @@
 
   <div class="card" id="card">
     <div class="logo-wrap">
-      <img src="/assets/kickall.png" alt="KickALL Logo" onerror="this.style.display='none'">
+      <img src="/Website/assets/kickall.png" alt="KickALL Logo" onerror="this.style.display='none'">
     </div>
 
     <div id="loadingState">
@@ -207,7 +194,7 @@
       </div>
       <h1 class="status-msg" id="errorTitle">Greška pri autorizaciji</h1>
       <p class="status-sub" id="errorDetail">Pokušaj ponovo.</p>
-      <a href="/index.html" class="btn-retry" id="retryBtn">← Nazad na prijavu</a>
+      <a href="/Website/index.html" class="btn-retry" id="retryBtn">← Nazad na prijavu</a>
     </div>
 
     <div id="successState" style="display:none;">
@@ -219,14 +206,24 @@
     </div>
   </div>
 
+  <script src="/Website/js/auth-config.js?v=2"></script>
+  <script>
+    // Disable global auth handler on callback page to avoid conflicts
+    window.DISABLE_GLOBAL_AUTH = true;
+  </script>
   <script>
     (async function kickOAuthCallback() {
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const baseRedirectPath = '';
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const state = params.get('state');
-      const error = params.get('error');
+      // Wait for auth-config to load
+      if (!window.KickAuth) {
+        console.error('KickAuth not loaded');
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('errorState').style.display = 'block';
+        document.getElementById('errorIcon').style.display = 'block';
+        document.getElementById('errorTitle').textContent = 'Sistem greška';
+        document.getElementById('errorDetail').textContent = 'Auth sistem se nije učitao.';
+        document.getElementById('retryBtn').style.display = 'inline-block';
+        return;
+      }
 
       function showError(title, detail) {
         document.getElementById('loadingState').style.display = 'none';
@@ -238,38 +235,63 @@
         document.getElementById('retryBtn').style.display = 'inline-block';
       }
 
+      const params = new URLSearchParams(window.location.search);
+      const error = params.get('error');
+
       if (error) {
         showError('Kick odbio autorizaciju', `Razlog: ${error}`);
+        KickAuth.clearOAuthData();
         return;
       }
 
-      const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
-      if (!isLocalhost && (!state || state !== savedState)) {
+      const code = params.get('code');
+      const state = params.get('state');
+
+      console.log('Callback Debug Info:', {
+        code: code ? code.substring(0, 20) + '...' : 'missing',
+        state: state ? state.substring(0, 20) + '...' : 'missing',
+        isLocalhost: KickAuth.isLocalhost()
+      });
+
+      if (!code || !state) {
+        showError('Nedostaju OAuth parametri', 'Code ili state nedostaju.');
+        return;
+      }
+
+      const savedState = KickAuth.getOAuthData(KickAuth.STORAGE_KEYS.OAUTH_STATE);
+      const codeVerifier = KickAuth.getOAuthData(KickAuth.STORAGE_KEYS.CODE_VERIFIER);
+
+      console.log('Storage Debug Info:', {
+        savedState: savedState ? savedState.substring(0, 20) + '...' : 'missing',
+        codeVerifier: codeVerifier ? codeVerifier.substring(0, 20) + '...' : 'missing',
+        stateMatch: savedState === state
+      });
+
+      if (!KickAuth.isLocalhost() && (!savedState || savedState !== state)) {
         showError('Nevalidan state parametar', 'State parametar se ne podudara. Moguća CSRF prevara.');
+        KickAuth.clearOAuthData();
         return;
       }
 
-      if (!code) {
-        showError('Nedostaje autorizacioni kod', 'Kick nije vratio autorizacioni kod.');
+      if (!codeVerifier) {
+        showError('Nedostaje code verifier', 'PKCE code verifier nije pronađen.');
+        KickAuth.clearOAuthData();
         return;
       }
-
-      const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
-      const redirectUri = isLocalhost ? `${window.location.origin}/auth/kick/callback/` : `${window.location.origin}/auth/kick/callback/`;
-      
-      const kickApiBase = (() => {
-        const fromGlobal = (window.KICK_API_BASE || '').trim();
-        if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-        // Lokalno koristi Render backend direktno, produkcija koristi origin (sa Netlify redirect-ima)
-        if (window.location.hostname === 'localhost' || 
-            window.location.hostname === '127.0.0.1') {
-          return 'https://kickbot-ihzb.onrender.com';
-        }
-        return window.location.origin;
-      })();
 
       try {
-        const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
+        const redirectUri = KickAuth.getRedirectUri();
+        const apiBase = KickAuth.getApiBase();
+
+        console.log('OAuth Debug:', {
+          redirectUri,
+          apiBase,
+          hasCodeVerifier: !!codeVerifier,
+          codeLength: code?.length
+        });
+
+        // Use local bot server for token exchange
+        const res = await fetch(`${apiBase}/api/kick/exchange`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
@@ -280,59 +302,47 @@
         });
 
         if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
-          showError('Greška pri razmeni tokena', err.detail || err.error || 'Server nije dostupan.');
+          const err = await res.json().catch(() => ({ error: 'Token exchange failed' }));
+          console.error('Token exchange error:', err);
+          showError('Greška pri razmeni tokena', err.detail || err.error_description || err.error || 'Server nije dostupan. Pokušaj ponovo kasnije.');
+          KickAuth.clearOAuthData();
           return;
         }
 
         const tokenData = await res.json();
 
         if (!tokenData.access_token) {
-          showError('Token nije dobijen', 'Kick server nije vratio access_token.');
+          showError('Token nije dobijen', 'Kick server nije vratio access token.');
+          KickAuth.clearOAuthData();
           return;
         }
 
-        // Store tokens globally in session and local storage
-        sessionStorage.setItem('kick_access_token', tokenData.access_token);
-        localStorage.setItem('kick_access_token', tokenData.access_token);
-        localStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
-        localStorage.setItem('kick_session_active', 'true');
+        // Store tokens globally using KickAuth
+        KickAuth.storeOAuthData(KickAuth.STORAGE_KEYS.ACCESS_TOKEN, tokenData.access_token);
+        KickAuth.storeOAuthData(KickAuth.STORAGE_KEYS.TOKEN_TYPE, tokenData.token_type || 'Bearer');
+        KickAuth.storeOAuthData(KickAuth.STORAGE_KEYS.SESSION_ACTIVE, 'true');
 
-        sessionStorage.removeItem('kick_oauth_state');
-        sessionStorage.removeItem('kick_code_verifier');
-        localStorage.removeItem('kick_oauth_state');
-        localStorage.removeItem('kick_code_verifier');
+        // Clean up OAuth-specific data
+        KickAuth.clearOAuthData();
 
+        // Success UI
         document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('successState').style.display = 'block';
+        const successState = document.getElementById('successState');
+        successState.style.display = 'block';
         document.getElementById('successIcon').style.display = 'block';
 
-        // Ecosystem site routing: KickALL, KickOT, KickAJ, KickAN, KickOV
-        const originSite = sessionStorage.getItem('kick_origin_site') || 
-                          localStorage.getItem('kick_origin_site') ||
-                          (sessionStorage.getItem('from_kickall') === 'true' ? 'kickall' : 'kickot');
+        // Get redirect page or default to dashboard
+        const redirectPage = KickAuth.getOAuthData(KickAuth.STORAGE_KEYS.REDIRECT_PAGE) || '/Website/dashboard.html';
 
-        let targetPage = 'dashboard.html';
-        if (originSite === 'kickot') {
-          targetPage = 'kickot/dashboard.html';
-        } else if (originSite === 'kickaj') {
-          targetPage = 'kickaj/dashboard.html';
-        } else if (originSite === 'kickan') {
-          targetPage = 'kickan/dashboard.html';
-        } else if (originSite === 'kickov') {
-          targetPage = 'kickov/dashboard.html';
-        }
-
-        const fullTarget = `${baseRedirectPath}/${targetPage}?kick_oauth=1`;
+        // Redirect after short delay
         setTimeout(() => {
-          window.location.replace(fullTarget);
-        }, 500);
+          window.location.href = redirectPage;
+        }, 800);
 
       } catch (fetchErr) {
-        showError(
-          'Nije moguće kontaktirati server',
-          'Proveri mrežnu konekciju ili konfiguraciju API-ja. ' + fetchErr.message
-        );
+        showError('Greška pri konekciji', fetchErr.message);
+        console.error('Fetch error:', fetchErr);
+        KickAuth.clearOAuthData();
       }
     })();
   </script>
