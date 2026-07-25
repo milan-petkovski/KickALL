@@ -1231,18 +1231,21 @@ function normalizeKickRedirectUri(uri) {
 }
 
 function resolveKickRedirectUri(candidate) {
-    if (candidate && (ALLOWED_KICK_REDIRECT_URIS.has(candidate) || ALLOWED_KICK_REDIRECT_URIS.has(normalizeKickRedirectUri(candidate)))) {
-        return candidate;
+    // If candidate is provided and in allowed list, use it
+    if (candidate) {
+        const normalizedCandidate = normalizeKickRedirectUri(candidate);
+        if (ALLOWED_KICK_REDIRECT_URIS.has(candidate) || ALLOWED_KICK_REDIRECT_URIS.has(normalizedCandidate)) {
+            return candidate;
+        }
     }
 
-    const normalizedCandidate = normalizeKickRedirectUri(candidate);
-    if (normalizedCandidate && ALLOWED_KICK_REDIRECT_URIS.has(normalizedCandidate)) {
-        return candidate;
-    }
-
+    // Fallback to env var or production
     const envUri = process.env.KICK_REDIRECT_URI;
-    if (envUri && (ALLOWED_KICK_REDIRECT_URIS.has(envUri) || ALLOWED_KICK_REDIRECT_URIS.has(normalizeKickRedirectUri(envUri)))) {
-        return envUri;
+    if (envUri) {
+        const normalizedEnvUri = normalizeKickRedirectUri(envUri);
+        if (ALLOWED_KICK_REDIRECT_URIS.has(envUri) || ALLOWED_KICK_REDIRECT_URIS.has(normalizedEnvUri)) {
+            return envUri;
+        }
     }
 
     return 'https://kickall.app/auth/kick/callback/';
