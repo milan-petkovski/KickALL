@@ -1,18 +1,15 @@
 /**
- * kickall - Interaktivni Skriptovi (Iteracija 2.2)
- * Sadrži simulatore za kickot, kickaj, kickov i kickan,
- * kao i animacije brojača, jezički switcher i specijalne efekte (flash border i blur uklanjanje).
+ * kickall - Interaktivni Skriptovi
+ * Sadrži simulatore, animacije brojača, jezički switcher i specijalne efekte
  */
 
+// CONFIG is loaded from config.js and available as window.CONFIG
+
 document.addEventListener('DOMContentLoaded', () => {
-    // -----------------------------------------------------------------
     // Element References
-    // -----------------------------------------------------------------
     const authKickLoginBtn = document.getElementById('authKickLoginBtn');
-    
-    // -----------------------------------------------------------------
-    // 0. OAuth Callback Handling - Now managed by global-auth.js
-    // -----------------------------------------------------------------
+
+    // OAuth Callback Handling - Now managed by global-auth.js
     
     // Reset loading state on page visibility change (handles back button)
     document.addEventListener('visibilitychange', () => {
@@ -132,13 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // -----------------------------------------------------------------
-    // 2. Efekat Bljeskanja (Deaktiviran zarad tečnog prelaza bez belog blica)
-    // -----------------------------------------------------------------
-    function triggerFlashEffect(element) {
-        // Deaktivirano blicanje po zahtevu korisnika
-        return;
-    }
 
     // -----------------------------------------------------------------
     // 3. Mobilni Meni
@@ -272,12 +262,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        // 3. Pokreni efekat bljeskanja na celoj tabli playground-a
-        if (mainPlayground) {
-            setTimeout(() => {
-                triggerFlashEffect(mainPlayground);
-            }, 100); // Smanjeno sa 500 na 100 za brži odziv
-        }
     }
 
     simulateTriggers.forEach(trigger => {
@@ -411,9 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
             oscillator.start();
             oscillator.stop(audioCtx.currentTime + duration);
         } catch (e) {
-            const t = window.translations || {};
-            const chatSim = t.chatSim || {};
-            console.log(chatSim.audioError || 'Audio API not supported.');
+            // Audio API not supported - silently fail
         }
     }
 
@@ -460,8 +442,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Get translations from global translations object
         const t = window.translations || {};
         const chatSim = t.chatSim || {};
-        const viewerName = chatSim.viewer || (isEn ? 'Viewer' : 'Gledalac');
-        const botName = chatSim.bot || 'kickot';
+        const viewerName = chatSim.viewer || window.CONFIG.DEFAULTS.VIEWER_NAME;
+        const botName = chatSim.bot || window.CONFIG.DEFAULTS.BOT_NAME;
 
         if (cmd === '!bacihejt') {
             const target = arg || chatSim.unnamedViewer || (isEn ? 'Unnamed viewer' : 'Neimenovani gledalac');
@@ -545,17 +527,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     "Slažem se sa ovim potpuno! Hype u chatu! 🚀",
                     "Zanimljivo razmišljanje. Šta ostali misle?",
                     "Hvala na poruci! Ne zaboravite da zapratite strim ako uživate! 💚",
-                    "kickot bot je uvek tu da nadgleda chat! 😎"
+                    `${window.CONFIG.DEFAULTS.BOT_NAME} bot je uvek tu da nadgleda chat! 😎`
                 ];
                 const repliesEn = [
                     "Totally agree with this! Chat hype! 🚀",
                     "Interesting thought. What does the rest of the chat think?",
                     "Thanks for the message! Don't forget to follow if you're enjoying! 💚",
-                    "kickot bot is always here watching over the chat! 😎"
+                    `${window.CONFIG.DEFAULTS.BOT_NAME} bot is always here watching over the chat! 😎`
                 ];
                 const replies = isEn ? repliesEn : repliesSr;
                 const reply = replies[Math.floor(Math.random() * replies.length)];
-                addChatMessage('kickot', reply, true);
+                addChatMessage(window.CONFIG.DEFAULTS.BOT_NAME, reply, true);
                 playSynthSound(450, 'sine', 0.1);
             }
         }
@@ -959,7 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     if (copyEmailBtn) {
         copyEmailBtn.addEventListener('click', () => {
-            const emailAddress = "contact@milanwebportal.com";
+            const emailAddress = window.CONFIG.CONTACT_EMAIL;
             navigator.clipboard.writeText(emailAddress).then(() => {
                 // Dodaj klasu za zelenu boju i sjaj
                 copyEmailBtn.classList.add('copied');
@@ -987,7 +969,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // ── Supabase Auth Session Check & UI Dynamic Update ──────
+    // Supabase Auth Session Check & UI Dynamic Update
     const authModal = document.getElementById('authModal');
     const navBtnLogin = document.getElementById('navBtnLogin');
     const mobileDashboardBtn = document.getElementById('mobileDashboardBtn');
@@ -996,13 +978,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const authModalClose = document.getElementById('authModalClose');
 
     // Initialize Supabase with same config as other pages
-    const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
-    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+    const sb = window.supabase.createClient(window.CONFIG.SUPABASE.URL, window.CONFIG.SUPABASE.ANON_KEY, {
       auth: {
         persistSession: true,
         storage: window.localStorage,
-        storageKey: 'kickbot-supabase-auth'
+        storageKey: window.CONFIG.SUPABASE.STORAGE_KEY
       }
     });
 
@@ -1063,11 +1043,7 @@ async function handleLogout() {
 }
 
 function notifyGlobalLogout(userId) {
-    const domains = [
-        'https://kickall.netlify.app',
-        'https://kickall.milanwebportal.com',
-        'http://localhost:5500'
-    ];
+    const domains = window.CONFIG.CROSS_DOMAIN_DOMAINS;
     
     domains.forEach(domain => {
         try {
@@ -1081,15 +1057,13 @@ function notifyGlobalLogout(userId) {
     });
     
     try {
-        localStorage.setItem('kickbot_global_logout', Date.now().toString());
+        localStorage.setItem(window.CONFIG.STORAGE_KEYS.GLOBAL_LOGOUT, Date.now().toString());
     } catch (e) {
         console.warn('LocalStorage not available during global logout:', e);
     }
     
     // Obavesti server koristeći prosleđeni id
-    const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'https://kickbot-ihzb.onrender.com'
-        : window.location.origin;
+    const apiBase = window.CONFIG.getBackendApiBase();
     if (userId) {
         fetch(`${apiBase}/api/global-logout`, {
             method: 'POST',
@@ -1113,7 +1087,7 @@ window.addEventListener('message', (event) => {
 });
 
 window.addEventListener('storage', (event) => {
-    if (event.key === 'kickbot_global_logout') {
+    if (event.key === window.CONFIG.STORAGE_KEYS.GLOBAL_LOGOUT) {
         try {
             localStorage.clear();
             sessionStorage.clear();
@@ -1276,7 +1250,7 @@ window.addEventListener('storage', (event) => {
                         }
                         
                         // Default to 8 modules active (all Kickot modules)
-                        activeModulesCount = 8;
+                        activeModulesCount = 8; // This is hardcoded by design
                     }
                 } catch (e) {
                     console.warn("User stats fetch fallback:", e);
@@ -1446,8 +1420,7 @@ window.addEventListener('storage', (event) => {
     }
 
     function getKickRedirectUri() {
-        // Match exact format from Kick Dashboard (with trailing slash)
-        return 'http://localhost:5500/auth/kick/callback/';
+        return window.CONFIG.OAUTH.getRedirectUri();
     }
 
     async function generateCodeChallenge(v) {
@@ -1474,9 +1447,9 @@ window.addEventListener('storage', (event) => {
         }
         
         // 3. Fallback ako nema KickAuth-a
-        const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
-        const KICK_REDIRECT_URI = getKickRedirectUri();
-        const KICK_SCOPE = 'user:read channel:read chat:read chat:write moderation:read moderation:write';
+        const KICK_CLIENT_ID = window.CONFIG.OAUTH.CLIENT_ID;
+        const KICK_REDIRECT_URI = window.CONFIG.OAUTH.getRedirectUri();
+        const KICK_SCOPE = window.CONFIG.OAUTH.SCOPE;
 
         const state = generateRandomString(16);
         const codeVerifier = generateRandomString(64);
@@ -1491,7 +1464,7 @@ window.addEventListener('storage', (event) => {
             console.warn('LocalStorage/sessionStorage not available during OAuth:', e);
         }
 
-        const authUrl = `https://id.kick.com/oauth/authorize?` + new URLSearchParams({
+        const authUrl = `${window.CONFIG.API.KICK_OAUTH_AUTHORIZE}?` + new URLSearchParams({
             response_type: 'code',
             client_id: KICK_CLIENT_ID,
             redirect_uri: KICK_REDIRECT_URI,
@@ -1523,7 +1496,7 @@ window.addEventListener('storage', (event) => {
 
             // For localhost/demo, exchange code for token using backend API
             const redirectUri = window.location.href.split('?')[0]; // Use current full URL
-            const kickApiBase = 'https://kickbot-ihzb.onrender.com';
+            const kickApiBase = window.CONFIG.getBackendApiBase();
             
             try {
                 const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
@@ -1634,9 +1607,7 @@ window.addEventListener('storage', (event) => {
 
     checkAuthSession();
 
-    // ─────────────────────────────────────────────────────────────
-    // 6. Lenis Smooth Scroll & Clean Scroll To Top Integration
-    // ─────────────────────────────────────────────────────────────
+    // Lenis Smooth Scroll & Clean Scroll To Top Integration
     let lenis = null;
     if (typeof window.Lenis !== 'undefined') {
         lenis = new window.Lenis({
@@ -1715,9 +1686,7 @@ window.addEventListener('storage', (event) => {
         });
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 7. Cursor Glow / Mouse Spotlight Effect (Debounced for performance)
-    // ─────────────────────────────────────────────────────────────
+    // Cursor Glow / Mouse Spotlight Effect (Debounced for performance)
     let spotlightTimeout = null;
     window.addEventListener('mousemove', (e) => {
         // Disable on mobile/tablet devices (< 1024px)
@@ -1731,9 +1700,7 @@ window.addEventListener('storage', (event) => {
         }, 16); // ~60fps max
     });
 
-    // ─────────────────────────────────────────────────────────────
-    // 8. Real Supabase & Kickot API Global Live Telemetry Stats
-    // ─────────────────────────────────────────────────────────────
+    // Real Supabase & Kickot API Global Live Telemetry Stats
     async function fetchRealDatabaseGlobalStats() {
         try {
             let realStreamsCount = 0;
@@ -1815,18 +1782,14 @@ window.addEventListener('storage', (event) => {
         counterElements.forEach(el => counterObserver.observe(el));
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // 9. Streamer Showcase Live Status Check Engine
-    // ─────────────────────────────────────────────────────────────
+    // Streamer Showcase Live Status Check Engine
     async function checkShowcaseStreamers() {
         const showcaseCards = document.querySelectorAll('.showcase-card[data-channel]');
         showcaseCards.forEach(async (card) => {
             const channel = card.getAttribute('data-channel');
             if (!channel) return;
             try {
-                const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-                    ? 'https://kickbot-ihzb.onrender.com'
-                    : window.location.origin;
+                const apiBase = window.CONFIG.getBackendApiBase();
                 const res = await fetch(`${apiBase}/api/avatar?username=${channel}`);
                 if (res.ok) {
                     const data = await res.json();
@@ -1852,9 +1815,7 @@ window.addEventListener('storage', (event) => {
     }
     checkShowcaseStreamers();
 
-    // ─────────────────────────────────────────────────────────────
-    // 10. Testimonials Kick Channel Data Fetch
-    // ─────────────────────────────────────────────────────────────
+    // Testimonials Kick Channel Data Fetch
     async function checkTestimonialChannels() {
         const testimonialCards = document.querySelectorAll('.testimonial-card[data-channel]');
         testimonialCards.forEach(async (card) => {
@@ -1864,9 +1825,7 @@ window.addEventListener('storage', (event) => {
             
             if (!channel) return;
             try {
-                const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-                    ? 'https://kickbot-ihzb.onrender.com'
-                    : window.location.origin;
+                const apiBase = window.CONFIG.getBackendApiBase();
                 const res = await fetch(`${apiBase}/api/avatar?username=${channel}`);
                 if (res.ok) {
                     const data = await res.json();
@@ -1897,9 +1856,7 @@ window.addEventListener('storage', (event) => {
     }
     checkTestimonialChannels();
 
-    // ─────────────────────────────────────────────────────────────
-    // 11. Dynamic FAQ Search & Accordion Filters
-    // ─────────────────────────────────────────────────────────────
+    // Dynamic FAQ Search & Accordion Filters
     const faqItems = document.querySelectorAll('.faq-item');
     const faqSearchInput = document.getElementById('faqSearchInput');
     const faqPills = document.querySelectorAll('.faq-pill');
@@ -1992,11 +1949,6 @@ window.addEventListener('storage', (event) => {
             const playgroundSection = document.getElementById('playground');
             if (playgroundSection) {
                 playgroundSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-            if (mainPlayground) {
-                setTimeout(() => {
-                    triggerFlashEffect(mainPlayground);
-                }, 600);
             }
         }, 300);
     }

@@ -4,13 +4,11 @@ let sb;
 if (window.sb) {
   sb = window.sb;
 } else {
-  const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
-  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
-  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  sb = window.supabase.createClient(window.CONFIG.SUPABASE.URL, window.CONFIG.SUPABASE.ANON_KEY, {
     auth: {
       persistSession: true,
       storage: window.localStorage,
-      storageKey: 'kickbot-supabase-auth'
+      storageKey: window.CONFIG.SUPABASE.STORAGE_KEY
     }
   });
   window.sb = sb;
@@ -19,9 +17,7 @@ if (window.sb) {
 // ── Fetch Kick Channel Data ───────────────────────────────
 async function fetchKickChannelData(username) {
   try {
-    const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'https://kickbot-ihzb.onrender.com'
-        : window.location.origin;
+    const apiBase = window.CONFIG.getBackendApiBase();
     const localRes = await fetch(`${apiBase}/api/avatar?username=${username}`);
     if (localRes.ok) {
       const d = await localRes.json();
@@ -31,10 +27,10 @@ async function fetchKickChannelData(username) {
     }
   } catch (_) { }
 
-  const apiUrl = `https://kick.com/api/v2/channels/${username}`;
+  const apiUrl = `${window.CONFIG.API.KICK_API}/channels/${username}`;
   const proxies = [
     {
-      url: `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`,
+      url: `${window.CONFIG.API.PROXY_ALLORIGINS}?url=${encodeURIComponent(apiUrl)}`,
       parse: async (res) => {
         const json = await res.json();
         const data = json.contents ? JSON.parse(json.contents) : null;
@@ -46,7 +42,7 @@ async function fetchKickChannelData(username) {
       }
     },
     {
-      url: `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
+      url: `${window.CONFIG.API.PROXY_CORSPROXY}${encodeURIComponent(apiUrl)}`,
       parse: async (res) => {
         const data = await res.json();
         return data ? {
@@ -155,26 +151,14 @@ async function checkAuth() {
   const code = urlParams.get('code');
 
   if (code) {
-    document.getElementById('authGateMsg').textContent = currentLang === 'sr' ? 'Razmenjujemo OAuth kod...' : 'Exchanging OAuth code...';
+    const authGateMsg = document.getElementById('authGateMsg');
+    if (authGateMsg) {
+      authGateMsg.textContent = currentLang === 'sr' ? 'Razmenjujemo OAuth kod...' : 'Exchanging OAuth code...';
+    }
     
     const codeVerifier = localStorage.getItem('kick_code_verifier') || sessionStorage.getItem('kick_code_verifier') || '';
-    const redirectUri = (() => {
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return `${window.location.origin}/auth/kick/callback/`;
-      }
-      return 'https://kickall.app/auth/kick/callback/';
-    })();
-    
-    const kickApiBase = (() => {
-      const fromGlobal = (window.KICK_API_BASE || '').trim();
-      if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-      // Lokalno koristi Render backend direktno, produkcija koristi origin (sa Netlify redirect-ima)
-      if (window.location.hostname === 'localhost' || 
-          window.location.hostname === '127.0.0.1') {
-        return 'https://kickbot-ihzb.onrender.com';
-      }
-      return `${window.location.origin}`;
-    })();
+    const redirectUri = window.CONFIG.OAUTH.getRedirectUri();
+    const kickApiBase = window.CONFIG.getBackendApiBase();
     
     try {
       const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
@@ -190,7 +174,10 @@ async function checkAuth() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
         console.error("Exchange error detail:", err);
-        document.getElementById('authGateMsg').textContent = `Greška pri autorizaciji: ${err.detail || err.error || 'nepoznato'}`;
+        const authGateMsg = document.getElementById('authGateMsg');
+        if (authGateMsg) {
+          authGateMsg.textContent = `Greška pri autorizaciji: ${err.detail || err.error || 'nepoznato'}`;
+        }
         setTimeout(() => { window.location.href = 'index.html'; }, 5000);
         return;
       }
@@ -209,7 +196,10 @@ async function checkAuth() {
       }
     } catch (err) {
       console.error("Code exchange failed:", err);
-      document.getElementById('authGateMsg').textContent = 'Greška na serveru...';
+      const authGateMsg = document.getElementById('authGateMsg');
+      if (authGateMsg) {
+        authGateMsg.textContent = 'Greška na serveru...';
+      }
       setTimeout(() => { window.location.href = 'index.html'; }, 3000);
       return;
     }
@@ -226,13 +216,18 @@ async function checkAuth() {
   }
 
   if (isOAuthRedirect && kickAccessToken) {
-    document.getElementById('authGateMsg').textContent = currentLang === 'sr' ? 'Povezujemo tvoj Kick nalog...' : 'Connecting your Kick account...';
+    const authGateMsg = document.getElementById('authGateMsg');
+    if (authGateMsg) {
+      authGateMsg.textContent = currentLang === 'sr' ? 'Povezujemo tvoj Kick nalog...' : 'Connecting your Kick account...';
+    }
     try {
       await handleKickOAuthSession(kickAccessToken);
       return;
     } catch (err) {
       console.error("Kick OAuth failed:", err);
-      document.getElementById('authGateMsg').textContent = `Greška pri prijavi: ${err.message || err}`;
+      if (authGateMsg) {
+        authGateMsg.textContent = `Greška pri prijavi: ${err.message || err}`;
+      }
       setTimeout(() => { window.location.href = 'index.html'; }, 5000);
       return;
     }
@@ -254,16 +249,18 @@ async function checkAuth() {
       console.warn('Failed to set origin flags:', e);
     }
     
-    initDashboard(currentUser);
+    initDashboardWithRetry(currentUser);
   }
 }
 
 // Handle Kick OAuth login inside KickAll
 async function handleKickOAuthSession(accessToken) {
   const gateMsg = document.getElementById('authGateMsg');
-  gateMsg.textContent = currentLang === 'sr' ? 'Preuzimamo profil sa Kick platforme...' : 'Fetching your profile from Kick...';
+  if (gateMsg) {
+    gateMsg.textContent = currentLang === 'sr' ? 'Preuzimamo profil sa Kick platforme...' : 'Fetching your profile from Kick...';
+  }
 
-  let kickUserRes = await fetch('https://api.kick.com/public/v1/users', {
+  let kickUserRes = await fetch(window.CONFIG.API.KICK_PUBLIC_API + '/users', {
     headers: { 'Authorization': `Bearer ${accessToken}` }
   });
 
@@ -278,7 +275,7 @@ async function handleKickOAuthSession(accessToken) {
     kickUserId = kickUser?.user_id || kickUser?.id || '';
     kickAvatar = kickUser?.profile_picture || kickUser?.profile_pic || '';
   } else {
-    const altRes = await fetch('https://id.kick.com/oauth/userinfo', {
+    const altRes = await fetch(window.CONFIG.API.KICK_USERINFO, {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     });
     if (altRes.ok) {
@@ -293,10 +290,12 @@ async function handleKickOAuthSession(accessToken) {
     throw new Error('Nije moguće dohvatiti Kick korisničko ime.');
   }
 
-  gateMsg.textContent = `${currentLang === 'sr' ? 'Dobrodošao' : 'Welcome'} @${kickUsername}!`;
+  if (gateMsg) {
+    gateMsg.textContent = `${currentLang === 'sr' ? 'Dobrodošao' : 'Welcome'} @${kickUsername}!`;
+  }
 
-  const kickEmail = `kick_user_${kickUsername.toLowerCase()}@kickot.com`;
-  const oauthPassword = `kick_oauth_${kickUsername.toLowerCase()}_kickot_2026`;
+  const kickEmail = `kick_user_${kickUsername.toLowerCase()}@${window.CONFIG.DEFAULTS.BOT_NAME}.com`;
+  const oauthPassword = `kick_oauth_${kickUsername.toLowerCase()}_${window.CONFIG.DEFAULTS.BOT_NAME}_2026`;
 
   // Get referral code from URL if present
   const urlParams = new URLSearchParams(window.location.search);
@@ -319,12 +318,14 @@ async function handleKickOAuthSession(accessToken) {
     
     localStorage.removeItem('kick_access_token');
     cleanQueryParams();
-    initDashboard(currentUser);
+    initDashboardWithRetry(currentUser);
     return;
   }
 
   // Create new user if not exists
-  gateMsg.textContent = currentLang === 'sr' ? 'Kreiramo nalog...' : 'Creating account...';
+  if (gateMsg) {
+    gateMsg.textContent = currentLang === 'sr' ? 'Kreiramo nalog...' : 'Creating account...';
+  }
   const { data: signUpData, error: signUpError } = await sb.auth.signUp({
     email: kickEmail,
     password: oauthPassword,
@@ -380,7 +381,7 @@ async function handleKickOAuthSession(accessToken) {
 
   localStorage.removeItem('kick_access_token');
   cleanQueryParams();
-  initDashboard(currentUser);
+  initDashboardWithRetry(currentUser);
 }
 
 async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, accessToken) {
@@ -434,7 +435,6 @@ async function processReferralCode(userId, referralCode) {
     if (error) {
       console.error('Error processing referral code:', error);
     } else {
-      console.log('Referral code processed successfully');
       // Show notification to user
       showReferralNotification();
     }
@@ -460,7 +460,6 @@ async function ensureUserHasReferralCode(userId) {
 
     // If user doesn't have referral stats, create them
     if (!existingStats) {
-      console.log('Creating referral stats for existing user:', userId);
       const { error: createError } = await sb.rpc('create_user_referral', {
         p_user_id: userId,
         p_referral_code: null
@@ -468,8 +467,6 @@ async function ensureUserHasReferralCode(userId) {
 
       if (createError) {
         console.error('Error creating referral stats:', createError);
-      } else {
-        console.log('Referral stats created successfully for existing user');
       }
     }
   } catch (err) {
@@ -583,8 +580,6 @@ async function awardReferralReward(referralCode, planPrice) {
     
     if (error) {
       console.error('Error awarding referral reward:', error);
-    } else {
-      console.log('Referral reward awarded successfully');
     }
   } catch (err) {
     console.error('Error in awardReferralReward:', err);
@@ -609,8 +604,6 @@ async function processPurchaseWithReferral(userId, planPrice, planName) {
     if (referralData && referralData.status === 'registered') {
       // Award referral reward to the referrer
       await awardReferralReward(referralData.referral_code, planPrice);
-      
-      console.log(`Referral reward awarded for ${planName} purchase`);
     }
 
     // Update user's plan in user_profiles
@@ -663,18 +656,21 @@ function cleanQueryParams() {
 // ── UI Initialization ─────────────────────────────────────
 function initDashboard(user) {
   const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
-  document.getElementById('userName').textContent = name;
+  const userNameEl = document.getElementById('userName');
+  if (userNameEl) userNameEl.textContent = name;
 
   const avatar = document.getElementById('userAvatar');
-  const avatarUrl = user.user_metadata?.avatar_url;
-  if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:image'))) {
-    avatar.style.backgroundImage = `url("${avatarUrl}")`;
-    avatar.style.backgroundSize = 'cover';
-    avatar.style.backgroundPosition = 'center';
-    avatar.textContent = '';
-  } else {
-    avatar.style.backgroundImage = 'none';
-    avatar.textContent = name.charAt(0).toUpperCase();
+  if (avatar) {
+    const avatarUrl = user.user_metadata?.avatar_url;
+    if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:image'))) {
+      avatar.style.backgroundImage = `url("${avatarUrl}")`;
+      avatar.style.backgroundSize = 'cover';
+      avatar.style.backgroundPosition = 'center';
+      avatar.textContent = '';
+    } else {
+      avatar.style.backgroundImage = 'none';
+      avatar.textContent = name.charAt(0).toUpperCase();
+    }
   }
 
   // Show profile menu
@@ -688,15 +684,18 @@ function initDashboard(user) {
     document.body.classList.remove('auth-loading');
     setTimeout(() => gate.remove(), 400);
   }
+}
 
-  playSound(800, 'sine', 0.15, 0.05);
-  setTimeout(() => playSound(1000, 'sine', 0.2, 0.05), 80);
-
-  // Ensure user has referral code (for existing users)
-  ensureUserHasReferralCode(user.id);
-
-  // Load referral data
-  loadReferralData(user.id);
+// Retry initialization if DOM elements are not ready
+function initDashboardWithRetry(user, retries = 3) {
+  const userNameEl = document.getElementById('userName');
+  const userMenuEl = document.getElementById('userMenu');
+  
+  if (userNameEl && userMenuEl) {
+    initDashboard(user);
+  } else if (retries > 0) {
+    setTimeout(() => initDashboardWithRetry(user, retries - 1), 100);
+  }
 }
 
 // Load referral data and update UI
@@ -1064,11 +1063,7 @@ async function handleLogout() {
 }
 
 function notifyGlobalLogout(userId) {
-  const domains = [
-    'https://kickall.netlify.app',
-    'https://kickall.milanwebportal.com',
-    'http://localhost:5500'
-  ];
+  const domains = window.CONFIG.CROSS_DOMAIN_DOMAINS;
 
   domains.forEach(domain => {
     try {
@@ -1082,15 +1077,13 @@ function notifyGlobalLogout(userId) {
   });
 
   try {
-    localStorage.setItem('kickbot_global_logout', Date.now().toString());
+    localStorage.setItem(window.CONFIG.STORAGE_KEYS.GLOBAL_LOGOUT, Date.now().toString());
   } catch (e) {
     console.warn('LocalStorage not available during global logout:', e);
   }
 
   if (userId) {
-    const apiBase = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-        ? 'https://kickbot-ihzb.onrender.com'
-        : window.location.origin;
+    const apiBase = window.CONFIG.getBackendApiBase();
     fetch(`${apiBase}/api/global-logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

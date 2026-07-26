@@ -34,6 +34,17 @@
     --shadow-violet: 0 0 25px rgba(139, 92, 246, 0.3);
     --shadow-green: 0 0 25px rgba(83, 252, 24, 0.3);
     --shadow-glass: 0 8px 32px 0 rgba(4, 3, 8, 0.5);
+    
+    /* Z-Index Scale */
+    --z-bg: -1;
+    --z-content: 1;
+    --z-badge: 10;
+    --z-overlay: 20;
+    --z-coming-soon: 25;
+    --z-modal: 100;
+    --z-dropdown: 120;
+    --z-header: 1000;
+    --z-auth-gate: 9999;
 }
 
 /* Resetovanja */
@@ -47,6 +58,11 @@ html {
     scroll-behavior: auto;
     scroll-padding-top: 80px;
     font-size: 16px;
+    overflow-x: hidden;
+}
+
+body {
+    overflow-x: hidden;
 }
 
 body {
@@ -54,7 +70,6 @@ body {
     color: var(--color-text);
     font-family: var(--font-body);
     line-height: 1.6;
-    overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -129,7 +144,7 @@ body {
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: -1;
+    z-index: var(--z-bg);
     pointer-events: none;
     overflow: hidden;
 }
@@ -275,7 +290,7 @@ a {
     top: 0;
     left: 0;
     width: 100%;
-    z-index: 1000;
+    z-index: var(--z-header);
     background: rgba(6, 4, 10, 0.8);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--color-border);
@@ -478,6 +493,22 @@ a {
     width: 100%;
 }
 
+@media (max-width: 968px) {
+    .hero-container {
+        grid-template-columns: 1fr;
+        gap: 40px;
+        text-align: center;
+    }
+    
+    .hero-content {
+        max-width: 100%;
+    }
+    
+    .hero-visual {
+        display: none;
+    }
+}
+
 .hero-content {
     max-width: 650px;
 }
@@ -487,6 +518,18 @@ a {
     line-height: 1.1;
     margin-bottom: 24px;
     letter-spacing: -0.03em;
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero-title {
+        font-size: 2rem;
+    }
 }
 
 .hero-description {
@@ -499,6 +542,18 @@ a {
 .hero-actions {
     display: flex;
     gap: 16px;
+}
+
+@media (max-width: 768px) {
+    .hero-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .hero-actions .btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 /* Hero Vizuelni Deo - Dashboard Mockup */
@@ -758,6 +813,13 @@ section {
     margin: 0 auto;
 }
 
+@media (max-width: 768px) {
+    .features-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+    }
+}
+
 .feature-card {
     background-color: var(--color-bg-card);
     border: 1px solid var(--color-border);
@@ -780,7 +842,7 @@ section {
     height: 100%;
     background: radial-gradient(800px circle at var(--mouse-x, 0) var(--mouse-y, 0), rgba(255, 255, 255, 0.04), transparent 40%);
     pointer-events: none;
-    z-index: 1;
+    z-index: var(--z-content);
 }
 
 .feature-card:hover {
@@ -805,7 +867,7 @@ section {
     padding: 4px 10px;
     border-radius: 4px;
     letter-spacing: 0.05em;
-    z-index: 10;
+    z-index: var(--z-badge);
 }
 
 .badge-active {
@@ -954,6 +1016,18 @@ section {
     padding: 8px 16px;
     gap: 8px;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 480px) {
+    .playground-tabs {
+        padding: 8px 12px;
+    }
+    
+    .tab-btn {
+        padding: 12px 16px;
+        font-size: 0.85rem;
+    }
 }
 
 .tab-btn {
@@ -1287,7 +1361,7 @@ section {
     background-color: rgba(10, 6, 22, 0.76);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
-    z-index: 25;
+    z-index: var(--z-coming-soon);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1449,7 +1523,7 @@ section {
     height: 100%;
     background-color: var(--color-green);
     box-shadow: 0 0 10px var(--color-green);
-    z-index: 10;
+    z-index: var(--z-badge);
 }
 
 /* ISPRAVLJENO: drum-roller horizontalno širenje i sprečavanje wrapping-a */
@@ -1491,7 +1565,7 @@ section {
     width: 100%;
     height: 100%;
     background-color: rgba(6, 4, 10, 0.95);
-    z-index: 20;
+    z-index: var(--z-overlay);
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -1644,7 +1718,7 @@ section {
     display: flex;
     justify-content: center;
     pointer-events: none;
-    z-index: 15;
+    z-index: var(--z-overlay);
 }
 
 .live-alert-card {
@@ -2127,7 +2201,7 @@ section {
     border: 2px solid var(--color-green);
     box-shadow: 0 10px 30px rgba(83, 252, 24, 0.1);
     transform: scale(1.03);
-    z-index: 10;
+    z-index: var(--z-badge);
 }
 
 .pricing-card.popular:hover {
@@ -2461,7 +2535,7 @@ section {
     max-width: 650px;
     margin: 0 auto;
     position: relative;
-    z-index: 10;
+    z-index: var(--z-badge);
 }
 
 .cta-card h2 {
@@ -2624,7 +2698,7 @@ section {
         padding: 100px 40px;
         gap: 24px;
         transition: var(--transition-normal);
-        z-index: 105;
+        z-index: var(--z-dropdown);
     }
     
     .nav-menu.open {
@@ -2747,7 +2821,7 @@ section {
         0 20px 40px -10px rgba(0, 0, 0, 0.6),
         0 0 0 1px rgba(255, 255, 255, 0.05),
         inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    z-index: 120;
+    z-index: var(--z-dropdown);
     
     /* Perfekcija animacije otvaranja */
     opacity: 0;
@@ -2960,7 +3034,7 @@ section {
     background-color: rgba(6, 4, 10, 0.85);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    z-index: 999;
+    z-index: var(--z-modal);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -3148,7 +3222,7 @@ body::before {
     background: radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, rgba(83, 252, 24, 0.03) 40%, transparent 70%);
     transform: translate(-50%, -50%);
     pointer-events: none;
-    z-index: 0;
+    z-index: var(--z-bg);
     will-change: top, left;
 }
 
@@ -3159,7 +3233,7 @@ body::before {
     border: none;
     backdrop-filter: none;
     position: relative;
-    z-index: 2;
+    z-index: var(--z-content);
 }
 
 .stats-bar-grid {
@@ -3903,7 +3977,7 @@ body::before {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    z-index: 99;
+    z-index: var(--z-modal);
     opacity: 0;
     visibility: hidden;
     transform: translateY(20px) scale(0.9);
@@ -5618,7 +5692,9 @@ body::before {
 
 /* Touch Interaction Optimizations for Mobile */
 @media (hover: none) and (pointer: coarse) {
-    .btn, .tab-btn, .faq-pill, .cmd-badge, .theme-pill, .btn-alert-trigger, .period-btn {
+    .btn, .tab-btn, .faq-pill, .cmd-badge, .theme-pill, .btn-alert-trigger, .period-btn,
+    .mobile-toggle, .nav-menu button, .user-menu-trigger, .back-to-top-btn,
+    .spin-btn, .copy-btn, .close-btn {
         min-height: 44px;
         min-width: 44px;
     }
