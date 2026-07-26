@@ -157,13 +157,237 @@
       background: #53FC18;
     }
 
+    /* Maximum Responsiveness */
+    @media (max-width: 1024px) {
+      .container {
+        max-width: 700px;
+        padding: 60px 24px;
+      }
+    }
+
     @media (max-width: 768px) {
       h1 {
         font-size: 2rem;
       }
 
+      h2 {
+        font-size: 1.3rem;
+      }
+
+      h3 {
+        font-size: 1.1rem;
+      }
+
       .container {
+        max-width: 100%;
         padding: 40px 20px;
+      }
+
+      .warning,
+      .danger {
+        padding: 16px;
+        margin: 24px 0;
+      }
+
+      ul {
+        padding-left: 20px;
+      }
+
+      li {
+        margin-bottom: 10px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      h1 {
+        font-size: 1.75rem;
+        margin-bottom: 24px;
+      }
+
+      h2 {
+        font-size: 1.2rem;
+        margin-top: 32px;
+        margin-bottom: 16px;
+      }
+
+      h3 {
+        font-size: 1.05rem;
+      }
+
+      .container {
+        padding: 32px 16px;
+      }
+
+      .back-link {
+        font-size: 0.9rem;
+        margin-bottom: 24px;
+      }
+
+      p {
+        font-size: 0.95rem;
+        margin-bottom: 14px;
+      }
+
+      ul {
+        padding-left: 18px;
+        margin-bottom: 16px;
+      }
+
+      li {
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+      }
+
+      .warning,
+      .danger {
+        padding: 14px;
+        margin: 20px 0;
+        border-radius: 10px;
+      }
+
+      .warning p,
+      .danger p {
+        font-size: 0.9rem;
+      }
+
+      .icon-warning {
+        width: 20px;
+        height: 20px;
+        margin-right: 6px;
+      }
+
+      .icon-warning svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .highlight {
+        font-size: 0.95rem;
+      }
+    }
+
+    @media (max-width: 480px) {
+      h1 {
+        font-size: 1.5rem;
+        line-height: 1.3;
+      }
+
+      h2 {
+        font-size: 1.1rem;
+        margin-top: 24px;
+        margin-bottom: 14px;
+      }
+
+      h3 {
+        font-size: 1rem;
+      }
+
+      .container {
+        padding: 24px 14px;
+      }
+
+      .back-link {
+        font-size: 0.85rem;
+        margin-bottom: 20px;
+      }
+
+      p {
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+        line-height: 1.5;
+      }
+
+      ul {
+        padding-left: 16px;
+        margin-bottom: 14px;
+      }
+
+      li {
+        font-size: 0.9rem;
+        margin-bottom: 6px;
+        line-height: 1.4;
+      }
+
+      .warning,
+      .danger {
+        padding: 12px;
+        margin: 16px 0;
+        border-radius: 8px;
+      }
+
+      .warning p,
+      .danger p {
+        font-size: 0.85rem;
+        line-height: 1.4;
+      }
+
+      .icon-warning {
+        width: 18px;
+        height: 18px;
+        margin-right: 5px;
+      }
+
+      .icon-warning svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .highlight {
+        font-size: 0.9rem;
+      }
+
+      a {
+        word-break: break-word;
+      }
+
+      /* Horizontal scroll for long lists on very small screens */
+      ul {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+    }
+
+    @media (max-width: 360px) {
+      h1 {
+        font-size: 1.35rem;
+      }
+
+      h2 {
+        font-size: 1rem;
+      }
+
+      .container {
+        padding: 20px 12px;
+      }
+
+      p {
+        font-size: 0.85rem;
+      }
+
+      li {
+        font-size: 0.85rem;
+      }
+    }
+
+    /* Landscape orientation optimizations */
+    @media (max-height: 600px) and (orientation: landscape) {
+      .container {
+        padding: 30px 20px;
+      }
+
+      h1 {
+        font-size: 1.8rem;
+        margin-bottom: 20px;
+      }
+
+      h2 {
+        margin-top: 24px;
+        margin-bottom: 14px;
+      }
+
+      .warning,
+      .danger {
+        margin: 16px 0;
       }
     }
   </style>

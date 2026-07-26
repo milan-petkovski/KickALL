@@ -7,20 +7,9 @@ body {
   flex-direction: column;
 }
 
+/* Use main header styles instead of dashboard-specific */
 .dashboard-header {
-  border-bottom: 1px solid rgba(139, 92, 246, 0.15);
-  background: rgba(14, 10, 29, 0.6);
-  backdrop-filter: blur(12px);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.dashboard-container {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 70px;
+  display: none;
 }
 
 body.auth-loading {
@@ -84,21 +73,23 @@ body.auth-loading {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  padding: 130px 0 40px 0;
+  padding: 40px 0 30px 0;
   position: relative;
+  margin-top: 80px;
 }
 
 .welcome-section {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 60px;
   padding: 0;
+  margin-top: 20px;
 }
 
 .welcome-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 2.8rem;
+  font-size: 3.5rem;
   font-weight: 700;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   background: linear-gradient(135deg, #fff 40%, var(--color-violet) 100%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -107,7 +98,7 @@ body.auth-loading {
 }
 
 .welcome-subtitle {
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   color: var(--color-text-muted);
   max-width: 600px;
   margin: 0 auto;
@@ -135,7 +126,7 @@ body.auth-loading {
   }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 1280px) {
   .module-grid {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -145,7 +136,7 @@ body.auth-loading {
   background: rgba(14, 10, 29, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 24px;
-  padding: 35px 30px;
+  padding: 45px 35px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -264,10 +255,10 @@ body.auth-loading {
 
 .card-title {
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.8rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #fff;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   transition: color var(--transition-normal);
 }
 
@@ -292,10 +283,10 @@ body.auth-loading {
 }
 
 .card-description {
-  font-size: 0.92rem;
+  font-size: 1rem;
   color: var(--color-text-muted);
   line-height: 1.6;
-  margin-bottom: 30px;
+  margin-bottom: 35px;
   flex-grow: 1;
 }
 
@@ -1405,4 +1396,1146 @@ body.auth-loading {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
   font-size: 1.1rem;
+}
+
+/* Maximum Responsiveness */
+@media (max-width: 1024px) {
+  .dashboard-main-container {
+    max-width: 100%;
+    padding: 0 20px;
+  }
+
+  .welcome-title {
+    font-size: 3.5rem;
+  }
+
+  .welcome-subtitle {
+    font-size: 1.3rem;
+    max-width: 500px;
+  }
+
+  .module-dashboard-card {
+    padding: 40px 30px;
+  }
+
+  .card-title {
+    font-size: 1.8rem;
+  }
+
+  .card-description {
+    font-size: 0.95rem;
+  }
+
+  .modal-container {
+    padding: 32px;
+    max-width: 90%;
+  }
+
+  .pm-modal-body {
+    padding: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 80px 0 30px 0;
+  }
+
+  .welcome-title {
+    font-size: 3.2rem;
+    margin-bottom: 10px;
+  }
+
+  .welcome-subtitle {
+    font-size: 1.3rem;
+    max-width: 100%;
+  }
+
+  .welcome-section {
+    margin-bottom: 40px;
+    margin-top: 0;
+  }
+
+  .module-grid {
+    gap: 20px;
+  }
+
+  .module-dashboard-card {
+    padding: 35px 25px;
+    border-radius: 20px;
+  }
+
+  .card-header-row {
+    margin-bottom: 20px;
+  }
+
+  .card-title {
+    font-size: 1.6rem;
+  }
+
+  .card-description {
+    font-size: 0.95rem;
+    margin-bottom: 30px;
+  }
+
+  .card-btn {
+    height: 44px;
+    font-size: 0.9rem;
+  }
+
+  .card-icon-wrap {
+    width: 42px;
+    height: 42px;
+  }
+
+  .card-status-badge {
+    font-size: 0.68rem;
+    padding: 5px 12px;
+  }
+
+  .header-actions {
+    gap: 16px;
+  }
+
+  .referral-link-section {
+    margin-top: 40px;
+    padding: 16px;
+  }
+
+  .referral-link-btn {
+    font-size: 0.85rem;
+    padding: 6px 14px;
+  }
+
+  .modal-container {
+    padding: 28px 24px;
+    max-width: 95%;
+  }
+
+  .modal-title {
+    font-size: 1.5rem;
+  }
+
+  .modal-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .pm-ref-stats {
+    gap: 8px;
+  }
+
+  .pm-ref-stat {
+    padding: 12px 8px;
+  }
+
+  .pm-ref-stat-val {
+    font-size: 1.2rem;
+  }
+
+  .pm-ref-stat-lbl {
+    font-size: 0.68rem;
+  }
+
+  .pm-ref-link-box {
+    padding: 14px;
+  }
+
+  .pm-ref-custom-box {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .pm-ref-email-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .pm-ref-withdraw {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pm-btn-submit {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .wheel-outer {
+    width: 200px;
+    height: 200px;
+  }
+
+  .wheel-canvas {
+    width: 200px;
+    height: 200px;
+  }
+
+  .spin-btn {
+    padding: 10px 24px;
+    font-size: 0.95rem;
+  }
+
+  .analytics-preview {
+    padding: 16px;
+  }
+
+  .analytics-stat-row {
+    font-size: 0.82rem;
+  }
+
+  .analytics-chart-bar {
+    height: 30px;
+  }
+
+  .analytics-chart-text {
+    font-size: 0.76rem;
+    padding: 0 10px;
+  }
+
+  .withdrawal-modal {
+    max-width: 95%;
+  }
+
+  .withdrawal-form {
+    gap: 16px;
+  }
+
+  .amount-presets {
+    gap: 6px;
+  }
+
+  .amount-preset-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  .form-input,
+  .form-select {
+    padding: 10px 14px;
+    font-size: 0.9rem;
+  }
+
+  .withdrawal-submit-btn {
+    height: 44px;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-main-container {
+    padding: 0 16px;
+  }
+
+  .dashboard-container {
+    height: 56px;
+  }
+
+  .main-content {
+    padding: 50px 0 24px 0;
+  }
+
+  .welcome-title {
+    font-size: 2.8rem;
+  }
+
+  .welcome-subtitle {
+    font-size: 1.25rem;
+  }
+
+  .welcome-section {
+    margin-bottom: 30px;
+    margin-top: 0;
+  }
+
+  .module-grid {
+    gap: 20px;
+  }
+
+  .module-dashboard-card {
+    padding: 30px 20px;
+    border-radius: 18px;
+  }
+
+  .card-header-row {
+    margin-bottom: 18px;
+  }
+
+  .card-icon-wrap {
+    width: 42px;
+    height: 42px;
+  }
+
+  .card-icon-wrap svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .card-title {
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+  }
+
+  .card-description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 28px;
+  }
+
+  .card-btn {
+    height: 46px;
+    font-size: 0.95rem;
+    border-radius: 12px;
+  }
+
+  .card-status-badge {
+    font-size: 0.64rem;
+    padding: 4px 10px;
+  }
+
+  .header-actions {
+    gap: 12px;
+  }
+
+  .lang-switcher {
+    display: flex;
+    gap: 4px;
+  }
+
+  .lang-btn {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+  }
+
+  .user-menu-trigger {
+    padding: 4px 12px 4px 4px;
+    height: 40px;
+  }
+
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
+  }
+
+  .user-name {
+    font-size: 0.85rem;
+  }
+
+  .referral-link-section {
+    margin-top: 32px;
+    padding: 12px;
+  }
+
+  .referral-link-btn {
+    font-size: 0.8rem;
+    padding: 5px 12px;
+  }
+
+  .modal-container {
+    padding: 24px 20px;
+    max-width: 96%;
+    border-radius: 20px;
+  }
+
+  .modal-close-btn {
+    top: 20px;
+    right: 20px;
+    width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+
+  .modal-title {
+    font-size: 1.3rem;
+    gap: 10px;
+  }
+
+  .modal-subtitle {
+    font-size: 0.8rem;
+    margin-bottom: 20px;
+  }
+
+  .pm-modal {
+    border-radius: 20px;
+  }
+
+  .pm-modal-title {
+    font-size: 1rem;
+  }
+
+  .pm-modal-subtitle {
+    font-size: 0.72rem;
+  }
+
+  .pm-modal-close {
+    width: 28px;
+    height: 28px;
+  }
+
+  .pm-modal-close svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .pm-modal-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .pm-modal-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .pm-modal-body {
+    padding: 18px 16px;
+    gap: 14px;
+  }
+
+  .pm-referral-header-inner {
+    padding: 16px 18px 14px 18px;
+    gap: 12px;
+  }
+
+  .pm-ref-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .pm-ref-stat {
+    padding: 12px 6px;
+    border-radius: 10px;
+  }
+
+  .pm-ref-stat-val {
+    font-size: 1.1rem;
+    margin-bottom: 4px;
+  }
+
+  .pm-ref-stat-lbl {
+    font-size: 0.64rem;
+  }
+
+  .pm-ref-link-box {
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  .pm-label {
+    font-size: 0.76rem;
+    margin-bottom: 6px;
+  }
+
+  .pm-ref-link-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .pm-ref-code-input {
+    font-size: 0.9rem;
+    padding: 10px 12px;
+  }
+
+  .pm-ref-copy-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 16px;
+    font-size: 0.85rem;
+  }
+
+  .pm-ref-link-full {
+    font-size: 0.72rem;
+    gap: 4px;
+  }
+
+  .pm-ref-link-full svg {
+    width: 9px;
+    height: 9px;
+  }
+
+  .pm-ref-custom-box {
+    padding: 12px;
+    border-radius: 10px;
+  }
+
+  .pm-ref-custom-title {
+    font-size: 0.8rem;
+  }
+
+  .pm-ref-custom-body {
+    font-size: 0.76rem;
+  }
+
+  .pm-ref-email-btn {
+    padding: 8px 12px;
+    font-size: 0.75rem;
+  }
+
+  .pm-ref-email-btn svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .pm-ref-rewards-title {
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+  }
+
+  .pm-ref-rewards-title svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .pm-ref-rewards-list {
+    max-height: 120px;
+    gap: 6px;
+  }
+
+  .pm-ref-empty {
+    padding: 14px;
+    font-size: 0.78rem;
+  }
+
+  .pm-ref-withdraw {
+    padding-top: 14px;
+    gap: 12px;
+  }
+
+  .pm-ref-withdraw-title {
+    font-size: 0.8rem;
+  }
+
+  .pm-ref-withdraw-sub {
+    font-size: 0.7rem;
+  }
+
+  .pm-btn-submit {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+
+  .pm-btn-submit svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .wheel-simulator {
+    margin: 20px 0;
+    gap: 16px;
+  }
+
+  .wheel-outer {
+    width: 180px;
+    height: 180px;
+    border-width: 5px;
+  }
+
+  .wheel-canvas {
+    width: 180px;
+    height: 180px;
+  }
+
+  .wheel-pointer {
+    width: 20px;
+    height: 20px;
+    top: -10px;
+  }
+
+  .spin-btn {
+    padding: 10px 20px;
+    font-size: 0.9rem;
+  }
+
+  .wheel-result {
+    font-size: 1rem;
+  }
+
+  .analytics-preview {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .analytics-stat-row {
+    font-size: 0.78rem;
+    margin-bottom: 10px;
+  }
+
+  .analytics-chart-bar {
+    height: 28px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+  }
+
+  .analytics-chart-fill {
+    border-radius: 6px;
+  }
+
+  .analytics-chart-text {
+    font-size: 0.72rem;
+    padding: 0 8px;
+  }
+
+  .withdrawal-modal {
+    max-width: 96%;
+    border-radius: 20px;
+  }
+
+  .modal-close-btn {
+    top: 16px;
+    right: 16px;
+  }
+
+  .withdrawal-form {
+    margin: 20px 0;
+    gap: 14px;
+  }
+
+  .form-group {
+    gap: 6px;
+  }
+
+  .form-label {
+    font-size: 0.85rem;
+  }
+
+  .amount-presets {
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .amount-preset-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    border-radius: 6px;
+  }
+
+  .form-input,
+  .form-select {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    border-radius: 8px;
+  }
+
+  .form-hint {
+    font-size: 0.75rem;
+  }
+
+  .withdrawal-submit-btn {
+    height: 42px;
+    font-size: 0.9rem;
+    border-radius: 10px;
+  }
+
+  .withdrawal-info {
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .info-text {
+    font-size: 0.8rem;
+  }
+
+  #modalAvailableBalance {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-main-container {
+    padding: 0 14px;
+  }
+
+  .dashboard-container {
+    height: 52px;
+  }
+
+  .main-content {
+    padding: 45px 0 20px 0;
+  }
+
+  .welcome-title {
+    font-size: 2.5rem;
+    line-height: 1.2;
+  }
+
+  .welcome-subtitle {
+    font-size: 1.2rem;
+    line-height: 1.5;
+  }
+
+  .welcome-section {
+    margin-bottom: 25px;
+    margin-top: 0;
+  }
+
+  .module-grid {
+    gap: 18px;
+  }
+
+  .module-dashboard-card {
+    padding: 28px 18px;
+    border-radius: 16px;
+  }
+
+  .card-header-row {
+    margin-bottom: 16px;
+  }
+
+  .card-icon-wrap {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+
+  .card-icon-wrap svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .card-title {
+    font-size: 1.35rem;
+  }
+
+  .card-description {
+    font-size: 0.92rem;
+    margin-bottom: 24px;
+  }
+
+  .card-btn {
+    height: 44px;
+    font-size: 0.9rem;
+  }
+
+  .card-status-badge {
+    font-size: 0.6rem;
+    padding: 4px 8px;
+  }
+
+  .header-actions {
+    gap: 10px;
+  }
+
+  .lang-btn {
+    padding: 5px 8px;
+    font-size: 0.7rem;
+  }
+
+  .user-menu-trigger {
+    padding: 3px 10px 3px 3px;
+    height: 38px;
+  }
+
+  .user-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+  }
+
+  .user-name {
+    font-size: 0.8rem;
+  }
+
+  .chevron-icon {
+    width: 10px;
+    height: 10px;
+  }
+
+  .referral-link-section {
+    margin-top: 24px;
+    padding: 10px;
+  }
+
+  .referral-link-btn {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+  }
+
+  .referral-link-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .modal-container {
+    padding: 20px 16px;
+    max-width: 98%;
+    border-radius: 18px;
+  }
+
+  .modal-close-btn {
+    top: 16px;
+    right: 16px;
+    width: 26px;
+    height: 26px;
+    font-size: 0.75rem;
+  }
+
+  .modal-title {
+    font-size: 1.15rem;
+  }
+
+  .modal-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .pm-modal {
+    border-radius: 18px;
+  }
+
+  .pm-modal-title {
+    font-size: 0.92rem;
+  }
+
+  .pm-modal-subtitle {
+    font-size: 0.68rem;
+  }
+
+  .pm-modal-close {
+    width: 26px;
+    height: 26px;
+  }
+
+  .pm-modal-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .pm-modal-icon svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .pm-modal-body {
+    padding: 16px 14px;
+    gap: 12px;
+  }
+
+  .pm-referral-header-inner {
+    padding: 14px 16px 12px 16px;
+    gap: 10px;
+  }
+
+  .pm-ref-stats {
+    gap: 6px;
+  }
+
+  .pm-ref-stat {
+    padding: 10px 6px;
+  }
+
+  .pm-ref-stat-val {
+    font-size: 1rem;
+  }
+
+  .pm-ref-stat-lbl {
+    font-size: 0.6rem;
+  }
+
+  .pm-ref-link-box {
+    padding: 10px;
+  }
+
+  .pm-label {
+    font-size: 0.72rem;
+  }
+
+  .pm-ref-code-input {
+    font-size: 0.85rem;
+    padding: 8px 10px;
+  }
+
+  .pm-ref-copy-btn {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  .pm-ref-copy-btn svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .pm-ref-link-full {
+    font-size: 0.68rem;
+  }
+
+  .pm-ref-custom-box {
+    padding: 10px;
+  }
+
+  .pm-ref-custom-title {
+    font-size: 0.76rem;
+  }
+
+  .pm-ref-custom-body {
+    font-size: 0.72rem;
+  }
+
+  .pm-ref-email-btn {
+    padding: 6px 10px;
+    font-size: 0.72rem;
+  }
+
+  .pm-ref-rewards-title {
+    font-size: 0.8rem;
+  }
+
+  .pm-ref-rewards-list {
+    max-height: 100px;
+  }
+
+  .pm-ref-empty {
+    padding: 12px;
+    font-size: 0.75rem;
+  }
+
+  .pm-ref-withdraw {
+    padding-top: 12px;
+  }
+
+  .pm-ref-withdraw-title {
+    font-size: 0.76rem;
+  }
+
+  .pm-ref-withdraw-sub {
+    font-size: 0.68rem;
+  }
+
+  .pm-btn-submit {
+    padding: 7px 12px;
+    font-size: 0.8rem;
+  }
+
+  .wheel-simulator {
+    gap: 14px;
+  }
+
+  .wheel-outer {
+    width: 160px;
+    height: 160px;
+  }
+
+  .wheel-canvas {
+    width: 160px;
+    height: 160px;
+  }
+
+  .wheel-pointer {
+    width: 18px;
+    height: 18px;
+    top: -9px;
+  }
+
+  .spin-btn {
+    padding: 8px 18px;
+    font-size: 0.85rem;
+  }
+
+  .wheel-result {
+    font-size: 0.9rem;
+  }
+
+  .analytics-preview {
+    padding: 12px;
+  }
+
+  .analytics-stat-row {
+    font-size: 0.75rem;
+  }
+
+  .analytics-chart-bar {
+    height: 26px;
+  }
+
+  .analytics-chart-text {
+    font-size: 0.68rem;
+    padding: 0 6px;
+  }
+
+  .withdrawal-modal {
+    max-width: 98%;
+    border-radius: 18px;
+  }
+
+  .withdrawal-form {
+    margin: 16px 0;
+    gap: 12px;
+  }
+
+  .form-label {
+    font-size: 0.8rem;
+  }
+
+  .amount-preset-btn {
+    padding: 5px 10px;
+    font-size: 0.75rem;
+  }
+
+  .form-input,
+  .form-select {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  .form-hint {
+    font-size: 0.72rem;
+  }
+
+  .withdrawal-submit-btn {
+    height: 40px;
+    font-size: 0.85rem;
+  }
+
+  .withdrawal-info {
+    padding: 12px;
+  }
+
+  .info-text {
+    font-size: 0.75rem;
+  }
+
+  #modalAvailableBalance {
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .dashboard-main-container {
+    padding: 0 12px;
+  }
+
+  .welcome-title {
+    font-size: 2.3rem;
+  }
+
+  .welcome-subtitle {
+    font-size: 1.15rem;
+  }
+
+  .module-dashboard-card {
+    padding: 26px 16px;
+  }
+
+  .card-title {
+    font-size: 1.2rem;
+  }
+
+  .card-description {
+    font-size: 0.88rem;
+  }
+
+  .card-btn {
+    height: 42px;
+    font-size: 0.85rem;
+  }
+
+  .card-icon-wrap {
+    width: 38px;
+    height: 38px;
+  }
+
+  .modal-container {
+    padding: 18px 14px;
+  }
+
+  .modal-title {
+    font-size: 1.05rem;
+  }
+
+  .pm-modal-title {
+    font-size: 0.88rem;
+  }
+
+  .pm-ref-stat-val {
+    font-size: 0.95rem;
+  }
+
+  .wheel-outer {
+    width: 140px;
+    height: 140px;
+  }
+
+  .wheel-canvas {
+    width: 140px;
+    height: 140px;
+  }
+
+  .spin-btn {
+    padding: 8px 16px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Landscape orientation optimizations */
+@media (max-height: 600px) and (orientation: landscape) {
+  .dashboard-container {
+    height: 50px;
+  }
+
+  .main-content {
+    padding: 60px 0 20px 0;
+  }
+
+  .welcome-title {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+  }
+
+  .welcome-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .welcome-section {
+    margin-bottom: 20px;
+  }
+
+  .module-dashboard-card {
+    padding: 20px 16px;
+  }
+
+  .card-description {
+    margin-bottom: 20px;
+  }
+
+  .modal-container {
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  .wheel-simulator {
+    margin: 15px 0;
+    gap: 12px;
+  }
+
+  .wheel-outer {
+    width: 160px;
+    height: 160px;
+  }
+
+  .wheel-canvas {
+    width: 160px;
+    height: 160px;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .module-dashboard-card:hover {
+    transform: none;
+  }
+
+  .card-btn:hover {
+    transform: none;
+  }
+
+  .spin-btn:hover {
+    transform: none;
+  }
+
+  .referral-link-btn:hover {
+    transform: none;
+  }
+
+  .pm-ref-email-btn:hover {
+    transform: none;
+  }
 }

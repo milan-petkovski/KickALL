@@ -1,13 +1,20 @@
 // ── Supabase Configuration ────────────────────────────────
-const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
-  auth: {
-    persistSession: true,
-    storage: window.localStorage,
-    storageKey: 'kickbot-supabase-auth'
-  }
-});
+let sb;
+// Use Supabase client from app.js if available, otherwise create new one
+if (window.sb) {
+  sb = window.sb;
+} else {
+  const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
+  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+  sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+    auth: {
+      persistSession: true,
+      storage: window.localStorage,
+      storageKey: 'kickbot-supabase-auth'
+    }
+  });
+  window.sb = sb;
+}
 
 // ── Fetch Kick Channel Data ───────────────────────────────
 async function fetchKickChannelData(username) {
@@ -118,9 +125,15 @@ function t(key) {
 }
 
 // Synth Sound Utility
+let audioCtx = null;
 function playSound(freq, type = 'sine', duration = 0.1, gainVal = 0.1) {
   try {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
     const osc = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
     osc.connect(gainNode);
@@ -990,21 +1003,6 @@ function setLang(lang) {
 
 document.getElementById('btn-sr').addEventListener('click', () => setLang('sr'));
 document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
-
-// ── User Dropdown Toggle ──────────────────────────────────
-const trigger = document.getElementById('userMenuTrigger');
-const menu = document.getElementById('userMenu');
-
-if (trigger && menu) {
-  trigger.addEventListener('click', (e) => {
-    e.stopPropagation();
-    menu.classList.toggle('open');
-  });
-
-  document.addEventListener('click', () => {
-    menu.classList.remove('open');
-  });
-}
 
 // Logout Action
 const btnLogout = document.getElementById('btnLogout');
