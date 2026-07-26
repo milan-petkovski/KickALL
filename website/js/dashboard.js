@@ -675,7 +675,10 @@ function initDashboard(user) {
 
   // Show profile menu
   const userMenuEl = document.getElementById('userMenu');
-  if (userMenuEl) userMenuEl.classList.add('visible');
+  if (userMenuEl) {
+    userMenuEl.classList.add('visible');
+    userMenuEl.style.display = ''; // Remove inline display: none
+  }
 
   // Hide auth gate
   const gate = document.getElementById('authGate');
