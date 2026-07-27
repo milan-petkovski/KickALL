@@ -20,7 +20,48 @@ window.CONFIG = {
     KICK_OAUTH_AUTHORIZE: 'https://id.kick.com/oauth/authorize',
     KICK_USERINFO: 'https://id.kick.com/oauth/userinfo',
     PROXY_ALLORIGINS: 'https://api.allorigins.win/get',
-    PROXY_CORSPROXY: 'https://corsproxy.io/?'
+    PROXY_CORSPROXY: 'https://corsproxy.io/?',
+    
+    // CORS-safe fetch wrapper
+    async fetchWithCORS(url, options = {}) {
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                          window.location.hostname === '127.0.0.1';
+      
+      // Always use backend API as proxy for external requests
+      const backendBase = this.getBackendApiBase();
+      
+      try {
+        // Try direct fetch first (might work in production)
+        if (!isLocalhost) {
+          const directResponse = await fetch(url, options);
+          if (directResponse.ok) return directResponse;
+        }
+        
+        // Fallback to backend proxy
+        const proxyUrl = `${backendBase}/api/proxy`;
+        const proxyResponse = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            targetUrl: url,
+            method: options.method || 'GET',
+            headers: options.headers || {},
+            body: options.body
+          })
+        });
+        
+        if (proxyResponse.ok) {
+          return proxyResponse;
+        }
+        
+        throw new Error('Proxy request failed');
+      } catch (error) {
+        console.error('CORS fetch error:', error);
+        throw error;
+      }
+    }
   },
 
   // Backend API Configuration

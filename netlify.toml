@@ -60,6 +60,12 @@
   force = true
 
 [[redirects]]
+  from = "/api/proxy"
+  to = "/.netlify/functions/api-proxy"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/auth/kick/callback"
   to = "/auth/kick/callback/index.html"
   status = 200

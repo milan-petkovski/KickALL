@@ -3,7 +3,14 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Kickot" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="msapplication-tap-highlight" content="no" />
+  <meta name="color-scheme" content="dark" />
   <title data-i18n="meta.title">Kickot | Bot za Kick platformu</title>
   <meta name="description" data-i18n="meta.desc" content="Kickot je moćan chatbot za Kick platformu. Komande, moderacija, watchtime, leaderboard i mini igre." />
   <meta name="keywords" content="Kickot, Kick bot, Kick chatbot, watchtime, leaderboard, Kick moderacija" />
@@ -14,6 +21,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
   <link rel="dns-prefetch" href="https://rcukparptzzyssqdmydt.supabase.co" />
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/assets/logo.webp" />
 
   <!-- Open Graph (Discord, Viber i društvene mreže) -->
   <meta property="og:type" content="website" />
@@ -44,6 +55,21 @@
   <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
   <link rel="apple-touch-icon" href="assets/logo.png" />
   <link rel="stylesheet" href="css/style.css" />
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .catch(registrationError => {
+            // Silent fail - SW registration not critical
+          });
+      });
+    }
+  </script>
+  
+  <!-- Mobile Performance Optimizations -->
+  <script src="../js/mobile-optimization.js" defer></script>
 
   <style>
     .btn-kick-login:hover {
@@ -81,7 +107,7 @@
                     </span>
                     <span data-i18n="nav.back">KickAll</span>
                 </a>
-                <a href="#" class="logo" id="navLogo">
+                <a href="index.html" class="logo" id="navLogo">
                     <img src="assets/kickot.png" alt="Kickot Logo" class="logo-img" style="height: 48px;">
                 </a>
             </div>
@@ -727,7 +753,7 @@
     <footer class="footer">
         <div class="container footer-container">
             <div class="footer-brand">
-                <a href="#" class="logo" id="footerLogo">
+                <a href="index.html" class="logo" id="footerLogo">
                     <img src="assets/kickot.png" alt="Kickot Logo" class="footer-logo-img" style="height: 38px;">
                 </a>
                 <p class="footer-tagline" data-i18n="footer.tagline">

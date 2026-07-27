@@ -183,20 +183,31 @@ document.querySelectorAll('[data-reveal]').forEach(el => revealObserver.observe(
 // ── Smooth scroll ──────────────────────────────────────────
 document.querySelectorAll('a[href^="#"]').forEach(a => {
   a.addEventListener('click', e => {
-    const target = document.querySelector(a.getAttribute('href'));
-    if (target) { 
-      e.preventDefault(); 
-      target.scrollIntoView({ behavior: 'smooth' });
-      
-      // Close mobile menu if open
-      const navMenu = document.getElementById('navMenu');
-      const mobileToggle = document.getElementById('mobileToggle');
-      if (navMenu && navMenu.classList.contains('open')) {
-        navMenu.classList.remove('open');
-        if (mobileToggle) mobileToggle.classList.remove('active');
-        mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
-        mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+    const href = a.getAttribute('href');
+    
+    // Skip empty or invalid hash selectors
+    if (!href || href === '#' || href.trim() === '') {
+      return;
+    }
+    
+    try {
+      const target = document.querySelector(href);
+      if (target) { 
+        e.preventDefault(); 
+        target.scrollIntoView({ behavior: 'smooth' });
+        
+        // Close mobile menu if open
+        const navMenu = document.getElementById('navMenu');
+        const mobileToggle = document.getElementById('mobileToggle');
+        if (navMenu && navMenu.classList.contains('open')) {
+          navMenu.classList.remove('open');
+          if (mobileToggle) mobileToggle.classList.remove('active');
+          mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+          mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+        }
       }
+    } catch (error) {
+      // Silent fail for invalid selectors
     }
   });
 });
@@ -1070,14 +1081,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const targetEl = document.querySelector(href);
-            if (targetEl) {
-                e.preventDefault();
-                if (window.lenisInstance) {
-                    window.lenisInstance.scrollTo(targetEl, { offset: -80, duration: 1.2 });
-                } else {
-                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            try {
+                const targetEl = document.querySelector(href);
+                if (targetEl) {
+                    e.preventDefault();
+                    if (window.lenisInstance) {
+                        window.lenisInstance.scrollTo(targetEl, { offset: -80, duration: 1.2 });
+                    } else {
+                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
+            } catch (error) {
+                // Silent fail for invalid selectors
             }
         });
     });

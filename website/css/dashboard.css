@@ -2537,25 +2537,178 @@ body.auth-loading {
   }
 }
 
-/* Touch device optimizations */
+/* Advanced Touch Device Optimizations */
 @media (hover: none) and (pointer: coarse) {
-  .module-dashboard-card:hover {
-    transform: none;
+  /* Ensure all interactive elements meet minimum touch target size */
+  .module-dashboard-card, .card-btn, .spin-btn, .referral-link-btn, .pm-ref-email-btn,
+  .tab-btn, .cmd-badge, .action-btn, .close-btn, .save-btn, .cancel-btn {
+    min-height: 48px;
+    min-width: 48px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  
+  /* Enhanced touch feedback */
+  .module-dashboard-card, .card-btn, .spin-btn, .referral-link-btn, .pm-ref-email-btn {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .module-dashboard-card::after, .card-btn::after, .spin-btn::after, 
+  .referral-link-btn::after, .pm-ref-email-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+  }
+  
+  .module-dashboard-card:active::after, .card-btn:active::after, .spin-btn:active::after,
+  .referral-link-btn:active::after, .pm-ref-email-btn:active::after {
+    width: 200px;
+    height: 200px;
   }
 
-  .card-btn:hover {
+  /* Remove hover effects on touch devices */
+  .module-dashboard-card:hover, .card-btn:hover, .spin-btn:hover, 
+  .referral-link-btn:hover, .pm-ref-email-btn:hover {
     transform: none;
+    box-shadow: var(--shadow-glass);
   }
 
-  .spin-btn:hover {
-    transform: none;
+  /* Add active state feedback */
+  .module-dashboard-card:active, .card-btn:active, .spin-btn:active,
+  .referral-link-btn:active, .pm-ref-email-btn:active {
+    transform: scale(0.97);
+    transition: transform 0.1s ease;
   }
+  
+  /* Input elements */
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"],
+  textarea, select {
+    min-height: 48px;
+    font-size: 16px; /* Prevent iOS zoom */
+    touch-action: manipulation;
+  }
+  
+  /* Buttons and controls */
+  .btn {
+    min-height: 48px;
+    min-width: 48px;
+    padding: 12px 20px;
+  }
+  
+  /* Navigation elements */
+  .sidebar-link {
+    min-height: 48px;
+    padding: 12px 16px;
+  }
+  
+  /* Cards and panels */
+  .dashboard-card, .settings-card, .stats-card {
+    min-height: 48px;
+  }
+  
+  /* Smooth scrolling for mobile */
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Improved scrollbar for mobile */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  
+  /* Prevent pull-to-refresh on sensitive areas */
+  .dashboard-content, .sidebar {
+    overscroll-behavior: contain;
+  }
+}
 
-  .referral-link-btn:hover {
-    transform: none;
-  }
+/* Mobile Performance Optimizations */
+@media (max-width: 768px) {
+    /* Reduce complex animations on mobile */
+    .blob {
+        animation-duration: 12s !important;
+        opacity: 0.12 !important;
+    }
+    
+    /* Disable GPU-intensive effects on low-end devices */
+    .glow-bg {
+        will-change: transform;
+        backface-visibility: hidden;
+        perspective: 1000px;
+    }
+    
+    /* Optimize rendering for mobile */
+    * {
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+    
+    /* Reduce shadow complexity */
+    .card, .module-dashboard-card, .settings-card {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Optimize image rendering */
+    img {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+    
+    /* Reduce font rendering complexity */
+    body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+    }
+}
 
-  .pm-ref-email-btn:hover {
-    transform: none;
-  }
+/* Slow connection optimizations */
+.slow-connection {
+    /* Disable animations on slow connections */
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    /* Reduce image quality */
+    img {
+        filter: blur(0.5px);
+    }
+    
+    /* Disable complex effects */
+    .glow-bg, .blob {
+        display: none;
+    }
+}
+
+/* Low battery optimizations */
+.low-battery {
+    /* Reduce animations */
+    *, *::before, *::after {
+        animation-duration: 2s !important;
+        transition-duration: 0.3s !important;
+    }
+    
+    /* Disable background effects */
+    .glow-bg {
+        opacity: 0.5;
+    }
+    
+    .blob {
+        animation: none !important;
+    }
 }

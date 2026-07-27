@@ -79,6 +79,105 @@ body {
     scrollbar-color: var(--color-violet) transparent;
 }
 
+/* Mobile Performance Optimizations */
+@media (max-width: 768px) {
+    /* Reduce complex animations on mobile */
+    .blob {
+        animation-duration: 12s !important;
+        opacity: 0.12 !important;
+    }
+    
+    /* Disable GPU-intensive effects on low-end devices */
+    .glow-bg {
+        will-change: transform;
+        backface-visibility: hidden;
+        perspective: 1000px;
+    }
+    
+    /* Optimize rendering for mobile */
+    * {
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+    
+    /* Reduce shadow complexity */
+    .card, .feature-card, .pricing-card {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Optimize image rendering */
+    img {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+    
+    /* Reduce font rendering complexity */
+    body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+    }
+}
+
+/* Slow connection optimizations */
+.slow-connection {
+    /* Disable animations on slow connections */
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    /* Reduce image quality */
+    img {
+        filter: blur(0.5px);
+    }
+    
+    /* Disable complex effects */
+    .glow-bg, .blob {
+        display: none;
+    }
+}
+
+/* Low battery optimizations */
+.low-battery {
+    /* Reduce animations */
+    *, *::before, *::after {
+        animation-duration: 2s !important;
+        transition-duration: 0.3s !important;
+    }
+    
+    /* Disable background effects */
+    .glow-bg {
+        opacity: 0.5;
+    }
+    
+    .blob {
+        animation: none !important;
+    }
+}
+
+/* Landscape orientation optimizations */
+@media (max-height: 500px) and (orientation: landscape) {
+    .header {
+        padding: 8px 0;
+    }
+    
+    .nav-menu {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .hero-section {
+        padding: 40px 0;
+    }
+    
+    .blob {
+        display: none;
+    }
+}
+
 /* WebKit pregledači (Chrome, Edge, Safari) */
 ::-webkit-scrollbar {
     width: 6px;
@@ -5699,51 +5798,150 @@ body::before {
     }
 }
 
-/* Touch Interaction Optimizations for Mobile */
+/* Advanced Touch Interaction Optimizations for Mobile */
 @media (hover: none) and (pointer: coarse) {
+    /* Ensure all interactive elements meet minimum touch target size */
     .btn, .tab-btn, .faq-pill, .cmd-badge, .theme-pill, .btn-alert-trigger, .period-btn,
     .mobile-toggle, .nav-menu button, .user-menu-trigger, .back-to-top-btn,
-    .spin-btn, .copy-btn, .close-btn {
-        min-height: 44px;
-        min-width: 44px;
+    .spin-btn, .copy-btn, .close-btn, .lang-btn, .nav-link, .dropdown-item {
+        min-height: 48px;
+        min-width: 48px;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+        -webkit-user-select: none;
     }
     
-    .nav-link {
-        padding: 12px 0;
+    /* Enhanced touch feedback */
+    .btn, .tab-btn, .mobile-toggle, .nav-link, .dropdown-item {
+        position: relative;
+        overflow: hidden;
     }
     
-    .dropdown-item {
-        padding: 14px 16px;
+    .btn::after, .tab-btn::after, .mobile-toggle::after, .nav-link::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 0;
+        height: 0;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        transition: width 0.3s, height 0.3s;
     }
     
+    .btn:active::after, .tab-btn:active::after, .mobile-toggle:active::after, .nav-link:active::after {
+        width: 200px;
+        height: 200px;
+    }
+    
+    /* Remove hover effects on touch devices */
     .feature-card:hover, .pricing-card:hover, .testimonial-card:hover, .bar-stat-card:hover,
-    .perf-card:hover, .showcase-card:hover {
+    .perf-card:hover, .showcase-card:hover, .module-card:hover {
         transform: none;
+        box-shadow: var(--shadow-glass);
     }
     
+    /* Add active state feedback */
     .feature-card:active, .pricing-card:active, .testimonial-card:active, .bar-stat-card:active,
-    .perf-card:active, .showcase-card:active {
-        transform: scale(0.98);
+    .perf-card:active, .showcase-card:active, .module-card:active {
+        transform: scale(0.97);
+        transition: transform 0.1s ease;
     }
     
-    .btn-primary:active, .btn-secondary:active {
+    .btn-primary:active, .btn-secondary:active, .btn-outline:active {
         transform: scale(0.95);
+        transition: transform 0.1s ease;
     }
     
+    /* Improved mobile menu touch targets */
     .mobile-toggle {
-        min-width: 44px;
-        min-height: 44px;
-        padding: 10px;
+        min-width: 48px;
+        min-height: 48px;
+        padding: 12px;
     }
     
+    .mobile-menu-close {
+        min-width: 48px;
+        min-height: 48px;
+        padding: 12px;
+    }
+    
+    /* Chat and input elements */
     .chat-send-btn {
-        min-height: 44px;
-        min-width: 44px;
+        min-height: 48px;
+        min-width: 48px;
     }
     
+    input[type="text"], input[type="email"], input[type="password"], textarea, select {
+        min-height: 48px;
+        font-size: 16px; /* Prevent iOS zoom */
+        touch-action: manipulation;
+    }
+    
+    /* Back to top button */
     .back-to-top-btn {
-        min-width: 50px;
-        min-height: 50px;
+        min-width: 56px;
+        min-height: 56px;
+    }
+    
+    /* Language switcher */
+    .lang-switcher {
+        gap: 8px;
+    }
+    
+    .lang-btn {
+        min-width: 44px;
+        min-height: 44px;
+        font-size: 14px;
+    }
+    
+    /* User menu */
+    .user-menu-trigger {
+        min-height: 48px;
+        padding: 8px 12px;
+    }
+    
+    .user-avatar {
+        min-width: 40px;
+        min-height: 40px;
+    }
+    
+    /* Navigation links spacing */
+    .nav-link {
+        padding: 16px 0;
+        margin: 4px 0;
+    }
+    
+    /* Dropdown items */
+    .dropdown-item {
+        padding: 16px 20px;
+        margin: 4px 0;
+    }
+    
+    /* Prevent text selection on interactive elements */
+    .btn, .nav-link, .mobile-toggle, .user-menu-trigger, .lang-btn {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+    
+    /* Smooth scrolling for mobile */
+    html {
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Improved scrollbar for mobile */
+    ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+    
+    /* Prevent pull-to-refresh on sensitive areas */
+    .no-pull-refresh {
+        overscroll-behavior: contain;
     }
 }
 

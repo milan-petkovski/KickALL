@@ -144,14 +144,13 @@ let marriagesQuery = '';
 async function initAuth() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
+    const code = urlParams.get('code') || sessionStorage.getItem('kick_oauth_code');
     const oauthError = urlParams.get('error');
     
     // Check if coming from kickall (multiple sources with fallbacks)
     const fromKickAll = sessionStorage.getItem('from_kickall') === 'true' ||
                         localStorage.getItem('kick_origin_site') === 'kickall' ||
-                        (document.referrer && document.referrer.includes('kickall.app')) ||
-                        (document.referrer && document.referrer.includes(window.location.hostname));
+                        (document.referrer && document.referrer.includes('kickall.app'));
 
     if (oauthError) {
       document.getElementById('authGateMsg').textContent = 'Kick odbio autorizaciju...';
@@ -161,7 +160,8 @@ async function initAuth() {
     }
 
     // Skip OAuth code exchange if coming from kickall (already authenticated via Supabase)
-    if (code && !fromKickAll) {
+    // or if token already exists in localStorage (already exchanged by callback)
+    if (code && !fromKickAll && !localStorage.getItem('kick_access_token')) {
       document.getElementById('authGateMsg').textContent = 'Autorizacija u toku...';
 
       const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
@@ -218,6 +218,7 @@ async function initAuth() {
         sessionStorage.removeItem('kick_oauth_intent');
         sessionStorage.removeItem('kick_add_channel_uid');
         sessionStorage.removeItem('kick_oauth_source');
+        sessionStorage.removeItem('kick_oauth_code');
         localStorage.removeItem('kick_oauth_state');
         localStorage.removeItem('kick_code_verifier');
 
@@ -325,12 +326,13 @@ async function initAuth() {
       window.history.replaceState({}, '', window.location.pathname);
     }
 
-    if (urlParamsOAuth && kickAccessToken && !fromKickAll) {
+    if (urlParamsOAuth && kickAccessToken) {
       document.getElementById('authGateMsg').textContent = 'Učitavamo tvoj Kick profil...';
       try {
         await handleKickOAuthSession(kickAccessToken);
         return;
       } catch (kickErr) {
+        console.error("Kick OAuth failed:", kickErr);
         // Kick OAuth failed, continuing with standard session check
       }
     }
@@ -356,7 +358,8 @@ async function initAuth() {
     
     await initApp();
   } catch (err) {
-    document.getElementById('authGateMsg').textContent = 'Greška pri proveri sesije.';
+    console.error('Auth error:', err);
+    document.getElementById('authGateMsg').textContent = 'Greška pri proveri sesije: ' + err.message;
     // Critical error - keep for debugging
   }
 }

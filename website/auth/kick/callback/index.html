@@ -3,27 +3,6 @@
 
 <head>
   <meta charset="UTF-8" />
-  <script>
-    (function () {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      const error = params.get('error');
-
-      if (code || error) {
-        const originSite = sessionStorage.getItem('kick_origin_site') ||
-          localStorage.getItem('kick_origin_site') ||
-          (sessionStorage.getItem('from_kickall') === 'true' ? 'kickall' : 'kickot');
-
-        let targetPage = 'dashboard.html';
-        if (originSite === 'kickot') targetPage = 'kickot/dashboard.html';
-        else if (originSite === 'kickaj') targetPage = 'kickaj/dashboard.html';
-        else if (originSite === 'kickan') targetPage = 'kickan/dashboard.html';
-        else if (originSite === 'kickov') targetPage = 'kickov/dashboard.html';
-
-        window.location.replace(`/${targetPage}` + window.location.search);
-      }
-    })();
-  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KickALL | OAuth Autorizacija</title>
   <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
@@ -180,47 +159,6 @@
 </head>
 
 <body>
-  <div class="glow-bg">
-    <div class="blob blob-violet"></div>
-    <div class="blob blob-green"></div>
-  </div>
-
-  <div class="card" id="card">
-    <div class="logo-wrap">
-      <img src="/assets/kickall.png" alt="KickALL Logo" onerror="this.style.display='none'">
-    </div>
-
-    <div id="loadingState">
-      <div class="spinner"></div>
-      <h1>Autorizacija u toku...</h1>
-      <p>Molimo sačekaj dok obradimo prijavu.</p>
-    </div>
-
-    <div id="errorState" style="display:none;">
-      <div class="status-icon" style="color: #EF4444;">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="15" y1="9" x2="9" y2="15"/>
-          <line x1="9" y1="9" x2="15" y2="15"/>
-        </svg>
-      </div>
-      <h1 class="status-msg" id="errorTitle">Greška pri autorizaciji</h1>
-      <p class="status-sub" id="errorDetail">Pokušaj ponovo.</p>
-      <a href="/index.html" class="btn-retry">Pokušaj ponovo</a>
-    </div>
-
-    <div id="successState" style="display:none;">
-      <div class="status-icon" style="color: #53FC18;">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-          <polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-      </div>
-      <h1 class="status-msg">Uspešna prijava!</h1>
-      <p class="status-sub">Preusmeravanje na dashboard...</p>
-    </div>
-  </div>
-
   <script>
     (async function processKickOAuth() {
       const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
@@ -229,40 +167,26 @@
       const state = params.get('state');
       const error = params.get('error');
 
-      const UI = {
-        loading: document.getElementById('loadingState'),
-        error: document.getElementById('errorState'),
-        success: document.getElementById('successState'),
-        errorTitle: document.getElementById('errorTitle'),
-        errorDetail: document.getElementById('errorDetail')
-      };
-
-      function showError(title, detail) {
-        UI.loading.style.display = 'none';
-        UI.success.style.display = 'none';
-        UI.error.style.display = 'block';
-        UI.errorTitle.textContent = title || 'Greška pri autorizaciji';
-        UI.errorDetail.textContent = detail || 'Došlo je do neočekivane greške. Pokušaj ponovo.';
-      }
-
       if (error) {
-        showError('Kick je odbio autorizaciju', `Razlog: ${error}`);
+        window.location.href = '/index.html?error=' + encodeURIComponent(error);
         return;
       }
 
       const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
       if (!isLocalhost && (!state || state !== savedState)) {
-        showError('Bezbednosna provera neuspešna', 'State parametar se ne podudara.');
+        window.location.href = '/index.html?error=state_mismatch';
         return;
       }
 
       if (!code) {
-        showError('Nedostaje autorizacioni kod', 'Kick nije poslao kod za autentifikaciju.');
+        window.location.href = '/index.html?error=no_code';
         return;
       }
 
       const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
-      const redirectUri = `${window.location.origin}/auth/kick/callback/`;
+      const redirectUri = isLocalhost 
+        ? 'http://localhost:5500/auth/kick/callback/' 
+        : 'https://kickall.app/auth/kick/callback/';
 
       const apiBase = isLocalhost || window.location.hostname.endsWith('netlify.app')
         ? 'https://kickbot-ihzb.onrender.com'
@@ -276,14 +200,13 @@
         });
 
         if (!response.ok) {
-          const errData = await response.json().catch(() => ({ error: 'Greška na serveru' }));
-          showError('Razmena tokena nije uspela', errData.detail || errData.error || 'Server nije dostupan.');
+          window.location.href = '/index.html?error=exchange_failed';
           return;
         }
 
         const tokenData = await response.json();
         if (!tokenData.access_token) {
-          showError('Token nije dobijen', 'Kick server nije vratio pristupni token.');
+          window.location.href = '/index.html?error=no_token';
           return;
         }
 
@@ -291,14 +214,12 @@
         localStorage.setItem('kick_access_token', tokenData.access_token);
         localStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
         localStorage.setItem('kick_session_active', 'true');
+        sessionStorage.setItem('kick_oauth_code', code);
 
         ['kick_oauth_state', 'kick_code_verifier'].forEach(key => {
           sessionStorage.removeItem(key);
           localStorage.removeItem(key);
         });
-
-        UI.loading.style.display = 'none';
-        UI.success.style.display = 'block';
 
         const originSite = sessionStorage.getItem('kick_origin_site') ||
           localStorage.getItem('kick_origin_site') ||
@@ -313,12 +234,10 @@
 
         const targetPage = targets[originSite] || 'dashboard.html';
 
-        setTimeout(() => {
-          window.location.replace(`/${targetPage}?kick_oauth=1`);
-        }, 500);
+        window.location.replace(`/${targetPage}?kick_oauth=1`);
 
       } catch (err) {
-        showError('Greška pri konekciji', 'Nije moguće kontaktirati API server: ' + err.message);
+        window.location.href = '/index.html?error=connection_error';
       }
     })();
   </script>

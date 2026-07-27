@@ -3613,6 +3613,187 @@ input[type="number"]::-webkit-inner-spin-button {
   line-height: 1.55;
 }
 
+/* Advanced Touch Device Optimizations for Kickot Dashboard */
+@media (hover: none) and (pointer: coarse) {
+  /* Ensure all interactive elements meet minimum touch target size */
+  .btn, .tab-btn, .cmd-badge, .action-btn, .close-btn, .save-btn, .cancel-btn,
+  .pm-btn-cancel, .pm-btn-submit, .pm-modal-close, .pm-ref-email-btn,
+  .sidebar-link, .settings-btn, .command-btn {
+    min-height: 48px;
+    min-width: 48px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  
+  /* Enhanced touch feedback */
+  .btn, .tab-btn, .cmd-badge, .action-btn, .pm-btn-cancel, .pm-btn-submit {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .btn::after, .tab-btn::after, .cmd-badge::after, .action-btn::after,
+  .pm-btn-cancel::after, .pm-btn-submit::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+  }
+  
+  .btn:active::after, .tab-btn:active::after, .cmd-badge:active::after, .action-btn:active::after,
+  .pm-btn-cancel:active::after, .pm-btn-submit:active::after {
+    width: 200px;
+    height: 200px;
+  }
+
+  /* Remove hover effects on touch devices */
+  .pm-modal-close:hover, .pm-btn-cancel:hover, .pm-btn-submit:hover,
+  .sidebar-link:hover, .settings-btn:hover, .command-btn:hover {
+    transform: none;
+  }
+
+  /* Add active state feedback */
+  .pm-modal-close:active, .pm-btn-cancel:active, .pm-btn-submit:active,
+  .sidebar-link:active, .settings-btn:active, .command-btn:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+  
+  /* Input elements */
+  input[type="text"], input[type="email"], input[type="password"], input[type="number"],
+  textarea, select {
+    min-height: 48px;
+    font-size: 16px; /* Prevent iOS zoom */
+    touch-action: manipulation;
+  }
+  
+  /* Cards and panels */
+  .pm-card, .settings-card, .stats-card, .referral-card {
+    min-height: 48px;
+  }
+  
+  /* Modal elements */
+  .pm-modal-close {
+    min-width: 48px;
+    min-height: 48px;
+  }
+  
+  /* Smooth scrolling for mobile */
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Improved scrollbar for mobile */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  
+  /* Prevent pull-to-refresh on sensitive areas */
+  .dashboard-content, .sidebar, .pm-modal-body {
+    overscroll-behavior: contain;
+  }
+  
+  /* Referral stats grid touch optimization */
+  .pm-ref-stat {
+    min-height: 48px;
+    padding: 16px 12px;
+  }
+  
+  /* Command badges */
+  .cmd-badge {
+    min-height: 48px;
+    padding: 12px 16px;
+  }
+}
+
+/* Mobile Performance Optimizations */
+@media (max-width: 768px) {
+    /* Reduce complex animations on mobile */
+    .blob {
+        animation-duration: 12s !important;
+        opacity: 0.12 !important;
+    }
+    
+    /* Disable GPU-intensive effects on low-end devices */
+    .glow-bg {
+        will-change: transform;
+        backface-visibility: hidden;
+        perspective: 1000px;
+    }
+    
+    /* Optimize rendering for mobile */
+    * {
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+    
+    /* Reduce shadow complexity */
+    .card, .pm-card, .settings-card {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    /* Optimize image rendering */
+    img {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+    
+    /* Reduce font rendering complexity */
+    body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+    }
+}
+
+/* Slow connection optimizations */
+.slow-connection {
+    /* Disable animations on slow connections */
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+    
+    /* Reduce image quality */
+    img {
+        filter: blur(0.5px);
+    }
+    
+    /* Disable complex effects */
+    .glow-bg, .blob {
+        display: none;
+    }
+}
+
+/* Low battery optimizations */
+.low-battery {
+    /* Reduce animations */
+    *, *::before, *::after {
+        animation-duration: 2s !important;
+        transition-duration: 0.3s !important;
+    }
+    
+    /* Disable background effects */
+    .glow-bg {
+        opacity: 0.5;
+    }
+    
+    .blob {
+        animation: none !important;
+    }
+}
+
 .pm-code {
   background: rgba(139, 92, 246, 0.12);
   border: 1px solid rgba(139, 92, 246, 0.22);

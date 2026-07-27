@@ -3,7 +3,14 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Kickot" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="msapplication-tap-highlight" content="no" />
+  <meta name="color-scheme" content="dark" />
   <title>Kickot Dashboard</title>
   <meta name="description" content="Kickot bot control panel. Upravljaj komandama, leaderboard tabelom i podešavanjima bota." />
   <meta name="robots" content="noindex, nofollow" />
@@ -14,6 +21,21 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://rcukparptzzyssqdmydt.supabase.co" crossorigin />
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .catch(registrationError => {
+            // Silent fail - SW registration not critical
+          });
+      });
+    }
+  </script>
+  
+  <!-- Mobile Performance Optimizations -->
+  <script src="../js/mobile-optimization.js" defer></script>
 
   <!-- Fontovi (Inter, JetBrains Mono, Space Grotesk) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -55,7 +77,7 @@
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </a>
-        <a href="#" onclick="window.location.href = window.KickotConfig.paths.indexUrl; return false;" class="sidebar-logo">
+        <a href="index.html" onclick="window.location.href = window.KickotConfig.paths.indexUrl; return false;" class="sidebar-logo">
           <img src="assets/kickot.png" alt="Kickot Logo" class="logo-img">
         </a>
         <a href="https://paypal.me/milanwebportal/5EUR" target="_blank" rel="noopener noreferrer" class="sidebar-header-btn coffee-btn" title="Kupi mi kafu">

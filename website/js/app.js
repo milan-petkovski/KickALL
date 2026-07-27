@@ -1648,19 +1648,23 @@ window.addEventListener('storage', (event) => {
                 return;
             }
 
-            const targetEl = document.querySelector(href);
-            if (targetEl) {
-                e.preventDefault();
-                if (window.lenisInstance) {
-                    window.lenisInstance.scrollTo(targetEl, { offset: -80, duration: 1.2 });
-                } else {
-                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
+            try {
+                const targetEl = document.querySelector(href);
+                if (targetEl) {
+                    e.preventDefault();
+                    if (window.lenisInstance) {
+                        window.lenisInstance.scrollTo(targetEl, { offset: -80, duration: 1.2 });
+                    } else {
+                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
 
-                if (navMenu && navMenu.classList.contains('open')) {
-                    navMenu.classList.remove('open');
-                    if (mobileToggle) mobileToggle.classList.remove('active');
+                    if (navMenu && navMenu.classList.contains('open')) {
+                        navMenu.classList.remove('open');
+                        if (mobileToggle) mobileToggle.classList.remove('active');
+                    }
                 }
+            } catch (error) {
+                // Silent fail for invalid selectors
             }
         });
     });

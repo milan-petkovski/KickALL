@@ -3,7 +3,14 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="KickALL" />
+  <meta name="format-detection" content="telephone=no" />
+  <meta name="msapplication-tap-highlight" content="no" />
+  <meta name="color-scheme" content="dark" />
   <title>KICKALL - Centralni Dashboard</title>
   <meta name="description" content="Centralni dashboard za KickAll ekosistem. Izaberi modul, prati referral nagrade i upravljaj svojim strimom." />
   <meta name="robots" content="noindex, nofollow" />
@@ -14,6 +21,25 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://rcukparptzzyssqdmydt.supabase.co" crossorigin />
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/assets/logo.webp" />
+  
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .catch(registrationError => {
+            // Silent fail - SW registration not critical
+          });
+      });
+    }
+  </script>
+  
+  <!-- Mobile Performance Optimizations -->
+  <script src="js/mobile-optimization.js" defer></script>
 
   <!-- Fontovi -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
