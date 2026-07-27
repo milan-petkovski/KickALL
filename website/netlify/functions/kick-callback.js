@@ -30,12 +30,15 @@ exports.handler = async (event) => {
     const codeVerifier = url.searchParams.get('code_verifier') || '';
     const state = url.searchParams.get('state') || '';
 
+    // Determine origin site from state or default to kickall
+    const originSite = state.includes('kickot') ? 'kickot' : 'kickall';
+
     if (error) {
       return {
         statusCode: 302,
         headers: {
           ...headers,
-          'Location': `/kickot/dashboard.html?error=${encodeURIComponent(error)}`
+          'Location': `/${originSite}/dashboard.html?error=${encodeURIComponent(error)}`
         },
         body: ''
       };
@@ -79,7 +82,7 @@ exports.handler = async (event) => {
         statusCode: 302,
         headers: {
           ...headers,
-          'Location': `/kickot/dashboard.html#kick_token=${encodeURIComponent(accessToken)}&token_type=${encodeURIComponent(tokenType)}&expires_in=${expiresIn}`
+          'Location': `/${originSite}/dashboard.html#kick_token=${encodeURIComponent(accessToken)}&token_type=${encodeURIComponent(tokenType)}&expires_in=${expiresIn}`
         },
         body: ''
       };
@@ -88,7 +91,7 @@ exports.handler = async (event) => {
         statusCode: 302,
         headers: {
           ...headers,
-          'Location': `/kickot/dashboard.html?error=${encodeURIComponent('OAuth exchange failed')}`
+          'Location': `/${originSite}/dashboard.html?error=${encodeURIComponent('OAuth exchange failed')}`
         },
         body: ''
       };
@@ -98,7 +101,7 @@ exports.handler = async (event) => {
       statusCode: 302,
       headers: {
         ...headers,
-        'Location': `/kickot/dashboard.html?error=${encodeURIComponent('Server error')}`
+        'Location': `/${originSite}/dashboard.html?error=${encodeURIComponent('Server error')}`
       },
       body: ''
     };

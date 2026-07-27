@@ -10,30 +10,59 @@ const translations = {
   en: {}
 };
 
-// ── Supabase Init ──────────────────────────────────────────
-const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+// ── Configuration Check ───────────────────────────────────────
+if (!window.KickotConfig) {
+  throw new Error('KickotConfig not loaded. Please ensure config.js is loaded before app.js');
+}
 
+// Use KickAll CONFIG if available, otherwise use Kickot config
+const CONFIG = window.CONFIG || window.KickotConfig;
+
+// ── Supabase Init ──────────────────────────────────────────
 const { createClient } = window.supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
-  auth: {
-    persistSession: true,
-    storage: window.localStorage,
-    storageKey: 'kickbot-supabase-auth'
+const supabaseConfig = CONFIG.SUPABASE || (CONFIG.supabase ? CONFIG.supabase : null);
+const storageKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_ACCESS_TOKEN : (CONFIG.storage ? CONFIG.storage.storageKey : 'kickbot-supabase-auth');
+
+const sb = createClient(
+  supabaseConfig ? supabaseConfig.url : 'https://rcukparptzzyssqdmydt.supabase.co',
+  supabaseConfig ? supabaseConfig.anonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc',
+  {
+    auth: {
+      persistSession: true,
+      storage: window.localStorage,
+      storageKey: storageKey
+    }
   }
-});
+);
 
 let currentUser = null;
 
-// Track Referral Code from URL
+// Track Referral Code from URL - Match KickAll
 (function checkReferralParam() {
   try {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
     if (ref) {
-      localStorage.setItem('kickot_referral_code', ref.trim().toUpperCase());
+      const referralKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.USER_REFERRAL_CODE : 'user_referral_code';
+      localStorage.setItem(referralKey, ref.trim().toUpperCase());
     }
-  } catch (e) {}
+  } catch (e) {
+    // Silently fail - referral tracking is optional
+  }
+})();
+
+// Track from_kickall for cross-site navigation
+(function checkFromKickAll() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromKickAll = params.get('from_kickall');
+    if (fromKickAll === 'true') {
+      const fromKickAllKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.FROM_KICKALL : 'from_kickall';
+      sessionStorage.setItem(fromKickAllKey, 'true');
+    }
+  } catch (e) {
+    // Silently fail
+  }
 })();
 
 // ── Translations ─�async function setLang(lang) {
@@ -53,22 +82,23 @@ function t(key) {
 
 async function setLang(lang) {
   currentLang = lang;
-  localStorage.setItem('kickall-lang', lang);
-  localStorage.setItem('kickall_lang', lang);
+  const languageKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICKALL_LANG : 'kickall_lang';
+  localStorage.setItem(languageKey, lang);
   document.documentElement.lang = lang === 'sr' ? 'sr' : 'en';
 
   document.body.classList.toggle('lang-sr', lang === 'sr');
   document.body.classList.toggle('lang-en', lang === 'en');
 
   try {
-    const res = await fetch(`locales/${lang}.json`);
+    const localePath = window.KickotConfig.getLocalePath(lang);
+    const res = await fetch(localePath);
     if (res.ok) {
       const data = await res.json();
       translations[lang] = { ...translations[lang], ...data };
       applyJsonTranslations(data);
     }
   } catch (e) {
-    console.log('JSON i18n load error in kickot:', e);
+    // Silently fail - locale loading is optional
   }
 
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -154,8 +184,92 @@ document.querySelectorAll('[data-reveal]').forEach(el => revealObserver.observe(
 document.querySelectorAll('a[href^="#"]').forEach(a => {
   a.addEventListener('click', e => {
     const target = document.querySelector(a.getAttribute('href'));
-    if (target) { e.preventDefault(); target.scrollIntoView({ behavior: 'smooth' }); }
+    if (target) { 
+      e.preventDefault(); 
+      target.scrollIntoView({ behavior: 'smooth' });
+      
+      // Close mobile menu if open
+      const navMenu = document.getElementById('navMenu');
+      const mobileToggle = document.getElementById('mobileToggle');
+      if (navMenu && navMenu.classList.contains('open')) {
+        navMenu.classList.remove('open');
+        if (mobileToggle) mobileToggle.classList.remove('active');
+        mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+        mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+      }
+    }
   });
+});
+
+// ── Mobile Menu ─────────────────────────────────────────────
+const mobileToggle = document.getElementById('mobileToggle');
+const navMenu = document.getElementById('navMenu');
+const mobileMenuClose = document.getElementById('mobileMenuClose');
+const mobileLoginBtn = document.getElementById('mobileLoginBtn');
+const mobileDashboardBtn = document.getElementById('mobileDashboardBtn');
+
+if (mobileToggle && navMenu) {
+  mobileToggle.addEventListener('click', () => {
+    navMenu.classList.toggle('open');
+    mobileToggle.classList.toggle('active');
+
+    // Animacija dugmeta (burger u X)
+    const spans = mobileToggle.querySelectorAll('span');
+    if (mobileToggle.classList.contains('active')) {
+      spans[0].style.transform = 'rotate(45deg) translate(6px, 6px)';
+      spans[1].style.opacity = '0';
+      spans[2].style.transform = 'rotate(-45deg) translate(5px, -5px)';
+    } else {
+      spans[0].style.transform = 'none';
+      spans[1].style.opacity = '1';
+      spans[2].style.transform = 'none';
+    }
+  });
+
+  // Zatvori meni na klik linka
+  navMenu.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+      navMenu.classList.remove('open');
+      mobileToggle.classList.remove('active');
+      mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+      mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+    });
+  });
+}
+
+// Mobile menu close button
+if (mobileMenuClose && navMenu && mobileToggle) {
+  mobileMenuClose.addEventListener('click', () => {
+    navMenu.classList.remove('open');
+    mobileToggle.classList.remove('active');
+    mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+    mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+  });
+}
+
+// Mobile login button
+if (mobileLoginBtn) {
+  mobileLoginBtn.addEventListener('click', () => {
+    openModal('login');
+    // Close mobile menu
+    navMenu.classList.remove('open');
+    mobileToggle.classList.remove('active');
+    mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+    mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+  });
+}
+
+// Close mobile menu when clicking outside
+document.addEventListener('click', (e) => {
+  if (navMenu && navMenu.classList.contains('open')) {
+    // Check if click is outside nav menu and mobile toggle
+    if (!navMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
+      navMenu.classList.remove('open');
+      mobileToggle.classList.remove('active');
+      mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+      mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+    }
+  }
 });
 
 // ── Particles ─────────────────────────────────────────────
@@ -224,7 +338,7 @@ function playSynthSound(frequency = 440, type = 'sine', duration = 0.1, volume =
     osc.start();
     osc.stop(audioCtx.currentTime + duration);
   } catch (e) {
-    console.warn('Audio is blocked or not supported:', e);
+    // Silently fail - audio is blocked or not supported
   }
 }
 
@@ -369,9 +483,9 @@ window.addEventListener('keydown', e => {
 // ── Kick OAuth / Login Flow ────────────────────────────────
 function getKickRedirectUri() {
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:5500/auth/kick/callback/'; // Use fixed callback URL for consistency
+    return 'http://localhost:5500/auth/kick/callback/'; // Use shared callback URL
   }
-  return 'https://kickall.app/auth/kick/callback/';
+  return 'https://kickall.app/auth/kick/callback/'; // Use shared callback URL
 }
 
 function generateRandomString(length) {
@@ -416,16 +530,21 @@ async function openKickLogin() {
   const KICK_REDIRECT_URI = getKickRedirectUri();
   const KICK_SCOPE = 'user:read channel:read chat:read chat:write moderation:read moderation:write';
 
-  const state = generateRandomString(16);
+  const state = `kickot_${generateRandomString(16)}`;
   const codeVerifier = generateRandomString(64);
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  localStorage.setItem('kick_oauth_state', state);
-  localStorage.setItem('kick_code_verifier', codeVerifier);
-  localStorage.setItem('kick_origin_site', 'kickot');
-  sessionStorage.setItem('kick_oauth_state', state);
-  sessionStorage.setItem('kick_code_verifier', codeVerifier);
-  sessionStorage.setItem('kick_origin_site', 'kickot');
+  // Use KickAll storage keys for cross-site auth
+  const oauthStateKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_OAUTH_STATE : 'kick_oauth_state';
+  const codeVerifierKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_CODE_VERIFIER : 'kick_code_verifier';
+  const originSiteKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_ORIGIN_SITE : 'kick_origin_site';
+
+  localStorage.setItem(oauthStateKey, state);
+  localStorage.setItem(codeVerifierKey, codeVerifier);
+  localStorage.setItem(originSiteKey, 'kickot');
+  sessionStorage.setItem(oauthStateKey, state);
+  sessionStorage.setItem(codeVerifierKey, codeVerifier);
+  sessionStorage.setItem(originSiteKey, 'kickot');
 
   const authUrl = `https://id.kick.com/oauth/authorize?` + new URLSearchParams({
     response_type: 'code',
@@ -464,7 +583,8 @@ async function handleLogin() {
       closeModal();
       onUserChange(data.user);
       setTimeout(() => {
-        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
+        const fromKickAllKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.FROM_KICKALL : 'from_kickall';
+        const fromKickAll = sessionStorage.getItem(fromKickAllKey) === 'true';
         window.location.href = fromKickAll ? '../dashboard.html' : 'dashboard.html';
       }, 800);
     }
@@ -529,7 +649,8 @@ async function handleSignup() {
       closeModal();
       onUserChange(signUpData.session.user);
       setTimeout(() => {
-        const fromKickAll = sessionStorage.getItem('from_kickall') === 'true';
+        const fromKickAllKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.FROM_KICKALL : 'from_kickall';
+        const fromKickAll = sessionStorage.getItem(fromKickAllKey) === 'true';
         window.location.href = fromKickAll ? '../dashboard.html' : 'dashboard.html';
       }, 800);
     } else {
@@ -645,6 +766,14 @@ function onUserChange(user) {
       }
     }
 
+    // Mobile menu - show dashboard button, hide login button
+    if (mobileDashboardBtn) {
+      mobileDashboardBtn.style.display = 'inline-flex';
+    }
+    if (mobileLoginBtn) {
+      mobileLoginBtn.style.display = 'none';
+    }
+
     const heroPrimaryBtn = document.getElementById('heroPrimaryBtn');
     const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
     if (heroPrimaryBtn && heroPrimaryBtnText) {
@@ -657,6 +786,14 @@ function onUserChange(user) {
   } else {
     if (guestNav) guestNav.style.display = 'flex';
     if (userMenu) userMenu.classList.remove('visible');
+
+    // Mobile menu - show login button, hide dashboard button
+    if (mobileDashboardBtn) {
+      mobileDashboardBtn.style.display = 'none';
+    }
+    if (mobileLoginBtn) {
+      mobileLoginBtn.style.display = 'inline-flex';
+    }
 
     const heroPrimaryBtn = document.getElementById('heroPrimaryBtn');
     const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
@@ -720,10 +857,73 @@ sb.auth.onAuthStateChange((event, session) => {
   onUserChange(session?.user || null);
 });
 
+// ── Kick Login Button with Redirect Animation ─────────────
+const authKickLoginBtn = document.getElementById('authKickLoginBtn');
+if (authKickLoginBtn) {
+  authKickLoginBtn.addEventListener('click', () => {
+    // Add loading state
+    authKickLoginBtn.classList.add('loading');
+    authKickLoginBtn.disabled = true;
+    const btnText = authKickLoginBtn.querySelector('span');
+    const originalText = btnText.textContent;
+    btnText.textContent = 'Preusmeravanje...';
+
+    // Small delay to show loading state before redirect
+    setTimeout(() => {
+      openKickLogin();
+    }, 500);
+  });
+
+  // Reset loading state on page visibility change (handles back button)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      authKickLoginBtn.classList.remove('loading');
+      authKickLoginBtn.disabled = false;
+      const btnText = authKickLoginBtn.querySelector('span');
+      if (btnText) {
+        btnText.textContent = btnText.getAttribute('data-i18n') ? 
+          window.translations?.auth?.login?.kick || 'Prijavi se preko Kicka' : 
+          'Prijavi se preko Kicka';
+      }
+    }
+  });
+
+  // Reset loading state on pageshow event (handles back/forward navigation)
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      authKickLoginBtn.classList.remove('loading');
+      authKickLoginBtn.disabled = false;
+      const btnText = authKickLoginBtn.querySelector('span');
+      if (btnText) {
+        btnText.textContent = btnText.getAttribute('data-i18n') ? 
+          window.translations?.auth?.login?.kick || 'Prijavi se preko Kicka' : 
+          'Prijavi se preko Kicka';
+      }
+    }
+  });
+
+  // Reset loading state when modal opens
+  const originalOpenModal = openModal;
+  window.openModal = function(tab) {
+    originalOpenModal(tab);
+    authKickLoginBtn.classList.remove('loading');
+    authKickLoginBtn.disabled = false;
+    const btnText = authKickLoginBtn.querySelector('span');
+    if (btnText) {
+      btnText.textContent = btnText.getAttribute('data-i18n') ? 
+        window.translations?.auth?.login?.kick || 'Prijavi se preko Kicka' : 
+        'Prijavi se preko Kicka';
+    }
+  };
+}
+
 const cards = document.querySelectorAll('.feature-card, .pricing-card');
 cards.forEach(card => {
   let cardTimeout = null;
   card.addEventListener('mousemove', e => {
+    // Disable on mobile/tablet devices (< 1024px)
+    if (window.innerWidth < 1024) return;
+    
     if (cardTimeout) return;
     cardTimeout = setTimeout(() => {
       const rect = card.getBoundingClientRect();
@@ -801,7 +1001,7 @@ async function handleLogout() {
       ]);
     }
   } catch (e) {
-    console.error("Logout greška:", e);
+    // Silently fail - logout error
   } finally {
     const cleanUrl = window.location.origin + window.location.pathname;
     window.location.replace(cleanUrl);
@@ -814,6 +1014,9 @@ async function handleLogout() {
 (function initCursorSpotlight() {
     let spotlightTimeout = null;
     window.addEventListener('mousemove', (e) => {
+        // Disable on mobile/tablet devices (< 1024px)
+        if (window.innerWidth < 1024) return;
+        
         if (spotlightTimeout) return;
         spotlightTimeout = setTimeout(() => {
             document.body.style.setProperty('--mouse-x', `${e.clientX}px`);

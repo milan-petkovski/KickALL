@@ -1451,7 +1451,7 @@ window.addEventListener('storage', (event) => {
         const KICK_REDIRECT_URI = window.CONFIG.OAUTH.getRedirectUri();
         const KICK_SCOPE = window.CONFIG.OAUTH.SCOPE;
 
-        const state = generateRandomString(16);
+        const state = `kickall_${generateRandomString(16)}`;
         const codeVerifier = generateRandomString(64);
         const codeChallenge = await generateCodeChallenge(codeVerifier);
 
@@ -1735,8 +1735,9 @@ window.addEventListener('storage', (event) => {
             const statBarUptime = document.getElementById('statBarUptime');
             if (statBarUptime) statBarUptime.setAttribute('data-target', realUptime);
 
-            const statUsers = document.getElementById('statUsers');
-            if (statUsers) statUsers.setAttribute('data-target', realStreamsCount);
+            // Keep static value for statUsers (25.400) - don't override with database value
+            // const statUsers = document.getElementById('statUsers');
+            // if (statUsers) statUsers.setAttribute('data-target', realStreamsCount);
 
             const statMessagesNum = document.getElementById('statMessagesNum');
             if (statMessagesNum) statMessagesNum.setAttribute('data-target', Math.round(realMessagesCount / 1000000));

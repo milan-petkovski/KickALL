@@ -3,15 +3,26 @@
    Supabase CRUD + Real-time + UI
    ═══════════════════════════════════════════════════════════ */
 
+// ── Configuration Check ───────────────────────────────────────
+if (!window.KickotConfig) {
+  throw new Error('KickotConfig not loaded. Please ensure config.js is loaded before dashboard.js');
+}
+
+// Use KickAll CONFIG if available, otherwise use Kickot config
+const CONFIG = window.CONFIG || window.KickotConfig;
+
 // ── Supabase Init ──────────────────────────────────────────
-const SUPABASE_URL = 'https://rcukparptzzyssqdmydt.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
 const { createClient } = window.supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
+const supabaseConfig = CONFIG.SUPABASE || CONFIG.supabase || null;
+const supabaseUrl = supabaseConfig ? supabaseConfig.url : 'https://rcukparptzzyssqdmydt.supabase.co';
+const supabaseAnonKey = supabaseConfig ? supabaseConfig.anonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+const storageKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_ACCESS_TOKEN : (CONFIG.storage ? CONFIG.storage.storageKey : 'kickbot-supabase-auth');
+
+const sb = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     storage: window.localStorage,
-    storageKey: 'kickbot-supabase-auth'
+    storageKey: storageKey
   }
 });
 
@@ -137,16 +148,15 @@ async function initAuth() {
     const oauthError = urlParams.get('error');
     
     // Check if coming from kickall (multiple sources with fallbacks)
-    const fromKickAll = sessionStorage.getItem('from_kickall') === 'true' || 
+    const fromKickAll = sessionStorage.getItem('from_kickall') === 'true' ||
                         localStorage.getItem('kick_origin_site') === 'kickall' ||
                         (document.referrer && document.referrer.includes('kickall.app')) ||
-                        (document.referrer && document.referrer.includes('localhost:5500/dashboard.html')) ||
-                        (document.referrer && document.referrer.includes('localhost:5500/index.html'));
+                        (document.referrer && document.referrer.includes(window.location.hostname));
 
     if (oauthError) {
       document.getElementById('authGateMsg').textContent = 'Kick odbio autorizaciju...';
       showToast('error', `Kick odbio autorizaciju: ${oauthError}`, '❌');
-      setTimeout(() => { window.location.href = '../index.html'; }, 2000);
+      setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 2000);
       return;
     }
 
@@ -156,33 +166,17 @@ async function initAuth() {
 
       const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
       const stateParam = urlParams.get('state');
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-      if (!isLocalhost && (!stateParam || stateParam !== savedState)) {
+      if (!window.KickotConfig.isLocalhost && (!stateParam || stateParam !== savedState)) {
         document.getElementById('authGateMsg').textContent = 'Nevalidan state parametar...';
         showToast('error', 'State parametar se ne podudara.', '❌');
-        setTimeout(() => { window.location.href = '../index.html'; }, 2000);
+        setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 2000);
         return;
       }
 
       const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
-      const redirectUri = (() => {
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          return `${window.location.origin}/auth/kick/callback/`;
-        }
-        return 'https://kickall.app/auth/kick/callback/';
-      })();
-
-      const kickApiBase = (() => {
-        const fromGlobal = (window.KICK_API_BASE || '').trim();
-        if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-        // Lokalno koristi Render backend direktno, produkcija koristi origin (sa Netlify redirect-ima)
-        if (window.location.hostname === 'localhost' ||
-          window.location.hostname === '127.0.0.1') {
-          return 'https://kickbot-ihzb.onrender.com';
-        }
-        return `${window.location.origin}`;
-      })();
+      const redirectUri = window.KickotConfig.api.kickOAuthRedirect;
+      const kickApiBase = window.KickotConfig.api.baseUrl;
 
       try {
         const res = await Promise.race([
@@ -202,7 +196,7 @@ async function initAuth() {
           const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
           document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
           showToast('error', err.detail || err.error || 'Server nedostupan', '❌');
-          setTimeout(() => { window.location.href = '../index.html'; }, 3000);
+          setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 3000);
           return;
         }
 
@@ -210,7 +204,7 @@ async function initAuth() {
         if (!tokenData.access_token) {
           document.getElementById('authGateMsg').textContent = 'Token nije primljen...';
           showToast('error', 'Nije primljen access_token', '❌');
-          setTimeout(() => { window.location.href = '../index.html'; }, 3000);
+          setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 3000);
           return;
         }
 
@@ -309,7 +303,7 @@ async function initAuth() {
       } catch (err) {
         document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
         showToast('error', err.message, '❌');
-        setTimeout(() => { window.location.href = '../index.html'; }, 3000);
+        setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 3000);
         return;
       }
     }
@@ -318,13 +312,26 @@ async function initAuth() {
     const kickAccessToken = localStorage.getItem('kick_access_token');
     const urlParamsOAuth = urlParams.get('kick_oauth') === '1';
 
+    // Check for hash fragment token from Netlify callback
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const hashToken = hashParams.get('kick_token');
+    if (hashToken) {
+      localStorage.setItem('kick_access_token', hashToken);
+      const tokenType = hashParams.get('token_type') || 'Bearer';
+      localStorage.setItem('kick_token_type', tokenType);
+      const expiresIn = hashParams.get('expires_in') || '3600';
+      localStorage.setItem('kick_session_active', Date.now().toString());
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
     if (urlParamsOAuth && kickAccessToken && !fromKickAll) {
       document.getElementById('authGateMsg').textContent = 'Učitavamo tvoj Kick profil...';
       try {
         await handleKickOAuthSession(kickAccessToken);
         return;
       } catch (kickErr) {
-        console.warn('Kick OAuth sesija nije uspela, proveravamo standardnu sesiju:', kickErr);
+        // Kick OAuth failed, continuing with standard session check
       }
     }
 
@@ -338,7 +345,7 @@ async function initAuth() {
     
     if (!session) {
       document.getElementById('authGateMsg').textContent = 'Preusmeravanje na prijavu...';
-      setTimeout(() => { window.location.href = '../index.html?login=1'; }, 1200);
+      setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl + '?login=1'; }, 1200);
       return;
     }
     currentUser = session.user;
@@ -350,7 +357,7 @@ async function initAuth() {
     await initApp();
   } catch (err) {
     document.getElementById('authGateMsg').textContent = 'Greška pri proveri sesije.';
-    console.error(err);
+    // Critical error - keep for debugging
   }
 }
 
@@ -380,8 +387,7 @@ async function handleKickOAuthSession(accessToken) {
     kickAvatar = kickUser?.profile_picture || kickUser?.profile_pic || '';
     kickBio = kickUser?.bio || '';
   } else {
-    console.warn('Kick users API nije vratio uspeh, pokušavamo alternativni endpoint...');
-    // Alternativni endpoint
+    // Kick users API failed, trying alternative endpoint
     const altRes = await fetch('https://id.kick.com/oauth/userinfo', {
       headers: { 'Authorization': `Bearer ${accessToken}` }
     });
@@ -478,7 +484,7 @@ async function handleKickOAuthSession(accessToken) {
   }, { onConflict: 'id' });
 
   if (profileError) {
-    console.error('Greška pri kreiranju user_profiles:', profileError);
+    // Profile creation error - non-critical for auth flow
   }
 
   // Odmah prijavi novog korisnika
@@ -541,12 +547,12 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
       updated_at: new Date().toISOString()
     }).eq('id', userId);
   } catch (err) {
-    console.warn('Nije moguće ažurirati Kick profil:', err);
+    // Profile update failed - non-critical
   }
 }
 
 sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_OUT') { window.location.href = '../index.html'; }
+  if (event === 'SIGNED_OUT') { window.location.href = window.KickotConfig.paths.indexUrl; }
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -696,7 +702,7 @@ async function loadUserProfile() {
       });
     }
   } catch (err) {
-    console.error('Failed to load managed channels:', err);
+    // Managed channels load failed - non-critical
   }
 
   if (currentChannels.length > 0) {
@@ -1007,7 +1013,7 @@ async function resolveChatroomId(username) {
       }
     }
   } catch (err) {
-    console.warn('corsproxy.io failed, trying fallback...', err);
+    // CORS proxy failed, trying fallback
   }
 
   // 3. Pokušavamo preko allorigins.win
@@ -1030,7 +1036,7 @@ async function resolveChatroomId(username) {
       }
     }
   } catch (err) {
-    console.error('All fallbacks failed for resolving channel:', err);
+    // All fallbacks failed for resolving channel
   }
 
   return null;
@@ -1225,7 +1231,7 @@ async function loadNotifications() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('Greška pri učitavanju obaveštenja:', error);
+      // Notifications load error
       return;
     }
 
@@ -1241,7 +1247,7 @@ async function loadNotifications() {
       renderNotifContent();
     }
   } catch (err) {
-    console.error('Izuzetak pri učitavanju obaveštenja:', err);
+    // Notifications load exception
   }
 }
 
@@ -1254,7 +1260,7 @@ async function loadChangelogs() {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('Greška pri učitavanju changeloga:', error);
+      // Changelogs load error
       return;
     }
 
@@ -1273,7 +1279,7 @@ async function loadChangelogs() {
       renderNotifContent();
     }
   } catch (err) {
-    console.error('Izuzetak pri učitavanju changeloga:', err);
+    // Changelogs load exception
   }
 }
 
@@ -1286,43 +1292,43 @@ async function loadAllData() {
     Promise.race([
       loadCommands(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Commands load timeout')), 8000))
-    ]).catch(() => { console.warn('Commands load failed or timed out'); }),
+    ]).catch(() => { /* Commands load timeout */ }),
     Promise.race([
       loadLeaderboard(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Leaderboard load timeout')), 8000))
-    ]).catch(() => { console.warn('Leaderboard load failed or timed out'); }),
+    ]).catch(() => { /* Leaderboard load timeout */ }),
     Promise.race([
       loadWatchtime(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Watchtime load timeout')), 8000))
-    ]).catch(() => { console.warn('Watchtime load failed or timed out'); }),
+    ]).catch(() => { /* Watchtime load timeout */ }),
     Promise.race([
       loadMarriages(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Marriages load timeout')), 5000))
-    ]).catch(() => { console.warn('Marriages load failed or timed out'); }),
+    ]).catch(() => { /* Marriages load timeout */ }),
     Promise.race([
       loadLoveStatuses(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Love statuses load timeout')), 5000))
-    ]).catch(() => { console.warn('Love statuses load failed or timed out'); }),
+    ]).catch(() => { /* Love statuses load timeout */ }),
     Promise.race([
       loadBotConfig(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Bot config load timeout')), 5000))
-    ]).catch(() => { console.warn('Bot config load failed or timed out'); }),
+    ]).catch(() => { /* Bot config load timeout */ }),
     Promise.race([
       loadBotStatus(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Bot status load timeout')), 5000))
-    ]).catch(() => { console.warn('Bot status load failed or timed out'); }),
+    ]).catch(() => { /* Bot status load timeout */ }),
     Promise.race([
       loadNotifications(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Notifications load timeout')), 5000))
-    ]).catch(() => { console.warn('Notifications load failed or timed out'); }),
+    ]).catch(() => { /* Notifications load timeout */ }),
     Promise.race([
       loadChangelogs(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Changelogs load timeout')), 5000))
-    ]).catch(() => { console.warn('Changelogs load failed or timed out'); })
+    ]).catch(() => { /* Changelogs load timeout */ })
   ]);
 
   // Load channel live status separately (non-critical, can fail without blocking UI)
-  loadChannelLiveStatus().catch(() => { console.warn('Channel live status load failed (non-critical)'); });
+  loadChannelLiveStatus().catch(() => { /* Channel live status load failed (non-critical) */ });
 
   setupRealtimeChannels();
   startLiveActivityFeed();
@@ -1350,7 +1356,6 @@ async function refreshAllData() {
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
     btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
   } catch (err) {
-    console.error('Greška pri osvežavanju:', err);
     showToast('error', 'Greška pri osvežavanju podataka.', '⚠️');
 
     // Prikaz crvenog X znaka
@@ -1527,7 +1532,7 @@ async function loadCommands() {
     .eq('channel_id', activeChannel.id)
     .order('created_at', { ascending: false });
 
-  if (error) { console.error('Commands:', error); return; }
+  if (error) { return; }
   const dbData = data || [];
 
   const dbCustom = dbData.filter(c => !c.is_default);
@@ -1923,7 +1928,7 @@ async function loadLeaderboard() {
     }
   }
 
-  if (error) { console.error('Leaderboard:', error); return; }
+  if (error) { return; }
   allLeaderboard = data || [];
   renderMiniLeaderboard(allLeaderboard.slice(0, 5));
 
@@ -1964,7 +1969,7 @@ async function loadWatchtime() {
     .order('minutes', { ascending: false })
     .limit(200);
 
-  if (error) { console.error('Watchtime:', error); return; }
+  if (error) { return; }
   allWatchtime = data || [];
   renderMiniWatchtime(allWatchtime.slice(0, 5));
 
@@ -2468,7 +2473,7 @@ async function loadMarriages() {
     .eq('channel_id', activeChannel.id)
     .order('married_at', { ascending: false });
 
-  if (error) { console.error('Marriages:', error); return; }
+  if (error) { return; }
   allMarriages = data || [];
   filterMarriages(marriagesQuery);
 
@@ -2490,7 +2495,7 @@ async function loadLoveStatuses() {
     .order('updated_at', { ascending: false })
     .limit(200);
 
-  if (error) { console.error('Love modifiers:', error); return; }
+  if (error) { return; }
   allLoveStatuses = data || [];
   filterLoveStatuses(loveStatusesQuery);
 
@@ -2676,7 +2681,7 @@ async function loadBotConfig() {
     .eq('channel_id', activeChannel.id)
     .maybeSingle();
 
-  if (error) { console.error('Config:', error); return; }
+  if (error) { return; }
 
   if (data) {
     currentChannelConfig = data;
@@ -3036,7 +3041,6 @@ async function saveBotConfig(silent = false) {
 
   if (error) {
     showToast('error', 'Greška pri čuvanju config-a', '❌');
-    console.error(error);
     return;
   }
 
@@ -3062,7 +3066,6 @@ async function saveBotConfigFields(fieldsToUpdate) {
     .eq('user_id', getChannelOwnerId());
 
   if (error) {
-    console.error('Error updating bot config fields:', error);
     return { error };
   }
 
@@ -3152,7 +3155,6 @@ async function confirmCustomBotAuth() {
       if (error) throw error;
       showToast('success', `Custom bot account ${formattedBotName} je uspešno autorizovan i povezan!`);
     } catch (err) {
-      console.error('Custom bot auth error:', err);
       showToast('success', `Custom bot account ${formattedBotName} je uspešno povezan!`);
     }
   } else {
@@ -3179,7 +3181,7 @@ async function disconnectCustomBot() {
         .eq('user_id', getChannelOwnerId())
         .eq('channel_id', activeChannel.id);
     } catch (err) {
-      console.error('Disconnect bot error:', err);
+      // Disconnect bot error
     }
   }
 
@@ -3252,14 +3254,7 @@ function toggleModerationPanelState() {
 }
 
 function getBotApiBase() {
-  const fromGlobal = (window.KICK_API_BASE || '').trim();
-  if (fromGlobal) return fromGlobal.replace(/\/+$/, '');
-  // Lokalno koristi Render backend direktno, produkcija koristi origin (sa Netlify redirect-ima)
-  if (window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1') {
-    return 'https://kickbot-ihzb.onrender.com';
-  }
-  return window.location.origin;
+  return window.KickotConfig.api.baseUrl;
 }
 
 function notifyBotToReload() {
@@ -3350,7 +3345,6 @@ async function saveModerationSettings(silent = false) {
 
   if (error) {
     showToast('error', 'Greška pri čuvanju podešavanja moderacije', '❌');
-    console.error(error);
     return;
   }
 
@@ -3913,7 +3907,7 @@ async function saveCommand() {
   if (error) {
     errEl.textContent = 'Greška pri čuvanju. Pokušaj ponovo.';
     errEl.style.display = 'block';
-    console.error(error); return;
+    return;
   }
 
   showToast('success', editingCmdId ? 'Komanda uspešno izmenjena' : 'Komanda uspešno kreirana!', 'check');
@@ -3941,7 +3935,7 @@ async function toggleCommand(id, currentEnabled, isDefault) {
     };
 
     const { error } = await sb.from('custom_commands').insert(payload);
-    if (error) { showToast('error', 'Greška pri čuvanju ugrađene komande', 'error'); console.error(error); return; }
+    if (error) { showToast('error', 'Greška pri čuvanju ugrađene komande', 'error'); return; }
   } else {
     const { error } = await sb.from('custom_commands')
       .update({ enabled: !currentEnabled, updated_at: new Date().toISOString() })
@@ -4182,9 +4176,9 @@ async function handleSignOut() {
       ]);
     }
   } catch (e) {
-    console.error("KickOT signOut error:", e);
+    // SignOut error
   } finally {
-    window.location.replace('../index.html');
+    window.location.replace(window.KickotConfig.paths.indexUrl);
   }
 }
 
@@ -4192,7 +4186,7 @@ function notifyGlobalLogout(userId) {
   const domains = [
     'https://kickall.netlify.app',
     'https://kickall.milanwebportal.com',
-    'http://localhost:5500'
+    window.location.origin
   ];
 
   domains.forEach(domain => {
@@ -4221,7 +4215,7 @@ window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
     localStorage.clear();
     sessionStorage.clear();
-    window.location.replace('../index.html');
+    window.location.replace(window.KickotConfig.paths.indexUrl);
   }
 });
 
@@ -4229,7 +4223,7 @@ window.addEventListener('storage', (event) => {
   if (event.key === 'kickbot_global_logout') {
     localStorage.clear();
     sessionStorage.clear();
-    window.location.replace('../index.html');
+    window.location.replace(window.KickotConfig.paths.indexUrl);
   }
 });
 
@@ -4547,7 +4541,6 @@ async function syncLatestKickAvatar() {
       showToast('error', `Nije bilo moguće preuzeti profilnu sliku sa Kicka za @${cleanChannel}.`);
     }
   } catch (err) {
-    console.error('syncLatestKickAvatar error:', err);
     showToast('error', 'Greška prilikom preuzimanja profilne slike sa Kicka.');
   } finally {
     if (btn) {
@@ -4849,7 +4842,6 @@ async function addNewManager() {
     renderSettingsManagersList();
 
   } catch (err) {
-    console.error('Failed to add manager:', err);
     errEl.textContent = 'Greška pri dodavanju menadžera. Pokušaj ponovo.';
     errEl.style.display = 'block';
   } finally {
@@ -4881,7 +4873,6 @@ async function removeChannelManager(username) {
     renderSettingsManagersList();
 
   } catch (err) {
-    console.error('Failed to remove manager:', err);
     showToast('error', 'Greška pri uklanjanju menadžera.', '❌');
   }
 }
@@ -5260,7 +5251,6 @@ async function addNewChannel() {
           }
           updateOverviewModulesUI();
           showToast('error', `Greška pri promeni modula "${name}". Pokušaj ponovo.`);
-          console.error('toggleModuleFromOverview error:', err);
         }
       }
 
@@ -5512,10 +5502,7 @@ async function addNewChannel() {
       }
 
       function getKickRedirectUri() {
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-          return `${window.location.origin}/auth/kick/callback/`;
-        }
-        return 'https://kickall.app/auth/kick/callback/';
+        return window.KickotConfig.api.kickOAuthRedirect;
       }
 
       async function openKickLoginForChannel() {
@@ -6479,7 +6466,6 @@ async function addNewChannel() {
           }, { onConflict: 'channel_id' });
 
         if (error) {
-          console.error('SongRequest config save error:', error);
           if (!silent) showToast('error', 'Greška pri čuvanju podešavanja song request-a', '❌');
           return;
         }
@@ -7330,7 +7316,7 @@ async function addNewChannel() {
             await ensureUserHasReferralCode(currentUser.id);
             await loadReferralData(currentUser.id);
           } catch (err) {
-            console.error('Referral load error:', err);
+            // Referral load error
           }
         }
       }
@@ -7342,7 +7328,7 @@ async function addNewChannel() {
             await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: null });
           }
         } catch (err) {
-          console.error('Referral code check error:', err);
+          // Referral code check error
         }
       }
 
@@ -7354,13 +7340,12 @@ async function addNewChannel() {
           const { data: rewards } = await sb.from('referral_rewards').select('*').eq('user_id', userId).order('created_at', { ascending: false });
           updateRewardsList(rewards || []);
         } catch (err) {
-          console.error('Error loading referral data:', err);
+          // Error loading referral data
         }
       }
 
       function generateReferralLink(referralCode) {
-        const baseUrl = window.location.origin;
-        return `${baseUrl}/index.html?ref=${referralCode}`;
+        return `${window.KickotConfig.paths.indexUrl}?ref=${referralCode}`;
       }
 
       function updateReferralStats(stats) {
@@ -7524,7 +7509,7 @@ async function handleWithdrawalSubmit(e) {
         Nacin_Isplate: method,
         Detalji_Isplate: details
       })
-    }).catch(err => console.error('FormSubmit mail error:', err));
+    }).catch(err => { /* FormSubmit mail error */ });
 
     showToast('Zahtev za isplatu je uspešno poslat! Bićete obavešteni o isplati.', 'success');
     
@@ -7533,7 +7518,6 @@ async function handleWithdrawalSubmit(e) {
     closeModal('withdrawalModal');
 
   } catch (err) {
-    console.error('Withdrawal error:', err);
     showToast('Došlo je do greške prilikom slanja zahteva.', 'error');
   }
 }

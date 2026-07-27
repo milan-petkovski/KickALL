@@ -18,6 +18,9 @@
   <!-- Fontovi (Inter, JetBrains Mono, Space Grotesk) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 
+  <!-- Dynamic Configuration -->
+  <script src="js/config.js"></script>
+
   <!-- Favicon i Stilovi -->
   <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
   <link rel="apple-touch-icon" href="assets/logo.png" />
@@ -46,13 +49,13 @@
     <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
-        <a href="../dashboard.html" class="sidebar-header-btn back-btn" title="Nazad na KickALL">
+        <a href="index.html" class="sidebar-header-btn back-btn" title="Nazad na KickALL">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </a>
-        <a href="index.html" class="sidebar-logo">
+        <a href="#" onclick="window.location.href = window.KickotConfig.paths.indexUrl; return false;" class="sidebar-logo">
           <img src="assets/kickot.png" alt="Kickot Logo" class="logo-img">
         </a>
         <a href="https://paypal.me/milanwebportal/5EUR" target="_blank" rel="noopener noreferrer" class="sidebar-header-btn coffee-btn" title="Kupi mi kafu">
@@ -4264,7 +4267,7 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
-  <script src="js/dashboard.min.js"></script>
+  <script src="js/dashboard.js"></script>
 </body>
 
 </html>
