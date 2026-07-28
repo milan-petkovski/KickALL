@@ -1,11 +1,10 @@
 /* Premium Dashboard Styles Override & Enhancements */
+@import url('base.css');
+
 body {
-  background-color: #06040A;
-  font-family: 'Inter', sans-serif;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
 }
 
 /* Use main header styles instead of dashboard-specific */
@@ -2711,4 +2710,36 @@ body.auth-loading {
     .blob {
         animation: none !important;
     }
+}
+
+/* Language Switcher Styles */
+.lang-switcher {
+    display: flex;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 2px;
+}
+
+.lang-btn {
+    background: none;
+    border: none;
+    color: var(--color-text-muted, #CBD5E1);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-family: var(--font-heading, sans-serif);
+    font-weight: bold;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.lang-btn:hover {
+    color: #ffffff;
+}
+
+.lang-btn.active {
+    background-color: #6D28D9;
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(109, 40, 217, 0.4);
 }

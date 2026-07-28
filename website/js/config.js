@@ -24,20 +24,9 @@ window.CONFIG = {
     
     // CORS-safe fetch wrapper
     async fetchWithCORS(url, options = {}) {
-      const isLocalhost = window.location.hostname === 'localhost' || 
-                          window.location.hostname === '127.0.0.1';
-      
-      // Always use backend API as proxy for external requests
-      const backendBase = this.getBackendApiBase();
+      const backendBase = window.CONFIG ? window.CONFIG.getBackendApiBase() : 'https://kickbot-ihzb.onrender.com';
       
       try {
-        // Try direct fetch first (might work in production)
-        if (!isLocalhost) {
-          const directResponse = await fetch(url, options);
-          if (directResponse.ok) return directResponse;
-        }
-        
-        // Fallback to backend proxy
         const proxyUrl = `${backendBase}/api/proxy`;
         const proxyResponse = await fetch(proxyUrl, {
           method: 'POST',
@@ -59,13 +48,9 @@ window.CONFIG = {
         const errorData = await proxyResponse.json().catch(() => ({ error: 'Proxy request failed' }));
         throw new Error(errorData.error || 'Proxy request failed');
       } catch (error) {
-        console.error('CORS fetch error:', error);
-        
-        // User-friendly error message
         if (window.toastSystem) {
           window.toastSystem.error('Network error: ' + (error.message || 'Unable to connect to server'));
         }
-        
         throw error;
       }
     }
@@ -142,23 +127,40 @@ window.CONFIG = {
     AUTH_GATE_MSG_COLOR: '#9393B5'
   },
 
-  // Keep-alive configuration for Render free tier
+  // Optimized keep-alive configuration for Render & Netlify free tiers
   KEEP_ALIVE: {
-    // Ping interval in milliseconds (every 4 minutes to prevent cold starts)
-    PING_INTERVAL: 240000,
-    // Health check endpoint
+    // Ping interval set to 10 minutes (prevents sleeping while tab is active without exceeding free hours)
+    PING_INTERVAL: 600000,
     HEALTH_ENDPOINT: '/api/health',
-    // Enable keep-alive only in production
     ENABLED: !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
   }
 };
 
-// Keep-alive ping for Render free tier (prevent cold starts)
+// Adaptive Keep-Alive Ping for Render free tier (only runs when tab is visible)
 if (window.CONFIG.KEEP_ALIVE.ENABLED) {
-  setInterval(() => {
-    fetch(`${window.CONFIG.getBackendApiBase()}${window.CONFIG.KEEP_ALIVE.HEALTH_ENDPOINT}`)
-      .catch(() => {
-        // Silent fail - health check is just for keeping server awake
+  let pingTimer = null;
+  
+  const sendHealthPing = () => {
+    if (document.visibilityState === 'visible') {
+      fetch(`${window.CONFIG.getBackendApiBase()}${window.CONFIG.KEEP_ALIVE.HEALTH_ENDPOINT}`, {
+        method: 'GET',
+        cache: 'no-store'
+      }).catch(() => {
+        // Silent fail - health check is only to maintain container warm state
       });
-  }, window.CONFIG.KEEP_ALIVE.PING_INTERVAL);
+    }
+  };
+
+  // Trigger initial ping if visible
+  sendHealthPing();
+
+  // Set periodic ping
+  pingTimer = setInterval(sendHealthPing, window.CONFIG.KEEP_ALIVE.PING_INTERVAL);
+
+  // Restart ping on tab re-focus
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      sendHealthPing();
+    }
+  });
 }

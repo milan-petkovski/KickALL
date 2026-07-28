@@ -54,18 +54,21 @@ async function getOrFetchAvatar(username, elementId) {
   if (!username) return;
   const key = username.toLowerCase();
 
+  // Check memory cache first (fastest)
   if (avatarCache[key] && avatarCache[key] !== 'loading' && avatarCache[key] !== 'none') {
     updateAvatarUI(elementId, avatarCache[key]);
     return;
   }
 
-  const cachedLocal = localStorage.getItem(`avatar-cache-${key}`);
-  if (cachedLocal && cachedLocal !== 'none') {
-    avatarCache[key] = cachedLocal;
-    updateAvatarUI(elementId, cachedLocal);
+  // Check IndexedDB cache (second fastest, much larger capacity)
+  const cachedDB = await getAvatarFromCache(username);
+  if (cachedDB) {
+    avatarCache[key] = cachedDB;
+    updateAvatarUI(elementId, cachedDB);
     return;
   }
 
+  // Handle concurrent requests for same avatar
   if (avatarCache[key] === 'loading') {
     const interval = setInterval(() => {
       if (avatarCache[key] !== 'loading') {
@@ -78,19 +81,22 @@ async function getOrFetchAvatar(username, elementId) {
     return;
   }
 
+  // Fetch from Kick API
   avatarCache[key] = 'loading';
   const avatarUrl = await fetchKickAvatar(username);
   if (avatarUrl) {
     avatarCache[key] = avatarUrl;
-    try {
-      localStorage.setItem(`avatar-cache-${key}`, avatarUrl);
-    } catch (_) { }
+    // Save to IndexedDB (async, non-blocking)
+    setAvatarInCache(username, avatarUrl).catch(err => {
+      console.warn('Failed to cache avatar in IndexedDB:', err);
+    });
     updateAvatarUI(elementId, avatarUrl);
   } else {
     avatarCache[key] = 'none';
-    try {
-      localStorage.setItem(`avatar-cache-${key}`, 'none');
-    } catch (_) { }
+    // Save 'none' to IndexedDB to avoid re-fetching
+    setAvatarInCache(username, 'none').catch(err => {
+      console.warn('Failed to cache avatar status in IndexedDB:', err);
+    });
   }
 }
 
@@ -187,9 +193,7 @@ async function initAuth() {
     // Check for existing Supabase session first (from KickAll)
     const { data: { session: initialSession } } = await sb.auth.getSession();
     if (initialSession?.user) {
-      console.log('Kickot Dashboard: Using existing Supabase session from KickAll');
       currentUser = initialSession.user;
-      hideAuthGate();
       await initApp();
       return;
     }
@@ -202,7 +206,7 @@ async function initAuth() {
       const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
       const stateParam = urlParams.get('state');
 
-      console.log('Kickot OAuth state check:', { savedState, stateParam, isLocalhost: window.KickotConfig.isLocalhost });
+
 
       if (!window.KickotConfig.isLocalhost && (!stateParam || stateParam !== savedState)) {
         console.error('Kickot OAuth state mismatch - Expected:', savedState, 'Got:', stateParam);
@@ -220,12 +224,6 @@ async function initAuth() {
       const kickApiBase = window.KickotConfig.api.baseUrl;
 
       try {
-        console.log('Kickot OAuth exchange:', { 
-          codeVerifier: codeVerifier ? 'present' : 'missing', 
-          redirectUri, 
-          kickApiBase 
-        });
-        
         const res = await Promise.race([
           fetch(`${kickApiBase}/api/kick/exchange`, {
             method: 'POST',
@@ -239,7 +237,7 @@ async function initAuth() {
           new Promise((_, reject) => setTimeout(() => reject(new Error('OAuth exchange timeout')), 25000))
         ]);
 
-        console.log('Kickot exchange response status:', res.status);
+
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
@@ -413,7 +411,7 @@ async function initAuth() {
       return;
     }
     
-    console.log('Kickot Dashboard: Found Supabase session', authSession.user);
+
     currentUser = authSession.user;
     
     // Set origin site for cross-dashboard navigation
@@ -424,7 +422,6 @@ async function initAuth() {
       console.warn('Failed to set origin flags:', e);
     }
     
-    hideAuthGate();
     await initApp();
   } catch (err) {
     console.error('Auth error:', err);
@@ -631,6 +628,13 @@ sb.auth.onAuthStateChange((event, session) => {
 // APP INIT
 // ═══════════════════════════════════════════════════════════
 async function initApp() {
+  // Migrate avatar cache from localStorage to IndexedDB (cleanup old data)
+  try {
+    await migrateAvatarCache();
+  } catch (err) {
+    console.warn('Avatar cache migration failed:', err);
+  }
+
   // Load user profile + channels
   await loadUserProfile();
 
@@ -654,6 +658,9 @@ async function initApp() {
 
   // Load initial panel and all data BEFORE showing app
   if (activeChannel) {
+    // Update auth gate message to show loading state
+    document.getElementById('authGateMsg').textContent = 'Učitavanje podataka...';
+    
     await loadAllData();
     let lastPanel = localStorage.getItem('active-dashboard-panel');
     // Default to overview if panel is unknown or invalid
@@ -684,6 +691,9 @@ async function initApp() {
   const authGate = document.getElementById('authGate');
   const app = document.getElementById('app');
 
+  // Add a small delay to ensure smooth transition
+  await new Promise(resolve => setTimeout(resolve, 300));
+
   // Start fade out of auth gate and fade in of app
   authGate.classList.add('fade-out');
   app.classList.add('fade-in');
@@ -691,7 +701,7 @@ async function initApp() {
   // Wait for transition to complete, then hide auth gate
   setTimeout(() => {
     authGate.style.display = 'none';
-  }, 400);
+  }, 500);
 
   setupAutosave();
 }
@@ -3631,6 +3641,21 @@ async function toggleBotActive() {
   const active = document.getElementById('botActiveToggle').checked;
   updateBotStatusUI(active);
 
+  // Track bot action
+  if (window.KickALLDataLayer) {
+    if (active) {
+      window.KickALLDataLayer.trackBotActivation({
+        channel_name: activeChannel.username,
+        channel_id: activeChannel.id
+      });
+    } else {
+      window.KickALLDataLayer.trackBotDeactivation({
+        channel_name: activeChannel.username,
+        channel_id: activeChannel.id
+      });
+    }
+  }
+
   const { error } = await sb.from('bot_config')
     .upsert({
       user_id: getChannelOwnerId(),
@@ -3644,10 +3669,28 @@ async function toggleBotActive() {
     showToast('error', 'Greška pri promeni statusa', '❌');
     document.getElementById('botActiveToggle').checked = !active;
     updateBotStatusUI(!active);
+    
+    // Track bot action failure
+    if (window.KickALLDataLayer) {
+      window.KickALLDataLayer.trackError('bot_toggle_error', {
+        action: active ? 'bot_start' : 'bot_stop',
+        channel_name: activeChannel.username,
+        error_message: error?.message || 'Unknown error'
+      });
+    }
   } else {
     showToast(active ? 'success' : 'info', `Bot je ${active ? 'pokrenut' : 'zaustavljen'}`, active ? '🟢' : '⭕');
     addLocalLog('INFO', active ? 'Korisnik je pokrenuo bota' : 'Korisnik je zaustavio bota');
     notifyBotToReload();
+    
+    // Track bot action success
+    if (window.KickALLAnalytics) {
+      window.KickALLAnalytics.trackBotAction(
+        active ? 'bot_start' : 'bot_stop',
+        active ? 'active' : 'inactive',
+        'success'
+      );
+    }
   }
 }
 
@@ -4501,7 +4544,8 @@ function escapeHtml(str) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function fmtDate(iso) {

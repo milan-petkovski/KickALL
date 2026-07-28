@@ -1,6 +1,22 @@
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60000;
+const MAX_REQUESTS_PER_WINDOW = 30;
+
+function isRateLimited(clientIp) {
+  if (clientIp === '127.0.0.1' || clientIp === 'localhost' || clientIp === '::1' || clientIp.includes('127.0.0.1')) {
+    return false;
+  }
+  const now = Date.now();
+  const history = (rateLimitMap.get(clientIp) || []).filter(t => now - t < RATE_LIMIT_WINDOW_MS);
+  if (history.length >= MAX_REQUESTS_PER_WINDOW) return true;
+  history.push(now);
+  rateLimitMap.set(clientIp, history);
+  return false;
+}
+
 exports.handler = async (event) => {
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json'
@@ -19,6 +35,18 @@ exports.handler = async (event) => {
       statusCode: 405,
       headers,
       body: JSON.stringify({ error: 'Method not allowed' })
+    };
+  }
+
+  const clientIp = event.headers['x-nf-client-connection-ip'] || 
+                   (event.headers['x-forwarded-for'] ? event.headers['x-forwarded-for'].split(',')[0].trim() : null) || 
+                   event.headers['client-ip'] || 
+                   'unknown';
+  if (isRateLimited(clientIp)) {
+    return {
+      statusCode: 429,
+      headers: { ...headers, 'Retry-After': '60' },
+      body: JSON.stringify({ error: 'Rate limit exceeded. Please wait 60 seconds.' })
     };
   }
 
@@ -51,10 +79,11 @@ exports.handler = async (event) => {
       body: text
     };
   } catch (error) {
+    console.error('Kick me upstream error:', error);
     return {
       statusCode: 502,
       headers,
-      body: JSON.stringify({ error: 'Upstream unavailable', detail: error.message })
+      body: JSON.stringify({ error: 'Upstream service temporarily unavailable' })
     };
   }
 };

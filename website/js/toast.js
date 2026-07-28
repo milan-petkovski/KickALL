@@ -27,14 +27,6 @@ class ToastSystem {
       this.container.id = 'toastContainer';
       document.body.appendChild(this.container);
     }
-
-    // Load CSS if not already loaded
-    if (!document.querySelector('link[href*="toast.css"]')) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = '/css/toast.css';
-      document.head.appendChild(link);
-    }
   }
 
   /**
@@ -162,9 +154,13 @@ class ToastSystem {
   }
 
   escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    if (text === null || text === undefined) return '';
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   // Convenience methods
@@ -202,11 +198,11 @@ window.showError = (message, duration) => window.toastSystem.error(message, dura
 window.showWarning = (message, duration) => window.toastSystem.warning(message, duration);
 window.showInfo = (message, duration) => window.toastSystem.info(message, duration);
 
-// Replace alert with toast (optional - can be disabled)
+// Replace alert with non-blocking toast notification
 if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-  const originalAlert = window.alert;
   window.alert = function(message) {
-    window.toastSystem.warning(message, 0); // No auto-dismiss for alerts
-    return originalAlert.call(window, message); // Still call original for debugging
+    if (window.toastSystem) {
+      window.toastSystem.warning(message, 6000);
+    }
   };
 }

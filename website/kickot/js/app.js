@@ -10,6 +10,16 @@ const translations = {
   en: {}
 };
 
+// ── Init Language from localStorage ───────────────────────────
+try {
+  const savedLang = localStorage.getItem('kickall_lang');
+  if (savedLang) {
+    currentLang = savedLang;
+  }
+} catch (e) {
+  console.warn('LocalStorage not available:', e);
+}
+
 // ── Configuration Check & Fallback ────────────────────────────
 const CONFIG = window.CONFIG || window.KickotConfig || {};
 
@@ -77,11 +87,13 @@ let currentUser = null;
   }
 })();
 
-// ── Translations ─�async function setLang(lang) {
 // ── Translations ──
+// ── Translations ───────────────────────────────────────────
 function t(key) {
+  if (!key) return '';
   const keys = key.split('.');
   let value = translations[currentLang];
+  
   for (const k of keys) {
     if (value && typeof value === 'object') {
       value = value[k];
@@ -89,7 +101,30 @@ function t(key) {
       return key;
     }
   }
-  return value || key;
+  return value !== undefined ? value : key;
+}
+
+function updateDOMTranslations() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const text = t(key);
+
+    if (text && text !== key) {
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        el.placeholder = text;
+      } else if (el.classList.contains('btn-text')) {
+        el.textContent = text;
+      } else {
+        el.innerHTML = text;
+      }
+    }
+  });
+
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    const text = t(key);
+    if (text && text !== key) el.placeholder = text;
+  });
 }
 
 async function setLang(lang) {
@@ -101,42 +136,42 @@ async function setLang(lang) {
   document.body.classList.toggle('lang-sr', lang === 'sr');
   document.body.classList.toggle('lang-en', lang === 'en');
 
+  // 1. Sačekaj da se prevod učita sa servera
   try {
     const localePath = window.KickotConfig.getLocalePath(lang);
     const res = await fetch(localePath);
     if (res.ok) {
       const data = await res.json();
-      translations[lang] = { ...translations[lang], ...data };
-      applyJsonTranslations(data);
+      translations[lang] = data;
+      window.translations = translations;
+    } else {
+      console.error('Failed to load translations:', res.status);
     }
   } catch (e) {
-    // Silently fail - locale loading is optional
+    console.error('Failed to load translations:', e);
   }
 
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const key = el.getAttribute('data-i18n');
-    const text = translations[lang] ? translations[lang][key] : undefined;
-    if (text !== undefined) {
-      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-        el.placeholder = text;
-      } else {
-        el.innerHTML = text;
-      }
-    }
-  });
+  // 2. Ažuriraj sve DOM elemente TEK NAKON što je JSON učitan
+  updateDOMTranslations();
 
-  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-    const key = el.getAttribute('data-i18n-placeholder');
-    const text = translations[lang] ? translations[lang][key] : undefined;
-    if (text) el.placeholder = text;
-  });
+  // 3. Dispatch pricing language change event for pricing period updates
+  document.dispatchEvent(new CustomEvent('pricingLanguageChanged', { detail: { language: lang } }));
 
-  const heroPrimaryBtn = document.getElementById('heroPrimaryBtn');
+  // 4. Ažuriranje specifičnih dugmadi i meta oznaka
   const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
-  if (heroPrimaryBtn && heroPrimaryBtnText && currentUser) {
-    const t = window.translations || {};
-    const userProfile = t.userProfile || {};
-    heroPrimaryBtnText.textContent = userProfile.goToDashboard || (lang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard');
+  if (heroPrimaryBtnText && currentUser) {
+    const text = t('nav.goToDashboard');
+    if (text && text !== 'nav.goToDashboard') {
+      heroPrimaryBtnText.textContent = text;
+    }
+  }
+
+  const ctaPrimaryBtnText = document.getElementById('ctaPrimaryBtnText');
+  if (ctaPrimaryBtnText && currentUser) {
+    const text = t('nav.goToDashboard');
+    if (text && text !== 'nav.goToDashboard') {
+      ctaPrimaryBtnText.textContent = text;
+    }
   }
 
   const btnSr = document.getElementById('btn-sr');
@@ -144,27 +179,20 @@ async function setLang(lang) {
   if (btnSr) btnSr.classList.toggle('active', lang === 'sr');
   if (btnEn) btnEn.classList.toggle('active', lang === 'en');
 
-  document.title = t('meta.title');
+  const titleText = t('meta.title');
+  if (titleText && titleText !== 'meta.title') {
+    document.title = titleText;
+  }
   const metaDesc = document.querySelector('meta[name="description"]');
-  if (metaDesc) metaDesc.content = t('meta.desc');
-}
-
-function applyJsonTranslations(obj, prefix = '') {
-  for (const key in obj) {
-    const fullKey = prefix ? `${prefix}.${key}` : key;
-    if (typeof obj[key] === 'object' && obj[key] !== null) {
-      applyJsonTranslations(obj[key], fullKey);
-    } else {
-      const elements = document.querySelectorAll(`[data-i18n="${fullKey}"]`);
-      elements.forEach(el => {
-        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-          el.placeholder = obj[key];
-        } else {
-          el.innerHTML = obj[key];
-        }
-      });
+  if (metaDesc) {
+    const descText = t('meta.desc');
+    if (descText && descText !== 'meta.desc') {
+      metaDesc.content = descText;
     }
   }
+  
+  // Dispatch language change event for consent banner
+  document.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lang } }));
 }
 
 // ── Navbar Scroll ──────────────────────────────────────────
@@ -413,23 +441,25 @@ document.querySelectorAll('.cmd-item').forEach(item => {
 });
 
 function updateCommandPreview(item) {
-  const cmdName = item.querySelector('.cmd-name').textContent.split(' ')[0];
-  const replyText = item.getAttribute('data-reply');
-  const previewContainer = document.getElementById('cmdPreviewContent');
+    const cmdName = item.querySelector('.cmd-name').textContent.split(' ')[0];
+    const replyKey = item.getAttribute('data-reply-key');
+    const replyText = replyKey ? t(replyKey) : '';
+    const previewContainer = document.getElementById('cmdPreviewContent');
 
-  if (previewContainer) {
-    previewContainer.innerHTML = `
-      <div class="cp-line"><span class="cp-user">Gledalac:</span> <span class="cp-msg">${cmdName}</span></div>
-      <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">${replyText}</span></div>
-    `;
-    playSynthSound(600, 'sine', 0.15);
-    const playground = document.getElementById('mainPlayground');
-    if (playground) {
-      playground.classList.remove('flash-active');
-      void playground.offsetWidth;
-      playground.classList.add('flash-active');
+    if (previewContainer) {
+        const viewerStr = t('cmd.viewer') !== 'cmd.viewer' ? t('cmd.viewer') : 'Gledalac';
+        previewContainer.innerHTML = `
+            <div class="cp-line"><span class="cp-user">${viewerStr}:</span> <span class="cp-msg">${cmdName}</span></div>
+            <div class="cp-line bot-reply"><span class="cp-bot">kickot</span> <span class="cp-msg" style="color:var(--color-green)">${replyText}</span></div>
+        `;
+        playSynthSound(600, 'sine', 0.15);
+        const playground = document.getElementById('mainPlayground');
+        if (playground) {
+            playground.classList.remove('flash-active');
+            void playground.offsetWidth;
+            playground.classList.add('flash-active');
+        }
     }
-  }
 }
 
 // ── Auth Helper Functions ──────────────────────────────────
@@ -581,7 +611,7 @@ async function openKickLogin() {
   const codeVerifierKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_CODE_VERIFIER : 'kick_code_verifier';
   const originSiteKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_ORIGIN_SITE : 'kick_origin_site';
 
-  console.log('Kickot OAuth initiation:', { state, codeVerifier: codeVerifier.substring(0, 10) + '...', originSite: 'kickot' });
+
 
   localStorage.setItem(oauthStateKey, state);
   localStorage.setItem(codeVerifierKey, codeVerifier);
@@ -822,9 +852,7 @@ function onUserChange(user) {
     const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
     if (heroPrimaryBtn && heroPrimaryBtnText) {
       heroPrimaryBtn.onclick = () => { window.location.href = 'dashboard.html'; };
-      const t = window.translations || {};
-      const userProfile = t.userProfile || {};
-      heroPrimaryBtnText.textContent = userProfile.goToDashboard || (currentLang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard');
+      heroPrimaryBtnText.textContent = t('nav.goToDashboard');
       heroPrimaryBtnText.removeAttribute('data-i18n');
     }
   } else {
@@ -854,47 +882,118 @@ function onUserChange(user) {
     if (ctaPrimaryBtn && ctaPrimaryBtnText) {
       if (user) {
         ctaPrimaryBtn.onclick = () => { window.location.href = 'dashboard.html'; };
-        const t = window.translations || {};
-        const userProfile = t.userProfile || {};
-        ctaPrimaryBtnText.textContent = userProfile.goToDashboard || (currentLang === 'sr' ? 'Idi na Dashboard' : 'Go to Dashboard');
+        ctaPrimaryBtnText.textContent = t('nav.goToDashboard');
         ctaPrimaryBtnText.removeAttribute('data-i18n');
       } else {
         ctaPrimaryBtn.onclick = () => { openModal('login'); };
-        ctaPrimaryBtnText.setAttribute('data-i18n', 'cta.primary');
-        ctaPrimaryBtnText.textContent = currentLang === 'sr' ? 'Prijavi se' : 'Login';
+        ctaPrimaryBtnText.setAttribute('data-i18n', 'cta.login');
+        ctaPrimaryBtnText.textContent = t('cta.login');
       }
     }
 }
 
 // ── Toast Notifications ────────────────────────────────────
-let toastIdCounter = 0;
+let toastId = 0;
+function showToast(type, msg, iconEmoji = '💬', duration = 4000) {
+  let container = document.getElementById('toastContainer');
+  // Ensure container is a direct child of body (fixes DOM nesting issues)
+  if (!container || container.parentElement !== document.body) {
+    if (container) container.remove();
+    container = document.createElement('div');
+    container.className = 'toast-container';
+    container.id = 'toastContainer';
+    document.body.appendChild(container);
+  }
 
-function showToast(type, msg, icon = '💬', duration = 4000) {
-  const container = document.getElementById('toastContainer');
-  if (!container) return;
-  const id = ++toastIdCounter;
+  const id = ++toastId;
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.id = `toast-${id}`;
 
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  toast.id = `toast-${id}`;
-  toast.innerHTML = `
-    <span class="toast-icon">${icon}</span>
-    <div class="toast-body"><div class="toast-msg">${msg}</div></div>
+  let svgIcon = '';
+  if (type === 'success') {
+    svgIcon = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    `;
+  } else if (type === 'error') {
+    svgIcon = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="15" y1="9" x2="9" y2="15"></line>
+        <line x1="9" y1="9" x2="15" y2="15"></line>
+      </svg>
+    `;
+  } else if (type === 'info') {
+    svgIcon = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="16" x2="12" y2="12"></line>
+        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+      </svg>
+    `;
+  } else {
+    svgIcon = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+    `;
+  }
+
+  el.innerHTML = `
+    <div class="toast-icon-wrap">${svgIcon}</div>
+    <div class="toast-msg">${msg}</div>
     <button class="toast-close" onclick="removeToast(${id})">✕</button>
   `;
-  container.appendChild(toast);
+
+  // Max 3 newest toasts: push the oldest active one up with a smooth slide-up collapse
+  const activeToasts = Array.from(container.children).filter(child => !child.classList.contains('toast-leaving'));
+  if (activeToasts.length >= 3) {
+    const oldest = activeToasts[0];
+    oldest.classList.add('toast-leaving');
+    const match = oldest.id.match(/toast-(\d+)/);
+    if (match) {
+      removeToast(parseInt(match[1]));
+    } else {
+      oldest.remove();
+    }
+  }
+
+  container.appendChild(el);
+
+  // Trigger entry animation in the next paint cycle
+  setTimeout(() => {
+    el.classList.add('toast-show');
+  }, 20);
 
   setTimeout(() => removeToast(id), duration);
 }
-
 function removeToast(id) {
   const el = document.getElementById(`toast-${id}`);
   if (el) {
-    el.style.opacity = '0';
-    el.style.transform = 'translateX(20px)';
-    setTimeout(() => el.remove(), 300);
+    el.classList.add('toast-leaving');
+    el.classList.remove('toast-show');
+    setTimeout(() => el.remove(), 250);
   }
 }
+
+// Create ToastSystem interface for compatibility with existing code
+window.toastSystem = {
+  show: showToast,
+  success: (msg, duration) => showToast('success', msg, '✓', duration),
+  error: (msg, duration) => showToast('error', msg, '✕', duration),
+  warning: (msg, duration) => showToast('info', msg, '⚠', duration),
+  info: (msg, duration) => showToast('info', msg, 'ℹ', duration),
+  dismiss: (toastElement) => {
+    if (toastElement && toastElement.id) {
+      const match = toastElement.id.match(/toast-(\d+)/);
+      if (match) removeToast(parseInt(match[1]));
+    }
+  }
+};
 
 // ── Auth Listener & Spotlight ──────────────────────────────
 sb.auth.onAuthStateChange((event, session) => {
@@ -906,7 +1005,7 @@ sb.auth.onAuthStateChange((event, session) => {
   try {
     const { data: { session } } = await sb.auth.getSession();
     if (session?.user) {
-      console.log('Kickot: Found existing session from KickAll', session.user);
+
       onUserChange(session.user);
     }
   } catch (error) {
@@ -1090,6 +1189,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function scrollToTop() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+
+    // Re-apply translations when user returns to tab (fixes alt-tab issue)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && currentUser) {
+            const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
+            const ctaPrimaryBtnText = document.getElementById('ctaPrimaryBtnText');
+            if (heroPrimaryBtnText) heroPrimaryBtnText.textContent = t('nav.goToDashboard');
+            if (ctaPrimaryBtnText) ctaPrimaryBtnText.textContent = t('nav.goToDashboard');
+        }
+    });
 
     // Smooth scroll za sve navigacione linkove
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {

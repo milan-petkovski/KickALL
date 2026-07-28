@@ -6,7 +6,11 @@ bun.lockb
 # Build outputs
 *.min.css
 *.min.js
-*.webp
+# Note: *.webp removed from build outputs - we want to commit optimized webp images
+
+# Test files
+api-test.html
+api-test.js
 
 # OS files
 .DS_Store
@@ -29,6 +33,7 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+.env.example
 
 # Cache
 .cache/

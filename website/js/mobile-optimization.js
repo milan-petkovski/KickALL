@@ -3,11 +3,9 @@
  * Enhances mobile experience with performance improvements and gestures
  */
 
-// Disable console logs in production
+// Disable debug logs in production, preserve error and warn for observability
 if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     console.log = function() {};
-    console.warn = function() {};
-    console.error = function() {};
     console.info = function() {};
     console.debug = function() {};
 }

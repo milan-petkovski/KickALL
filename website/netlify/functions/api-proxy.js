@@ -1,6 +1,38 @@
+// In-memory rate limiter for serverless execution instance
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const MAX_REQUESTS_PER_WINDOW = 30;  // Max 30 requests/min per IP
+const MAX_BODY_BYTES = 50000;        // Max 50KB payload
+
+function isRateLimited(clientIp) {
+  if (clientIp === '127.0.0.1' || clientIp === 'localhost' || clientIp === '::1' || clientIp.includes('127.0.0.1')) {
+    return false;
+  }
+  const now = Date.now();
+  const userHistory = rateLimitMap.get(clientIp) || [];
+  const validHistory = userHistory.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW_MS);
+  
+  if (validHistory.length >= MAX_REQUESTS_PER_WINDOW) {
+    return true;
+  }
+  
+  validHistory.push(now);
+  rateLimitMap.set(clientIp, validHistory);
+  
+  // Periodic cleanup
+  if (rateLimitMap.size > 1000) {
+    for (const [ip, history] of rateLimitMap.entries()) {
+      if (history.length === 0 || now - history[history.length - 1] > RATE_LIMIT_WINDOW_MS) {
+        rateLimitMap.delete(ip);
+      }
+    }
+  }
+  return false;
+}
+
 exports.handler = async (event) => {
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json'
@@ -19,6 +51,29 @@ exports.handler = async (event) => {
       statusCode: 405,
       headers,
       body: JSON.stringify({ error: 'Method not allowed' })
+    };
+  }
+
+  // Extract client IP
+  const clientIp = event.headers['x-nf-client-connection-ip'] || 
+                   (event.headers['x-forwarded-for'] ? event.headers['x-forwarded-for'].split(',')[0].trim() : null) || 
+                   event.headers['client-ip'] || 
+                   'unknown';
+
+  if (isRateLimited(clientIp)) {
+    return {
+      statusCode: 429,
+      headers: { ...headers, 'Retry-After': '60' },
+      body: JSON.stringify({ error: 'Rate limit exceeded', detail: 'Too many requests. Please try again in a minute.' })
+    };
+  }
+
+  // Payload size limit
+  if (event.body && event.body.length > MAX_BODY_BYTES) {
+    return {
+      statusCode: 413,
+      headers,
+      body: JSON.stringify({ error: 'Payload too large', detail: 'Request body exceeds 50KB size limit' })
     };
   }
 
@@ -54,7 +109,9 @@ exports.handler = async (event) => {
       };
     }
 
-    const isAllowed = allowedDomains.some(domain => url.hostname.includes(domain));
+    const isAllowed = allowedDomains.some(domain => 
+      url.hostname === domain || url.hostname.endsWith('.' + domain)
+    );
 
     if (!isAllowed) {
       return {

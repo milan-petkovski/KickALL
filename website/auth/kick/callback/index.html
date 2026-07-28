@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
   <title>KickALL | OAuth Autorizacija</title>
-  <link rel="icon" href="../../assets/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="../../../assets/favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="/assets/logo.webp">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -104,20 +104,6 @@
       width: auto;
     }
 
-    .spinner {
-      width: 44px;
-      height: 44px;
-      border: 3px solid rgba(83, 252, 24, 0.15);
-      border-top-color: #53FC18;
-      border-radius: 50%;
-      animation: spin 0.75s linear infinite;
-      margin: 0 auto 20px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
     h1 {
       font-family: 'Space Grotesk', sans-serif;
       font-size: 1.35rem;
@@ -183,30 +169,69 @@
 </head>
 
 <body>
-  <div class="card">
+  <div class="card" id="errorCard" style="display: none;">
     <div class="logo-wrap">
-      <img src="assets/kickot.webp" alt="Kickot Logo" class="logo-img" style="height: 52px; width: auto;" loading="lazy">
+      <img src="../../../assets/kickall.webp" alt="Kickall Logo" class="logo-img" style="height: 52px; width: auto;" loading="lazy">
     </div>
-    <div class="spinner" id="loadingSpinner"></div>
-    <h1 id="loadingTitle">Obrada...</h1>
-    <p id="loadingMessage">Autorizacija je u toku</p>
-    <div class="error-message" id="errorMessage" style="display: none;"></div>
+    <div class="status-icon">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+    </div>
+    <h1>Greška prilikom autorizacije</h1>
+    <p class="status-msg" id="errorStatus">Došlo je do greške</p>
+    <p class="status-sub" id="errorDetails">Molimo vas pokušajte ponovo</p>
+    <a href="../../../index.html" class="btn-retry">Nazad na početnu</a>
   </div>
 
   <script>
-    function showErrorToUser(message) {
-      const spinner = document.getElementById('loadingSpinner');
-      const title = document.getElementById('loadingTitle');
-      const msg = document.getElementById('loadingMessage');
-      const errorDiv = document.getElementById('errorMessage');
-      
-      if (spinner) spinner.style.display = 'none';
-      if (title) title.textContent = 'Greška';
-      if (msg) msg.style.display = 'none';
-      if (errorDiv) {
-        errorDiv.textContent = message;
-        errorDiv.style.display = 'block';
+    const userLang = (localStorage.getItem('kickall_lang') || 'sr') === 'en' ? 'en' : 'sr';
+    const translations = {
+      sr: {
+        title: 'Greška prilikom autorizacije',
+        btnRetry: 'Nazad na početnu',
+        defaultStatus: 'Došlo je do greške',
+        defaultDetails: 'Molimo vas pokušajte ponovo',
+        oauthCancel: 'Autorizacija je otkazana. Molimo vas pokušajte ponovo.',
+        tokenMismatch: 'Token mismatch. Molimo vas započnite proces autorizacije ponovo.',
+        missingCode: 'Authorization code nedostaje. Molimo vas pokušajte ponovo.',
+        missingVerifier: 'Verifikacioni kod nedostaje. Molimo vas započnite proces autorizacije ponovo.',
+        serverWaking: 'Backend server se budi. Molim vas sačekajte 15-30 sekundi i pokušajte ponovo.',
+        exchangeFailed: 'Greška prilikom razmene tokena. Molimo vas pokušajte ponovo.',
+        missingToken: 'Nedostaje access token u odgovoru. Molimo vas pokušajte ponovo.',
+        connError: 'Greška u povezivanju sa serverom. Molimo vas pokušajte ponovo.'
+      },
+      en: {
+        title: 'Authorization Error',
+        btnRetry: 'Back to Home',
+        defaultStatus: 'An error occurred',
+        defaultDetails: 'Please try again',
+        oauthCancel: 'Authorization was canceled. Please try again.',
+        tokenMismatch: 'Token mismatch. Please restart authorization.',
+        missingCode: 'Authorization code is missing. Please try again.',
+        missingVerifier: 'Verification code is missing. Please restart authorization.',
+        serverWaking: 'Backend server is waking up. Please wait 15-30 seconds and try again.',
+        exchangeFailed: 'Token exchange failed. Please try again.',
+        missingToken: 'Access token missing in response. Please try again.',
+        connError: 'Server connection error. Please try again.'
       }
+    };
+    const t = translations[userLang];
+
+    function showErrorToUser(statusMessage, detailsMessage) {
+      const errorCard = document.getElementById('errorCard');
+      const errorStatus = document.getElementById('errorStatus');
+      const errorDetails = document.getElementById('errorDetails');
+      const cardTitle = errorCard ? errorCard.querySelector('h1') : null;
+      const btnRetry = errorCard ? errorCard.querySelector('.btn-retry') : null;
+      
+      if (cardTitle) cardTitle.textContent = t.title;
+      if (btnRetry) btnRetry.textContent = t.btnRetry;
+      if (errorCard) errorCard.style.display = 'block';
+      if (errorStatus) errorStatus.textContent = statusMessage || t.defaultStatus;
+      if (errorDetails) errorDetails.textContent = detailsMessage || t.defaultDetails;
     }
 
     (async function processKickOAuth() {
@@ -216,10 +241,7 @@
       const error = params.get('error');
 
       if (error) {
-        // Redirect to appropriate index based on current path
-        const currentPath = window.location.pathname;
-        const basePath = currentPath.includes('/auth/') ? '/' : '../';
-        window.location.href = `${basePath}index.html?error=` + encodeURIComponent(error);
+        showErrorToUser('OAuth Error', t.oauthCancel);
         return;
       }
 
@@ -232,16 +254,12 @@
       
       if (!isLocalhost && (!state || state !== savedState)) {
         console.error('State mismatch - Expected:', savedState, 'Got:', state);
-        const currentPath = window.location.pathname;
-        const basePath = currentPath.includes('/auth/') ? '/' : '../';
-        window.location.href = `${basePath}index.html?error=state_mismatch`;
+        showErrorToUser('Security Error', t.tokenMismatch);
         return;
       }
 
       if (!code) {
-        const currentPath = window.location.pathname;
-        const basePath = currentPath.includes('/auth/') ? '/' : '../';
-        window.location.href = `${basePath}index.html?error=no_code`;
+        showErrorToUser('Missing Code', t.missingCode);
         return;
       }
 
@@ -253,10 +271,7 @@
       
       if (!codeVerifier) {
         console.error('Code verifier missing from storage');
-        // Redirect to appropriate index based on current path
-        const currentPath = window.location.pathname;
-        const basePath = currentPath.includes('/auth/') ? '/' : '../';
-        window.location.href = `${basePath}index.html?error=no_verifier`;
+        showErrorToUser('Session Error', t.missingVerifier);
         return;
       }
       
@@ -290,18 +305,14 @@
           
           // Show error to user immediately for 502 errors
           if (response.status === 502) {
-            showErrorToUser('Backend server se budi (Render cold start). Molim vas sačekajte 15-30 sekundi i pokušajte ponovo.');
+            showErrorToUser('Server Unavailable', t.serverWaking);
             
             // Auto-redirect after longer delay to allow for server wake-up
             setTimeout(() => {
-              const currentPath = window.location.pathname;
-              const basePath = currentPath.includes('/auth/') ? '/' : '../';
-              window.location.href = `${basePath}index.html?error=server_unavailable`;
+              window.location.href = `/index.html`;
             }, 15000);
           } else {
-            const currentPath = window.location.pathname;
-            const basePath = currentPath.includes('/auth/') ? '/' : '../';
-            window.location.href = `${basePath}index.html?error=exchange_failed&details=` + encodeURIComponent(errorText);
+            showErrorToUser('Token Exchange Failed', t.exchangeFailed);
           }
           return;
         }
@@ -311,9 +322,7 @@
         
         if (!tokenData.access_token) {
           console.error('No access token in response:', tokenData);
-          const currentPath = window.location.pathname;
-          const basePath = currentPath.includes('/auth/') ? '/' : '../';
-          window.location.href = `${basePath}index.html?error=no_token&details=` + encodeURIComponent(JSON.stringify(tokenData));
+          showErrorToUser('Invalid Token Response', t.missingToken);
           return;
         }
 
@@ -341,13 +350,12 @@
 
         const targetPage = targets[originSite] || 'dashboard.html';
 
-        // Use relative path for production compatibility
-        window.location.replace(`${targetPage}?kick_oauth=1`);
+        // Use absolute path from root to avoid path concatenation issues
+        window.location.replace(`/${targetPage}?kick_oauth=1`);
 
       } catch (err) {
-        const currentPath = window.location.pathname;
-        const basePath = currentPath.includes('/auth/') ? '/' : '../';
-        window.location.href = `${basePath}index.html?error=connection_error`;
+        console.error('OAuth callback error:', err);
+        showErrorToUser('Connection Error', t.connError);
       }
     })();
   </script>

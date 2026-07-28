@@ -86,11 +86,11 @@ KickALL is a comprehensive streaming ecosystem designed specifically for Kick st
 - Mobile-first responsive design
 
 ## Related Links
-- Main Platform: https://kickall.app/
-- Kickot Chatbot: https://kickall.app/kickot/
-- Dashboard: https://kickall.app/dashboard.html
-- Terms of Service: https://kickall.app/terms.html
-- Privacy Policy: https://kickall.app/privacy.html
+- [Main Platform](https://kickall.app/)
+- [Kickot Chatbot](https://kickall.app/kickot/)
+- [Dashboard](https://kickall.app/dashboard.html)
+- [Terms of Service](https://kickall.app/terms.html)
+- [Privacy Policy](https://kickall.app/privacy.html)
 
 ## Developer Notes
 - Built with vanilla JavaScript (no frameworks)

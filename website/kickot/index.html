@@ -19,7 +19,18 @@
   <meta name="author" content="Milan Web Portal" />
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <meta name="theme-color" content="#0b0716" />
-  
+
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZNGNF6TEM"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KZNGNF6TEM');
+  </script>
+  <!-- End Google Analytics -->
+
   <!-- Canonical URL -->
   <link rel="canonical" href="https://kickall.app/kickot/" />
   
@@ -174,6 +185,7 @@
   <!-- Favicon i Stilovi -->
   <link rel="icon" href="/assets/favicon.ico" type="image/x-icon" />
   <link rel="apple-touch-icon" href="/assets/logo.webp" />
+  <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/style.css" />
   
   <!-- Service Worker Registration -->
@@ -222,7 +234,7 @@
                             <polyline points="12 19 5 12 12 5" />
                         </svg>
                     </span>
-                    <span data-i18n="nav.back">KickAll</span>
+                    <span data-i18n="navBack">KickAll</span>
                 </a>
                 <a href="index.html" class="logo" id="navLogo">
                     <img src="assets/kickot.webp" alt="Kickot Logo" class="logo-img" style="height: 48px;" loading="lazy">
@@ -244,15 +256,15 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M19 12H5M12 19l-7-7 7-7"/>
                         </svg>
-                        <span>Nazad na KickALL</span>
+                        <span data-i18n="nav.backToKickall">Nazad na KickALL</span>
                     </a>
                     <a href="dashboard.html" class="btn btn-primary btn-large mobile-dashboard-btn" id="mobileDashboardBtn" style="display: none; align-items: center; justify-content: center; gap: 10px;">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
                         </svg>
-                        <span>Idi na Dashboard</span>
+                        <span data-i18n="nav.goToDashboard">Idi na Dashboard</span>
                     </a>
-                    <button type="button" class="btn btn-secondary btn-large mobile-login-btn" id="mobileLoginBtn">
+                    <button type="button" class="btn btn-secondary btn-large mobile-login-btn" id="mobileLoginBtn" data-i18n="nav.login">
                         Prijavi se
                     </button>
                 </div>
@@ -295,7 +307,7 @@
                                 <polyline points="16 17 21 12 16 7" />
                                 <line x1="21" y1="12" x2="9" y2="12" />
                             </svg>
-                            <span data-i18n="nav.logout">Odjavi se</span>
+                            <span data-i18n="navLogout">Odjavi se</span>
                         </a>
                     </div>
                 </div>
@@ -319,17 +331,17 @@
                                 <path
                                     d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
                             </svg>
-                            <span data-i18n="hero.badge.platform">Kick Platforma</span>
+                            <span data-i18n="hero.badgePlatform">Kick Platforma</span>
                         </span>
                         <span class="badge badge-live">
                             <span class="live-status-dot"></span>
-                            <span data-i18n="hero.live">Aktivan</span>
+                            <span data-i18n="hero.badgeLive">Aktivan</span>
                         </span>
                     </div>
                     <h1 class="hero-title">
                         <span class="kickbot-title-styled gradient-text">Kick<span class="b-anchor"><span
                                     class="elevated-b">b</span></span>ot</span>
-                        <span class="hero-title-rest" data-i18n="hero.title.rest">
+                        <span class="hero-title-rest" data-i18n="hero.titleRest">
                             za <span class="text-green-flat">KICK</span> koji radi dok ti strimuješ
                         </span>
                     </h1>
@@ -343,9 +355,9 @@
                                 <path
                                     d="M19 0H5a5 5 0 0 0-5 5v14a5 5 0 0 0 5 5h14a5 5 0 0 0 5-5V5a5 5 0 0 0-5-5zM9 17H6.5v-10H9v3.5l4-3.5h3.5l-4.5 4.5 4.8 5.5H13.3l-4.3-5V17z" />
                             </svg>
-                            <span data-i18n="hero.cta.primary" id="heroPrimaryBtnText">Počni besplatno</span>
+                            <span data-i18n="hero.ctaPrimary" id="heroPrimaryBtnText">Počni besplatno</span>
                         </button>
-                        <a href="#features" class="btn btn-secondary btn-large" data-i18n="hero.cta.secondary">Vidi funkcionalnosti</a>
+                        <a href="#features" class="btn btn-secondary btn-large" data-i18n="hero.ctaSecondary">Vidi funkcionalnosti</a>
                     </div>
                     <p class="hero-note"
                         style="margin-top: 20px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--color-text-muted);">
@@ -364,7 +376,7 @@
                             <span class="dot red pulse-dot"></span>
                             <span class="status-text font-bold text-green"
                                 style="font-size: 0.82rem; font-family: var(--font-heading); text-transform: uppercase; letter-spacing: 0.05em;"
-                                data-i18n="hero.preview.status">
+                                data-i18n="hero.previewStatus">
                                 Strimer • UŽIVO
                             </span>
                             <span class="window-title" style="margin-left: auto;">KICKOT</span>
@@ -372,18 +384,18 @@
                         <div class="card-body dashboard-layout">
                             <div class="db-row">
                                 <div class="db-col">
-                                    <span class="db-label" data-i18n="hero.preview.viewers">Gledaoci</span>
+                                    <span class="db-label" data-i18n="hero.previewViewers">Gledaoci</span>
                                     <span class="db-value text-green">1.201</span>
                                 </div>
                                 <div class="db-col">
-                                    <span class="db-label" data-i18n="hero.preview.botstatus">Status bota</span>
-                                    <span class="db-value text-violet" data-i18n="hero.preview.active">AKTIVAN</span>
+                                    <span class="db-label" data-i18n="hero.previewBotstatus">Status bota</span>
+                                    <span class="db-value text-violet" data-i18n="hero.previewActive">AKTIVAN</span>
                                 </div>
                             </div>
 
                             <!-- Mini Graph Preview -->
                             <div class="db-mini-chart">
-                                <div class="mini-chart-header" data-i18n="hero.preview.charttitle">
+                                <div class="mini-chart-header" data-i18n="hero.previewCharttitle">
                                     Aktivnost komandi (Proteklih 6h)
                                 </div>
                                 <div class="mini-chart-bars">
@@ -409,8 +421,8 @@
                                     </svg>
                                 </div>
                                 <div class="db-alert-content">
-                                    <span class="db-alert-title" data-i18n="hero.preview.alerttitle">NOVI PRATILAC!</span>
-                                    <span class="db-alert-desc" data-i18n="hero.preview.alertdesc">@korisnik je upravo zapratio kanal! Dobro Došao!</span>
+                                    <span class="db-alert-title" data-i18n="hero.previewAlerttitle">NOVI PRATILAC!</span>
+                                    <span class="db-alert-desc" data-i18n="hero.previewAlertdesc">@korisnik je upravo zapratio kanal! Dobro Došao!</span>
                                 </div>
                             </div>
 
@@ -419,7 +431,7 @@
                                 <div class="db-chat-msg"><span class="chat-user">Korisnik</span>: !love @kickot</div>
                                 <div class="db-chat-msg bot">
                                     <span class="chat-user bot-tag">Kickot</span>:
-                                    <span data-i18n="hero.preview.chatresponse">❤️ Ljubavni Kalkulator: @korisnik + @kickot = 100% | Komentar: Savršen par, čista hemija i večna ljubav! ❤️🔥</span>
+                                    <span data-i18n="hero.previewChatresponse">❤️ Ljubavni Kalkulator: @korisnik + @kickot = 100% | Komentar: Savršen par, čista hemija i večna ljubav! ❤️🔥</span>
                                 </div>
                             </div>
                         </div>
@@ -546,52 +558,47 @@
                             <button class="category-btn" data-category="tools" data-i18n="cmds.cat.tools">Alati & Muzika</button>
                         </div>
                         <div class="commands-list" id="commandsList">
-                            <!-- Statistika i rangiranje -->
-                            <div class="cmd-item active" data-cmd="top-watchtime" data-cat="stats" data-reply="👑 Top gledaoci po watchtime-u: 1. Korisnik1 (0h) 2. Korisnik2 (0h) 3. Korisnik3 (0h)">
+                            <div class="cmd-item active" data-cmd="top-watchtime" data-cat="stats" data-reply-key="cmd.reply.topwt">
                                 <span class="cmd-name">!topwatchtime</span>
                                 <span class="cmd-desc" data-i18n="cmd.desc.topwt">Top lista po satima gledanja strima</span>
                             </div>
-                            <div class="cmd-item" data-cmd="top-chat" data-cat="stats" data-reply="💬 Top lista po broju poruka u četu: 1. Korisnik1 (0) 2. Korisnik2 (0) 3. Korisnik3 (0)">
+                            <div class="cmd-item" data-cmd="top-chat" data-cat="stats" data-reply-key="cmd.reply.topchat">
                                 <span class="cmd-name">!topchat</span>
                                 <span class="cmd-desc" data-i18n="cmd.desc.topchat">Top lista najaktivnijih korisnika u četu</span>
                             </div>
-                            <div class="cmd-item" data-cmd="rank" data-cat="stats" data-reply="⭐ @korisnik — Rang: VIP | Watchtime: 0h 0m | Poruke: 0 | Koins: 0">
+                            <div class="cmd-item" data-cmd="rank" data-cat="stats" data-reply-key="cmd.reply.rank">
                                 <span class="cmd-name">!rank / !me</span>
-                                <span class="cmd-desc" data-i18n="cmd.desc.rank">Prikaz tvog ranga, watchtime-a i stanja koina</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.rank">Prikaz tvog ranga, watchtime a i stanja koina</span>
                             </div>
-                            <div class="cmd-item" data-cmd="koins" data-cat="stats" data-reply="🪙 @korisnik na računu trenutno ima 0 Koins-a i nalazi se na 0. mestu rang liste!">
+                            <div class="cmd-item" data-cmd="koins" data-cat="stats" data-reply-key="cmd.reply.koins">
                                 <span class="cmd-name">!koins</span>
-                                <span class="cmd-desc" data-i18n="cmd.desc.koins">Provera stanja poena / koina na kanalu</span>
+                                <span class="cmd-desc" data-i18n="cmd.desc.koins">Provera stanja poena na kanalu</span>
                             </div>
-
-                            <!-- Zabava i interakcija -->
-                            <div class="cmd-item" data-cmd="duel" data-cat="fun" data-reply="⚔️ @korisnik1 izaziva @korisnik2 na dvoboj! Borba je bila žestoka, a pobednik je @korisnik2 uz 15 HP-a viška!" style="display: none;">
+                            <div class="cmd-item" data-cmd="duel" data-cat="fun" data-reply-key="cmd.reply.duel" style="display: none;">
                                 <span class="cmd-name">!duel @korisnik</span>
                                 <span class="cmd-desc" data-i18n="cmd.desc.duel">Pokreni epsku simulaciju borbe u četu</span>
                             </div>
-                            <div class="cmd-item" data-cmd="roll" data-cat="fun" data-reply="🎲 @korisnik baca kockicu i dobija 50! (Raspon 1-100)" style="display: none;">
+                            <div class="cmd-item" data-cmd="roll" data-cat="fun" data-reply-key="cmd.reply.roll" style="display: none;">
                                 <span class="cmd-name">!roll</span>
                                 <span class="cmd-desc" data-i18n="cmd.desc.roll">Bacanje kockice (67 donosi automatsku pobedu)</span>
                             </div>
-                            <div class="cmd-item" data-cmd="iq" data-cat="fun" data-reply="🧠 IQ test za @korisnik: 100! (Prosečan, vreme je za kvizove!)" style="display: none;">
+                            <div class="cmd-item" data-cmd="iq" data-cat="fun" data-reply-key="cmd.reply.iq" style="display: none;">
                                 <span class="cmd-name">!iq [@korisnik]</span>
                                 <span class="cmd-desc" data-i18n="cmd.desc.iq">Meri koeficijent inteligencije u četu</span>
                             </div>
-                            <div class="cmd-item" data-cmd="vencaj" data-cat="fun" data-reply="💍 @korisnik1 prosdiše @korisnik2! Kompatibilnost je 50%! @korisnik2 ima 60 sekundi da ukuca !prihvati ili !odbij." style="display: none;">
+                            <div class="cmd-item" data-cmd="vencaj" data-cat="fun" data-reply-key="cmd.reply.vencaj" style="display: none;">
                                 <span class="cmd-name">!vencaj @korisnik</span>
                                 <span class="cmd-desc" data-i18n="cmd.desc.vencaj">Započni venčanje sa nekim u četu</span>
                             </div>
-
-                            <!-- Alati i muzika -->
-                            <div class="cmd-item" data-cmd="pesma" data-cat="tools" data-reply="🎵 Uspešno naručena pesma: Pesma - Naziv (Zatražio: @korisnik)" style="display: none;">
+                            <div class="cmd-item" data-cmd="pesma" data-cat="tools" data-reply-key="cmd.reply.song" style="display: none;">
                                 <span class="cmd-name">!pesma [link/naziv]</span>
                                 <span class="cmd-desc" data-i18n="cmd.desc.song">Naruči pesmu za red reprodukcije</span>
                             </div>
-                            <div class="cmd-item" data-cmd="uptime" data-cat="tools" data-reply="⏱️ Kanal je uživo već 3 sata i 42 minuta!" style="display: none;">
+                            <div class="cmd-item" data-cmd="uptime" data-cat="tools" data-reply-key="cmd.reply.uptime" style="display: none;">
                                 <span class="cmd-name">!uptime</span>
                                 <span class="cmd-desc" data-i18n="cmd.desc.uptime">Proveri koliko dugo traje trenutni strim</span>
                             </div>
-                            <div class="cmd-item" data-cmd="followage" data-cat="tools" data-reply="⏰ @korisnik prati ovaj kanal već 0 meseci i 0 dana." style="display: none;">
+                            <div class="cmd-item" data-cmd="followage" data-cat="tools" data-reply-key="cmd.reply.followage" style="display: none;">
                                 <span class="cmd-name">!followage</span>
                                 <span class="cmd-desc" data-i18n="cmd.desc.followage">Proveri tačno vreme praćenja kanala</span>
                             </div>
@@ -613,24 +620,35 @@
         <section class="pricing-section" id="pricing">
             <div class="container">
                 <div class="section-header" data-reveal>
-                    <span class="glow-tag" data-i18n="pricing.tag">PRILAGOĐENO SVIMA</span>
+                    <span class="glow-tag" data-i18n="pricing.tag">IZABERI SVOJ PAKET</span>
                     <h2 class="section-title" data-i18n="pricing.title">
-                        Transparentni i fleksibilni paketi
+                        Izaberi svoj paket snage
                     </h2>
                     <p class="section-subtitle" data-i18n="pricing.subtitle">
-                        Izaberi paket koji najbolje odgovara tvojim strimerskim potrebama i veličini tvoje zajednice.
+                        Jednostavno. Jasno. Bez skrivenih troškova.
                     </p>
+
+                <!-- Monthly/Yearly Switch -->
+                <div class="pricing-toggle">
+                    <div class="toggle-container">
+                        <button class="toggle-btn active" id="monthlyBtn" onclick="setPricingPeriod('monthly')">
+                            <span data-i18n="pricing.monthly">Mesečno</span>
+                        </button>
+                        <button class="toggle-btn" id="yearlyBtn" onclick="setPricingPeriod('yearly')">
+                            <span data-i18n="pricing.yearly">Godišnje</span>
+                            <span class="discount-badge" data-i18n="pricing.discount">17% POPUST</span>
+                        </button>
+                    </div>
+                </div>
                 </div>
 
                 <div class="pricing-grid">
-                    <!-- BESPLATNO -->
+                    <!-- FREE -->
                     <div class="pricing-card" id="pricing-free">
                         <div class="p-card-header">
-                            <h3 class="p-title" data-i18n="pricing.free.title">
-                                BESPLATNO
-                            </h3>
+                            <h3 class="p-title" data-i18n="pricing.free.title">FREE</h3>
                             <div class="p-price">
-                                <span class="p-currency">€</span>0
+                                <span class="p-currency">$</span>0
                                 <span class="p-period" data-i18n="pricing.period">/ mesečno</span>
                             </div>
                             <p class="p-desc" data-i18n="pricing.free.desc">
@@ -642,65 +660,120 @@
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.free.f1">Osnovni <strong>Kickot</strong> chatbot</span>
+                                        <span data-i18n="pricing.free.kickotChatbot">Osnovni <strong>Kickot</strong> Chatbot</span>
                                     </span>
-                                    <span class="p-tag-active" data-i18n="modules.active">AKTIVNO</span>
+                                    <span class="p-tag-active" data-i18n="pricing.active">AKTIVNO</span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.free.f2">Svih 8 <strong>Kickot</strong> modula</span>
+                                        <span data-i18n="pricing.free.kickajGiveaway">Osnovni <strong>Kickaj</strong> Giveaway</span>
+                                    </span>
+                                    <span class="p-tag-soon" data-i18n="pricing.soon">USKORO</span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.kickanAnalytics">Osnovna <strong>Kickan</strong> Analitika</span>
+                                    </span>
+                                    <span class="p-tag-soon" data-i18n="pricing.soon">USKORO</span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.kickovOverlays">Osnovni <strong>Kickov</strong> Overlayevi</span>
+                                    </span>
+                                    <span class="p-tag-soon" data-i18n="pricing.soon">USKORO</span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.leaderboard">Leaderboard (Top 20)</span>
                                     </span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.free.f3">Do 50 prilagođenih komandi</span>
+                                        <span data-i18n="pricing.free.customCommands">50 custom komandi</span>
                                     </span>
                                 </li>
-                                <li class="p-disabled">
+                                <li>
                                     <span>
-                                        <span class="p-cross">✕</span>
-                                        <span data-i18n="pricing.free.f4"><strong>Kickov</strong> overlayevi (uskoro)</span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.builtInCommands">Sve ugrađene komande</span>
                                     </span>
                                 </li>
-                                <li class="p-disabled">
+                                <li>
                                     <span>
-                                        <span class="p-cross">✕</span>
-                                        <span data-i18n="pricing.free.f5"><strong>Kickaj</strong> giveaway sistem (uskoro)</span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.autoMessages">5 automatskih poruka</span>
                                     </span>
                                 </li>
-                                <li class="p-disabled">
+                                <li>
                                     <span>
-                                        <span class="p-cross">✕</span>
-                                        <span data-i18n="pricing.free.f6"><strong>Kickan</strong> napredna analitika (uskoro)</span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.botInteraction">Bot interakcija (alertovi)</span>
                                     </span>
                                 </li>
-                                <li class="p-disabled">
+                                <li>
                                     <span>
-                                        <span class="p-cross">✕</span>
-                                        <span data-i18n="pricing.free.f7">Prioritetna podrška</span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.loveMarriage">Ljubav i brakovi (do 100 ljudi)</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.miniGames">Osnovne Mini igre</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.songRequest">Song request (max 5 u queue)</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.rankingSystem">Osnovni Ranking sistem</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.moderation">Osnovna Moderacija</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.free.support">Podrška - putem emaila</span>
                                     </span>
                                 </li>
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-secondary w-full" id="pricingFreeBtn" onclick="openModal('login')" data-i18n="pricing.free.btn">
+                            <button class="btn btn-secondary w-full" id="pricingFreeBtn" onclick="window.location.href='../index.html'" data-i18n="pricing.free.btn">
                                 Započni besplatno
                             </button>
                         </div>
                     </div>
 
-                    <!-- PRO BOOSTER -->
+                    <!-- PRO -->
                     <div class="pricing-card popular" id="pricing-pro">
                         <div class="popular-ribbon" data-i18n="pricing.popular">
                             POPULARNO
                         </div>
                         <div class="p-card-header">
-                            <h3 class="p-title">PRO</h3>
+                            <h3 class="p-title" data-i18n="pricing.pro.title">PRO</h3>
                             <div class="p-price">
-                                <span class="p-currency">€</span>5
+                                <span class="p-currency">$</span>9.99
                                 <span class="p-period" data-i18n="pricing.period">/ mesečno</span>
+                            </div>
+                            <div class="p-price-monthly">
+                                <span class="strike-price">$9.99/mes</span>
+                                <span class="save-info" data-i18n="pricing.freeMonths">• 2 meseca besplatno</span>
                             </div>
                             <p class="p-desc" data-i18n="pricing.pro.desc">
                                 Sve što je potrebno ozbiljnom strimeru za brzi rast kanala i punu interakciju.
@@ -711,64 +784,111 @@
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.pro.f1">Napredni <strong>kickot</strong> bot</span>
+                                        <span data-i18n="pricing.pro.kickotChatbot">Napredni <strong>Kickot</strong> Chatbot</span>
                                     </span>
-                                    <span class="p-tag-active" data-i18n="modules.active">AKTIVNO</span>
+                                    <span class="p-tag-active" data-i18n="pricing.active">AKTIVNO</span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.pro.f2">Sve čet mini igre i komande</span>
+                                        <span data-i18n="pricing.pro.kickajGiveaway"><strong>Kickaj</strong> Giveaway</span>
+                                    </span>
+                                    <span class="p-tag-soon" data-i18n="pricing.soon">USKORO</span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.kickanAnalytics"><strong>Kickan</strong> Analitika</span>
+                                    </span>
+                                    <span class="p-tag-soon" data-i18n="pricing.soon">USKORO</span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.kickovOverlays"><strong>Kickov</strong> Overlayevi</span>
+                                    </span>
+                                    <span class="p-tag-soon" data-i18n="pricing.soon">USKORO</span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.leaderboard">Leaderboard</span>
                                     </span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.pro.f3"><strong>kickaj</strong> giveaway sistem</span>
-                                    </span>
-                                    <span class="p-tag-soon" data-i18n="modules.soon">USKORO</span>
-                                </li>
-                                <li>
-                                    <span>
-                                        <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.pro.f4"><strong>kickov</strong> overleji</span>
-                                    </span>
-                                    <span class="p-tag-soon" data-i18n="modules.soon">USKORO</span>
-                                </li>
-                                <li>
-                                    <span>
-                                        <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.pro.f5">Osnovna mesečna analitika</span>
+                                        <span data-i18n="pricing.pro.customCommands">200 custom komandi</span>
                                     </span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.pro.f6">Prioritetna imejl podrška</span>
+                                        <span data-i18n="pricing.pro.autoMessages">50 automatskih poruka</span>
                                     </span>
                                 </li>
-                                <li class="p-disabled">
+                                <li>
                                     <span>
-                                        <span class="p-cross">✕</span>
-                                        <span data-i18n="pricing.pro.f7">Namenski VIP bot</span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.loveMarriage">Ljubav i brakovi</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.miniGames">Mini igre</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.songRequest">Song request</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.rankingSystem">Ranking sistem</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.moderation">Moderacija</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.customBotName">Custom bot ime</span>
+                                    </span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.pro.support">Podrška - putem emaila i discord-a</span>
                                     </span>
                                 </li>
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-primary w-full" id="pricingProBtn" onclick="openModal('login')" data-i18n="pricing.pro.btn">
-                                Izaberi Pro paket
+                            <button class="btn btn-primary w-full" id="pricingProBtn" onclick="window.location.href='../index.html'">
+                                <span class="btn-text" data-i18n="pricing.pro.btn">Izaberi Pro</span> - <span class="btn-price">$9.99/mes</span>
                             </button>
                         </div>
                     </div>
 
-                    <!-- ELITE VIP -->
+                    <!-- ELITE -->
                     <div class="pricing-card" id="pricing-elite">
                         <div class="p-card-header">
-                            <h3 class="p-title">ELITE</h3>
+                            <h3 class="p-title" data-i18n="pricing.elite.title">ELITE</h3>
                             <div class="p-price">
-                                <span class="p-currency">€</span>15
+                                <span class="p-currency">$</span>14.99
                                 <span class="p-period" data-i18n="pricing.period">/ mesečno</span>
+                            </div>
+                            <div class="p-price-monthly">
+                                <span class="strike-price">$14.99/mes</span>
+                                <span class="save-info" data-i18n="pricing.freeMonths">• 2 meseca besplatno</span>
                             </div>
                             <p class="p-desc" data-i18n="pricing.elite.desc">
                                 Za profesionalne strimere koji traže apsolutno najbolju tehnologiju i podršku.
@@ -779,57 +899,232 @@
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.elite.f1">Ceo ekosistem uključen</span>
+                                        <span data-i18n="pricing.elite.fullEcosystem">Pun <strong>KickALL</strong> ekosistem
+</span>
+                                    </span>
+                                    <span class="p-tag-active" data-i18n="pricing.active">AKTIVNO</span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.elite.unlimitedCommands">Neograničeno komanda
+</span>
                                     </span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.elite.f2"><strong>kickan</strong> detaljna analitika</span>
-                                    </span>
-                                    <span class="p-tag-soon" data-i18n="modules.soon">USKORO</span>
-                                </li>
-                                <li>
-                                    <span>
-                                        <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.elite.f3">Namenski VIP bot sa tvojim imenom</span>
+                                        <span data-i18n="pricing.elite.unlimitedMessages">Neograničeno automatskih poruka
+</span>
                                     </span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.elite.f4">Neograničen broj vidžeta i alertova</span>
+                                        <span data-i18n="pricing.elite.personalSetup"><strong>Ja</strong> lično nameštam bota umesto tebe</span>
+                                    </span>
+                                    <span class="p-tag-vip" data-i18n="pricing.vip">VIP</span>
+                                </li>
+                                <li>
+                                    <span>
+                                        <span class="p-check">✓</span>
+                                        <span data-i18n="pricing.elite.customBotVip">Custom bot (VIP + Lično podešavanje)</span>
                                     </span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.elite.f5">VIP imejl status podrške</span>
+                                        <span data-i18n="pricing.elite.eliteSupport">Elitna podrška putem WhatsApp-a</span>
                                     </span>
-                                </li>
-                                <li>
-                                    <span>
-                                        <span class="p-check">✓</span>
-                                        <strong data-i18n="pricing.elite.f6">Neprekidna podrška uz brzi odziv</strong>
-                                    </span>
-                                </li>
-                                <li>
-                                    <span>
-                                        <span class="p-check">✓</span>
-                                        <span data-i18n="pricing.elite.f7">Individualne sesije podešavanja strima</span>
-                                    </span>
+                                    <span class="p-tag-vip" data-i18n="pricing.vip">VIP</span>
                                 </li>
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-secondary w-full" id="pricingEliteBtn" onclick="openModal('login')" data-i18n="pricing.elite.btn">
-                                Izaberi Elite VIP
+                            <button class="btn btn-secondary w-full" id="pricingEliteBtn" onclick="window.location.href='../index.html'">
+                                <span class="btn-text" data-i18n="pricing.elite.btn">Izaberi Elite</span> - <span class="btn-price">$14.99/mes</span>
                             </button>
                         </div>
                     </div>
                 </div>
+                
+                <!-- Godišnja ušteda info -->
+                <div class="pricing-annual-note">
+                    <p data-i18n="pricing.annualNote">💰 <strong>2 meseca besplatno</strong> uz godišnju pretplatu! Pro: $99.99/god | Elite: $149.99/god</p>
+                </div>
             </div>
         </section>
+
+        <script>
+            // Pricing Toggle Functionality
+            const monthlyPrices = {
+                free: '$0',
+                pro: '$9.99',
+                elite: '$14.99'
+            };
+
+            const yearlyPrices = {
+                free: '$0',
+                pro: '$99.99',
+                elite: '$149.99'
+            };
+
+            function setPricingPeriod(period) {
+                const monthlyBtn = document.getElementById('monthlyBtn');
+                const yearlyBtn = document.getElementById('yearlyBtn');
+                const proPrice = document.querySelector('#pricing-pro .p-price');
+                const elitePrice = document.querySelector('#pricing-elite .p-price');
+                const proMonthlyStrike = document.querySelector('#pricing-pro .p-price-monthly');
+                const eliteMonthlyStrike = document.querySelector('#pricing-elite .p-price-monthly');
+                const proBtnPrice = document.querySelector('#pricingProBtn .btn-price');
+                const eliteBtnPrice = document.querySelector('#pricingEliteBtn .btn-price');
+                const annualNote = document.querySelector('.pricing-annual-note p');
+                
+                // Get translations based on current language
+                const lang = document.documentElement.lang || 'sr';
+                const periodText = window.translations?.pricing?.period || (lang === 'en' ? '/ month' : '/ mesečno');
+                const monthlyText = window.translations?.pricing?.freeMonths || (lang === 'en' ? '• 2 months free' : '• 2 meseca besplatno');
+                const yearlyNote = window.translations?.pricing?.annualNote || (lang === 'en' ? '💰 <strong>2 months free</strong> with yearly subscription! Pro: $99.99/year | Elite: $149.99/year' : '💰 <strong>2 meseca besplatno</strong> uz godišnju pretplatu! Pro: $99.99/god | Elite: $149.99/god');
+                const yearlyNoteYearly = window.translations?.pricing?.annualNoteYearly || (lang === 'en' ? '💰 <strong>Save 2 months</strong> with yearly subscription!' : '💰 <strong>Ušteda 2 meseca</strong> uz godišnju pretplatu!');
+                const monthlySuffix = lang === 'en' ? '/mo' : '/mes';
+                const yearlySuffix = lang === 'en' ? '/year' : '/god';
+
+                if (period === 'monthly') {
+                    monthlyBtn.classList.add('active');
+                    yearlyBtn.classList.remove('active');
+                    
+                    if (proPrice) {
+                        proPrice.innerHTML = `<span class="p-currency">$</span>9.99<span class="p-period">${periodText}</span>`;
+                    }
+                    if (elitePrice) {
+                        elitePrice.innerHTML = `<span class="p-currency">$</span>14.99<span class="p-period">${periodText}</span>`;
+                    }
+                    if (proMonthlyStrike) {
+                        proMonthlyStrike.classList.remove('show');
+                        proMonthlyStrike.querySelector('.strike-price').textContent = `$9.99${monthlySuffix}`;
+                        proMonthlyStrike.querySelector('.save-info').textContent = monthlyText;
+                    }
+                    if (eliteMonthlyStrike) {
+                        eliteMonthlyStrike.classList.remove('show');
+                        eliteMonthlyStrike.querySelector('.strike-price').textContent = `$14.99${monthlySuffix}`;
+                        eliteMonthlyStrike.querySelector('.save-info').textContent = monthlyText;
+                    }
+                    if (proBtnPrice) {
+                        proBtnPrice.textContent = `$9.99${monthlySuffix}`;
+                    }
+                    if (eliteBtnPrice) {
+                        eliteBtnPrice.textContent = `$14.99${monthlySuffix}`;
+                    }
+                    
+                    // Update button texts for price
+                    const proBtn = document.getElementById('pricingProBtn');
+                    const eliteBtn = document.getElementById('pricingEliteBtn');
+                    const freeBtn = document.getElementById('pricingFreeBtn');
+                    if (freeBtn) {
+                        const btnText = window.translations?.pricing?.free?.btn || (lang === 'en' ? 'Start for free' : 'Započni besplatno');
+                        freeBtn.textContent = btnText;
+                    }
+                    if (proBtn) {
+                        const btnText = window.translations?.pricing?.pro?.btn || (lang === 'en' ? 'Choose Pro' : 'Izaberi Pro');
+                        const btnTextElement = proBtn.querySelector('.btn-text');
+                        if (btnTextElement) {
+                            btnTextElement.textContent = btnText;
+                        }
+                        const priceText = `$9.99${monthlySuffix}`;
+                        const priceElement = proBtn.querySelector('.btn-price');
+                        if (priceElement) {
+                            priceElement.textContent = priceText;
+                        }
+                    }
+                    if (eliteBtn) {
+                        const btnText = window.translations?.pricing?.elite?.btn || (lang === 'en' ? 'Choose Elite' : 'Izaberi Elite');
+                        const btnTextElement = eliteBtn.querySelector('.btn-text');
+                        if (btnTextElement) {
+                            btnTextElement.textContent = btnText;
+                        }
+                        const priceText = `$14.99${monthlySuffix}`;
+                        const priceElement = eliteBtn.querySelector('.btn-price');
+                        if (priceElement) {
+                            priceElement.textContent = priceText;
+                        }
+                    }
+                    if (annualNote) {
+                        annualNote.innerHTML = yearlyNote;
+                    }
+                } else {
+                    yearlyBtn.classList.add('active');
+                    monthlyBtn.classList.remove('active');
+                    
+                    if (proPrice) {
+                        proPrice.innerHTML = `<span class="p-currency">$</span>99.99<span class="p-period">${yearlySuffix}</span>`;
+                    }
+                    if (elitePrice) {
+                        elitePrice.innerHTML = `<span class="p-currency">$</span>149.99<span class="p-period">${yearlySuffix}</span>`;
+                    }
+                    if (proMonthlyStrike) {
+                        proMonthlyStrike.classList.add('show');
+                        proMonthlyStrike.querySelector('.strike-price').textContent = `$9.99${monthlySuffix}`;
+                        proMonthlyStrike.querySelector('.save-info').textContent = monthlyText;
+                    }
+                    if (eliteMonthlyStrike) {
+                        eliteMonthlyStrike.classList.add('show');
+                        eliteMonthlyStrike.querySelector('.strike-price').textContent = `$14.99${monthlySuffix}`;
+                        eliteMonthlyStrike.querySelector('.save-info').textContent = monthlyText;
+                    }
+                    if (proBtnPrice) {
+                        proBtnPrice.textContent = `$99.99${yearlySuffix}`;
+                    }
+                    if (eliteBtnPrice) {
+                        eliteBtnPrice.textContent = `$149.99${yearlySuffix}`;
+                    }
+                    
+                    // Update button texts for price
+                    const proBtn = document.getElementById('pricingProBtn');
+                    const eliteBtn = document.getElementById('pricingEliteBtn');
+                    const freeBtn = document.getElementById('pricingFreeBtn');
+                    if (freeBtn) {
+                        const btnText = window.translations?.pricing?.free?.btn || (lang === 'en' ? 'Start for free' : 'Započni besplatno');
+                        freeBtn.textContent = btnText;
+                    }
+                    if (proBtn) {
+                        const btnText = window.translations?.pricing?.pro?.btn || (lang === 'en' ? 'Choose Pro' : 'Izaberi Pro');
+                        const btnTextElement = proBtn.querySelector('.btn-text');
+                        if (btnTextElement) {
+                            btnTextElement.textContent = btnText;
+                        }
+                        const priceText = `$99.99${yearlySuffix}`;
+                        const priceElement = proBtn.querySelector('.btn-price');
+                        if (priceElement) {
+                            priceElement.textContent = priceText;
+                        }
+                    }
+                    if (eliteBtn) {
+                        const btnText = window.translations?.pricing?.elite?.btn || (lang === 'en' ? 'Choose Elite' : 'Izaberi Elite');
+                        const btnTextElement = eliteBtn.querySelector('.btn-text');
+                        if (btnTextElement) {
+                            btnTextElement.textContent = btnText;
+                        }
+                        const priceText = `$149.99${yearlySuffix}`;
+                        const priceElement = eliteBtn.querySelector('.btn-price');
+                        if (priceElement) {
+                            priceElement.textContent = priceText;
+                        }
+                    }
+                    if (annualNote) {
+                        annualNote.innerHTML = yearlyNoteYearly;
+                    }
+                }
+            }
+            
+            // Listen for language changes and update pricing
+            document.addEventListener('pricingLanguageChanged', function(event) {
+                const monthlyBtn = document.getElementById('monthlyBtn');
+                const yearlyBtn = document.getElementById('yearlyBtn');
+                const currentPeriod = (monthlyBtn && monthlyBtn.classList.contains('active')) ? 'monthly' : 'yearly';
+
+                setPricingPeriod(currentPeriod);
+            });
+        </script>
 
         <!-- ══════════════ CTA SECTION ══════════════ -->
         <section class="cta-section" id="cta">
@@ -877,19 +1172,19 @@
                     Moćan i pouzdan chatbot za Kick platformu. Deo kompletnog KickALL ekosistema alata za strimere.
                 </p>
                 <p class="footer-contact-info">
-                    <span>Kontakt email:</span> <a href="mailto:contact@milanwebportal.com">contact@milanwebportal.com</a>
+                    <span data-i18n="footer.contact">Kontakt email:</span> <a href="mailto:contact@milanwebportal.com">contact@milanwebportal.com</a>
                 </p>
             </div>
             <div class="footer-links-group">
                 <div class="footer-column">
-                    <h4 data-i18n="footer.productsTitle">Proizvodi</h4>
+                    <h3 data-i18n="footer.productsTitle">Proizvodi</h3>
                     <a href="index.html">Kickot</a>
                     <a href="../index.html#playground" class="footer-tab-trigger" data-target-tab="kickaj">Kickaj</a>
                     <a href="../index.html#playground" class="footer-tab-trigger" data-target-tab="kickan">Kickan</a>
                     <a href="../index.html#playground" class="footer-tab-trigger" data-target-tab="kickov">Kickov</a>
                 </div>
                 <div class="footer-column">
-                    <h4 data-i18n="footer.socialTitle">Socijalne mreže</h4>
+                    <h3 data-i18n="footer.socialTitle">Socijalne mreže</h3>
                     <a href="https://milanwebportal.com" target="_blank" rel="noopener">Website</a>
                     <a href="https://instagram.com/milanwebportal" target="_blank" rel="noopener">Instagram</a>
                     <a href="https://tiktok.com/@milanwebportal" target="_blank" rel="noopener">TikTok</a>
@@ -897,25 +1192,25 @@
                     <a href="https://paypal.me/milanwebportal" target="_blank" rel="noopener">PayPal</a>
                 </div>
                 <div class="footer-column">
-                    <h4 data-i18n="footer.shortcutsTitle">Prečice</h4>
-                    <a href="#features">Funkcije</a>
-                    <a href="#commands">Isprobaj</a>
-                    <a href="#pricing">Cene</a>
+                    <h3 data-i18n="footer.shortcutsTitle">Prečice</h3>
+                    <a href="#features" data-i18n="footer.shortcutFeatures">Funkcije</a>
+                    <a href="#commands" data-i18n="footer.shortcutTry">Isprobaj</a>
+                    <a href="#pricing" data-i18n="footer.shortcutPricing">Cene</a>
                 </div>
             </div>
         </div>
         <div class="footer-bottom">
             <div class="container footer-bottom-container">
                 <div class="footer-bottom-left">
-                    &copy; 2026 KickALL / Kickot. Sva prava zadržana.
+                    &copy; 2026 KickALL / Kickot. <span data-i18n="footer.rights">Sva prava zadržana.</span>
                 </div>
                 <div class="footer-bottom-center">
-                    Napravio <a href="https://milanwebportal.com" target="_blank" rel="noopener">milanwebportal.com</a>
+                    <span data-i18n="footer.createdBy">Napravio</span> <a href="https://milanwebportal.com" target="_blank" rel="noopener">milanwebportal.com</a>
                 </div>
                 <div class="footer-bottom-right">
-                    <a href="../privacy.html">Privatnost</a>
+                    <a href="../privacy.html" data-i18n="footer.privacy">Privatnost</a>
                     <span class="dot-sep">•</span>
-                    <a href="../terms.html">Uslovi</a>
+                    <a href="../terms.html" data-i18n="footer.terms">Uslovi</a>
                 </div>
             </div>
         </div>
@@ -1019,7 +1314,7 @@
     </div>
 
     <!-- ══════════════ TOAST CONTAINER ══════════════ -->
-    <div class="toast-container" id="toastContainer"></div>
+    <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
     <!-- Back to Top Floating Button -->
     <button type="button" class="back-to-top-btn" id="backToTopBtn" aria-label="Nazad na vrh">
@@ -1029,6 +1324,12 @@
     </button>
 
     <script src="js/app.js"></script>
+  
+  <!-- KickALL Data Layer & Analytics -->
+  <script src="../js/data-layer.js"></script>
+  <script src="../js/route-tracking.js"></script>
+  <script src="../js/consent-banner.js"></script>
+  <script src="../js/analytics.js"></script>
 </body>
 
 </html>

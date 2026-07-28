@@ -75,33 +75,43 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function setLanguage(lang) {
-        currentLang = lang;
-        if (lang === 'en') {
-            try {
-                localStorage.setItem('kickall_lang', 'en');
-            } catch (e) {
-                console.warn('LocalStorage not available:', e);
-            }
-            if (btnEn) btnEn.classList.add('active');
-            if (btnSr) btnSr.classList.remove('active');
-        } else {
-            try {
-                localStorage.setItem('kickall_lang', 'sr');
-            } catch (e) {
-                console.warn('LocalStorage not available:', e);
-            }
-            if (btnSr) btnSr.classList.add('active');
-            if (btnEn) btnEn.classList.remove('active');
-        }
-        loadTranslations(lang);
+async function setLanguage(lang) {
+    const oldLang = currentLang; // Capture previous language
+    currentLang = lang;
+    document.documentElement.lang = lang;
+    
+    try {
+        localStorage.setItem('kickall_lang', lang);
+    } catch (e) {
+        console.warn('LocalStorage not available:', e);
     }
+
+    if (btnEn && btnSr) {
+        btnEn.classList.toggle('active', lang === 'en');
+        btnSr.classList.toggle('active', lang === 'sr');
+    }
+
+    // Track language change
+    if (window.KickALLAnalytics) {
+        window.KickALLAnalytics.trackLanguageChange(oldLang, lang);
+    }
+
+    await loadTranslations(lang);
+    checkAuthSession(); // Osvežava dinamične kartice i dugmad na novom jeziku
+    
+    // Dispatch language change event for consent banner and pricing updates
+    document.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lang } }));
+    
+    // Additional event specifically for pricing updates
+    document.dispatchEvent(new CustomEvent('pricingLanguageChanged', { detail: { language: lang } }));
+}
 
     async function loadTranslations(lang) {
         try {
-            const res = await fetch(`locales/${lang}.json`);
+            const res = await fetch(`/locales/${lang}.json`);
             if (res.ok) {
                 const data = await res.json();
+                window.translations = data;
                 applyTranslations(data);
             } else {
                 console.warn(`Failed to load translations for ${lang}: HTTP ${res.status}`);
@@ -121,6 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 elements.forEach(el => {
                     if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
                         el.placeholder = obj[key];
+                    } else if (el.classList.contains('btn-text') || !/<[a-z][\s\S]*>/i.test(obj[key])) {
+                        el.textContent = obj[key];
                     } else {
                         el.innerHTML = obj[key];
                     }
@@ -430,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     quickCmdBadges.forEach(badge => {
         badge.addEventListener('click', () => {
-            const cmd = badge.getAttribute('data-cmd');
+            const cmd = badge.textContent.trim();
             const t = window.translations || {};
             const chatSim = t.chatSim || {};
             const viewerName = chatSim.viewer || 'Gledalac';
@@ -517,7 +529,7 @@ document.addEventListener('DOMContentLoaded', () => {
             addChatMessage(botName, responseText, true);
             playSynthSound(440, 'sine', 0.2);
 
-        } else if (cmd === '!vreme') {
+        } else if (cmd === '!vreme' || cmd === '!weather') {
             const weatherText = chatSim.weather || '🌍 Weather in Belgrade: ⛅ Partly cloudy | 🌡️ 26°C (feels like 25°C) | 💧 Humidity: 32% | 💨 Wind: 22 km/h';
             addChatMessage(botName, weatherText, true);
             playSynthSound(500, 'sine', 0.2);
@@ -1007,6 +1019,16 @@ if (window.location.search.includes('action=logout')) {
 }
 
 async function handleLogout() {
+    // Track logout event
+    if (window.KickALLDataLayer) {
+        window.KickALLDataLayer.trackLogout({
+            method: 'kick_oauth'
+        });
+        window.KickALLDataLayer.setUserProperties({
+            user_type: 'guest'
+        });
+    }
+
     try {
         let korisnikId = null;
         if (typeof sb !== 'undefined' && sb && sb.auth) {
@@ -1222,21 +1244,29 @@ window.addEventListener('storage', (event) => {
             // Update CTA button for logged-in user
             const ctaKickLoginBtnEl = document.getElementById('ctaKickLoginBtn');
             if (ctaKickLoginBtnEl) {
+                const t = window.translations || {};
+                const userProfile = t.userProfile || {};
+                const isEn = currentLang === 'en';
+                const goToDashboardText = userProfile.goToDashboard || (isEn ? 'Go to Dashboard' : 'Idi na Dashboard');
                 ctaKickLoginBtnEl.innerHTML = `
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
                         <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
                     </svg>
-                    <span>Idi na Dashboard</span>
+                    <span>${goToDashboardText}</span>
                 `;
             }
 
             // Update Free Plan button for logged-in user
             const pricingFreeBtnEl = document.getElementById('pricingFreeBtn');
             if (pricingFreeBtnEl) {
+                const t = window.translations || {};
+                const userProfile = t.userProfile || {};
+                const isEn = currentLang === 'en';
+                const goToDashboardText = userProfile.goToDashboard || (isEn ? 'Go to Dashboard' : 'Idi na Dashboard');
                 pricingFreeBtnEl.href = 'dashboard.html';
                 pricingFreeBtnEl.innerHTML = `
-                    <span>Idi na Dashboard</span>
+                    <span>${goToDashboardText}</span>
                 `;
             }
 
@@ -1439,6 +1469,14 @@ window.addEventListener('storage', (event) => {
     }
 
     async function openKickLogin() {
+        // Track auth event start
+        if (window.KickALLDataLayer) {
+            window.KickALLDataLayer.trackLogin({
+                method: 'kick_oauth',
+                auth_type: 'oauth_start'
+            });
+        }
+
         // 1. Jasno postavi origin site i target stranicu
         try {
             sessionStorage.setItem('kick_origin_site', 'kickall');
@@ -1560,6 +1598,19 @@ window.addEventListener('storage', (event) => {
                 if (window.toastSystem) {
                     window.toastSystem.success('Uspešna prijava! Preusmeravanje na dashboard...');
                 }
+                
+                // Track successful auth
+                if (window.KickALLDataLayer) {
+                    window.KickALLDataLayer.trackLogin({
+                        method: 'kick_oauth',
+                        auth_type: 'oauth_success',
+                        user_id: user?.id
+                    });
+                    window.KickALLDataLayer.setUserProperties({
+                        user_type: 'authenticated'
+                    });
+                }
+                
                 window.location.href = 'dashboard.html';
                 
             } catch (fetchErr) {

@@ -1,5 +1,5 @@
 // KickALL Service Worker for PWA functionality
-const CACHE_NAME = 'kickall-v1';
+const CACHE_NAME = 'kickall-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -47,7 +47,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - network-first for HTML, cache-first for static assets
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') {
@@ -77,23 +77,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request)
-      .then((cachedResponse) => {
-        // Return cached version if available
-        if (cachedResponse) {
-          return cachedResponse;
-        }
+  // Check if this is an HTML file
+  const isHtmlRequest = event.request.headers.get('accept') && 
+                        event.request.headers.get('accept').includes('text/html');
 
-        // Otherwise fetch from network
-        return fetch(event.request)
-          .then((response) => {
-            // Don't cache if not successful
-            if (!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // Clone response to cache
+  if (isHtmlRequest) {
+    // Network-first strategy for HTML files
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Cache the fresh response
+          if (response && response.status === 200) {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME)
               .then((cache) => {
@@ -102,29 +96,83 @@ self.addEventListener('fetch', (event) => {
               .catch(err => {
                 // Silently fail cache errors
               });
-
-            return response;
-          })
-          .catch((error) => {
-            // Return offline fallback for HTML pages
-            if (event.request.headers.get('accept') && 
-                event.request.headers.get('accept').includes('text/html')) {
+          }
+          return response;
+        })
+        .catch((error) => {
+          // Fallback to cache if network fails
+          return caches.match(event.request)
+            .then((cachedResponse) => {
+              if (cachedResponse) {
+                return cachedResponse;
+              }
+              // Ultimate fallback to index.html
               return caches.match('/index.html');
-            }
-            // Return offline fallback for CSS/JS
-            if (event.request.url.endsWith('.css') || 
-                event.request.url.endsWith('.js')) {
-              return new Response('Offline - Resource not available', {
-                status: 503,
-                headers: { 'Content-Type': 'text/plain' }
+            });
+        })
+    );
+  } else {
+    // Cache-first strategy for static assets (CSS, JS, images)
+    event.respondWith(
+      caches.match(event.request)
+        .then((cachedResponse) => {
+          if (cachedResponse) {
+            // Try to update cache in background
+            fetch(event.request)
+              .then((response) => {
+                if (response && response.status === 200) {
+                  const responseToCache = response.clone();
+                  caches.open(CACHE_NAME)
+                    .then((cache) => {
+                      cache.put(event.request, responseToCache);
+                    })
+                    .catch(err => {
+                      // Silently fail cache errors
+                    });
+                }
+              })
+              .catch(() => {
+                // Ignore network errors, serve cached version
               });
-            }
-          });
-      })
-      .catch((error) => {
-        return fetch(event.request);
-      })
-  );
+            return cachedResponse;
+          }
+
+          // Not in cache, fetch from network
+          return fetch(event.request)
+            .then((response) => {
+              // Don't cache if not successful
+              if (!response || response.status !== 200 || response.type !== 'basic') {
+                return response;
+              }
+
+              // Clone response to cache
+              const responseToCache = response.clone();
+              caches.open(CACHE_NAME)
+                .then((cache) => {
+                  cache.put(event.request, responseToCache);
+                })
+                .catch(err => {
+                  // Silently fail cache errors
+                });
+
+              return response;
+            })
+            .catch((error) => {
+              // Return offline fallback for CSS/JS
+              if (event.request.url.endsWith('.css') || 
+                  event.request.url.endsWith('.js')) {
+                return new Response('Offline - Resource not available', {
+                  status: 503,
+                  headers: { 'Content-Type': 'text/plain' }
+                });
+              }
+            });
+        })
+        .catch((error) => {
+          return fetch(event.request);
+        })
+    );
+  }
 });
 
 // Handle background sync for offline actions

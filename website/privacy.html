@@ -27,6 +27,17 @@
   <link rel="alternate" hreflang="en" href="https://kickall.app/en/privacy.html">
   <link rel="alternate" hreflang="x-default" href="https://kickall.app/privacy.html">
   
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZNGNF6TEM"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KZNGNF6TEM');
+  </script>
+  <!-- End Google Analytics -->
+
   <!-- Network Optimization -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -174,7 +185,6 @@
 
     .back-link {
       display: inline-block;
-      margin-bottom: 30px;
       color: rgba(255, 255, 255, 0.5);
       text-decoration: none;
       font-weight: 500;
@@ -318,7 +328,6 @@
 
       .back-link {
         font-size: 0.9rem;
-        margin-bottom: 24px;
       }
 
       p {
@@ -386,7 +395,7 @@
 
       .back-link {
         font-size: 0.85rem;
-        margin-bottom: 20px;
+        margin-bottom: 0;
       }
 
       p {
@@ -491,31 +500,38 @@
   </style>
 </head>
 <body>
-  <div class="container">
-    <a href="index.html" class="back-link">← Nazad na početnu</a>
+  <main role="main">
+    <div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <a href="index.html" class="back-link" data-i18n="privacy.backLink">← Nazad na početnu</a>
+      <div style="display: flex; gap: 8px;">
+        <button class="lang-btn" id="btn-sr" style="background: none; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 12px; cursor: pointer;">SR</button>
+        <button class="lang-btn" id="btn-en" style="background: none; border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 12px; cursor: pointer;">EN</button>
+      </div>
+    </div>
 
-    <h1>Politika Privatnosti</h1>
-    <p>Poslednja ažuriranje: <span class="highlight">1. Avgust 2026.</span></p>
+    <h1 data-i18n="privacy.title">Politika Privatnosti</h1>
+    <p data-i18n="privacy.lastUpdated">Poslednja ažuriranje: <span class="highlight">1. Avgust 2026.</span></p>
 
-    <h2>1. Uvod</h2>
-    <p>KickALL ("mi", "naša služba") se obavezuje da zaštiti privatnost korisnika. Ova politika privatnosti opisuje kako prikupljamo, koristimo i čuvamo vaše lične podatke kada koristite našu platformu.</p>
+    <h2 data-i18n="privacy.section1">1. Uvod</h2>
+    <p data-i18n="privacy.intro">KickALL ("mi", "naša služba") se obavezuje da zaštiti privatnost korisnika. Ova politika privatnosti opisuje kako prikupljamo, koristimo i čuvamo vaše lične podatke kada koristite našu platformu.</p>
 
-    <h2>2. Podaci koje prikupljamo</h2>
-    <h3>2.1. Podaci koje pružate</h3>
+    <h2 data-i18n="privacy.section2">2. Podaci koje prikupljamo</h2>
+    <h3 data-i18n="privacy.section2_1">2.1. Podaci koje pružate</h3>
     <ul>
-      <li><span class="highlight">Kick OAuth podaci:</span> Pristup vašem Kick nalogu (username, avatar, chatroom_id) nakon autorizacije</li>
-      <li><span class="highlight">Supabase autentifikacija:</span> Email adresa i lozinka (enkriptovana)</li>
-      <li><span class="highlight">Referral podaci:</span> Referral kodovi i statistika pozivanja</li>
+      <li data-i18n="privacy.data1"><span class="highlight">Kick OAuth podaci:</span> Pristup vašem Kick nalogu (username, avatar, chatroom_id) nakon autorizacije</li>
+      <li data-i18n="privacy.data2"><span class="highlight">Supabase autentifikacija:</span> Email adresa i lozinka (enkriptovana)</li>
+      <li data-i18n="privacy.data3"><span class="highlight">Referral podaci:</span> Referral kodovi i statistika pozivanja</li>
     </ul>
 
-    <h3>2.2. Automatski prikupljeni podaci</h3>
+    <h3 data-i18n="privacy.section2_2">2.2. Automatski prikupljeni podaci</h3>
     <ul>
-      <li>IP adresa i lokacija (za bezbednost i prevenciju zloupotrebe)</li>
-      <li>Informacije o uređaju i browser-u</li>
-      <li>Korišćenje funkcionalnosti (bot komande, dashboard aktivnost)</li>
+      <li data-i18n="privacy.autoData1">IP adresa i lokacija (za bezbednost i prevenciju zloupotrebe)</li>
+      <li data-i18n="privacy.autoData2">Informacije o uređaju i browser-u</li>
+      <li data-i18n="privacy.autoData3">Korišćenje funkcionalnosti (bot komande, dashboard aktivnost)</li>
     </ul>
 
-    <h2>3. Kako koristimo vaše podatke</h2>
+    <h2 data-i18n="privacy.section3">3. Kako koristimo vaše podatke</h2>
     <ul>
       <li><span class="highlight">Pružanje usluge:</span> Omogućavanje rada KickALL chatbota i dashboard-a</li>
       <li><span class="highlight">Autentifikacija:</span> Verifikacija korisničkog naloga preko Kick OAuth-a</li>
@@ -524,234 +540,291 @@
       <li><span class="highlight">Referral program:</span> Praćenje i isplata nagrada</li>
     </ul>
 
-    <h2>4. Deljenje podataka</h2>
-    <p>Vaši podaci se <span class="highlight">NE dele</span> sa trećim licima za marketinške svrhe. Deljenje podataka se vrši samo u sledećim slučajevima:</p>
+    <h2 data-i18n="privacy.section4">4. Deljenje podataka</h2>
+    <p data-i18n="privacy.sharingIntro">Vaši podaci se <span class="highlight">NE dele</span> sa trećim licima za marketinške svrhe. Deljenje podataka se vrši samo u sledećim slučajevima:</p>
     <ul>
-      <li><span class="highlight">Kick API:</span> Neophodno za funkcionisanje chatbota (samo username, avatar, chatroom_id)</li>
-      <li><span class="highlight">Supabase:</span> Cloud baza podataka za čuvanje korisničkih naloga</li>
-      <li><span class="highlight">Zakonske obaveze:</span> Ako to zahteva zakon ili sudski nalog</li>
+      <li data-i18n="privacy.sharing1"><span class="highlight">Kick API:</span> Neophodno za funkcionisanje chatbota (samo username, avatar, chatroom_id)</li>
+      <li data-i18n="privacy.sharing2"><span class="highlight">Supabase:</span> Cloud baza podataka za čuvanje korisničkih naloga</li>
+      <li data-i18n="privacy.sharing3"><span class="highlight">Zakonske obaveze:</span> Ako to zahteva zakon ili sudski nalog</li>
     </ul>
 
     <div class="warning">
-      <p><strong><span class="icon-warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>VAŽNO:</strong> Vaša lozinka se čuva samo u enkriptovanom obliku i nikada se ne deli. Kick OAuth tokeni se čuvaju sigurno u localStorage/sessionStorage.</p>
+      <p data-i18n="privacy.warning1"><strong><span class="icon-warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>VAŽNO:</strong> Vaša lozinka se čuva samo u enkriptovanom obliku i nikada se ne deli. Kick OAuth tokeni se čuvaju sigurno u localStorage/sessionStorage.</p>
     </div>
 
-    <h2>5. Čuvanje podataka</h2>
+    <h2 data-i18n="privacy.section5">5. Čuvanje podataka</h2>
     <ul>
-      <li>Korisnički nalozi se čuvaju dok ne zatražite brisanje</li>
-      <li>OAuth tokeni se čuvaju u browser-u (localStorage/sessionStorage)</li>
-      <li>Referral statistika se čuva za potrebe programa</li>
-      <li>Logovi se čuvaju 90 dana za bezbednosne svrhe</li>
+      <li data-i18n="privacy.retention1">Korisnički nalozi se čuvaju dok ne zatražite brisanje</li>
+      <li data-i18n="privacy.retention2">OAuth tokeni se čuvaju u browser-u (localStorage/sessionStorage)</li>
+      <li data-i18n="privacy.retention3">Referral statistika se čuva za potrebe programa</li>
+      <li data-i18n="privacy.retention4">Logovi se čuvaju 90 dana za bezbednosne svrhe</li>
     </ul>
 
-    <h2>6. Vaša prava</h2>
-    <p>Imate pravo da:</p>
+    <h2 data-i18n="privacy.section6">6. Vaša prava</h2>
+    <p data-i18n="privacy.rightsIntro">Imate pravo da:</p>
     <ul>
-      <li>Pristupite svojim podacima</li>
-      <li>Zatražite ispravku ili brisanje podataka</li>
-      <li>Opozovete saglasnost za korišćenje podataka</li>
-      <li>Podnesete žalbu nadležnom organu za zaštitu podataka</li>
+      <li data-i18n="privacy.right1">Pristupite svojim podacima</li>
+      <li data-i18n="privacy.right2">Zatražite ispravku ili brisanje podataka</li>
+      <li data-i18n="privacy.right3">Opozovete saglasnost za korišćenje podataka</li>
+      <li data-i18n="privacy.right4">Podnesete žalbu nadležnom organu za zaštitu podataka</li>
     </ul>
 
-    <h2>7. Bezbednost</h2>
-    <p>Primenjujemo moderne bezbednosne mere:</p>
+    <h2 data-i18n="privacy.section7">7. Bezbednost</h2>
+    <p data-i18n="privacy.securityIntro">Primenjujemo moderne bezbednosne mere:</p>
     <ul>
-      <li>SSL/TLS enkripcija za sve komunikacije</li>
-      <li>Enkriptovane lozinke (bcrypt)</li>
-      <li>OAuth 2.0 sa PKCE za Kick autentifikaciju</li>
-      <li>Regularni bezbednosni auditi</li>
+      <li data-i18n="privacy.security1">SSL/TLS enkripcija za sve komunikacije</li>
+      <li data-i18n="privacy.security2">Enkriptovane lozinke (bcrypt)</li>
+      <li data-i18n="privacy.security3">OAuth 2.0 sa PKCE za Kick autentifikaciju</li>
+      <li data-i18n="privacy.security4">Regularni bezbednosni auditi</li>
     </ul>
 
-    <h2>8. Promene ove politike</h2>
-    <p>Rezervišemo pravo da promenimo ovu politiku privatnosti. Korisnici će biti obavešteni o važnim promenama putem email-a ili obaveštenja na platformi.</p>
+    <h2 data-i18n="privacy.section8">8. Promene ove politike</h2>
+    <p data-i18n="privacy.changes">Rezervišemo pravo da promenimo ovu politiku privatnosti. Korisnici će biti obavešteni o važnim promenama putem email-a ili obaveštenja na platformi.</p>
 
-    <h2>9. Kontakt</h2>
-    <p>Za sva pitanja u vezi privatnosti, kontaktirajte nas na:</p>
-    <p><span class="highlight">Email:</span> contact@milanwebportal.com</p>
-    <p><span class="highlight">Adresa:</span> KickALL, Beograd, Srbija</p>
+    <h2 data-i18n="privacy.section9">9. Kontakt</h2>
+    <p data-i18n="privacy.contactIntro">Za sva pitanja u vezi privatnosti, kontaktirajte nas na:</p>
+    <p data-i18n="privacy.contactEmail"><span class="highlight">Email:</span> contact@milanwebportal.com</p>
+    <p data-i18n="privacy.contactAddress"><span class="highlight">Adresa:</span> KickALL, Beograd, Srbija</p>
 
-    <h2>10. GDPR Usklađenost</h2>
-    <p>KickALL je usklađen sa Opštom regulativom o zaštiti podataka (GDPR) i lokalnim zakonima o zaštiti privatnosti.</p>
+    <h2 data-i18n="privacy.section10">10. GDPR Usklađenost</h2>
+    <p data-i18n='privacy.gdpr'>KickALL je usklađen sa Opštom regulativom o zaštiti podataka (GDPR) i lokalnim zakonima o zaštiti privatnosti.</p>
 
-    <h2>11. Cookies i Tracking</h2>
-    <h3>11.1. Kolačići koje koristimo</h3>
+    <h2 data-i18n="privacy.section11">11. Cookies i Tracking</h2>
+    <h3 data-i18n="privacy.section11_1">11.1. Kolačići koje koristimo</h3>
     <ul>
-      <li><span class="highlight">Neophodni kolačići:</span> Za autentifikaciju i sesiju (localStorage, sessionStorage)</li>
-      <li><span class="highlight">Analitički kolačići:</span> Za praćenje korišćenja i unapređenje usluge</li>
-      <li><span class="highlight">Funkcionalni kolačići:</span> Za pamćenje postavki i preferencija</li>
+      <li data-i18n="privacy.cookie1"><span class="highlight">Neophodni kolačići:</span> Za autentifikaciju i sesiju (localStorage, sessionStorage)</li>
+      <li data-i18n="privacy.cookie2"><span class="highlight">Analitički kolačići:</span> Za praćenje korišćenja i unapređenje usluge</li>
+      <li data-i18n="privacy.cookie3"><span class="highlight">Funkcionalni kolačići:</span> Za pamćenje postavki i preferencija</li>
     </ul>
 
-    <h3>11.2. Upravljanje kolačićima</h3>
+    <h3 data-i18n="privacy.section11_2">11.2. Upravljanje kolačićima</h3>
     <ul>
-      <li>Možete ugasiti kolačiće u browser postavkama</li>
-      <li>Gašenje kolačića može uticati na funkcionalnost usluge</li>
-      <li>Koristimo samo prve strane kolačiće (first-party cookies)</li>
+      <li data-i18n="privacy.cookieManage1">Možete ugasiti kolačiće u browser postavkama</li>
+      <li data-i18n="privacy.cookieManage2">Gašenje kolačića može uticati na funkcionalnost usluge</li>
+      <li data-i18n="privacy.cookieManage3">Koristimo samo prve strane kolačiće (first-party cookies)</li>
     </ul>
 
-    <h2>12. Deca i maloletnici</h2>
+    <h2 data-i18n="privacy.section12">12. Deca i maloletnici</h2>
     <ul>
-      <li>KickALL nije namenjen deci mlađim od 13 godina</li>
-      <li>Nemojte nam slati lične podatke dece</li>
-      <li>Ako otkrijemo da smo prikupili podatke dece, brišemo ih odmah</li>
-      <li>Roditelji mogu zatražiti brisanje podataka svoje dece</li>
+      <li data-i18n="privacy.children1">KickALL nije namenjen deci mlađim od 13 godina</li>
+      <li data-i18n="privacy.children2">Nemojte nam slati lične podatke dece</li>
+      <li data-i18n="privacy.children3">Ako otkrijemo da smo prikupili podatke dece, brišemo ih odmah</li>
+      <li data-i18n="privacy.children4">Roditelji mogu zatražiti brisanje podataka svoje dece</li>
     </ul>
 
     <div class="warning">
-      <p><strong><span class="icon-warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>VAŽNO:</strong> Roditelji su odgovorni za nadzor korišćenja interneta od strane svoje dece.</p>
+      <p data-i18n="privacy.warning2"><strong><span class="icon-warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>VAŽNO:</strong> Roditelji su odgovorni za nadzor korišćenja interneta od strane svoje dece.</p>
     </div>
 
-    <h2>13. Marketing komunikacija</h2>
+    <h2 data-i18n="privacy.section13">13. Marketing komunikacija</h2>
     <ul>
-      <li>Šaljemo email obaveštenja samo uz vašu saglasnost</li>
-      <li>Možete se odjaviti iz bilo kog email liste</li>
-      <li>Nemojte koristiti email adrese za spam</li>
-      <li>Newsletter-i sadrže samo relevantne informacije o usluzi</li>
+      <li data-i18n="privacy.marketing1">Šaljemo email obaveštenja samo uz vašu saglasnost</li>
+      <li data-i18n="privacy.marketing2">Možete se odjaviti iz bilo kog email liste</li>
+      <li data-i18n="privacy.marketing3">Nemojte koristiti email adrese za spam</li>
+      <li data-i18n="privacy.marketing4">Newsletter-i sadrže samo relevantne informacije o usluzi</li>
     </ul>
 
-    <h2>14. Treće strane servisi</h2>
-    <h3>14.1. Servisi koje koristimo</h3>
+    <h2 data-i18n="privacy.section14">14. Treće strane servisi</h2>
+    <h3 data-i18n="privacy.section14_1">14.1. Servisi koje koristimo</h3>
     <ul>
-      <li><span class="highlight">Supabase:</span> Baza podataka i autentifikacija</li>
-      <li><span class="highlight">Kick API:</span> Integracija sa Kick platformom</li>
-      <li><span class="highlight">Netlify:</span> Hosting i deployment</li>
-      <li><span class="highlight">Render:</span> Backend API hosting</li>
+      <li data-i18n="privacy.thirdParty1"><span class="highlight">Supabase:</span> Baza podataka i autentifikacija</li>
+      <li data-i18n="privacy.thirdParty2"><span class="highlight">Kick API:</span> Integracija sa Kick platformom</li>
+      <li data-i18n="privacy.thirdParty3"><span class="highlight">Netlify:</span> Hosting i deployment</li>
+      <li data-i18n="privacy.thirdParty4"><span class="highlight">Render:</span> Backend API hosting</li>
     </ul>
 
-    <h3>14.2. Treće strane politike</h3>
+    <h3 data-i18n="privacy.section14_2">14.2. Treće strane politike</h3>
     <ul>
-      <li>Nismo odgovorni za privatnost trećih strana</li>
-      <li>Pročitajte politike privatnosti svih servisa koje koristimo</li>
-      <li>Treće strane mogu imati sopstvene politike kolačića</li>
+      <li data-i18n="privacy.thirdPartyPolicy1">Nismo odgovorni za privatnost trećih strana</li>
+      <li data-i18n="privacy.thirdPartyPolicy2">Pročitajte politike privatnosti svih servisa koje koristimo</li>
+      <li data-i18n="privacy.thirdPartyPolicy3">Treće strane mogu imati sopstvene politike kolačića</li>
     </ul>
 
-    <h2>15. Prenos podataka izvan EU</h2>
+    <h2 data-i18n="privacy.section15">15. Prenos podataka izvan EU</h2>
     <ul>
-      <li>Vaši podaci se čuvaju na serverima u EU regionu</li>
-      <li>Neki servisi mogu imati servere izvan EU</li>
-      <li>Koristimo standardne ugovorne klauzule (SCCs) za prenos</li>
-      <li>Sve prenosene podatke štitimo adekvatnim mera</li>
+      <li data-i18n="privacy.transfer1">Vaši podaci se čuvaju na serverima u EU regionu</li>
+      <li data-i18n="privacy.transfer2">Neki servisi mogu imati servere izvan EU</li>
+      <li data-i18n="privacy.transfer3">Koristimo standardne ugovorne klauzule (SCCs) za prenos</li>
+      <li data-i18n="privacy.transfer4">Sve prenosene podatke štitimo adekvatnim mera</li>
     </ul>
 
-    <h2>16. Backup i oporavak podataka</h2>
+    <h2 data-i18n="privacy.section16">16. Backup i oporavak podataka</h2>
     <ul>
-      <li>Pravimo redovne backup-e korisničkih podataka</li>
-      <li>Backup-i su enkriptovani i sigurni</li>
-      <li>U opasnosti možemo vratiti podatke iz backup-a</li>
-      <li>Backup-i se čuvaju 30 dana</li>
+      <li data-i18n="privacy.backup1">Pravimo redovne backup-e korisničkih podataka</li>
+      <li data-i18n="privacy.backup2">Backup-i su enkriptovani i sigurni</li>
+      <li data-i18n="privacy.backup3">U opasnosti možemo vratiti podatke iz backup-a</li>
+      <li data-i18n="privacy.backup4">Backup-i se čuvaju 30 dana</li>
     </ul>
 
-    <h2>17. Logovanje i monitoring</h2>
+    <h2 data-i18n="privacy.section17">17. Logovanje i monitoring</h2>
     <ul>
-      <li>Logujemo pristup usluzi za bezbednost</li>
-      <li>Logovi sadrže IP adresu, timestamp, i akcije</li>
-      <li>Logovi se čuvaju 90 dana</li>
-      <li>Logovi se koriste samo za bezbednost i debugging</li>
+      <li data-i18n="privacy.logging1">Logujemo pristup usluzi za bezbednost</li>
+      <li data-i18n="privacy.logging2">Logovi sadrže IP adresu, timestamp, i akcije</li>
+      <li data-i18n="privacy.logging3">Logovi se čuvaju 90 dana</li>
+      <li data-i18n="privacy.logging4">Logovi se koriste samo za bezbednost i debugging</li>
     </ul>
 
-    <h2>18. Pravo na zaborav</h2>
+    <h2 data-i18n="privacy.section18">18. Pravo na zaborav</h2>
     <ul>
-      <li>Imate pravo da zatražite brisanje svih vaših podataka</li>
-      <li>Zahtev za brisanje šaljete na contact@milanwebportal.com</li>
-      <li>Brišemo podatke u roku 30 dana</li>
-      <li>Neki podaci moramo zadržati po zakonu (logovi, transakcije)</li>
+      <li data-i18n="privacy.forget1">Imate pravo da zatražite brisanje svih vaših podataka</li>
+      <li data-i18n="privacy.forget2">Zahtev za brisanje šaljete na contact@milanwebportal.com</li>
+      <li data-i18n="privacy.forget3">Brišemo podatke u roku 30 dana</li>
+      <li data-i18n="privacy.forget4">Neki podaci moramo zadržati po zakonu (logovi, transakcije)</li>
     </ul>
 
-    <h2>19. Promene i obaveštenja</h2>
+    <h2 data-i18n="privacy.section19">19. Promene i obaveštenja</h2>
     <ul>
-      <li>Obaveštavamo korisnike o važnim promenama</li>
-      <li>Manje promene ne zahtevaju obaveštenje</li>
-      <li>Korisnici imaju 30 dana da prihvate promene</li>
-      <li>Nastav korišćenja znači prihvatanje promena</li>
+      <li data-i18n="privacy.notify1">Obaveštavamo korisnike o važnim promenama</li>
+      <li data-i18n="privacy.notify2">Manje promene ne zahtevaju obaveštenje</li>
+      <li data-i18n="privacy.notify3">Korisnici imaju 30 dana da prihvate promene</li>
+      <li data-i18n="privacy.notify4">Nastav korišćenja znači prihvatanje promena</li>
     </ul>
 
-    <h2>20. Međunarodni korisnici</h2>
+    <h2 data-i18n="privacy.section20">20. Međunarodni korisnici</h2>
     <ul>
-      <li>KickALL je dostupan korisnicima širom sveta</li>
-      <li>Primenjujemo GDPR standarde za sve korisnike</li>
-      <li>Lokalni zakoni imaju prednost ako su stroži</li>
-      <li>Korisnici izvan EU su pokriveni istim standardima</li>
+      <li data-i18n="privacy.international1">KickALL je dostupan korisnicima širom sveta</li>
+      <li data-i18n="privacy.international2">Primenjujemo GDPR standarde za sve korisnike</li>
+      <li data-i18n="privacy.international3">Lokalni zakoni imaju prednost ako su stroži</li>
+      <li data-i18n="privacy.international4">Korisnici izvan EU su pokriveni istim standardima</li>
     </ul>
 
-    <h2>21. Sigurnosni incidenti</h2>
+    <h2 data-i18n="privacy.section21">21. Sigurnosni incidenti</h2>
     <ul>
-      <li>Obaveštavamo korisnike o sigurnosnim incidentima u roku 72 sata</li>
-      <li>Incidenti se prijavljuju nadležnim organima</li>
-      <li>Pravimo sve da minimizujemo štetu</li>
-      <li>Provodimo istragu nakon svakog incidenta</li>
+      <li data-i18n="privacy.incident1">Obaveštavamo korisnike o sigurnosnim incidentima u roku 72 sata</li>
+      <li data-i18n="privacy.incident2">Incidenti se prijavljuju nadležnim organima</li>
+      <li data-i18n="privacy.incident3">Pravimo sve da minimizujemo štetu</li>
+      <li data-i18n="privacy.incident4">Provodimo istragu nakon svakog incidenta</li>
     </ul>
 
     <div class="danger">
-      <p><span class="icon-warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><strong>U SLUČAJU SIGURNOSNOG INCIDENTA:</strong></p>
+      <p data-i18n="privacy.danger1"><span class="icon-warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><strong>U SLUČAJU SIGURNOSNOG INCIDENTA:</strong></p>
       <ul>
-        <li>Kontaktirajte nas odmah na contact@milanwebportal.com</li>
-        <li>Promenite lozinku na svim servisima</li>
-        <li>Pratite obaveštenja na našem sajtu</li>
-        <li>Budite oprezni na phishing napade</li>
+        <li data-i18n="privacy.dangerAction1">Kontaktirajte nas odmah na contact@milanwebportal.com</li>
+        <li data-i18n="privacy.dangerAction2">Promenite lozinku na svim servisima</li>
+        <li data-i18n="privacy.dangerAction3">Pratite obaveštenja na našem sajtu</li>
+        <li data-i18n="privacy.dangerAction4">Budite oprezni na phishing napade</li>
       </ul>
     </div>
 
-    <h2>22. Data Retention (Čuvanje podataka)</h2>
+    <h2 data-i18n="privacy.section22">22. Data Retention (Čuvanje podataka)</h2>
     <ul>
-      <li><span class="highlight">Aktivni nalozi:</span> Dok su aktivni</li>
-      <li><span class="highlight">Neaktivni nalozi:</span> 2 godine nakon poslednje aktivnosti</li>
-      <li><span class="highlight">OAuth tokeni:</span> U browser-u (localStorage/sessionStorage)</li>
-      <li><span class="highlight">Referral podaci:</span> 5 godina</li>
-      <li><span class="highlight">Logovi:</span> 90 dana</li>
-      <li><span class="highlight">Backup-i:</span> 30 dana</li>
-      <li><span class="highlight">Email komunikacija:</span> 3 godine</li>
+      <li data-i18n="privacy.retentionDetail1"><span class="highlight">Aktivni nalozi:</span> Dok su aktivni</li>
+      <li data-i18n="privacy.retentionDetail2"><span class="highlight">Neaktivni nalozi:</span> 2 godine nakon poslednje aktivnosti</li>
+      <li data-i18n="privacy.retentionDetail3"><span class="highlight">OAuth tokeni:</span> U browser-u (localStorage/sessionStorage)</li>
+      <li data-i18n="privacy.retentionDetail4"><span class="highlight">Referral podaci:</span> 5 godina</li>
+      <li data-i18n="privacy.retentionDetail5"><span class="highlight">Logovi:</span> 90 dana</li>
+      <li data-i18n="privacy.retentionDetail6"><span class="highlight">Backup-i:</span> 30 dana</li>
+      <li data-i18n="privacy.retentionDetail7"><span class="highlight">Email komunikacija:</span> 3 godine</li>
     </ul>
 
-    <h2>23. Pristup informacijama</h2>
+    <h2 data-i18n="privacy.section23">23. Pristup informacijama</h2>
     <ul>
-      <li>Možete zatražiti kopiju svih vaših podataka</li>
-      <li>Podaci se dostavljaju u strogo definisanom formatu (JSON, CSV)</li>
-      <li>Dostava je besplatna jednom godišnje</li>
-      <li>Dodatni zahtevi se naplaćuju administrativnom naknadom</li>
+      <li data-i18n="privacy.access1">Možete zatražiti kopiju svih vaših podataka</li>
+      <li data-i18n="privacy.access2">Podaci se dostavljaju u strogo definisanom formatu (JSON, CSV)</li>
+      <li data-i18n="privacy.access3">Dostava je besplatna jednom godišnje</li>
+      <li data-i18n="privacy.access4">Dodatni zahtevi se naplaćuju administrativnom naknadom</li>
     </ul>
 
-    <h2>24. Automatizovano donošenje odluka</h2>
+    <h2 data-i18n="privacy.section24">24. Automatizovano donošenje odluka</h2>
     <ul>
-      <li>KickALL ne koristi automatizovano donošenje odluka</li>
-      <li>Sve odluke se donose ljudskom intervencijom</li>
-      <li>Imate pravo na reviziju svake odluke</li>
-      <li>Možete zatražiti objašnjenje automatskih procesa</li>
+      <li data-i18n="privacy.autoDecision1">KickALL ne koristi automatizovano donošenje odluka</li>
+      <li data-i18n="privacy.autoDecision2">Sve odluke se donose ljudskom intervencijom</li>
+      <li data-i18n="privacy.autoDecision3">Imate pravo na reviziju svake odluke</li>
+      <li data-i18n="privacy.autoDecision4">Možete zatražiti objašnjenje automatskih procesa</li>
     </ul>
 
-    <h2>25. Profilacija</h2>
+    <h2 data-i18n="privacy.section25">25. Profilacija</h2>
     <ul>
-      <li>Ne profiliramo korisnike za marketinške svrhe</li>
-      <li>Koristimo podatke samo za unapređenje usluge</li>
-      <li>Nemojte koristiti profilaciju za diskriminaciju</li>
-      <li>Svi korisnici se tretiraju jednako</li>
+      <li data-i18n="privacy.profiling1">Ne profiliramo korisnike za marketinške svrhe</li>
+      <li data-i18n="privacy.profiling2">Koristimo podatke samo za unapređenje usluge</li>
+      <li data-i18n="privacy.profiling3">Nemojte koristiti profilaciju za diskriminaciju</li>
+      <li data-i18n="privacy.profiling4">Svi korisnici se tretiraju jednako</li>
     </ul>
 
-    <h2>26. Kontakt i podrška</h2>
-    <p>Za sva pitanja u vezi privatnosti, kontaktirajte nas na:</p>
-    <p><span class="highlight">Email:</span> contact@milanwebportal.com</p>
-    <p><span class="highlight">Adresa:</span> KickALL, Beograd, Srbija</p>
-    <p><span class="highlight">Telefon:</span> Dostupan na zahtev</p>
-    <p><span class="highlight">Vreme odgovora:</span> 24-48 sati</p>
+    <h2 data-i18n="privacy.section26">26. Kontakt i podrška</h2>
+    <p data-i18n="privacy.supportIntro">Za sva pitanja u vezi privatnosti, kontaktirajte nas na:</p>
+    <p data-i18n="privacy.supportEmail"><span class="highlight">Email:</span> contact@milanwebportal.com</p>
+    <p data-i18n="privacy.supportAddress"><span class="highlight">Adresa:</span> KickALL, Beograd, Srbija</p>
+    <p data-i18n="privacy.supportPhone"><span class="highlight">Telefon:</span> Dostupan na zahtev</p>
+    <p data-i18n="privacy.supportResponse"><span class="highlight">Vreme odgovora:</span> 24-48 sati</p>
 
-    <h2>27. Dodatni resursi</h2>
+    <h2 data-i18n="privacy.section27">27. Dodatni resursi</h2>
     <ul>
-      <li><a href="https://gdpr.eu/" target="_blank" rel="noopener">GDPR zvanični sajt</a></li>
-      <li><a href="https://www.poverenik.rs/" target="_blank" rel="noopener">Poverenik za informacije od javnog značaja i zaštitu podataka o ličnosti</a></li>
-      <li><a href="terms.html" target="_blank" rel="noopener">Naši uslovi korišćenja</a></li>
+      <li data-i18n="privacy.resource1"><a href="https://gdpr.eu/" target="_blank" rel="noopener">GDPR zvanični sajt</a></li>
+      <li data-i18n="privacy.resource2"><a href="https://www.poverenik.rs/" target="_blank" rel="noopener">Poverenik za informacije od javnog značaja i zaštitu podataka o ličnosti</a></li>
+      <li data-i18n="privacy.resource3"><a href="terms.html" target="_blank" rel="noopener">Naši uslovi korišćenja</a></li>
     </ul>
 
     <div class="warning">
-      <p><strong><span class="icon-warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>ZAŠTITA VAŠIH PODATAKA JE NAŠA PRIORITET:</strong></p>
+      <p data-i18n="privacy.warning3"><strong><span class="icon-warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>ZAŠTITA VAŠIH PODATAKA JE NAŠA PRIORITET:</strong></p>
       <ul>
-        <li>Koristimo najviše standarde enkripcije</li>
-        <li>Redovno ažuriramo bezbednosne protokole</li>
-        <li>Vaši podaci su sigurni kod nas</li>
-        <li>Nikada nećemo prodati vaše podatke</li>
+        <li data-i18n="privacy.priority1">Koristimo najviše standarde enkripcije</li>
+        <li data-i18n="privacy.priority2">Redovno ažuriramo bezbednosne protokole</li>
+        <li data-i18n="privacy.priority3">Vaši podaci su sigurni kod nas</li>
+        <li data-i18n="privacy.priority4">Nikada nećemo prodati vaše podatke</li>
       </ul>
     </div>
 
-    <p style="margin-top: 30px; font-size: 0.9rem; color: rgba(255, 255, 255, 0.5);">
+    <p style="margin-top: 30px; font-size: 0.9rem; color: rgba(255, 255, 255, 0.5);" data-i18n="privacy.footer">
       Korišćenjem KickALL usluge potvrđujete da ste pročitali, razumeli i prihvatili ovu politiku privatnosti.
     </p>
   </div>
+  </main>
+
+  <script>
+    let currentLang = 'sr';
+    let translations = {};
+
+    try {
+      currentLang = localStorage.getItem('kickall_lang') || 'sr';
+    } catch (e) {
+      console.warn('LocalStorage not available:', e);
+    }
+
+    async function loadTranslations(lang) {
+      try {
+        const res = await fetch(`locales/${lang}.json`);
+        if (res.ok) {
+          translations = await res.json();
+          applyTranslations();
+        }
+      } catch (e) {
+        console.error('Error loading translations:', e);
+      }
+    }
+
+    function applyTranslations() {
+      if (translations.privacy) {
+        const t = translations.privacy;
+        const elements = document.querySelectorAll('[data-i18n^="privacy."]');
+        elements.forEach(el => {
+          const key = el.getAttribute('data-i18n');
+          const translationKey = key.replace('privacy.', '');
+          if (t[translationKey]) {
+            el.innerHTML = t[translationKey];
+          }
+        });
+      }
+    }
+
+    function setLang(lang) {
+      currentLang = lang;
+      try {
+        localStorage.setItem('kickall_lang', lang);
+      } catch (e) {
+        console.warn('LocalStorage not available:', e);
+      }
+      document.documentElement.lang = lang;
+      document.getElementById('btn-sr').classList.toggle('active', lang === 'sr');
+      document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+      loadTranslations(lang);
+    }
+
+    document.getElementById('btn-sr').addEventListener('click', () => setLang('sr'));
+    document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
+
+    // Initial load
+    setLang(currentLang);
+  </script>
 </body>
 </html>

@@ -4,81 +4,13 @@
    Boje: #8B5CF6 (Ljubičasta), #53FC18 (Neon zelena)
 */
 
-:root {
-    --color-violet: #8B5CF6;
-    --color-violet-glow: rgba(139, 92, 246, 0.5);
-    --color-violet-dark: #6D28D9;
-    --color-green: #53FC18;
-    --color-green-glow: rgba(83, 252, 24, 0.5);
-    --color-green-dark: #3FBA0E;
-    --color-green-hover: #6eff35;
-    
-    --color-bg-dark: #06040A;
-    --color-bg-panel: #0E0A1D;
-    --color-bg-card: #130E26;
-    --color-bg-input: #0A0614;
-    
-    --color-border: rgba(139, 92, 246, 0.15);
-    --color-border-hover: rgba(83, 252, 24, 0.35);
-    
-    --color-text: #F8FAFC;
-    --color-text-muted: #94A3B8;
-    --color-text-dark: #06040A;
-    
-    --font-heading: 'Space Grotesk', sans-serif;
-    --font-body: 'Inter', sans-serif;
-    
-    --transition-fast: 0.2s ease;
-    --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    
-    --shadow-violet: 0 0 25px rgba(139, 92, 246, 0.3);
-    --shadow-green: 0 0 25px rgba(83, 252, 24, 0.3);
-    --shadow-glass: 0 8px 32px 0 rgba(4, 3, 8, 0.5);
-    
-    /* Z-Index Scale */
-    --z-bg: -1;
-    --z-content: 1;
-    --z-badge: 10;
-    --z-overlay: 20;
-    --z-coming-soon: 25;
-    --z-modal: 100;
-    --z-dropdown: 120;
-    --z-header: 1000;
-    --z-auth-gate: 9999;
-}
+@import url('base.css');
 
-/* Resetovanja */
-*, *::before, *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
+/* Landing page specific styles */
 html {
     scroll-behavior: smooth;
     scroll-padding-top: 80px;
-    font-size: 16px;
-    overflow-x: hidden;
     overflow-y: auto;
-    touch-action: pan-y;
-}
-
-body {
-    overflow-x: hidden;
-}
-
-body {
-    background-color: var(--color-bg-dark);
-    color: var(--color-text);
-    font-family: var(--font-body);
-    line-height: 1.6;
-    -webkit-font-smoothing: antialiased;
-}
-
-/* Custom Cyberpunk Scrollbar */
-* {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-violet) transparent;
 }
 
 /* Mobile Performance Optimizations */
@@ -279,108 +211,8 @@ body {
     100% { transform: translate(60px, 50px) scale(1.15); }
 }
 
-/* Tipografija i Opšti Elementi */
-h1, h2, h3, h4 {
-    font-family: var(--font-heading);
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-}
-
-a {
-    color: inherit;
-    text-decoration: none;
-    transition: var(--transition-fast);
-}
-
-/* Dugmad */
-.btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 12px 28px;
-    border-radius: 12px;
-    font-family: var(--font-heading);
-    font-weight: 600;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: var(--transition-normal);
-    border: 2px solid transparent;
-}
-
-.btn-primary {
-    background-color: var(--color-green);
-    color: var(--color-text-dark);
-    box-shadow: 0 4px 15px rgba(83, 252, 24, 0.2);
-}
-
-.btn-primary:hover {
-    background-color: var(--color-green-hover);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(83, 252, 24, 0.45);
-}
-
-.btn-secondary {
-    background-color: rgba(139, 92, 246, 0.1);
-    color: var(--color-text);
-    border-color: rgba(139, 92, 246, 0.3);
-    backdrop-filter: blur(8px);
-}
-
-.btn-secondary:hover {
-    background-color: var(--color-violet);
-    color: var(--color-text);
-    border-color: var(--color-violet);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 25px rgba(139, 92, 246, 0.45);
-}
-
-.btn-large {
-    padding: 16px 36px;
-    font-size: 1.05rem;
-}
-
-.w-full {
-    width: 100%;
-}
-
-.mt-4 {
-    margin-top: 24px;
-}
-
-.inline-flex {
-    display: inline-flex;
-}
-
-/* Bedževi i Mali Detalji */
-.badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 16px;
-    background: rgba(139, 92, 246, 0.1);
-    border: 1px solid rgba(139, 92, 246, 0.2);
-    border-radius: 100px;
-    color: var(--color-violet);
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
 #heroBadge {
     margin-bottom: 20px;
-}
-
-@keyframes pulseBorder {
-    0%, 100% { border-color: rgba(139, 92, 246, 0.2); }
-    50% { border-color: var(--color-violet); }
-}
-
-.gradient-text {
-    background: linear-gradient(135deg, var(--color-violet) 0%, var(--color-green) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
 }
 
 /* Navigacija / Header */
@@ -530,9 +362,9 @@ a {
 }
 
 .lang-btn.active {
-    background-color: var(--color-violet);
-    color: var(--color-text);
-    box-shadow: var(--shadow-violet);
+    background-color: #6D28D9;
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(109, 40, 217, 0.4);
 }
 
 .mobile-toggle {
@@ -1077,11 +909,11 @@ section {
 }
 
 #card-kickot .card-action-link {
-    color: var(--color-violet);
+    color: #a78bfa;
 }
 #card-kickot .card-action-link:hover {
-    color: #a78bfa;
-    text-shadow: 0 0 8px rgba(139, 92, 246, 0.3);
+    color: #c4b5fd;
+    text-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
 }
 
 /* Interaktivni Playground Sekcija */
@@ -1093,14 +925,14 @@ section {
 .glow-tag {
     display: inline-block;
     padding: 4px 12px;
-    background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), rgba(83, 252, 24, 0.15));
+    background: linear-gradient(90deg, rgba(167, 139, 250, 0.35), rgba(83, 252, 24, 0.35));
     border-radius: 4px;
     font-size: 0.75rem;
-    font-weight: bold;
+    font-weight: 800;
     letter-spacing: 0.1em;
-    color: var(--color-text);
+    color: #FFFFFF;
     margin-bottom: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .playground-card {
@@ -1270,8 +1102,8 @@ section {
 .cmd-badge {
     align-self: flex-start;
     background-color: var(--color-bg-card);
-    border: 1px solid var(--color-border);
-    color: var(--color-violet);
+    border: 1px solid var(--color-violet);
+    color: #E0E7FF;
     padding: 8px 16px;
     border-radius: 8px;
     font-family: monospace;
@@ -1282,7 +1114,7 @@ section {
 
 .cmd-badge:hover {
     border-color: var(--color-violet);
-    background-color: rgba(139, 92, 246, 0.08);
+    background-color: rgba(139, 92, 246, 0.15);
     transform: translateX(4px);
 }
 
@@ -1375,11 +1207,11 @@ section {
 }
 
 .chat-message.system {
-    background-color: rgba(139, 92, 246, 0.08);
-    border: 1px solid rgba(139, 92, 246, 0.15);
+    background-color: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.25);
     padding: 8px 12px;
     border-radius: 8px;
-    color: var(--color-violet);
+    color: #C4B5FD;
     font-style: italic;
 }
 
@@ -1435,8 +1267,8 @@ section {
 .chat-send-btn {
     background-color: var(--color-violet);
     border: none;
-    color: var(--color-text);
-    font-weight: 600;
+    color: var(--color-text-dark);
+    font-weight: 700;
     padding: 0 24px;
     border-radius: 8px;
     cursor: pointer;
@@ -2169,7 +2001,7 @@ section {
 .btn-copy-email {
     background-color: var(--color-violet);
     border: none;
-    color: var(--color-text);
+    color: var(--color-text-dark);
     font-family: var(--font-heading);
     font-weight: bold;
     font-size: 0.8rem;
@@ -2187,7 +2019,7 @@ section {
 
 .btn-copy-email.copied {
     background-color: var(--color-green);
-    color: var(--color-text-dark);
+    color: #06040A;
     box-shadow: var(--shadow-green);
 }
 
@@ -2256,7 +2088,7 @@ section {
 
 .log-tag.log-agent {
     background-color: var(--color-violet);
-    color: var(--color-text);
+    color: var(--color-text-dark);
 }
 
 .log-tag.log-resolved {
@@ -2285,7 +2117,7 @@ section {
 
 .pricing-card {
     background-color: var(--color-bg-card);
-    border: 1px solid var(--color-border);
+    border: 1px solid rgba(139, 92, 246, 0.25);
     border-radius: 24px;
     padding: 40px;
     display: flex;
@@ -2296,8 +2128,8 @@ section {
 
 .pricing-card:hover {
     transform: translateY(-8px);
-    border-color: rgba(139, 92, 246, 0.4);
-    box-shadow: 0 15px 40px rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.5);
+    box-shadow: 0 15px 40px rgba(139, 92, 246, 0.15);
 }
 
 .pricing-card.popular {
@@ -2358,6 +2190,7 @@ section {
     font-size: 1.8rem;
     margin-top: 4px;
     font-weight: 600;
+    color: var(--color-text);
 }
 
 .p-period {
@@ -2421,7 +2254,12 @@ section {
 
 .p-disabled {
     color: var(--color-text-muted);
-    opacity: 0.5;
+    opacity: 0.6;
+}
+
+.p-disabled strong {
+    color: var(--color-text-muted);
+    opacity: 0.7;
 }
 
 .p-tag-active {
@@ -2446,8 +2284,127 @@ section {
     flex-shrink: 0;
 }
 
+.p-tag-vip {
+    font-size: 0.65rem;
+    font-weight: 800;
+    background-color: rgba(167, 139, 250, 0.25);
+    color: #C4B5FD;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
 .p-card-footer {
     margin-top: auto;
+}
+
+.pricing-annual-note {
+    margin-top: 40px;
+    text-align: center;
+    padding: 20px;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 12px;
+    color: var(--color-text-primary);
+}
+
+.pricing-annual-note p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+.pricing-annual-note strong {
+    color: var(--color-green);
+}
+
+/* Pricing Toggle */
+.pricing-toggle {
+    margin: 30px 0;
+    display: flex;
+    justify-content: center;
+}
+
+.toggle-container {
+    display: flex;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-radius: 50px;
+    padding: 4px;
+    position: relative;
+}
+
+.toggle-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary);
+    padding: 12px 32px;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+}
+
+.toggle-btn.active {
+    background: var(--color-violet);
+    color: var(--color-text-dark);
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+}
+
+.toggle-btn:hover:not(.active) {
+    color: var(--color-text-primary);
+}
+
+.discount-badge {
+    position: absolute;
+    top: -8px;
+    right: -4px;
+    background: var(--color-green);
+    color: var(--color-bg-dark);
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(83, 252, 24, 0.4);
+    animation: none;
+    white-space: nowrap;
+    z-index: 10;
+    display: block !important;
+    visibility: visible !important;
+}
+
+.btn-price {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin-left: 4px;
+}
+
+.p-price-monthly {
+    margin-bottom: 16px;
+    display: none;
+}
+
+.p-price-monthly.show {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.strike-price {
+    color: var(--color-text-muted);
+    text-decoration: line-through;
+    font-size: 0.9rem;
+    font-weight: 400;
+}
+
+.save-info {
+    color: var(--color-green);
+    font-size: 0.85rem;
+    font-weight: 600;
 }
 
 /* SEKCIJA: Testimonials */
@@ -2858,7 +2815,7 @@ section {
 .user-menu-trigger {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
     height: 44px;
     padding: 4px 16px 4px 6px;
     border-radius: 100px;
@@ -3765,9 +3722,9 @@ body::before {
 .faq-pill {
     padding: 8px 18px;
     border-radius: 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: var(--color-text-muted);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #E2E8F0;
     font-size: 0.85rem;
     font-weight: 600;
     cursor: pointer;
@@ -3775,10 +3732,10 @@ body::before {
 }
 
 .faq-pill:hover, .faq-pill.active {
-    background: var(--color-violet);
-    color: #fff;
-    border-color: var(--color-violet);
-    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
+    background: #6D28D9;
+    color: #ffffff;
+    border-color: #7C3AED;
+    box-shadow: 0 4px 15px rgba(109, 40, 217, 0.4);
 }
 
 .faq-accordion {

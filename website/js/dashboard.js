@@ -91,7 +91,7 @@ let currentUser = null;
 let currentLang = 'sr';
 let translations = {};
 try {
-  currentLang = localStorage.getItem('kickall-lang') || localStorage.getItem('kickall_lang') || 'sr';
+  currentLang = localStorage.getItem('kickall_lang') || 'sr';
 } catch (e) {
   console.warn('LocalStorage not available:', e);
 }
@@ -99,14 +99,33 @@ try {
 // Load translations
 async function loadTranslations(lang) {
   try {
-    const res = await fetch(`locales/${lang}.json`);
+    const res = await fetch(`/locales/${lang}.json`);
     if (res.ok) {
       translations = await res.json();
+      applyTranslations(translations);
     } else {
       console.warn(`Failed to load translations for ${lang}: HTTP ${res.status}`);
     }
   } catch (e) {
     console.error('Error loading translations:', e);
+  }
+}
+
+function applyTranslations(obj, prefix = '') {
+  for (const key in obj) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
+    if (typeof obj[key] === 'object' && obj[key] !== null) {
+      applyTranslations(obj[key], fullKey);
+    } else {
+      const elements = document.querySelectorAll(`[data-i18n="${fullKey}"]`);
+      elements.forEach(el => {
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+          el.placeholder = obj[key];
+        } else {
+          el.innerHTML = obj[key];
+        }
+      });
+    }
   }
 }
 
@@ -1014,12 +1033,12 @@ function setupWithdrawalModal() {
 function setLang(lang) {
   currentLang = lang;
   try {
-    localStorage.setItem('kickall-lang', lang);
     localStorage.setItem('kickall_lang', lang);
   } catch (e) {
     console.warn('LocalStorage not available:', e);
   }
   document.body.className = `lang-${lang}`;
+  document.documentElement.lang = lang;
 
   document.getElementById('btn-sr').classList.toggle('active', lang === 'sr');
   document.getElementById('btn-en').classList.toggle('active', lang === 'en');

@@ -1,5 +1,14 @@
 <!DOCTYPE html>
 <html lang="sr">
+  <script>
+    // Load saved language before rendering
+    try {
+      const savedLang = localStorage.getItem('kickall_lang') || 'sr';
+      document.documentElement.lang = savedLang;
+    } catch (e) {
+      console.warn('LocalStorage not available:', e);
+    }
+  </script>
 
 <head>
   <meta charset="UTF-8" />
@@ -14,7 +23,19 @@
   <title>KICKALL - Centralni Dashboard</title>
   <meta name="description" content="Centralni dashboard za KickAll ekosistem. Izaberi modul, prati referral nagrade i upravljaj svojim strimom." />
   <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://kickall.app/dashboard.html" />
   <meta name="theme-color" content="#0B0816" />
+
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZNGNF6TEM"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KZNGNF6TEM');
+  </script>
+  <!-- End Google Analytics -->
 
   <!-- Optimozacija mrežnih resursa i baze -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -50,12 +71,15 @@
   <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
 
   <!-- Favicon i Stilovi -->
-  <link rel="icon" href="/assets/favicon.ico" type="image/x-icon" />
+  <link rel="icon" href="/assets/favicon.ico" sizes="48x48" type="image/x-icon" />
+  <link rel="shortcut icon" href="/assets/favicon.ico" />
+  <link rel="stylesheet" href="css/base.css" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
 </head>
 
 <body class="auth-loading">
+
 
   <!-- Grid background glows -->
   <div class="glow-bg">
@@ -581,6 +605,12 @@
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/dashboard.js"></script>
+  
+  <!-- KickALL Data Layer & Analytics -->
+  <script src="js/data-layer.js"></script>
+  <script src="js/route-tracking.js"></script>
+  <script src="js/consent-banner.js"></script>
+  <script src="js/analytics.js"></script>
 </body>
 
 </html>

@@ -15,6 +15,16 @@
   <meta name="description" content="Kickot bot control panel. Upravljaj komandama, leaderboard tabelom i podešavanjima bota." />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="theme-color" content="#0b0716" />
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZNGNF6TEM"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KZNGNF6TEM');
+  </script>
+  <!-- End Google Analytics -->
 
   <!-- Optimizacija mrežnih veza sa bazom i CDN-om -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -53,9 +63,13 @@
 
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Avatar Cache Module (IndexedDB) -->
+  <script src="js/avatar-cache.js"></script>
 </head>
 
 <body>
+
 
   <!-- ══════════ AUTH GATE ══════════ -->
   <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
@@ -4293,6 +4307,12 @@
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
   <script src="js/dashboard.js"></script>
+  
+  <!-- KickALL Data Layer & Analytics -->
+  <script src="../js/data-layer.js"></script>
+  <script src="../js/route-tracking.js"></script>
+  <script src="../js/consent-banner.js"></script>
+  <script src="../js/analytics.js"></script>
 </body>
 
 </html>

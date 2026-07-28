@@ -47,12 +47,4 @@
         <changefreq>monthly</changefreq>
         <priority>0.3</priority>
     </url>
-    
-    <!-- API Test (developer tool) -->
-    <url>
-        <loc>https://kickall.app/api-test.html</loc>
-        <lastmod>2026-07-28</lastmod>
-        <changefreq>monthly</changefreq>
-        <priority>0.1</priority>
-    </url>
 </urlset>
