@@ -13,10 +13,13 @@ const CONFIG = window.CONFIG || window.KickotConfig;
 
 // ── Supabase Init ──────────────────────────────────────────
 const { createClient } = window.supabase;
-const supabaseConfig = CONFIG.SUPABASE || CONFIG.supabase || null;
-const supabaseUrl = supabaseConfig ? supabaseConfig.url : 'https://rcukparptzzyssqdmydt.supabase.co';
-const supabaseAnonKey = supabaseConfig ? supabaseConfig.anonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
-const storageKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_ACCESS_TOKEN : (CONFIG.storage ? CONFIG.storage.storageKey : 'kickbot-supabase-auth');
+
+// Direct fallback values for Supabase configuration
+const supabaseUrl = CONFIG.SUPABASE?.URL || CONFIG.supabase?.url || 'https://rcukparptzzyssqdmydt.supabase.co';
+const supabaseAnonKey = CONFIG.SUPABASE?.ANON_KEY || CONFIG.supabase?.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+
+// Use same storage key as KickAll for shared auth session
+const storageKey = CONFIG.SUPABASE?.STORAGE_KEY || CONFIG.storage?.storageKey || 'kickbot-supabase-auth';
 
 const sb = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -141,6 +144,27 @@ let marriagesQuery = '';
 // ═══════════════════════════════════════════════════════════
 // AUTH GUARD
 // ═══════════════════════════════════════════════════════════
+
+// Global function declaration to ensure it's available everywhere
+window.hideAuthGate = function() {
+  const authGate = document.getElementById('authGate');
+  const app = document.getElementById('app');
+  if (authGate) {
+    authGate.classList.add('fade-out');
+    setTimeout(() => {
+      authGate.style.display = 'none';
+    }, 400);
+  }
+  if (app) {
+    app.classList.add('fade-in');
+  }
+};
+
+// Local function for backward compatibility
+function hideAuthGate() {
+  window.hideAuthGate();
+}
+
 async function initAuth() {
   try {
     const urlParams = new URLSearchParams(window.location.search);
@@ -150,12 +174,23 @@ async function initAuth() {
     // Check if coming from kickall (multiple sources with fallbacks)
     const fromKickAll = sessionStorage.getItem('from_kickall') === 'true' ||
                         localStorage.getItem('kick_origin_site') === 'kickall' ||
-                        (document.referrer && document.referrer.includes('kickall.app'));
+                        (document.referrer && document.referrer.includes('kickall.app')) ||
+                        (document.referrer && document.referrer.includes('localhost'));
 
     if (oauthError) {
       document.getElementById('authGateMsg').textContent = 'Kick odbio autorizaciju...';
       showToast('error', `Kick odbio autorizaciju: ${oauthError}`, '❌');
       setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 2000);
+      return;
+    }
+
+    // Check for existing Supabase session first (from KickAll)
+    const { data: { session: initialSession } } = await sb.auth.getSession();
+    if (initialSession?.user) {
+      console.log('Kickot Dashboard: Using existing Supabase session from KickAll');
+      currentUser = initialSession.user;
+      hideAuthGate();
+      await initApp();
       return;
     }
 
@@ -167,18 +202,30 @@ async function initAuth() {
       const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
       const stateParam = urlParams.get('state');
 
+      console.log('Kickot OAuth state check:', { savedState, stateParam, isLocalhost: window.KickotConfig.isLocalhost });
+
       if (!window.KickotConfig.isLocalhost && (!stateParam || stateParam !== savedState)) {
+        console.error('Kickot OAuth state mismatch - Expected:', savedState, 'Got:', stateParam);
         document.getElementById('authGateMsg').textContent = 'Nevalidan state parametar...';
         showToast('error', 'State parametar se ne podudara.', '❌');
         setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 2000);
         return;
       }
 
-      const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
+      // Use CONFIG storage keys if available
+      const codeVerifierKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_CODE_VERIFIER : 'kick_code_verifier';
+      const codeVerifier = sessionStorage.getItem(codeVerifierKey) || localStorage.getItem(codeVerifierKey) || '';
+      
       const redirectUri = window.KickotConfig.api.kickOAuthRedirect;
       const kickApiBase = window.KickotConfig.api.baseUrl;
 
       try {
+        console.log('Kickot OAuth exchange:', { 
+          codeVerifier: codeVerifier ? 'present' : 'missing', 
+          redirectUri, 
+          kickApiBase 
+        });
+        
         const res = await Promise.race([
           fetch(`${kickApiBase}/api/kick/exchange`, {
             method: 'POST',
@@ -189,14 +236,25 @@ async function initAuth() {
               redirect_uri: redirectUri
             }).toString()
           }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('OAuth exchange timeout')), 15000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('OAuth exchange timeout')), 25000))
         ]);
+
+        console.log('Kickot exchange response status:', res.status);
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
-          document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
-          showToast('error', err.detail || err.error || 'Server nedostupan', '❌');
-          setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 3000);
+          console.error('Kickot exchange failed:', err);
+          
+          // Better error handling for Render cold starts
+          if (res.status === 502) {
+            document.getElementById('authGateMsg').textContent = 'Server se budi...';
+            showToast('error', 'Backend server se budi (Render cold start). Sačekajte 15-30 sekundi i pokušajte ponovo.', '❌');
+            setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 15000);
+          } else {
+            document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
+            showToast('error', err.detail || err.error || 'Server nedostupan', '❌');
+            setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 3000);
+          }
           return;
         }
 
@@ -213,8 +271,12 @@ async function initAuth() {
         const intent = sessionStorage.getItem('kick_oauth_intent') || 'login';
         const addChannelUid = sessionStorage.getItem('kick_add_channel_uid') || '';
 
-        sessionStorage.removeItem('kick_oauth_state');
-        sessionStorage.removeItem('kick_code_verifier');
+        // Use CONFIG storage keys if available
+        const oauthStateKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_OAUTH_STATE : 'kick_oauth_state';
+        sessionStorage.removeItem(oauthStateKey);
+        sessionStorage.removeItem(codeVerifierKey);
+        localStorage.removeItem(oauthStateKey);
+        localStorage.removeItem(codeVerifierKey);
         sessionStorage.removeItem('kick_oauth_intent');
         sessionStorage.removeItem('kick_add_channel_uid');
         sessionStorage.removeItem('kick_oauth_source');
@@ -340,22 +402,29 @@ async function initAuth() {
     // ── Standardna Supabase sesija ─────────────────────────────────────
     document.getElementById('authGateMsg').textContent = 'Proveravamo sesiju...';
     
-    const { data: { session } } = await Promise.race([
+    const { data: { session: authSession } } = await Promise.race([
       sb.auth.getSession(),
       new Promise((_, reject) => setTimeout(() => reject(new Error('Session check timeout')), 5000))
     ]);
     
-    if (!session) {
+    if (!authSession) {
       document.getElementById('authGateMsg').textContent = 'Preusmeravanje na prijavu...';
       setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl + '?login=1'; }, 1200);
       return;
     }
-    currentUser = session.user;
+    
+    console.log('Kickot Dashboard: Found Supabase session', authSession.user);
+    currentUser = authSession.user;
     
     // Set origin site for cross-dashboard navigation
-    sessionStorage.setItem('kick_origin_site', 'kickot');
-    localStorage.setItem('kick_origin_site', 'kickot');
+    try {
+      sessionStorage.setItem('kick_origin_site', 'kickot');
+      localStorage.setItem('kick_origin_site', 'kickot');
+    } catch (e) {
+      console.warn('Failed to set origin flags:', e);
+    }
     
+    hideAuthGate();
     await initApp();
   } catch (err) {
     console.error('Auth error:', err);
@@ -4301,7 +4370,7 @@ window.addEventListener('keydown', e => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// TOASTS
+// TOASTS (Old glassmorphism system)
 // ═══════════════════════════════════════════════════════════
 let toastId = 0;
 function showToast(type, msg, iconEmoji = '💬', duration = 4000) {
@@ -4389,6 +4458,21 @@ function removeToast(id) {
     setTimeout(() => el.remove(), 250);
   }
 }
+
+// Create ToastSystem interface for compatibility with existing code
+window.toastSystem = {
+  show: showToast,
+  success: (msg, duration) => showToast('success', msg, '✓', duration),
+  error: (msg, duration) => showToast('error', msg, '✕', duration),
+  warning: (msg, duration) => showToast('info', msg, '⚠', duration),
+  info: (msg, duration) => showToast('info', msg, 'ℹ', duration),
+  dismiss: (toastElement) => {
+    if (toastElement && toastElement.id) {
+      const match = toastElement.id.match(/toast-(\d+)/);
+      if (match) removeToast(parseInt(match[1]));
+    }
+  }
+};
 
 // ═══════════════════════════════════════════════════════════
 // UTILITIES

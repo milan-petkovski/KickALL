@@ -56,9 +56,16 @@ window.CONFIG = {
           return proxyResponse;
         }
         
-        throw new Error('Proxy request failed');
+        const errorData = await proxyResponse.json().catch(() => ({ error: 'Proxy request failed' }));
+        throw new Error(errorData.error || 'Proxy request failed');
       } catch (error) {
         console.error('CORS fetch error:', error);
+        
+        // User-friendly error message
+        if (window.toastSystem) {
+          window.toastSystem.error('Network error: ' + (error.message || 'Unable to connect to server'));
+        }
+        
         throw error;
       }
     }
@@ -84,18 +91,19 @@ window.CONFIG = {
     'http://localhost:5500'
   ],
 
-  // Timeouts (in milliseconds)
+  // Timeouts (in milliseconds) - Optimized for Render free tier cold starts
   TIMEOUTS: {
-    API_REQUEST: 6000,
-    COMMANDS_LOAD: 8000,
-    LEADERBOARD_LOAD: 8000,
-    WATCHTIME_LOAD: 8000,
-    MARRIAGES_LOAD: 5000,
-    LOVE_STATUS_LOAD: 5000,
-    BOT_CONFIG_LOAD: 5000,
-    BOT_STATUS_LOAD: 5000,
-    NOTIFICATIONS_LOAD: 5000,
-    CHANGELOGS_LOAD: 5000
+    API_REQUEST: 30000,  // Increased for Render cold starts (up to 30s)
+    COMMANDS_LOAD: 30000,
+    LEADERBOARD_LOAD: 30000,
+    WATCHTIME_LOAD: 30000,
+    MARRIAGES_LOAD: 20000,
+    LOVE_STATUS_LOAD: 20000,
+    BOT_CONFIG_LOAD: 20000,
+    BOT_STATUS_LOAD: 20000,
+    NOTIFICATIONS_LOAD: 20000,
+    CHANGELOGS_LOAD: 20000,
+    OAUTH_EXCHANGE: 25000  // Specific timeout for OAuth token exchange
   },
 
   // LocalStorage Keys
@@ -132,5 +140,25 @@ window.CONFIG = {
     SPINNER_TOP_COLOR: '#8B5CF6',
     AUTH_GATE_BG: '#07070D',
     AUTH_GATE_MSG_COLOR: '#9393B5'
+  },
+
+  // Keep-alive configuration for Render free tier
+  KEEP_ALIVE: {
+    // Ping interval in milliseconds (every 4 minutes to prevent cold starts)
+    PING_INTERVAL: 240000,
+    // Health check endpoint
+    HEALTH_ENDPOINT: '/api/health',
+    // Enable keep-alive only in production
+    ENABLED: !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
   }
 };
+
+// Keep-alive ping for Render free tier (prevent cold starts)
+if (window.CONFIG.KEEP_ALIVE.ENABLED) {
+  setInterval(() => {
+    fetch(`${window.CONFIG.getBackendApiBase()}${window.CONFIG.KEEP_ALIVE.HEALTH_ENDPOINT}`)
+      .catch(() => {
+        // Silent fail - health check is just for keeping server awake
+      });
+  }, window.CONFIG.KEEP_ALIVE.PING_INTERVAL);
+}

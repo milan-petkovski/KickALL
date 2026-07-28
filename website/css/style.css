@@ -55,10 +55,12 @@
 }
 
 html {
-    scroll-behavior: auto;
+    scroll-behavior: smooth;
     scroll-padding-top: 80px;
     font-size: 16px;
     overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: pan-y;
 }
 
 body {
@@ -95,9 +97,7 @@ body {
     }
     
     /* Optimize rendering for mobile */
-    * {
-        -webkit-transform: translateZ(0);
-        transform: translateZ(0);
+    .card, .feature-card, .pricing-card, .hero-glass-card {
         -webkit-backface-visibility: hidden;
         backface-visibility: hidden;
     }
@@ -452,6 +452,7 @@ a {
     color: var(--color-text-muted);
     position: relative;
     padding: 8px 0;
+    white-space: nowrap;
 }
 
 .nav-link:hover, .nav-link.active {
@@ -554,12 +555,13 @@ a {
 
 /* Hero Sekcija */
 .hero-section {
-    min-height: 100vh;
+    min-height: 95vh;
     padding: 120px 0 40px 0;
     display: flex;
     align-items: center;
     position: relative;
     box-shadow: none;
+    touch-action: pan-y;
 }
 
 /* Dynamic Hero Visual Cards */
@@ -2798,19 +2800,42 @@ section {
         position: fixed;
         top: 0;
         right: -100%;
-        width: 280px;
+        width: 240px;
         height: 100vh;
         background-color: var(--color-bg-panel);
         border-left: 1px solid var(--color-border);
         flex-direction: column;
-        padding: 100px 40px;
-        gap: 24px;
+        padding: 100px 25px;
+        gap: 16px;
         transition: var(--transition-normal);
         z-index: var(--z-dropdown);
+        align-items: center;
+    }
+
+    .nav-link {
+        font-size: 0.9rem;
+        text-align: center;
+    }
+
+    .mobile-menu-actions {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        margin-top: auto;
     }
 
     .nav-menu.open {
         right: 0;
+    }
+
+    body.nav-menu-open {
+        overflow: hidden;
+    }
+
+    html.nav-menu-open {
+        overflow: hidden;
     }
 
     .nav-actions {
@@ -5794,7 +5819,8 @@ body::before {
     }
     
     .nav-menu {
-        padding: 80px 30px;
+        padding: 80px 25px;
+        width: 300px;
     }
 }
 
@@ -5910,8 +5936,9 @@ body::before {
     
     /* Navigation links spacing */
     .nav-link {
-        padding: 16px 0;
-        margin: 4px 0;
+        padding: 12px 0;
+        margin: 2px 0;
+        font-size: 0.9rem;
     }
     
     /* Dropdown items */

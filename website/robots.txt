@@ -1,0 +1,39 @@
+# Robots.txt for KickALL Ecosystem
+# Allow all crawlers including AI agents
+
+User-agent: *
+Allow: /
+
+# Explicitly allow AI search crawlers
+User-agent: GPTBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# Disallow specific paths if needed
+Disallow: /auth/
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /admin/
+
+# Sitemap
+Sitemap: https://kickall.app/sitemap.xml
+
+# Crawl delay (optional, adjust based on server capacity)
+Crawl-delay: 1

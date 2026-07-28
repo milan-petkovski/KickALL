@@ -149,6 +149,10 @@ function playSound(freq, type = 'sine', duration = 0.1, gainVal = 0.1) {
 async function checkAuth() {
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
+  
+  // Check if coming from kickot (for session sharing)
+  const fromKickot = sessionStorage.getItem('from_kickot') === 'true' ||
+                      localStorage.getItem('kick_origin_site') === 'kickot';
 
   if (code) {
     const authGateMsg = document.getElementById('authGateMsg');
@@ -161,24 +165,31 @@ async function checkAuth() {
     const kickApiBase = window.CONFIG.getBackendApiBase();
     
     try {
-      const res = await fetch(`${kickApiBase}/api/kick/exchange`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          code,
-          code_verifier: codeVerifier,
-          redirect_uri: redirectUri
-        }).toString()
-      });
+      const res = await Promise.race([
+        fetch(`${kickApiBase}/api/kick/exchange`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            code_verifier: codeVerifier,
+            redirect_uri: redirectUri
+          }).toString()
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Exchange timeout')), 25000))
+      ]);
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
         console.error("Exchange error detail:", err);
         const authGateMsg = document.getElementById('authGateMsg');
         if (authGateMsg) {
-          authGateMsg.textContent = `Greška pri autorizaciji: ${err.detail || err.error || 'nepoznato'}`;
+          if (res.status === 502) {
+            authGateMsg.textContent = 'Server se budi (Render cold start)...';
+          } else {
+            authGateMsg.textContent = `Greška pri autorizaciji: ${err.detail || err.error || 'nepoznato'}`;
+          }
         }
-        setTimeout(() => { window.location.href = 'index.html'; }, 5000);
+        setTimeout(() => { window.location.href = 'index.html'; }, res.status === 502 ? 15000 : 5000);
         return;
       }
 
@@ -190,7 +201,7 @@ async function checkAuth() {
         localStorage.removeItem('kick_oauth_state');
         localStorage.removeItem('kick_code_verifier');
         
-        // Redirect to itself with kick_oauth=1 to complete login
+        // Use relative path for production compatibility
         window.location.href = window.location.pathname + '?kick_oauth=1';
         return;
       }
@@ -933,24 +944,32 @@ function setupWithdrawalModal() {
     const details = document.getElementById('paymentDetails').value;
 
     if (!amount || amount < 5) {
-      alert(t('dashboard.minWithdrawal'));
+      if (window.toastSystem) {
+        window.toastSystem.warning(t('dashboard.minWithdrawal'));
+      }
       return;
     }
 
     if (amount > window.currentAvailableBalance) {
-      alert(t('dashboard.insufficientFunds'));
+      if (window.toastSystem) {
+        window.toastSystem.warning(t('dashboard.insufficientFunds'));
+      }
       return;
     }
 
     if (!method || !details) {
-      alert(t('dashboard.enterWithdrawalDetails'));
+      if (window.toastSystem) {
+        window.toastSystem.warning(t('dashboard.enterWithdrawalDetails'));
+      }
       return;
     }
 
     try {
       const { data: { user } } = await sb.auth.getUser();
       if (!user) {
-        alert(currentLang === 'sr' ? 'Nisi prijavljen' : 'Not logged in');
+        if (window.toastSystem) {
+          window.toastSystem.error(currentLang === 'sr' ? 'Nisi prijavljen' : 'Not logged in');
+        }
         return;
       }
 
@@ -964,12 +983,16 @@ function setupWithdrawalModal() {
 
       if (error) {
         console.error('Withdrawal request error:', error);
-        alert(t('dashboard.withdrawalError'));
+        if (window.toastSystem) {
+          window.toastSystem.error(t('dashboard.withdrawalError'));
+        }
         return;
       }
 
       // Success
-      alert(t('dashboard.withdrawalSuccess'));
+      if (window.toastSystem) {
+        window.toastSystem.success(t('dashboard.withdrawalSuccess'));
+      }
       withdrawalModal.classList.remove('open');
       withdrawalForm.reset();
 
@@ -980,7 +1003,9 @@ function setupWithdrawalModal() {
 
     } catch (err) {
       console.error('Withdrawal error:', err);
-      alert(t('dashboard.withdrawalError'));
+      if (window.toastSystem) {
+        window.toastSystem.error(t('dashboard.withdrawalError'));
+      }
     }
   });
 }

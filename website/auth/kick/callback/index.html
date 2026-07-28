@@ -3,12 +3,27 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
   <title>KickALL | OAuth Autorizacija</title>
-  <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="../../assets/favicon.ico" type="image/x-icon">
+  <link rel="apple-touch-icon" href="/assets/logo.webp">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght=600;700&display=swap" rel="stylesheet">
+  
+  <!-- Configuration -->
+  <script src="/js/config.js"></script>
+  
+  <!-- Fallback for subdirectory structure -->
+  <script>
+    if (!window.CONFIG) {
+      // Try to load config from parent directory if not loaded
+      const script = document.createElement('script');
+      script.src = '../js/config.js';
+      document.head.appendChild(script);
+    }
+  </script>
+  
   <style>
     *,
     *::before,
@@ -135,6 +150,15 @@
       color: rgba(255, 255, 255, 0.45);
     }
 
+    .error-message {
+      color: #EF4444;
+      font-size: 0.9rem;
+      margin-top: 16px;
+      text-align: center;
+      max-width: 300px;
+      line-height: 1.4;
+    }
+
     .btn-retry {
       display: inline-block;
       margin-top: 24px;
@@ -159,54 +183,137 @@
 </head>
 
 <body>
+  <div class="card">
+    <div class="logo-wrap">
+      <img src="assets/kickot.webp" alt="Kickot Logo" class="logo-img" style="height: 52px; width: auto;" loading="lazy">
+    </div>
+    <div class="spinner" id="loadingSpinner"></div>
+    <h1 id="loadingTitle">Obrada...</h1>
+    <p id="loadingMessage">Autorizacija je u toku</p>
+    <div class="error-message" id="errorMessage" style="display: none;"></div>
+  </div>
+
   <script>
+    function showErrorToUser(message) {
+      const spinner = document.getElementById('loadingSpinner');
+      const title = document.getElementById('loadingTitle');
+      const msg = document.getElementById('loadingMessage');
+      const errorDiv = document.getElementById('errorMessage');
+      
+      if (spinner) spinner.style.display = 'none';
+      if (title) title.textContent = 'Greška';
+      if (msg) msg.style.display = 'none';
+      if (errorDiv) {
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+      }
+    }
+
     (async function processKickOAuth() {
-      const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       const state = params.get('state');
       const error = params.get('error');
 
       if (error) {
-        window.location.href = '/index.html?error=' + encodeURIComponent(error);
+        // Redirect to appropriate index based on current path
+        const currentPath = window.location.pathname;
+        const basePath = currentPath.includes('/auth/') ? '/' : '../';
+        window.location.href = `${basePath}index.html?error=` + encodeURIComponent(error);
         return;
       }
 
       const savedState = sessionStorage.getItem('kick_oauth_state') || localStorage.getItem('kick_oauth_state');
+      
+      // Skip state validation for localhost to avoid development issues
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                          window.location.hostname === '127.0.0.1' ||
+                          window.location.hostname === '0.0.0.0';
+      
       if (!isLocalhost && (!state || state !== savedState)) {
-        window.location.href = '/index.html?error=state_mismatch';
+        console.error('State mismatch - Expected:', savedState, 'Got:', state);
+        const currentPath = window.location.pathname;
+        const basePath = currentPath.includes('/auth/') ? '/' : '../';
+        window.location.href = `${basePath}index.html?error=state_mismatch`;
         return;
       }
 
       if (!code) {
-        window.location.href = '/index.html?error=no_code';
+        const currentPath = window.location.pathname;
+        const basePath = currentPath.includes('/auth/') ? '/' : '../';
+        window.location.href = `${basePath}index.html?error=no_code`;
         return;
       }
 
-      const codeVerifier = sessionStorage.getItem('kick_code_verifier') || localStorage.getItem('kick_code_verifier') || '';
-      const redirectUri = isLocalhost 
-        ? 'http://localhost:5500/auth/kick/callback/' 
-        : 'https://kickall.app/auth/kick/callback/';
+      // Use CONFIG storage keys if available
+      const codeVerifierKey = window.CONFIG && window.CONFIG.STORAGE_KEYS 
+        ? window.CONFIG.STORAGE_KEYS.KICK_CODE_VERIFIER 
+        : 'kick_code_verifier';
+      const codeVerifier = sessionStorage.getItem(codeVerifierKey) || localStorage.getItem(codeVerifierKey) || '';
+      
+      if (!codeVerifier) {
+        console.error('Code verifier missing from storage');
+        // Redirect to appropriate index based on current path
+        const currentPath = window.location.pathname;
+        const basePath = currentPath.includes('/auth/') ? '/' : '../';
+        window.location.href = `${basePath}index.html?error=no_verifier`;
+        return;
+      }
+      
+      // Use dynamic redirect URI based on current origin
+      const redirectUri = `${window.location.origin}/auth/kick/callback/`;
 
-      const apiBase = isLocalhost || window.location.hostname.endsWith('netlify.app')
-        ? 'https://kickbot-ihzb.onrender.com'
-        : (window.KICK_API_BASE || window.location.origin).replace(/\/+$/, '');
+      const apiBase = window.CONFIG && window.CONFIG.getBackendApiBase 
+        ? window.CONFIG.getBackendApiBase()
+        : (window.location.hostname.endsWith('netlify.app')
+          ? 'https://kickbot-ihzb.onrender.com'
+          : (window.KICK_API_BASE || window.location.origin).replace(/\/+$/, ''));
 
       try {
-        const response = await fetch(`${apiBase}/api/kick/exchange`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ code, code_verifier: codeVerifier, redirect_uri: redirectUri }).toString()
-        });
-
+        console.log('Attempting token exchange:', { apiBase, codeVerifier: codeVerifier ? 'present' : 'missing', redirectUri });
+        
+        // Simple single attempt with better error handling
+        const response = await Promise.race([
+          fetch(`${apiBase}/api/kick/exchange`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ code, code_verifier: codeVerifier, redirect_uri: redirectUri }).toString()
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Exchange timeout')), 25000))
+        ]);
+        
+        console.log('Exchange response status:', response.status);
+        
         if (!response.ok) {
-          window.location.href = '/index.html?error=exchange_failed';
+          const errorText = await response.text();
+          console.error('Exchange failed:', errorText);
+          
+          // Show error to user immediately for 502 errors
+          if (response.status === 502) {
+            showErrorToUser('Backend server se budi (Render cold start). Molim vas sačekajte 15-30 sekundi i pokušajte ponovo.');
+            
+            // Auto-redirect after longer delay to allow for server wake-up
+            setTimeout(() => {
+              const currentPath = window.location.pathname;
+              const basePath = currentPath.includes('/auth/') ? '/' : '../';
+              window.location.href = `${basePath}index.html?error=server_unavailable`;
+            }, 15000);
+          } else {
+            const currentPath = window.location.pathname;
+            const basePath = currentPath.includes('/auth/') ? '/' : '../';
+            window.location.href = `${basePath}index.html?error=exchange_failed&details=` + encodeURIComponent(errorText);
+          }
           return;
         }
 
         const tokenData = await response.json();
+        console.log('Token response:', tokenData);
+        
         if (!tokenData.access_token) {
-          window.location.href = '/index.html?error=no_token';
+          console.error('No access token in response:', tokenData);
+          const currentPath = window.location.pathname;
+          const basePath = currentPath.includes('/auth/') ? '/' : '../';
+          window.location.href = `${basePath}index.html?error=no_token&details=` + encodeURIComponent(JSON.stringify(tokenData));
           return;
         }
 
@@ -234,10 +341,13 @@
 
         const targetPage = targets[originSite] || 'dashboard.html';
 
-        window.location.replace(`/${targetPage}?kick_oauth=1`);
+        // Use relative path for production compatibility
+        window.location.replace(`${targetPage}?kick_oauth=1`);
 
       } catch (err) {
-        window.location.href = '/index.html?error=connection_error';
+        const currentPath = window.location.pathname;
+        const basePath = currentPath.includes('/auth/') ? '/' : '../';
+        window.location.href = `${basePath}index.html?error=connection_error`;
       }
     })();
   </script>

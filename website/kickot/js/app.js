@@ -10,22 +10,34 @@ const translations = {
   en: {}
 };
 
-// ── Configuration Check ───────────────────────────────────────
+// ── Configuration Check & Fallback ────────────────────────────
+const CONFIG = window.CONFIG || window.KickotConfig || {};
+
+// Ako je učitan glavni window.CONFIG, dodeljujemo ga i na KickotConfig
 if (!window.KickotConfig) {
-  throw new Error('KickotConfig not loaded. Please ensure config.js is loaded before app.js');
+  window.KickotConfig = CONFIG;
 }
 
-// Use KickAll CONFIG if available, otherwise use Kickot config
-const CONFIG = window.CONFIG || window.KickotConfig;
+// Garancija da getLocalePath metoda postoji za prevode
+if (!window.KickotConfig.getLocalePath) {
+  window.KickotConfig.getLocalePath = function(lang) {
+    return `locales/${lang}.json`;
+  };
+}
 
 // ── Supabase Init ──────────────────────────────────────────
 const { createClient } = window.supabase;
-const supabaseConfig = CONFIG.SUPABASE || (CONFIG.supabase ? CONFIG.supabase : null);
-const storageKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_ACCESS_TOKEN : (CONFIG.storage ? CONFIG.storage.storageKey : 'kickbot-supabase-auth');
+
+// Direct fallback values for Supabase configuration
+const supabaseUrl = CONFIG.SUPABASE?.URL || CONFIG.supabase?.url || 'https://rcukparptzzyssqdmydt.supabase.co';
+const supabaseAnonKey = CONFIG.SUPABASE?.ANON_KEY || CONFIG.supabase?.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+
+// Use same storage key as KickAll for shared auth session
+const storageKey = CONFIG.SUPABASE?.STORAGE_KEY || CONFIG.storage?.storageKey || 'kickbot-supabase-auth';
 
 const sb = createClient(
-  supabaseConfig ? supabaseConfig.url : 'https://rcukparptzzyssqdmydt.supabase.co',
-  supabaseConfig ? supabaseConfig.anonKey : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc',
+  supabaseUrl,
+  supabaseAnonKey,
   {
     auth: {
       persistSession: true,
@@ -202,8 +214,12 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
         if (navMenu && navMenu.classList.contains('open')) {
           navMenu.classList.remove('open');
           if (mobileToggle) mobileToggle.classList.remove('active');
-          mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
-          mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+          document.body.classList.remove('nav-menu-open');
+          document.documentElement.classList.remove('nav-menu-open');
+          if (mobileToggle) {
+            mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
+            mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
+          }
         }
       }
     } catch (error) {
@@ -223,6 +239,8 @@ if (mobileToggle && navMenu) {
   mobileToggle.addEventListener('click', () => {
     navMenu.classList.toggle('open');
     mobileToggle.classList.toggle('active');
+    document.body.classList.toggle('nav-menu-open');
+    document.documentElement.classList.toggle('nav-menu-open');
 
     // Animacija dugmeta (burger u X)
     const spans = mobileToggle.querySelectorAll('span');
@@ -242,6 +260,8 @@ if (mobileToggle && navMenu) {
     link.addEventListener('click', () => {
       navMenu.classList.remove('open');
       mobileToggle.classList.remove('active');
+      document.body.classList.remove('nav-menu-open');
+      document.documentElement.classList.remove('nav-menu-open');
       mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
       mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
     });
@@ -253,6 +273,8 @@ if (mobileMenuClose && navMenu && mobileToggle) {
   mobileMenuClose.addEventListener('click', () => {
     navMenu.classList.remove('open');
     mobileToggle.classList.remove('active');
+    document.body.classList.remove('nav-menu-open');
+    document.documentElement.classList.remove('nav-menu-open');
     mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
     mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
   });
@@ -265,6 +287,8 @@ if (mobileLoginBtn) {
     // Close mobile menu
     navMenu.classList.remove('open');
     mobileToggle.classList.remove('active');
+    document.body.classList.remove('nav-menu-open');
+    document.documentElement.classList.remove('nav-menu-open');
     mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
     mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
   });
@@ -277,6 +301,8 @@ document.addEventListener('click', (e) => {
     if (!navMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
       navMenu.classList.remove('open');
       mobileToggle.classList.remove('active');
+      document.body.classList.remove('nav-menu-open');
+      document.documentElement.classList.remove('nav-menu-open');
       mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
       mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
     }
@@ -493,10 +519,15 @@ window.addEventListener('keydown', e => {
 
 // ── Kick OAuth / Login Flow ────────────────────────────────
 function getKickRedirectUri() {
-  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-    return 'http://localhost:5500/auth/kick/callback/'; // Use shared callback URL
+  const hostname = window.location.hostname;
+  
+  // Localhost development
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:5500/auth/kick/callback/';
   }
-  return 'https://kickall.app/auth/kick/callback/'; // Use shared callback URL
+  
+  // Production - always use kickall.app domain
+  return 'https://kickall.app/auth/kick/callback/';
 }
 
 function generateRandomString(length) {
@@ -549,6 +580,8 @@ async function openKickLogin() {
   const oauthStateKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_OAUTH_STATE : 'kick_oauth_state';
   const codeVerifierKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_CODE_VERIFIER : 'kick_code_verifier';
   const originSiteKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_ORIGIN_SITE : 'kick_origin_site';
+
+  console.log('Kickot OAuth initiation:', { state, codeVerifier: codeVerifier.substring(0, 10) + '...', originSite: 'kickot' });
 
   localStorage.setItem(oauthStateKey, state);
   localStorage.setItem(codeVerifierKey, codeVerifier);
@@ -868,6 +901,19 @@ sb.auth.onAuthStateChange((event, session) => {
   onUserChange(session?.user || null);
 });
 
+// ── Initial Session Check ──────────────────────────────────
+(async function checkInitialSession() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) {
+      console.log('Kickot: Found existing session from KickAll', session.user);
+      onUserChange(session.user);
+    }
+  } catch (error) {
+    console.error('Kickot: Error checking initial session', error);
+  }
+})();
+
 // ── Kick Login Button with Redirect Animation ─────────────
 const authKickLoginBtn = document.getElementById('authKickLoginBtn');
 if (authKickLoginBtn) {
@@ -1038,37 +1084,11 @@ async function handleLogout() {
 })();
 
 // ─────────────────────────────────────────────────────────────
-// Lenis Smooth Scroll & Spotlight Glow & Back To Top Integration
+// Spotlight Glow & Back To Top Integration
 // ─────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    let lenis = null;
-    if (typeof window.Lenis !== 'undefined') {
-        lenis = new window.Lenis({
-            duration: 1.0,
-            easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-            direction: 'vertical',
-            gestureDirection: 'vertical',
-            smoothTouch: false,
-            smoothWheel: true,
-            wheelMultiplier: 1,
-            touchMultiplier: 2,
-            infinite: false
-        });
-        window.lenisInstance = lenis;
-
-        function lenisRaf(time) {
-            lenis.raf(time);
-            requestAnimationFrame(lenisRaf);
-        }
-        requestAnimationFrame(lenisRaf);
-    }
-
     function scrollToTop() {
-        if (window.lenisInstance) {
-            window.lenisInstance.scrollTo(0);
-        } else {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // Smooth scroll za sve navigacione linkove
@@ -1085,11 +1105,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const targetEl = document.querySelector(href);
                 if (targetEl) {
                     e.preventDefault();
-                    if (window.lenisInstance) {
-                        window.lenisInstance.scrollTo(targetEl, { offset: -80, duration: 1.2 });
-                    } else {
-                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             } catch (error) {
                 // Silent fail for invalid selectors

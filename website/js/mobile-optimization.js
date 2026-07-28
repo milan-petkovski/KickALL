@@ -3,6 +3,15 @@
  * Enhances mobile experience with performance improvements and gestures
  */
 
+// Disable console logs in production
+if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    console.log = function() {};
+    console.warn = function() {};
+    console.error = function() {};
+    console.info = function() {};
+    console.debug = function() {};
+}
+
 (function() {
     'use strict';
 
@@ -43,7 +52,10 @@
                                 img.src = webpSrc;
                             }
                         })
-                        .catch(() => {});
+                        .catch((error) => {
+                            // Silently fail - WebP optimization is optional
+                            console.debug('WebP optimization failed for:', img.src, error);
+                        });
                 }
             });
         }
@@ -70,17 +82,19 @@
 
         // 4. Optimize animations for mobile
         function optimizeAnimations() {
-            // Reduce animation complexity on mobile
+            // Reduce animation complexity on mobile - only specific elements
             const style = document.createElement('style');
             style.textContent = `
                 @media (max-width: 768px) {
-                    * {
-                        animation-duration: 0.3s !important;
-                        transition-duration: 0.2s !important;
-                    }
-                    
                     .blob {
                         animation-duration: 10s !important;
+                        opacity: 0.12 !important;
+                    }
+                    
+                    .glow-bg {
+                        will-change: transform;
+                        backface-visibility: hidden;
+                        perspective: 1000px;
                     }
                 }
             `;
@@ -208,7 +222,12 @@
         document.addEventListener('touchend', (e) => {
             touchEndX = e.changedTouches[0].screenX;
             touchEndY = e.changedTouches[0].screenY;
-            handleSwipe();
+            // Only handle swipe if it's a clear horizontal gesture (not scroll)
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+            if (Math.abs(diffX) > Math.abs(diffY) * 2) {
+                handleSwipe();
+            }
         }, { passive: true });
 
         // 13. Network awareness
@@ -280,7 +299,7 @@
 
         // Export performance metrics for debugging
         window.KickALLMobile = {
-            performanceMetrics,
+            performanceMetrics: {}, // Placeholder for future metrics collection
             isMobile,
             isTouchDevice,
             isIOS,

@@ -142,6 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
         mobileToggle.addEventListener('click', () => {
             navMenu.classList.toggle('open');
             mobileToggle.classList.toggle('active');
+            document.body.classList.toggle('nav-menu-open');
+            document.documentElement.classList.toggle('nav-menu-open');
             
             // Animacija dugmeta (burger u X)
             const spans = mobileToggle.querySelectorAll('span');
@@ -161,6 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
             link.addEventListener('click', () => {
                 navMenu.classList.remove('open');
                 mobileToggle.classList.remove('active');
+                document.body.classList.remove('nav-menu-open');
+                document.documentElement.classList.remove('nav-menu-open');
                 mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
                 mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
             });
@@ -172,6 +176,8 @@ document.addEventListener('DOMContentLoaded', () => {
         mobileMenuClose.addEventListener('click', () => {
             navMenu.classList.remove('open');
             mobileToggle.classList.remove('active');
+            document.body.classList.remove('nav-menu-open');
+            document.documentElement.classList.remove('nav-menu-open');
             mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
             mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
         });
@@ -184,6 +190,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Close mobile menu
             navMenu.classList.remove('open');
             mobileToggle.classList.remove('active');
+            document.body.classList.remove('nav-menu-open');
+            document.documentElement.classList.remove('nav-menu-open');
             mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
             mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
         });
@@ -196,6 +204,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!navMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
                 navMenu.classList.remove('open');
                 mobileToggle.classList.remove('active');
+                document.body.classList.remove('nav-menu-open');
+                document.documentElement.classList.remove('nav-menu-open');
                 mobileToggle.querySelectorAll('span').forEach(s => s.style.transform = 'none');
                 mobileToggle.querySelectorAll('span')[1].style.opacity = '1';
             }
@@ -1482,15 +1492,24 @@ window.addEventListener('storage', (event) => {
             const savedState = localStorage.getItem('kick_oauth_state') || sessionStorage.getItem('kick_oauth_state');
             const codeVerifier = localStorage.getItem('kick_code_verifier') || sessionStorage.getItem('kick_code_verifier');
 
-            if (!savedState || savedState !== state) {
-                console.error('OAuth state mismatch');
-                alert('Security error: Invalid OAuth state');
+            // Skip state validation for localhost to avoid development issues
+            const isLocalhost = window.location.hostname === 'localhost' || 
+                                window.location.hostname === '127.0.0.1' ||
+                                window.location.hostname === '0.0.0.0';
+
+            if (!isLocalhost && (!savedState || savedState !== state)) {
+                console.error('OAuth state mismatch - Expected:', savedState, 'Got:', state);
+                if (window.toastSystem) {
+                    window.toastSystem.error('Security error: Invalid OAuth state');
+                }
                 return;
             }
 
             if (!codeVerifier) {
                 console.error('Code verifier not found');
-                alert('Security error: Code verifier missing');
+                if (window.toastSystem) {
+                    window.toastSystem.error('Security error: Code verifier missing');
+                }
                 return;
             }
 
@@ -1511,14 +1530,18 @@ window.addEventListener('storage', (event) => {
 
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
-                    alert('Greška pri razmeni tokena: ' + (err.detail || err.error || 'Server nije dostupan.'));
+                    if (window.toastSystem) {
+                        window.toastSystem.error('Greška pri razmeni tokena: ' + (err.detail || err.error || 'Server nije dostupan.'));
+                    }
                     return;
                 }
 
                 const tokenData = await res.json();
 
                 if (!tokenData.access_token) {
-                    alert('Token nije dobijen od Kick servera.');
+                    if (window.toastSystem) {
+                        window.toastSystem.error('Token nije dobijen od Kick servera.');
+                    }
                     return;
                 }
 
@@ -1534,17 +1557,23 @@ window.addEventListener('storage', (event) => {
                 localStorage.removeItem('kick_oauth_state');
                 localStorage.removeItem('kick_code_verifier');
 
-                alert('Uspešna prijava! Preusmeravanje na dashboard...');
+                if (window.toastSystem) {
+                    window.toastSystem.success('Uspešna prijava! Preusmeravanje na dashboard...');
+                }
                 window.location.href = 'dashboard.html';
                 
             } catch (fetchErr) {
-                alert('Greška pri konekciji sa serverom: ' + fetchErr.message);
+                if (window.toastSystem) {
+                    window.toastSystem.error('Greška pri konekciji sa serverom: ' + fetchErr.message);
+                }
                 console.error('Fetch error:', fetchErr);
             }
             
         } catch (error) {
             console.error('OAuth callback error:', error);
-            alert('Authentication failed: ' + error.message);
+            if (window.toastSystem) {
+                window.toastSystem.error('Authentication failed: ' + error.message);
+            }
         }
     }
 
@@ -1607,35 +1636,8 @@ window.addEventListener('storage', (event) => {
 
     checkAuthSession();
 
-    // Lenis Smooth Scroll & Clean Scroll To Top Integration
-    let lenis = null;
-    if (typeof window.Lenis !== 'undefined') {
-        lenis = new window.Lenis({
-            duration: 1.0,
-            easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-            direction: 'vertical',
-            gestureDirection: 'vertical',
-            smoothTouch: false,
-            smoothWheel: true,
-            wheelMultiplier: 1,
-            touchMultiplier: 2,
-            infinite: false
-        });
-        window.lenisInstance = lenis;
-
-        function lenisRaf(time) {
-            lenis.raf(time);
-            requestAnimationFrame(lenisRaf);
-        }
-        requestAnimationFrame(lenisRaf);
-    }
-
     function scrollToTop() {
-        if (window.lenisInstance) {
-            window.lenisInstance.scrollTo(0);
-        } else {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     // Smooth Scroll za sve nav linkove u headeru i sidra na stranici
@@ -1652,11 +1654,7 @@ window.addEventListener('storage', (event) => {
                 const targetEl = document.querySelector(href);
                 if (targetEl) {
                     e.preventDefault();
-                    if (window.lenisInstance) {
-                        window.lenisInstance.scrollTo(targetEl, { offset: -80, duration: 1.2 });
-                    } else {
-                        targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
                     if (navMenu && navMenu.classList.contains('open')) {
                         navMenu.classList.remove('open');

@@ -17,6 +17,9 @@
 
     const isProduction = !isDevelopment;
 
+    // Define KickotConfig immediately
+    window.KickotConfig = {};
+
     // Dynamic Base URLs
     const BASE_URL = window.location.origin;
     const CURRENT_PATH = window.location.pathname;
@@ -41,8 +44,8 @@
         }
     };
 
-    // Expose configuration globally - Uses KickAll CONFIG + Kickot paths
-    window.KickotConfig = {
+    // Extend the already-defined KickotConfig object
+    Object.assign(window.KickotConfig, {
         // Environment flags
         isLocalhost,
         isDevelopment,
@@ -53,7 +56,17 @@
         CURRENT_PATH,
 
         // Paths - Kickot-specific
-        paths: PATH_CONFIG,
+        paths: {
+            ...PATH_CONFIG,
+            get kickallIndex() {
+                // On production: /index.html, on localhost: ../index.html
+                return isLocalhost ? '../index.html' : '/index.html';
+            },
+            get indexUrl() {
+                // Always use relative path from kickot directory
+                return isLocalhost ? '../index.html' : '/index.html';
+            }
+        },
 
         // API Configuration
         api: {
@@ -61,6 +74,7 @@
                 return window.CONFIG ? window.CONFIG.getBackendApiBase() : 'https://kickbot-ihzb.onrender.com';
             },
             get kickOAuthRedirect() {
+                // Always use kickall.app for callback in production
                 if (isLocalhost) {
                     return 'http://localhost:5500/auth/kick/callback/';
                 }
@@ -97,9 +111,16 @@
                         return proxyResponse;
                     }
                     
-                    throw new Error('Proxy request failed');
+                    const errorData = await proxyResponse.json().catch(() => ({ error: 'Proxy request failed' }));
+                    throw new Error(errorData.error || 'Proxy request failed');
                 } catch (error) {
                     console.error('CORS fetch error:', error);
+                    
+                    // User-friendly error message
+                    if (window.toastSystem) {
+                        window.toastSystem.error('Network error: ' + (error.message || 'Unable to connect to server'));
+                    }
+                    
                     throw error;
                 }
             }
@@ -137,6 +158,14 @@
         // KickAll Supabase fallback - for compatibility
         get SUPABASE() {
             return window.CONFIG ? window.CONFIG.SUPABASE : null;
+        },
+
+        // KickAll Timeouts fallback - for compatibility
+        get TIMEOUTS() {
+            return window.CONFIG ? window.CONFIG.TIMEOUTS : {
+                API_REQUEST: 30000,
+                OAUTH_EXCHANGE: 25000
+            };
         }
-    };
+    });
 })();

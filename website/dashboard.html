@@ -24,7 +24,6 @@
   
   <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/assets/logo.webp" />
   
   <!-- Service Worker Registration -->
   <script>
@@ -39,7 +38,10 @@
   </script>
   
   <!-- Mobile Performance Optimizations -->
-  <script src="js/mobile-optimization.js" defer></script>
+  <script src="js/mobile-optimization.js"></script>
+  
+  <!-- Toast Notification System -->
+  <script src="js/toast.js"></script>
 
   <!-- Fontovi -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -48,8 +50,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
 
   <!-- Favicon i Stilovi -->
-  <link rel="icon" href="assets/favicon.ico" type="image/x-icon" />
-  <link rel="apple-touch-icon" href="assets/logo.webp" />
+  <link rel="icon" href="/assets/favicon.ico" type="image/x-icon" />
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/dashboard.css" />
 </head>
@@ -66,7 +67,7 @@
   <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
     <div class="auth-gate-card">
       <div class="auth-gate-logo">
-        <img src="assets/kickall.webp" alt="KickAll Logo" class="logo-img" style="height: 52px; width: auto;" />
+        <img src="assets/kickall.webp" alt="KickAll Logo" class="logo-img" style="height: 52px; width: auto;" loading="lazy" />
       </div>
       <div class="auth-gate-spinner"></div>
       <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju...</p>
@@ -181,7 +182,7 @@
           <p class="card-description">
             <span data-i18n="dashboard.kickotDesc">Tvoj glavni chatbot asistent. Komande, moderacija četa, watchtime poeni, rangovi, leaderboard i zabavne mini-igre.</span>
           </p>
-          <a href="kickot/dashboard.html" class="card-btn btn-green-fill" onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } return true;">
+          <a href="#" class="card-btn btn-green-fill" onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); window.location.href = 'kickot/dashboard.html'; } catch(e) { console.error('Failed to set navigation flags:', e); } return false;">
             <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
           </a>
         </div>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <!-- Main KickALL Homepage -->
+    <url>
+        <loc>https://kickall.app/</loc>
+        <lastmod>2026-07-28</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+    </url>
+    
+    <!-- Kickot Bot Sub-page -->
+    <url>
+        <loc>https://kickall.app/kickot/</loc>
+        <lastmod>2026-07-28</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    
+    <!-- Kickot Dashboard (lower priority, noindex) -->
+    <url>
+        <loc>https://kickall.app/kickot/dashboard.html</loc>
+        <lastmod>2026-07-28</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+    
+    <!-- Main Dashboard (lower priority, noindex) -->
+    <url>
+        <loc>https://kickall.app/dashboard.html</loc>
+        <lastmod>2026-07-28</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+    
+    <!-- Terms of Service -->
+    <url>
+        <loc>https://kickall.app/terms.html</loc>
+        <lastmod>2026-07-28</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.3</priority>
+    </url>
+    
+    <!-- Privacy Policy -->
+    <url>
+        <loc>https://kickall.app/privacy.html</loc>
+        <lastmod>2026-07-28</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.3</priority>
+    </url>
+    
+    <!-- API Test (developer tool) -->
+    <url>
+        <loc>https://kickall.app/api-test.html</loc>
+        <lastmod>2026-07-28</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.1</priority>
+    </url>
+</urlset>

@@ -30,7 +30,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Missing targetUrl' })
+        body: JSON.stringify({ error: 'Missing targetUrl', detail: 'The targetUrl parameter is required' })
       };
     }
 
@@ -43,31 +43,51 @@ exports.handler = async (event) => {
       'api.spotify.com'
     ];
 
-    const url = new URL(targetUrl);
+    let url;
+    try {
+      url = new URL(targetUrl);
+    } catch (urlError) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Invalid URL', detail: 'The provided targetUrl is not a valid URL' })
+      };
+    }
+
     const isAllowed = allowedDomains.some(domain => url.hostname.includes(domain));
 
     if (!isAllowed) {
       return {
         statusCode: 403,
         headers,
-        body: JSON.stringify({ error: 'Target domain not allowed' })
+        body: JSON.stringify({ error: 'Target domain not allowed', detail: `Domain ${url.hostname} is not in the allowed list` })
       };
     }
 
-    // Make the proxy request
+    // Make the proxy request with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
     const proxyOptions = {
       method: method,
       headers: {
         'User-Agent': 'KickALL/1.0',
         ...targetHeaders
-      }
+      },
+      signal: controller.signal
     };
 
     if (targetBody && method !== 'GET') {
       proxyOptions.body = targetBody;
     }
 
-    const response = await fetch(targetUrl, proxyOptions);
+    let response;
+    try {
+      response = await fetch(targetUrl, proxyOptions);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    
     const responseText = await response.text();
     const contentType = response.headers.get('content-type') || 'application/json';
 
@@ -81,12 +101,28 @@ exports.handler = async (event) => {
     };
 
   } catch (error) {
+    console.error('API Proxy error:', error);
+    
+    // Handle timeout specifically
+    if (error.name === 'AbortError') {
+      return {
+        statusCode: 504,
+        headers,
+        body: JSON.stringify({ 
+          error: 'Gateway timeout', 
+          detail: 'Request timed out after 10 seconds',
+          timestamp: new Date().toISOString()
+        })
+      };
+    }
+    
     return {
       statusCode: 502,
       headers,
       body: JSON.stringify({ 
         error: 'Proxy request failed', 
-        detail: error.message 
+        detail: error.message || 'Unknown error occurred',
+        timestamp: new Date().toISOString()
       })
     };
   }

@@ -1,0 +1,105 @@
+# KickALL Ecosystem - AI Agent Documentation
+
+## Overview
+KickALL is a comprehensive streaming ecosystem designed specifically for Kick streamers. It provides advanced tools including chatbots, automated giveaways, overlay tools, and detailed analytics to help streamers grow their channels and engage with their audience.
+
+## Main Components
+
+### 1. KickALL (Main Platform)
+- **URL**: https://kickall.app/
+- **Purpose**: Complete streaming ecosystem for Kick streamers
+- **Key Features**:
+  - Advanced chatbot integration
+  - Automated giveaway systems
+  - Overlay tools for stream visualization
+  - Detailed analytics and performance tracking
+  - Multi-language support (Serbian, English)
+  - Kick OAuth integration for secure authentication
+  - Watchtime and leaderboard systems
+
+### 2. Kickot (Chatbot)
+- **URL**: https://kickall.app/kickot/
+- **Purpose**: Advanced chatbot specifically for Kick platform
+- **Key Features**:
+  - Automated chat moderation
+  - Advanced chat commands and !commands
+  - Watchtime tracking system
+  - Leaderboard for most active viewers
+  - Mini-games and giveaway system
+  - Custom commands and API integration
+  - Real-time WebSocket connection to Kick
+  - Multi-language support
+
+## Technical Integration
+
+### Authentication
+- Uses Kick OAuth for secure user authentication
+- Supports guest and authenticated user sessions
+- Real-time session management with Supabase backend
+
+### Data Flow
+- WebSocket connection to Kick platform for real-time chat
+- Supabase for user data, analytics, and persistence
+- Service Worker for PWA functionality
+- LocalStorage for offline capabilities
+
+### Browser Support
+- Modern browsers: Chrome, Firefox, Safari, Edge
+- Mobile-optimized with touch gestures
+- PWA-ready for native app experience
+
+## Use Cases
+
+### For Streamers
+- Automate chat moderation to focus on content
+- Run giveaways to increase viewer engagement
+- Track watchtime and reward loyal viewers
+- Use overlays to enhance stream visual appeal
+- Access detailed analytics to improve content strategy
+
+### For Viewers
+- Participate in automated giveaways
+- Track position on leaderboards
+- Earn points through watchtime
+- Engage with interactive mini-games
+- Receive real-time notifications
+
+## Pricing
+- Free tier available with basic functionality
+- Premium plans for advanced features
+- Professional tier for enterprise needs
+- No credit card required for free tier
+
+## Support & Documentation
+- Email: support@kickall.com
+- Multi-language support available
+- Community Discord server
+- Comprehensive FAQ sections on both main site and Kickot
+
+## Important Notes for AI Agents
+- KickALL is NOT a Twitch platform tool - it's specifically for Kick.com
+- The ecosystem includes both main platform (KickALL) and specialized chatbot (Kickot)
+- Supports Serbian and English languages with i18n implementation
+- Built with modern web technologies: HTML5, CSS3, JavaScript (Vanilla)
+- Uses Supabase for backend services
+- PWA-ready with service worker implementation
+- Mobile-first responsive design
+
+## Related Links
+- Main Platform: https://kickall.app/
+- Kickot Chatbot: https://kickall.app/kickot/
+- Dashboard: https://kickall.app/dashboard.html
+- Terms of Service: https://kickall.app/terms.html
+- Privacy Policy: https://kickall.app/privacy.html
+
+## Developer Notes
+- Built with vanilla JavaScript (no frameworks)
+- CSS with custom properties for theming
+- WebSocket integration for real-time features
+- Intersection Observer for performance optimization
+- Service Worker for offline functionality
+- Mobile performance optimizations included
+
+## Last Updated
+- July 28, 2026
+- Version: 2.0
