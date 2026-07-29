@@ -65,8 +65,8 @@
       "desc": "Zabavi chat sa !duel, !roll, !iq, !rulet, ili pokreni ljubavni sistem sa sklapanjem brakova i praćenjem kompatibilnosti."
     },
     "song": {
-      "title": "Song Request & Spotify",
-      "desc": "Poveži Spotify nalog, omogući gledaocima da naručuju pesme preko chata i upravljaj redom reprodukcije direktno iz dashboarda."
+      "title": "Song Request (YouTube Music)",
+      "desc": "Omogući gledaocima da naručuju pesme sa YouTube-a preko chata i upravljaj reprodukcijom zvuka direktno iz dashboarda."
     }
   },
   "cmds": {

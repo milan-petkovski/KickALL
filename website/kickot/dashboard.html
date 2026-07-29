@@ -1826,7 +1826,7 @@
           <div class="panel-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; margin-bottom: 1.75rem;">
             <div>
               <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
-                <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius-md); background: rgba(29, 185, 84, 0.15); color: #1DB954; border: 1px solid rgba(29, 185, 84, 0.3);">
+                <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--radius-md); background: rgb(255, 0, 51, 0.15); color: #FF0033; border: 1px solid rgb(255, 0, 51, 0.3);">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M9 18V5l12-2v13" />
                     <circle cx="6" cy="18" r="3" />
@@ -1835,7 +1835,7 @@
                 </div>
                 <span>Song Request</span>
               </h1>
-              <p class="panel-desc">Upravljajte muzičkim željama gledalaca u realnom vremenu i sinhronizujte reprodukciju sa Spotify nalogom.</p>
+              <p class="panel-desc">Upravljajte muzičkim željama gledalaca u realnom vremenu i puštajte pesme sa YouTube-a direktno u dashboardu.</p>
             </div>
             <div class="panel-header-toggle">
               <span class="panel-header-toggle__label">Song Request:</span>
@@ -1849,33 +1849,6 @@
           <!-- Plan Limit Status Banner -->
           <div class="plan-limit-banner" id="songsPlanLimitBanner" style="background: rgba(13, 9, 26, 0.6); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 12px; padding: 12px 16px; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;"></div>
 
-          <!-- Spotify Integration Banner -->
-          <div class="config-section" style="padding: 20px 24px; margin-bottom: 1.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; background: rgba(29, 185, 84, 0.04); border: 1px solid rgba(29, 185, 84, 0.25); border-radius: var(--radius-lg); backdrop-filter: blur(12px);">
-            <div style="display: flex; align-items: center; gap: 14px;">
-              <div style="width: 44px; height: 44px; border-radius: 50%; background: #1DB954; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 14px rgba(29, 185, 84, 0.35);">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="#000">
-                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.02 8.52-.6 11.64 1.32.42.18.48.66.301 1.02zm1.48-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141 C9.6 9.9 15 10.561 18.72 12.841c.361.181.54.78.281 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.18-1.2-.18-1.38-.72-.18-.6.18-1.2.72-1.38 4.26-1.26 11.28-1.02 15.72 1.62.54.3.72 1.02.42 1.56-.3.42-1.02.6-1.5 .3z"/>
-                </svg>
-              </div>
-              <div>
-                <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
-                  <span>Spotify Integracija</span>
-                  <span id="spotifyStatusBadge" class="status-pill status-inactive" style="font-size: 0.72rem; padding: 3px 10px; border-radius: 12px;">Nije povezano</span>
-                </h4>
-                <p style="margin: 4px 0 0 0; font-size: 0.83rem; color: var(--text-muted);" id="spotifyStatusDesc">Povežite svoj Spotify nalog za sinhronizovanu reprodukciju i automatsko puštanje pesama na strimu.</p>
-              </div>
-            </div>
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <button type="button" class="btn btn-sm" id="btnConnectSpotify" onclick="connectSpotifyAccount()" style="background: #1DB954; color: #000; font-weight: 700; border: none; padding: 9px 20px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 8px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.02 8.52-.6 11.64 1.32.42.18.48.66.301 1.02z"/></svg>
-                Poveži sa Spotify
-              </button>
-              <button type="button" class="btn btn-sm btn-outline danger" id="btnDisconnectSpotify" onclick="disconnectSpotifyAccount()" style="display: none; padding: 8px 14px;">
-                Odjavi Spotify
-              </button>
-            </div>
-          </div>
-
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.75rem; margin-bottom: 2rem;">
             
             <!-- Left Column: Player & Add Song -->
@@ -1884,17 +1857,18 @@
               <!-- Music Player Card -->
               <div class="config-section" style="padding: 24px; display: flex; flex-direction: column; gap: 20px; align-items: center; text-align: center; position: relative;">
                 
-                <!-- Album Art Container -->
-                <div style="width: 140px; height: 140px; min-width: 140px; min-height: 140px; flex-shrink: 0; border-radius: 16px; background: #111; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 30px rgba(0,0,0,0.5); position: relative; overflow: hidden; border: 1px solid var(--border-subtle);" id="playerCoverWrap">
-                  <img id="playerCoverImg" src="" alt="Album Cover" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
-                  <div id="playerDisk" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(29,185,84,0.25), #07070d);">
+                <!-- Album Art & YouTube Player Container -->
+                <div style="width: 220px; height: 140px; min-width: 220px; min-height: 140px; flex-shrink: 0; border-radius: 16px; background: #000; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 30px rgba(0,0,0,0.5); position: relative; overflow: hidden; border: 1px solid var(--border-subtle);" id="playerCoverWrap">
+                  <iframe id="ytAudioPlayer" src="https://www.youtube.com/embed/?enablejsapi=1&autoplay=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" frameborder="0" style="width: 100%; height: 100%; border: none; border-radius: 12px; position: relative; z-index: 1;"></iframe>
+                  <img id="playerCoverImg" src="" alt="Album Cover" style="width: 100%; height: 100%; object-fit: cover; display: none; position: absolute; top: 0; left: 0; pointer-events: none; z-index: 2;" />
+                  <div id="playerDisk" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, rgba(255,0,51,0.25), #07070d); position: absolute; top: 0; left: 0; pointer-events: none; z-index: 2;">
                     <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M9 18V5l12-2v13" />
                       <circle cx="6" cy="18" r="3" />
                       <circle cx="18" cy="16" r="3" />
                     </svg>
                   </div>
-                  <span id="playerSourceBadge" style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.75); border-radius: 6px; padding: 3px 6px; font-size: 0.65rem; color: #fff; font-weight: 700; backdrop-filter: blur(4px); display: none;">Spotify</span>
+                  <span id="playerSourceBadge" style="position: absolute; bottom: 8px; right: 8px; background: rgba(255,0,51,0.85); border-radius: 6px; padding: 3px 6px; font-size: 0.65rem; color: #fff; font-weight: 700; backdrop-filter: blur(4px); display: none; z-index: 5;">YouTube</span>
                 </div>
                 
                 <div>
@@ -1905,7 +1879,7 @@
                 <!-- Progress Bar -->
                 <div style="width: 100%; display: flex; flex-direction: column; gap: 6px;">
                   <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; position: relative; cursor: pointer;" onclick="seekPlayer(event)">
-                    <div style="width: 0%; height: 100%; background: #1DB954; border-radius: 3px; transition: width 0.1s linear;" id="playerProgress"></div>
+                    <div style="width: 0%; height: 100%; background: #FF0033; border-radius: 3px; transition: width 0.1s linear;" id="playerProgress"></div>
                   </div>
                   <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
                     <span id="playerCurrentTime">0:00</span>
@@ -1921,7 +1895,7 @@
                       <line x1="5" y1="19" x2="5" y2="5" />
                     </svg>
                   </button>
-                  <button class="btn" style="border-radius: 50%; width: 50px; height: 50px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; background: #1DB954; color: #000; border: none; box-shadow: 0 4px 15px rgba(29,185,84,0.4);" onclick="togglePlayback()" id="playBtn" title="Pusti / Pauziraj">
+                  <button class="btn" style="border-radius: 50%; width: 50px; height: 50px; padding: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; background: #FF0033; color: #fff; border: none; box-shadow: 0 4px 15px rgba(255,0,51,0.4);" onclick="togglePlayback()" id="playBtn" title="Pusti / Pauziraj">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" id="playIcon">
                       <polygon points="5 3 19 12 5 21 5 3" />
                     </svg>
@@ -1940,7 +1914,7 @@
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                     <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
                   </svg>
-                  <input type="range" id="playerVolumeSlider" min="0" max="100" value="80" style="flex-grow: 1; accent-color: #1DB954; height: 4px; cursor: pointer;" oninput="updateVolume(this.value)">
+                  <input type="range" id="playerVolumeSlider" min="0" max="100" value="80" style="flex-grow: 1; accent-color: #FF0033; height: 4px; cursor: pointer;" oninput="updateVolume(this.value)">
                 </div>
 
               </div>
@@ -1948,18 +1922,18 @@
               <!-- Request Form -->
               <div class="config-section" style="padding: 24px;">
                 <h3 class="config-section-title" style="display: flex; align-items: center; gap: 8px; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 16px;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1DB954" stroke-width="2.5">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF0033" stroke-width="2.5">
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
                   Dodaj pesmu ručno
                 </h3>
                 <div style="display: flex; gap: 8px; margin-bottom: 10px;">
-                  <input type="text" id="songRequestInput" class="form-input" style="flex-grow: 1;" placeholder="Unesi Spotify link, YouTube link ili naziv pesme..." onkeydown="if(event.key === 'Enter'){ event.preventDefault(); requestSong(); }" />
-                  <button id="songRequestAddBtn" class="btn btn-primary" onclick="requestSong()" style="padding: 10px 20px; white-space: nowrap;">Dodaj</button>
+                  <input type="text" id="songRequestInput" class="form-input" style="flex-grow: 1;" placeholder="Unesi YouTube link ili naziv pesme..." onkeydown="if(event.key === 'Enter'){ event.preventDefault(); requestSong(); }" />
+                  <button id="songRequestAddBtn" class="btn btn-primary" onclick="requestSong()" style="padding: 10px 20px; white-space: nowrap; background: #FF0033; border: none;">Dodaj</button>
                 </div>
                 <span class="config-hint" style="line-height: 1.4; display: block;">
-                  Gledaoci šalju muzičke želje direktno u četu kucanjem komande: <code style="background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; color: #1DB954; font-weight: bold;">!pesma [spotify/youtube link ili naziv pesme]</code>
+                  Gledaoci šalju muzičke želje u četu kucanjem komande: <code style="background: rgba(255,0,51,0.15); padding: 2px 6px; border-radius: 4px; color: #FF0033; font-weight: bold;">!pesma [youtube link ili naziv pesme]</code> (ili <code style="background: rgba(255,0,51,0.15); padding: 2px 6px; border-radius: 4px; color: #FF0033; font-weight: bold;">!sr [pesma]</code>)
                 </span>
               </div>
 
@@ -1972,12 +1946,13 @@
               <div class="config-section" style="padding: 24px; display: flex; flex-direction: column; gap: 16px; flex-grow: 1; min-height: 280px;">
                 <h3 class="config-section-title" style="display: flex; align-items: center; justify-content: space-between; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 0;">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: #1DB954;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: #FF0033;">
                       <line x1="8" y1="6" x2="21" y2="6" />
                       <line x1="8" y1="12" x2="21" y2="12" />
                       <line x1="8" y1="18" x2="21" y2="18" />
                       <line x1="3" y1="6" x2="3.01" y2="6" />
                       <line x1="3" y1="12" x2="3.01" y2="12" />
+                    </svg>
                       <line x1="3" y1="18" x2="3.01" y2="18" />
                     </svg>
                     <span>Lista pesama u redu</span>
@@ -1997,7 +1972,7 @@
               <div class="config-section" style="padding: 24px;">
                 <h3 class="config-section-title" style="display: flex; align-items: center; justify-content: space-between; font-size: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 12px; margin-bottom: 16px;">
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #1DB954;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #FF0033;">
                       <circle cx="12" cy="12" r="3"></circle>
                       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                     </svg>
@@ -4592,7 +4567,9 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
-  <script src="js/dashboard.js"></script>
+  <!-- YouTube Iframe API for Audio Player -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="js/dashboard.js?v=yt_music_v3"></script>
   
   <!-- KickALL Data Layer & Analytics -->
   <script src="../js/data-layer.js"></script>

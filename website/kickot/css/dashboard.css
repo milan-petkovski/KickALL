@@ -3265,15 +3265,7 @@ input[type="number"]::-webkit-inner-spin-button {
   min-height: 0;
 }
 
-/* ── Spotify connect button pulse ── */
-@keyframes spotify-pulse {
-  0%, 100% { box-shadow: 0 4px 15px rgba(29, 185, 84, 0.2); }
-  50% { box-shadow: 0 4px 25px rgba(29, 185, 84, 0.5); }
-}
 
-#btnConnectSpotify:not([disabled]) {
-  animation: spotify-pulse 2.5s ease-in-out infinite;
-}
 
 /* ── Economy Subpanel & Layout Enhancements ── */
 .eco-subpanel {

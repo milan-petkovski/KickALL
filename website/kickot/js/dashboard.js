@@ -299,7 +299,7 @@ function openCheckout(plan) {
     return;
   }
 
-  const url = `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId)}`;
+  const url = `${baseUrl}?custom[user_id]=${encodeURIComponent(userId)}&checkout[custom][user_id]=${encodeURIComponent(userId)}`;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 window.openCheckout = openCheckout;
@@ -989,7 +989,7 @@ async function initAuth() {
       window.history.replaceState({}, '', window.location.pathname);
     }
 
-    if (urlParamsOAuth && kickAccessToken) {
+    if (kickAccessToken) {
       document.getElementById('authGateMsg').textContent = 'Učitavamo tvoj Kick profil...';
       try {
         await handleKickOAuthSession(kickAccessToken);
@@ -1265,11 +1265,11 @@ async function initApp() {
     document.getElementById('authGateMsg').textContent = 'Učitavanje podataka...';
     
     await loadAllData();
-    let lastPanel = localStorage.getItem('active-dashboard-panel');
-    // Default to overview if panel is unknown or invalid
+    let lastPanel = 'overview';
+    const hashPanel = window.location.hash ? window.location.hash.replace('#', '') : null;
     const validPanels = ['overview', 'leaderboard', 'commands', 'games', 'announces', 'autoresponse', 'marriages', 'minigames', 'songs', 'economy', 'config', 'moderation'];
-    if (!lastPanel || !validPanels.includes(lastPanel) || lastPanel === 'no-channel') {
-      lastPanel = 'overview';
+    if (hashPanel && validPanels.includes(hashPanel)) {
+      lastPanel = hashPanel;
     }
     switchPanel(lastPanel);
     renderPlanLimitBanners();
@@ -3514,7 +3514,6 @@ async function loadBotConfig() {
     localSongQueue = Array.isArray(songSettings.queue) ? songSettings.queue : localSongQueue;
     renderSongQueue();
     updatePlayerUI();
-    initSpotifyState();
 
     // Load auto announce interval settings
     document.getElementById('cfgAnnounceInterval').value = data.announce_interval_mins ?? 15;
@@ -6955,34 +6954,17 @@ async function addNewChannel() {
         }, 800);
       }
 
-      // ── Song Request & Music Player Logic ──────────────────────────────────────
+      // ── Song Request & YouTube Audio Player Logic ─────────────────────────────
       let localSongQueue = [
         {
-          id: 's1',
-          title: 'Dao bih ovo malo života',
-          artist: 'Milanče Radosavljević',
+          id: 'yt_dQw4w9WgXcQ',
+          ytId: 'dQw4w9WgXcQ',
+          title: 'Never Gonna Give You Up',
+          artist: 'Rick Astley',
           requester: 'Strimer (Milan_567)',
-          duration: 215,
-          source: 'custom',
-          coverUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80'
-        },
-        {
-          id: 's2',
-          title: 'Jednoj ženi za sećanje',
-          artist: 'Jašar Ahmedovski',
-          requester: 'Gledalac (Marko_99)',
-          duration: 250,
-          source: 'spotify',
-          coverUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&auto=format&fit=crop&q=80'
-        },
-        {
-          id: 's3',
-          title: 'Žal',
-          artist: 'Šaban Šaulić',
-          requester: 'Moderator (Zoki)',
-          duration: 310,
-          source: 'custom',
-          coverUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300&auto=format&fit=crop&q=80'
+          duration: 212,
+          source: 'youtube',
+          coverUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
         }
       ];
 
@@ -6991,219 +6973,98 @@ async function addNewChannel() {
       let playbackInterval = null;
       let currentTimeSeconds = 0;
       let playerVolume = 80;
-      let spotifyToken = localStorage.getItem('kickbot_spotify_token') || null;
-      let spotifyUser = localStorage.getItem('kickbot_spotify_user') || null;
-      let spotifySyncInterval = null;
 
-      function generateRandomString(length) {
-        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        const values = crypto.getRandomValues(new Uint8Array(length));
-        return values.reduce((acc, x) => acc + possible[x % possible.length], '');
-      }
+      let ytPlayer = null;
+      let isYtReady = false;
 
-      async function generateCodeChallenge(codeVerifier) {
-        const data = new TextEncoder().encode(codeVerifier);
-        const digest = await crypto.subtle.digest('SHA-256', data);
-        return btoa(String.fromCharCode.apply(null, new Uint8Array(digest)))
-          .replace(/\+/g, '-')
-          .replace(/\//g, '_')
-          .replace(/=+$/, '');
-      }
-
-      function promptSpotifyClientId() {
-        const currentId = localStorage.getItem('kickbot_spotify_client_id') || '';
-        const input = prompt('Unesite vaš Spotify Client ID iz Spotify Developer Dashboard-a (https://developer.spotify.com/dashboard):', currentId);
-        if (input !== null && input.trim() !== '') {
-          localStorage.setItem('kickbot_spotify_client_id', input.trim());
-          showToast('Spotify Client ID je sačuvan!', 'success');
-          return input.trim();
+      // YouTube Iframe API callback
+      window.onYouTubeIframeAPIReady = function() {
+        try {
+          ytPlayer = new YT.Player('ytAudioPlayer', {
+            height: '100%',
+            width: '100%',
+            playerVars: {
+              autoplay: 1,
+              controls: 1,
+              disablekb: 0,
+              fs: 0,
+              rel: 0,
+              playsinline: 1,
+              origin: window.location.origin
+            },
+            events: {
+              'onReady': onYtPlayerReady,
+              'onStateChange': onYtPlayerStateChange,
+              'onError': onYtPlayerError
+            }
+          });
+        } catch (e) {
+          console.warn('[YouTube Audio Engine] API error:', e);
         }
-        return currentId;
-      }
+      };
 
-      async function checkSpotifyAuthCode() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        if (code) {
-          const verifier = localStorage.getItem('kickbot_spotify_code_verifier');
-          let clientId = localStorage.getItem('kickbot_spotify_client_id');
-          if (!clientId || clientId === 'c028a385f062402db3179261a8bb2a7e') {
-            clientId = '09165366748740278c242eb53d4a51f1';
-            localStorage.setItem('kickbot_spotify_client_id', clientId);
-          }
-          const redirectUri = window.location.origin + window.location.pathname;
-
+      function onYtPlayerReady(event) {
+        isYtReady = true;
+        if (ytPlayer) {
           try {
-            const response = await fetch('https://accounts.spotify.com/api/token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({
-                client_id: clientId,
-                grant_type: 'authorization_code',
-                code: code,
-                redirect_uri: redirectUri,
-                code_verifier: verifier
-              })
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-              spotifyToken = data.access_token;
-              if (data.refresh_token) localStorage.setItem('kickbot_spotify_refresh_token', data.refresh_token);
-              localStorage.setItem('kickbot_spotify_token', data.access_token);
-              history.replaceState(null, '', window.location.pathname);
-              fetchSpotifyUserProfile();
-            } else {
-              history.replaceState(null, '', window.location.pathname);
-            }
-          } catch (e) {
-            history.replaceState(null, '', window.location.pathname);
-          }
+            if (ytPlayer.unMute) ytPlayer.unMute();
+            if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume);
+          } catch (_) { }
         }
       }
-      checkSpotifyAuthCode();
 
-      async function fetchSpotifyUserProfile() {
-        if (!spotifyToken) return;
-        try {
-          const res = await fetch('https://api.spotify.com/v1/me', {
-            headers: { 'Authorization': `Bearer ${spotifyToken}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            spotifyUser = data.display_name || data.id || 'Spotify User';
-            localStorage.setItem('kickbot_spotify_user', spotifyUser);
-            initSpotifyState();
-            showToast(`Povezano sa Spotify nalogom: ${spotifyUser}`, 'success');
-            startSpotifyLiveSync();
+      function onYtPlayerStateChange(event) {
+        if (!event) return;
+        if (event.data === YT.PlayerState.ENDED) {
+          skipSong();
+        } else if (event.data === YT.PlayerState.PLAYING) {
+          isPlaying = true;
+          startTimer();
+          updatePlayerUI();
+          renderSongQueue();
+        } else if (event.data === YT.PlayerState.PAUSED) {
+          isPlaying = false;
+          stopTimer();
+          updatePlayerUI();
+          renderSongQueue();
+        }
+      }
+
+      function onYtPlayerError(event) {
+        console.warn('[YouTube Audio Engine] Video error, skipping song:', event ? event.data : '');
+        setTimeout(() => { skipSong(); }, 1500);
+      }
+
+      function extractYouTubeId(urlOrText) {
+        if (!urlOrText) return null;
+        const match = urlOrText.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+        return match && match[1] ? match[1] : null;
+      }
+
+      function startTimer() {
+        if (playbackInterval) clearInterval(playbackInterval);
+        playbackInterval = setInterval(() => {
+          const currentSong = localSongQueue[currentSongIndex];
+          if (!currentSong) {
+            stopTimer();
+            isPlaying = false;
+            updatePlayerUI();
+            return;
+          }
+          if (ytPlayer && ytPlayer.getCurrentTime && typeof ytPlayer.getCurrentTime === 'function') {
+            const curr = ytPlayer.getCurrentTime();
+            if (curr && !isNaN(curr)) currentTimeSeconds = Math.floor(curr);
           } else {
-            disconnectSpotifyAccount();
+            currentTimeSeconds++;
           }
-        } catch (e) {
-          initSpotifyState();
-        }
+          updatePlayerUI();
+        }, 1000);
       }
 
-      function initSpotifyState() {
-        const badge = document.getElementById('spotifyStatusBadge');
-        const desc = document.getElementById('spotifyStatusDesc');
-        const btnConnect = document.getElementById('btnConnectSpotify');
-        const btnDisconnect = document.getElementById('btnDisconnectSpotify');
-
-        if (!badge) return;
-
-        if (spotifyToken) {
-          badge.textContent = `Povezano (${spotifyUser || 'Spotify nalog'})`;
-          badge.className = 'status-pill status-active';
-          badge.style.background = 'rgba(29,185,84,0.15)';
-          badge.style.color = '#1DB954';
-          badge.style.border = '1px solid rgba(29,185,84,0.3)';
-
-          if (desc) desc.textContent = 'Vaš Spotify nalog je uspešno povezan. Bot sinhronizuje pesme i dodaje željene numere u pravi Spotify queue!';
-          if (btnConnect) btnConnect.style.display = 'none';
-          if (btnDisconnect) btnDisconnect.style.display = 'inline-flex';
-
-          startSpotifyLiveSync();
-        } else {
-          badge.textContent = 'Nije povezano';
-          badge.className = 'status-pill status-inactive';
-          badge.style.background = 'rgba(148,163,184,0.15)';
-          badge.style.color = '#94A3B8';
-          badge.style.border = '1px solid rgba(148,163,184,0.3)';
-
-          if (desc) desc.textContent = 'Povežite svoj Spotify nalog za sinhronizovanu reprodukciju i automatsko puštanje pesama na strimu.';
-          if (btnConnect) btnConnect.style.display = 'inline-flex';
-          if (btnDisconnect) btnDisconnect.style.display = 'none';
-
-          if (spotifySyncInterval) clearInterval(spotifySyncInterval);
-        }
-      }
-
-      async function connectSpotifyAccount() {
-        // Koristi novi podrazumevani Client ID
-        let clientId = localStorage.getItem('kickbot_spotify_client_id');
-        if (!clientId || clientId === 'c028a385f062402db3179261a8bb2a7e') {
-          clientId = '09165366748740278c242eb53d4a51f1';
-          localStorage.setItem('kickbot_spotify_client_id', clientId);
-        }
-
-        const redirectUri = window.location.origin + window.location.pathname;
-        const scopes = 'user-read-playback-state user-modify-playback-state user-read-currently-playing streaming';
-
-        const verifier = generateRandomString(64);
-        const challenge = await generateCodeChallenge(verifier);
-        localStorage.setItem('kickbot_spotify_code_verifier', verifier);
-        localStorage.setItem('kickbot_spotify_client_id', clientId);
-
-        const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&code_challenge_method=S256&code_challenge=${challenge}&show_dialog=true`;
-
-        window.location.href = authUrl;
-      }
-
-      function disconnectSpotifyAccount() {
-        spotifyToken = null;
-        spotifyUser = null;
-        localStorage.removeItem('kickbot_spotify_token');
-        localStorage.removeItem('kickbot_spotify_user');
-        localStorage.removeItem('kickbot_spotify_refresh_token');
-        localStorage.removeItem('kickbot_spotify_code_verifier');
-        if (spotifySyncInterval) clearInterval(spotifySyncInterval);
-        initSpotifyState();
-        showToast('Spotify nalog je uspešno odjavljen.', 'info');
-      }
-
-      function startSpotifyLiveSync() {
-        if (spotifySyncInterval) clearInterval(spotifySyncInterval);
-        syncSpotifyLivePlayer();
-        spotifySyncInterval = setInterval(syncSpotifyLivePlayer, 3000);
-      }
-
-      async function syncSpotifyLivePlayer() {
-        if (!spotifyToken) return;
-
-        try {
-          const res = await fetch('https://api.spotify.com/v1/me/player', {
-            headers: { 'Authorization': `Bearer ${spotifyToken}` }
-          });
-
-          if (res.status === 200) {
-            const data = await res.json();
-            if (data && data.item) {
-              const item = data.item;
-              isPlaying = data.is_playing;
-              currentTimeSeconds = Math.floor((data.progress_ms || 0) / 1000);
-
-              const trackTitle = item.name;
-              const artistNames = item.artists ? item.artists.map(a => a.name).join(', ') : '';
-              const durationSecs = Math.floor((item.duration_ms || 0) / 1000);
-              const albumCover = item.album && item.album.images && item.album.images[0] ? item.album.images[0].url : '';
-
-              // Update currently playing item in local queue or display top
-              if (localSongQueue.length > 0 && currentSongIndex < localSongQueue.length) {
-                localSongQueue[currentSongIndex].title = trackTitle;
-                localSongQueue[currentSongIndex].artist = artistNames;
-                localSongQueue[currentSongIndex].duration = durationSecs;
-                if (albumCover) localSongQueue[currentSongIndex].coverUrl = albumCover;
-                localSongQueue[currentSongIndex].source = 'spotify';
-              } else {
-                localSongQueue.unshift({
-                  id: 'sp_' + item.id,
-                  title: trackTitle,
-                  artist: artistNames,
-                  requester: 'Spotify Player',
-                  duration: durationSecs,
-                  source: 'spotify',
-                  coverUrl: albumCover
-                });
-                currentSongIndex = 0;
-              }
-
-              updatePlayerUI();
-              renderSongQueue();
-            }
-          }
-        } catch (e) {
-          // Quiet error handling
+      function stopTimer() {
+        if (playbackInterval) {
+          clearInterval(playbackInterval);
+          playbackInterval = null;
         }
       }
 
@@ -7237,7 +7098,7 @@ async function addNewChannel() {
           addInput.style.opacity = isQueueFull ? '0.5' : '1';
           addInput.placeholder = isQueueFull
             ? `Queue pun (${localSongQueue.length}/${sqLimits.maxSongQueue}) — nadogradi za veći queue`
-            : 'Unesi Spotify link, YouTube link ili naziv pesme...';
+            : 'Unesi YouTube link ili naziv pesme...';
         }
 
         if (localSongQueue.length === 0) {
@@ -7249,9 +7110,9 @@ async function addNewChannel() {
 
         queueList.innerHTML = localSongQueue.map((song, index) => {
           const isActive = index === currentSongIndex;
-          const activeBg = isActive ? 'rgba(29, 185, 84, 0.08)' : 'rgba(255,255,255,0.015)';
-          const activeBorder = isActive ? '1px solid rgba(29, 185, 84, 0.35)' : '1px solid var(--border-subtle)';
-          const activeText = isActive ? '#1DB954' : '#fff';
+          const activeBg = isActive ? 'rgba(255, 0, 51, 0.08)' : 'rgba(255,255,255,0.015)';
+          const activeBorder = isActive ? '1px solid rgba(255, 0, 51, 0.35)' : '1px solid var(--border-subtle)';
+          const activeText = isActive ? '#FF0033' : '#fff';
           const cover = song.coverUrl || defaultCover;
 
           return `
@@ -7264,8 +7125,8 @@ async function addNewChannel() {
           </div>
         </div>
         <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-          ${isActive && isPlaying ? '<span style="font-size: 0.72rem; color: #1DB954; font-weight: 700; display: flex; align-items: center; gap: 4px; background: rgba(29,185,84,0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(29,185,84,0.2);"><span class="status-dot" style="background: #1DB954; width:6px; height:6px; box-shadow:0 0 6px #1DB954;"></span> Svira</span>' : ''}
-          ${!isActive ? `<button type="button" class="btn btn-sm btn-outline" onclick="playSongNow(${index})" style="font-size: 0.72rem; padding: 3px 8px; border-color: rgba(29,185,84,0.3); color: #1DB954;" title="Pusti odmah">Pusti</button>` : ''}
+          ${isActive && isPlaying ? '<span style="font-size: 0.72rem; color: #FF0033; font-weight: 700; display: flex; align-items: center; gap: 4px; background: rgba(255,0,51,0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(255,0,51,0.2);"><span class="status-dot" style="background: #FF0033; width:6px; height:6px; box-shadow:0 0 6px #FF0033;"></span> Svira</span>' : ''}
+          ${!isActive ? `<button type="button" class="btn btn-sm btn-outline" onclick="playSongNow(${index})" style="font-size: 0.72rem; padding: 3px 8px; border-color: rgba(255,0,51,0.3); color: #FF0033;" title="Pusti odmah">Pusti</button>` : ''}
           <button type="button" class="btn btn-sm btn-text" onclick="removeSong(${index})" style="color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Ukloni pesmu">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -7327,8 +7188,8 @@ async function addNewChannel() {
 
         if (playerSourceBadge) {
           playerSourceBadge.style.display = 'inline-block';
-          playerSourceBadge.textContent = currentSong.source === 'spotify' ? 'Spotify' : 'YouTube';
-          playerSourceBadge.style.background = currentSong.source === 'spotify' ? 'rgba(29, 185, 84, 0.85)' : 'rgba(239, 68, 68, 0.85)';
+          playerSourceBadge.textContent = 'YouTube';
+          playerSourceBadge.style.background = 'rgba(255, 0, 51, 0.85)';
         }
 
         if (playIcon) {
@@ -7343,48 +7204,65 @@ async function addNewChannel() {
         }
       }
 
+      async function playCurrentAudio() {
+        const currentSong = localSongQueue[currentSongIndex];
+        if (!currentSong) return;
+
+        let ytId = currentSong.ytId || extractYouTubeId(currentSong.id) || extractYouTubeId(currentSong.title);
+
+        if (!ytId) {
+          const query = `${currentSong.artist ? currentSong.artist + ' ' : ''}${currentSong.title}`;
+          ytId = await searchYouTubeVideoId(query);
+          if (ytId) currentSong.ytId = ytId;
+        }
+
+        if (ytPlayer && ytId) {
+          try {
+            if (ytPlayer.unMute) ytPlayer.unMute();
+            if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
+          } catch (_) { }
+
+          if (ytPlayer.loadVideoById) {
+            ytPlayer.loadVideoById({
+              videoId: ytId,
+              startSeconds: 0
+            });
+            if (ytPlayer.playVideo) ytPlayer.playVideo();
+          }
+          isPlaying = true;
+          startTimer();
+        } else {
+          isPlaying = true;
+          startTimer();
+        }
+        updatePlayerUI();
+        renderSongQueue();
+      }
+
       async function togglePlayback() {
         if (localSongQueue.length === 0) {
           showToast('info', 'Dodajte najpre neku pesmu u red.', '🎵');
           return;
         }
 
-        isPlaying = !isPlaying;
-
-        if (spotifyToken) {
-          try {
-            const endpoint = isPlaying ? 'https://api.spotify.com/v1/me/player/play' : 'https://api.spotify.com/v1/me/player/pause';
-            await fetch(endpoint, {
-              method: 'PUT',
-              headers: { 'Authorization': `Bearer ${spotifyToken}` }
-            });
-          } catch (e) {
-            // Fallback local timer
-          }
-        }
-
         if (isPlaying) {
-          if (playbackInterval) clearInterval(playbackInterval);
-          playbackInterval = setInterval(() => {
-            const currentSong = localSongQueue[currentSongIndex];
-            if (!currentSong) {
-              clearInterval(playbackInterval);
-              isPlaying = false;
-              updatePlayerUI();
-              return;
-            }
-
-            currentTimeSeconds++;
-            if (currentTimeSeconds >= currentSong.duration) {
-              skipSong();
-            } else {
-              updatePlayerUI();
-            }
-          }, 1000);
-        } else {
-          if (playbackInterval) {
-            clearInterval(playbackInterval);
+          isPlaying = false;
+          if (ytPlayer && ytPlayer.pauseVideo) {
+            ytPlayer.pauseVideo();
           }
+          stopTimer();
+        } else {
+          isPlaying = true;
+          if (ytPlayer) {
+            try {
+              if (ytPlayer.unMute) ytPlayer.unMute();
+              if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
+              if (ytPlayer.playVideo) ytPlayer.playVideo();
+            } catch (_) { }
+          } else {
+            playCurrentAudio();
+          }
+          startTimer();
         }
 
         updatePlayerUI();
@@ -7392,19 +7270,7 @@ async function addNewChannel() {
       }
 
       async function skipSong() {
-        if (playbackInterval) {
-          clearInterval(playbackInterval);
-        }
-
-        if (spotifyToken) {
-          try {
-            await fetch('https://api.spotify.com/v1/me/player/next', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${spotifyToken}` }
-            });
-          } catch (e) { }
-        }
-
+        stopTimer();
         currentTimeSeconds = 0;
 
         if (localSongQueue.length > 0) {
@@ -7418,13 +7284,10 @@ async function addNewChannel() {
 
         if (localSongQueue.length === 0) {
           isPlaying = false;
+          if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
           showToast('info', 'Završeno puštanje svih pesama iz reda.', '🎵');
         } else {
-          if (isPlaying) {
-            isPlaying = false;
-            togglePlayback();
-            return;
-          }
+          playCurrentAudio();
         }
 
         updatePlayerUI();
@@ -7432,43 +7295,16 @@ async function addNewChannel() {
       }
 
       async function previousSong() {
-        if (playbackInterval) clearInterval(playbackInterval);
+        stopTimer();
         currentTimeSeconds = 0;
-
-        if (spotifyToken) {
-          try {
-            await fetch('https://api.spotify.com/v1/me/player/previous', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${spotifyToken}` }
-            });
-          } catch (e) { }
-        }
 
         if (currentSongIndex > 0) {
           currentSongIndex--;
         } else {
-          currentSongIndex = localSongQueue.length - 1;
+          currentSongIndex = Math.max(0, localSongQueue.length - 1);
         }
 
-        isPlaying = true;
-        playbackInterval = setInterval(() => {
-          const currentSong = localSongQueue[currentSongIndex];
-          if (!currentSong) {
-            clearInterval(playbackInterval);
-            isPlaying = false;
-            updatePlayerUI();
-            return;
-          }
-          currentTimeSeconds++;
-          if (currentTimeSeconds >= currentSong.duration) {
-            skipSong();
-          } else {
-            updatePlayerUI();
-          }
-        }, 1000);
-
-        updatePlayerUI();
-        renderSongQueue();
+        playCurrentAudio();
       }
 
       async function saveSongRequestConfig(silent) {
@@ -7515,15 +7351,8 @@ async function addNewChannel() {
 
       async function updateVolume(val) {
         playerVolume = parseInt(val) || 0;
-        if (spotifyToken) {
-          try {
-            await fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${playerVolume}`, {
-              method: 'PUT',
-              headers: { 'Authorization': `Bearer ${spotifyToken}` }
-            });
-          } catch (e) {
-            // Quiet volume sync error
-          }
+        if (ytPlayer && ytPlayer.setVolume) {
+          ytPlayer.setVolume(playerVolume);
         }
       }
 
@@ -7541,17 +7370,133 @@ async function addNewChannel() {
         updatePlayerUI();
       }
 
-      function requestSong() {
+      async function searchYouTubeVideoId(query) {
+        if (!query) return null;
+        const directId = extractYouTubeId(query);
+        if (directId) return directId;
+
+        const cleanQuery = query.trim();
+
+        // 1. Zvanični KickALL Netlify Backend Search Endpoint
+        try {
+          const res = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(4000) });
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.videoId) {
+              return data.videoId;
+            }
+          }
+        } catch (e) { }
+
+        // 2. Fallback: allorigins proxy
+        try {
+          const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery))}`, { signal: AbortSignal.timeout(4000) });
+          if (res.ok) {
+            const html = await res.text();
+            const match = html.match(/"videoId":"([\w-]{11})"/);
+            if (match && match[1]) {
+              return match[1];
+            }
+          }
+        } catch (e) { }
+
+        // 3. Fallback: corsproxy
+        try {
+          const res = await fetch(`https://corsproxy.io/?${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery))}`, { signal: AbortSignal.timeout(4000) });
+          if (res.ok) {
+            const html = await res.text();
+            const match = html.match(/"videoId":"([\w-]{11})"/);
+            if (match && match[1]) {
+              return match[1];
+            }
+          }
+        } catch (e) { }
+
+        return null;
+      }
+
+      async function resolveYouTubeSongSmart(query) {
+        if (!query) return null;
+        const cleanQuery = query.trim();
+
+        // 1. Direktan YouTube link / ID
+        const ytIdMatch = extractYouTubeId(cleanQuery);
+        if (ytIdMatch) {
+          try {
+            const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytIdMatch}&format=json`);
+            if (oembedRes.ok) {
+              const oembed = await oembedRes.json();
+              return {
+                ytId: ytIdMatch,
+                title: oembed.title || `YouTube Track (${ytIdMatch})`,
+                artist: oembed.author_name || 'YouTube',
+                coverUrl: `https://img.youtube.com/vi/${ytIdMatch}/hqdefault.jpg`,
+                duration: 210
+              };
+            }
+          } catch (e) { }
+          return {
+            ytId: ytIdMatch,
+            title: `YouTube Track (${ytIdMatch})`,
+            artist: 'YouTube',
+            coverUrl: `https://img.youtube.com/vi/${ytIdMatch}/hqdefault.jpg`,
+            duration: 210
+          };
+        }
+
+        // 2. Netlify Serverless YouTube Search
+        try {
+          const ytRes = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(5000) });
+          if (ytRes.ok) {
+            const data = await ytRes.json();
+            if (data && data.videoId) {
+              let artist = data.uploader || 'YouTube';
+              let title = data.title || cleanQuery;
+              if (title.includes(' - ')) {
+                const parts = title.split(' - ');
+                artist = parts[0].trim();
+                title = parts.slice(1).join(' - ').trim();
+              }
+              return {
+                ytId: data.videoId,
+                title: title,
+                artist: artist,
+                coverUrl: data.coverUrl || `https://img.youtube.com/vi/${data.videoId}/hqdefault.jpg`,
+                duration: data.duration || 210
+              };
+            }
+          }
+        } catch (e) { }
+
+        // 3. Fallback: Pronađi Video ID preko klijentskog proxy-ja
+        const foundYtId = await searchYouTubeVideoId(cleanQuery);
+        let artist = '';
+        let title = cleanQuery;
+        if (cleanQuery.includes(' - ')) {
+          const parts = cleanQuery.split(' - ');
+          artist = parts[0].trim();
+          title = parts.slice(1).join(' - ').trim();
+        }
+
+        return {
+          ytId: foundYtId,
+          title: title,
+          artist: artist,
+          coverUrl: foundYtId ? `https://img.youtube.com/vi/${foundYtId}/hqdefault.jpg` : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80',
+          duration: 210
+        };
+      }
+
+      async function requestSong() {
         const inputEl = document.getElementById('songRequestInput');
         if (!inputEl) return;
         const rawInput = inputEl.value ? inputEl.value.trim() : '';
 
         if (!rawInput) {
-          showToast('info', 'Molimo unesite naziv pesme ili YouTube / Spotify link.', '🎵');
+          showToast('info', 'Molimo unesite naziv pesme, izvođača ili YouTube link.', '🎵');
           return;
         }
 
-        // Plan limit check — blokira dodavanje ako je queue pun
         const queueLimits = getPlanLimits();
         if (queueLimits.maxSongQueue !== Infinity && localSongQueue.length >= queueLimits.maxSongQueue) {
           showToast('warning', `Dostignut je limit od ${queueLimits.maxSongQueue} pesama u redu za ${queueLimits.name} paket! Nadogradi za veći queue.`);
@@ -7559,47 +7504,40 @@ async function addNewChannel() {
           return;
         }
 
+        const addBtn = document.getElementById('songRequestAddBtn');
+        if (addBtn) {
+          addBtn.disabled = true;
+          addBtn.innerHTML = 'Tražim...';
+        }
+
+        showToast('info', `Tražim pesmu "${rawInput}" na YouTube-u...`, '🔍');
+
+        const resolved = await resolveYouTubeSongSmart(rawInput);
+
+        if (addBtn) {
+          addBtn.disabled = false;
+          addBtn.innerHTML = 'Dodaj';
+        }
+
+        if (!resolved) {
+          showToast('error', 'Nije bilo moguće pronaći pesmu.', '❌');
+          return;
+        }
+
         const maxDurationInput = document.getElementById('cfgSongRequestMaxDuration');
         const maxDuration = maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360;
-
-        let title = rawInput;
-        let artist = '';
-        let source = 'custom';
-        let coverUrl = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
-        let duration = Math.min(210, maxDuration);
-
-        // Check for YouTube link
-        const ytMatch = rawInput.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-        if (ytMatch && ytMatch[1]) {
-          const videoId = ytMatch[1];
-          source = 'youtube';
-          coverUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-          title = `YouTube Track (${videoId})`;
-        } else if (rawInput.includes('spotify.com/track/')) {
-          source = 'spotify';
-          coverUrl = 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300&auto=format&fit=crop&q=80';
-          const parts = rawInput.split('track/')[1];
-          const trackId = parts ? parts.split('?')[0] : '';
-          title = trackId ? `Spotify Track (${trackId})` : rawInput;
-        } else {
-          // Plain text song input: try to split artist and title if '-' present
-          if (rawInput.includes(' - ')) {
-            const parts = rawInput.split(' - ');
-            artist = parts[0].trim();
-            title = parts.slice(1).join(' - ').trim();
-          }
-        }
 
         const requesterName = (activeChannel && activeChannel.username) ? `Strimer (${activeChannel.username})` : 'Strimer';
 
         const newSong = {
-          id: 's_' + Date.now(),
-          title: title,
-          artist: artist,
+          id: 'yt_' + (resolved.ytId || Date.now()),
+          ytId: resolved.ytId,
+          title: resolved.title,
+          artist: resolved.artist,
           requester: requesterName,
-          duration: duration,
-          source: source,
-          coverUrl: coverUrl
+          duration: Math.min(resolved.duration || 210, maxDuration),
+          source: 'youtube',
+          coverUrl: resolved.coverUrl
         };
 
         localSongQueue.push(newSong);
@@ -7609,7 +7547,11 @@ async function addNewChannel() {
         updatePlayerUI();
         saveSongRequestConfig(true);
 
-        showToast('success', `Pesma "${title}" je uspešno dodata u red!`, '🎵');
+        if (localSongQueue.length === 1 && !isPlaying) {
+          playCurrentAudio();
+        }
+
+        showToast('success', `Pronađena pesma: "${resolved.artist ? resolved.artist + ' - ' : ''}${resolved.title}"`, '🎵');
       }
 
       function removeSong(index) {
@@ -7696,8 +7638,6 @@ async function addNewChannel() {
       window.updateVolume = updateVolume;
       window.seekPlayer = seekPlayer;
       window.saveSongRequestConfig = saveSongRequestConfig;
-      window.connectSpotifyAccount = connectSpotifyAccount;
-      window.disconnectSpotifyAccount = disconnectSpotifyAccount;
       window.switchEconomyTab = switchEconomyTab;
       window.updateEconomyPreviews = updateEconomyPreviews;
       window.saveEconomyConfig = saveEconomyConfig;

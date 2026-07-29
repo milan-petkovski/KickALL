@@ -1,5 +1,5 @@
 // KickALL Service Worker for PWA functionality
-const CACHE_NAME = 'kickall-v3';
+const CACHE_NAME = 'kickall-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -73,9 +73,8 @@ self.addEventListener('fetch', (event) => {
       event.request.url.includes('corsproxy.io') ||
       event.request.url.includes('render.com') ||
       event.request.url.includes('onrender.com') ||
-      event.request.url.includes('kickbot-') ||
-      event.request.url.includes('spotify.com') ||
-      event.request.url.includes('accounts.spotify.com')) {
+      event.request.url.includes('youtube.com') ||
+      event.request.url.includes('googlevideo.com')) {
     return;
   }
 

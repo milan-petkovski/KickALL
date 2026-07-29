@@ -65,8 +65,8 @@
       "desc": "Entertain chat with !duel, !roll, !iq, !rulet, or start love system with matchmaking and compatibility tracking."
     },
     "song": {
-      "title": "Song Request & Spotify",
-      "desc": "Connect Spotify account, allow viewers to request songs via chat and manage playback queue directly from dashboard."
+      "title": "Song Request (YouTube Music)",
+      "desc": "Allow viewers to request songs from YouTube via chat and manage audio playback directly from the dashboard."
     }
   },
   "cmds": {

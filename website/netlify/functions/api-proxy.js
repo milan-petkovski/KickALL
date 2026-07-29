@@ -94,8 +94,9 @@ exports.handler = async (event) => {
       'kick.com',
       'api.kick.com',
       'id.kick.com',
-      'spotify.com',
-      'api.spotify.com'
+      'youtube.com',
+      'www.youtube.com',
+      'i.ytimg.com'
     ];
 
     let url;
