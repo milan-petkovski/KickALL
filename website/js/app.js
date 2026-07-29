@@ -5,6 +5,20 @@
 
 // CONFIG is loaded from config.js and available as window.CONFIG
 
+// Track Referral Code from URL
+(function checkReferralParam() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        const ref = params.get('ref') || params.get('referral');
+        if (ref) {
+            const storageKey = (window.CONFIG && window.CONFIG.STORAGE_KEYS) ? window.CONFIG.STORAGE_KEYS.USER_REFERRAL_CODE : 'user_referral_code';
+            localStorage.setItem(storageKey, ref.trim().toUpperCase());
+        }
+    } catch (e) {
+        // Silently fail if storage unavailable
+    }
+})();
+
 document.addEventListener('DOMContentLoaded', () => {
     // Element References
     const authKickLoginBtn = document.getElementById('authKickLoginBtn');

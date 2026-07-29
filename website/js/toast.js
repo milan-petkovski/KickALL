@@ -192,7 +192,13 @@ if (document.readyState === 'loading') {
 }
 
 // Global convenience functions for backward compatibility
-window.showToast = (message, type, duration) => window.toastSystem.show(message, type, duration);
+window.showToast = (arg1, arg2, arg3) => {
+  if (!window.toastSystem) return;
+  if (['success', 'error', 'warning', 'info'].includes(arg1) && typeof arg2 === 'string') {
+    return window.toastSystem.show(arg2, arg1, arg3);
+  }
+  return window.toastSystem.show(arg1, arg2, arg3);
+};
 window.showSuccess = (message, duration) => window.toastSystem.success(message, duration);
 window.showError = (message, duration) => window.toastSystem.error(message, duration);
 window.showWarning = (message, duration) => window.toastSystem.warning(message, duration);

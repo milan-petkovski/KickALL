@@ -327,9 +327,9 @@ async function handleKickOAuthSession(accessToken) {
   const kickEmail = `kick_user_${kickUsername.toLowerCase()}@${window.CONFIG.DEFAULTS.BOT_NAME}.com`;
   const oauthPassword = `kick_oauth_${kickUsername.toLowerCase()}_${window.CONFIG.DEFAULTS.BOT_NAME}_2026`;
 
-  // Get referral code from URL if present
+  // Get referral code from URL or storage fallback
   const urlParams = new URLSearchParams(window.location.search);
-  const referralCode = urlParams.get('ref') || urlParams.get('referral');
+  const referralCode = urlParams.get('ref') || urlParams.get('referral') || localStorage.getItem('user_referral_code');
 
   // Try login
   const { data: signInData, error: signInError } = await sb.auth.signInWithPassword({
@@ -345,8 +345,10 @@ async function handleKickOAuthSession(accessToken) {
     if (referralCode) {
       await processReferralCode(currentUser.id, referralCode);
     }
+    await ensureUserHasReferralCode(currentUser.id);
     
     localStorage.removeItem('kick_access_token');
+    try { localStorage.removeItem('user_referral_code'); } catch(e) {}
     cleanQueryParams();
     initDashboardWithRetry(currentUser);
     return;
@@ -403,6 +405,12 @@ async function handleKickOAuthSession(accessToken) {
     updated_at: new Date().toISOString()
   });
 
+  // Process referral code if present
+  if (referralCode) {
+    await processReferralCode(currentUser.id, referralCode);
+  }
+  await ensureUserHasReferralCode(currentUser.id);
+
   // Login after signup
   await sb.auth.signInWithPassword({
     email: kickEmail,
@@ -410,6 +418,7 @@ async function handleKickOAuthSession(accessToken) {
   });
 
   localStorage.removeItem('kick_access_token');
+  try { localStorage.removeItem('user_referral_code'); } catch(e) {}
   cleanQueryParams();
   initDashboardWithRetry(currentUser);
 }
@@ -1223,6 +1232,46 @@ async function openReferralModal() {
     }
   }
 }
+
+function openWithdrawalModal() {
+  closeModal('referralModal');
+  const balEl = document.getElementById('modalAvailableBalance');
+  if (balEl) {
+    balEl.textContent = `€${(window.currentAvailableBalance || 0).toFixed(2)}`;
+  }
+  openModal('withdrawalModal');
+}
+
+function copyCustomRefEmail(btn) {
+  if (!btn) return;
+  const email = 'contact@milanwebportal.com';
+  navigator.clipboard.writeText(email).then(() => {
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> ${currentLang === 'sr' ? 'Kopirano!' : 'Copied!'}`;
+    btn.style.color = '#53fc18';
+    btn.style.borderColor = '#53fc18';
+    if (window.toastSystem) {
+      window.toastSystem.success(currentLang === 'sr' ? 'Mejl adresa je uspešno kopirana!' : 'Email address successfully copied!');
+    }
+    setTimeout(() => {
+      btn.innerHTML = origHTML;
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  }).catch((err) => {
+    console.error('Failed to copy email:', err);
+    if (window.toastSystem) {
+      window.toastSystem.error(currentLang === 'sr' ? 'Greška pri kopiranju mejla.' : 'Error copying email.');
+    }
+  });
+}
+
+// Expose referral functions globally
+window.openReferralModal = openReferralModal;
+window.openWithdrawalModal = openWithdrawalModal;
+window.copyCustomRefEmail = copyCustomRefEmail;
+window.closeModal = closeModal;
+window.openModal = openModal;
 
 
 // ── Interactive Sneak Peek Previews ─────────────────────

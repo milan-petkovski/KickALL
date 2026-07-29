@@ -47,8 +47,587 @@ let allWatchtime = [];   // cached watchtime rows
 let allMarriages = [];   // cached marriages
 let allLoveStatuses = [];  // cached love modifiers
 const avatarCache = {};
-let currentModFiltersSettings = {};
 let currentEconomyTab = localStorage.getItem('active-economy-tab') || 'config';
+
+// ── Pricing Plan Limits ───────────────────────────────────────
+let currentUserPlan = 'free';
+
+const PLAN_LIMITS = {
+  free: {
+    name: 'Free',
+    label: 'BESPLATNO',
+    badgeClass: 'plan-badge-free',
+    maxCustomCommands: 50,
+    maxAutoAnnounces: 5,
+    maxSongQueue: 5,
+    maxLeaderboardItems: 20,
+    maxLoveMarriages: 50, // 50 parova = 100 ljudi
+    customBotAllowed: false,
+    maxChannels: 1,
+    maxManagers: 5,
+    maxStoreItems: 10,
+    customPenaltySettings: false
+  },
+  pro: {
+    name: 'Pro',
+    label: 'PRO',
+    badgeClass: 'plan-badge-pro',
+    maxCustomCommands: 200,
+    maxAutoAnnounces: 50,
+    maxSongQueue: 50,
+    maxLeaderboardItems: Infinity,
+    maxLoveMarriages: Infinity,
+    customBotAllowed: true,
+    maxChannels: 5,
+    maxManagers: 10,
+    maxStoreItems: 50,
+    customPenaltySettings: true
+  },
+  elite: {
+    name: 'Elite',
+    label: 'ELITE',
+    badgeClass: 'plan-badge-elite',
+    maxCustomCommands: Infinity,
+    maxAutoAnnounces: Infinity,
+    maxSongQueue: Infinity,
+    maxLeaderboardItems: Infinity,
+    maxLoveMarriages: Infinity,
+    customBotAllowed: true,
+    maxChannels: Infinity,
+    maxManagers: Infinity,
+    maxStoreItems: Infinity,
+    customPenaltySettings: true
+  },
+  vip: {
+    name: 'Elite',
+    label: 'ELITE',
+    badgeClass: 'plan-badge-elite',
+    maxCustomCommands: Infinity,
+    maxAutoAnnounces: Infinity,
+    maxSongQueue: Infinity,
+    maxLeaderboardItems: Infinity,
+    maxLoveMarriages: Infinity,
+    customBotAllowed: true,
+    maxChannels: Infinity,
+    maxManagers: Infinity,
+    maxStoreItems: Infinity,
+    customPenaltySettings: true
+  }
+};
+
+function getPlanLimits() {
+  let p = (currentUserPlan || 'free').toLowerCase();
+  // Map business to elite
+  if (p === 'business') p = 'elite';
+  return PLAN_LIMITS[p] || PLAN_LIMITS.free;
+}
+
+function openUpgradeModal(feature) {
+  const modalNote = document.getElementById('upgradeModalNote');
+  
+  if (feature === 'commands') {
+    if (modalNote) modalNote.textContent = 'Dostignut je limit prilagođenih komandi za tvoj paket (Free: 50 | Pro: 200 | Elite: Neograničeno). Nadogradi nalog za više komandi!';
+  } else if (feature === 'announces') {
+    if (modalNote) modalNote.textContent = 'Dostignut je limit automatskih poruka za tvoj paket (Free: 5 | Pro: 50 | Elite: Neograničeno). Nadogradi nalog za više poruka!';
+  } else if (feature === 'customBot') {
+    if (modalNote) modalNote.textContent = 'Custom bot ime (sopstveni bot nalog) je dostupan samo za PRO i ELITE paket!';
+  } else if (feature === 'leaderboard') {
+    if (modalNote) modalNote.textContent = 'Besplatni paket prikazuje samo Top 20 gledalaca na rang listi. Nadogradi na PRO za sve gledaoce!';
+  } else if (feature === 'channels') {
+    if (modalNote) modalNote.textContent = 'Dostignut je limit kanala za tvoj paket (Free: 1 | Pro: 5 | Elite: Neograničeno). Nadogradi nalog za više kanala!';
+  } else if (feature === 'managers') {
+    if (modalNote) modalNote.textContent = 'Dostignut je limit menadžera za tvoj paket (Free: 5 | Pro: 10 | Elite: Neograničeno). Nadogradi nalog za više menadžera!';
+  } else if (feature === 'customPenalty') {
+    if (modalNote) modalNote.textContent = 'Individualne kazne za moderacijske filtere su dostupne samo za PRO i ELITE paket!';
+  } else if (feature === 'storeItems') {
+    if (modalNote) modalNote.textContent = 'Dostignut je limit artikala u prodavnici za tvoj paket (Free: 10 | Pro: 50 | Elite: Neograničeno). Nadogradi nalog za više artikala!';
+  } else {
+    if (modalNote) modalNote.textContent = 'Nadogradi svoj paket za veće limite, napredne funkcije i neograničenu automatizaciju!';
+  }
+  
+  // Update plan buttons based on current plan
+  updatePlanButtons();
+  
+  // Reset to monthly view
+  togglePricing('monthly');
+  openModal('upgradeModal');
+}
+
+function updatePlanButtons() {
+  const currentPlan = (currentUserPlan || 'free').toLowerCase();
+  if (currentPlan === 'business') currentPlan = 'elite';
+  
+  // Monthly pricing buttons
+  const monthlyFreeBtn = document.querySelector('#monthlyPricing .upgrade-plan-card:nth-child(1) button');
+  const monthlyProBtn = document.querySelector('#monthlyPricing .upgrade-plan-card:nth-child(2) a');
+  const monthlyEliteBtn = document.querySelector('#monthlyPricing .upgrade-plan-card:nth-child(3) a');
+  
+  // Yearly pricing buttons
+  const yearlyFreeBtn = document.querySelector('#yearlyPricing .upgrade-plan-card:nth-child(1) button');
+  const yearlyProBtn = document.querySelector('#yearlyPricing .upgrade-plan-card:nth-child(2) a');
+  const yearlyEliteBtn = document.querySelector('#yearlyPricing .upgrade-plan-card:nth-child(3) a');
+  
+  // Update Free button
+  if (monthlyFreeBtn) {
+    if (currentPlan === 'free') {
+      monthlyFreeBtn.textContent = 'Tvoj trenutni paket';
+      monthlyFreeBtn.disabled = true;
+      monthlyFreeBtn.style.opacity = '0.6';
+      monthlyFreeBtn.style.cursor = 'default';
+    } else {
+      monthlyFreeBtn.textContent = 'Izaberi Free';
+      monthlyFreeBtn.disabled = false;
+      monthlyFreeBtn.style.opacity = '';
+      monthlyFreeBtn.style.cursor = '';
+    }
+  }
+  
+  if (yearlyFreeBtn) {
+    if (currentPlan === 'free') {
+      yearlyFreeBtn.textContent = 'Tvoj trenutni paket';
+      yearlyFreeBtn.disabled = true;
+      yearlyFreeBtn.style.opacity = '0.6';
+      yearlyFreeBtn.style.cursor = 'default';
+    } else {
+      yearlyFreeBtn.textContent = 'Izaberi Free';
+      yearlyFreeBtn.disabled = false;
+      yearlyFreeBtn.style.opacity = '';
+      yearlyFreeBtn.style.cursor = '';
+    }
+  }
+  
+  // Update Pro button
+  if (monthlyProBtn) {
+    if (currentPlan === 'pro') {
+      // Replace anchor with button
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-primary';
+      button.style.cssText = 'width: 100%; margin-top: auto; text-align: center; padding: 12px; font-weight: 600; opacity: 0.6; cursor: default;';
+      button.disabled = true;
+      button.textContent = 'Tvoj trenutni paket';
+      monthlyProBtn.parentNode.replaceChild(button, monthlyProBtn);
+    } else {
+      monthlyProBtn.style.display = 'inline-flex';
+    }
+  }
+  
+  if (yearlyProBtn) {
+    if (currentPlan === 'pro') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-primary';
+      button.style.cssText = 'width: 100%; margin-top: auto; text-align: center; padding: 12px; font-weight: 600; opacity: 0.6; cursor: default;';
+      button.disabled = true;
+      button.textContent = 'Tvoj trenutni paket';
+      yearlyProBtn.parentNode.replaceChild(button, yearlyProBtn);
+    } else {
+      yearlyProBtn.style.display = 'inline-flex';
+    }
+  }
+  
+  // Update Elite button
+  if (monthlyEliteBtn) {
+    if (currentPlan === 'elite') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-primary';
+      button.style.cssText = 'width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; font-weight: 700; padding: 12px; opacity: 0.6; cursor: default;';
+      button.disabled = true;
+      button.textContent = 'Tvoj trenutni paket';
+      monthlyEliteBtn.parentNode.replaceChild(button, monthlyEliteBtn);
+    } else {
+      monthlyEliteBtn.style.display = 'inline-flex';
+    }
+  }
+  
+  if (yearlyEliteBtn) {
+    if (currentPlan === 'elite') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-primary';
+      button.style.cssText = 'width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; font-weight: 700; padding: 12px; opacity: 0.6; cursor: default;';
+      button.disabled = true;
+      button.textContent = 'Tvoj trenutni paket';
+      yearlyEliteBtn.parentNode.replaceChild(button, yearlyEliteBtn);
+    } else {
+      yearlyEliteBtn.style.display = 'inline-flex';
+    }
+  }
+}
+
+function togglePricing(type) {
+  const monthlyPricing = document.getElementById('monthlyPricing');
+  const yearlyPricing = document.getElementById('yearlyPricing');
+  const monthlyBtn = document.getElementById('monthlyBtn');
+  const yearlyBtn = document.getElementById('yearlyBtn');
+  
+  if (type === 'monthly') {
+    monthlyPricing.style.display = 'grid';
+    yearlyPricing.style.display = 'none';
+    monthlyBtn.style.background = 'rgba(139, 92, 246, 0.2)';
+    monthlyBtn.style.color = '#fff';
+    yearlyBtn.style.background = 'transparent';
+    yearlyBtn.style.color = 'var(--text-muted)';
+  } else {
+    monthlyPricing.style.display = 'none';
+    yearlyPricing.style.display = 'grid';
+    monthlyBtn.style.background = 'transparent';
+    monthlyBtn.style.color = 'var(--text-muted)';
+    yearlyBtn.style.background = 'rgba(139, 92, 246, 0.2)';
+    yearlyBtn.style.color = '#fff';
+  }
+}
+window.openUpgradeModal = openUpgradeModal;
+
+function applyPenaltySettingsRestrictions() {
+  const limits = getPlanLimits();
+  const penaltySelects = [
+    'cfgModPenaltyCaps',
+    'cfgModPenaltyLinks', 
+    'cfgModPenaltyEmotes',
+    'cfgModPenaltySymbols',
+    'cfgModPenaltyWords',
+    'cfgModPenaltySpam',
+    'cfgModPenaltyMaxLen',
+    'cfgModPenaltyMentions'
+  ];
+
+  penaltySelects.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (!limits.customPenaltySettings) {
+        // Free plan - disable individual penalty settings
+        el.disabled = true;
+        el.value = 'default';
+        el.style.opacity = '0.5';
+        el.style.cursor = 'not-allowed';
+        
+        // Add title to explain restriction
+        el.title = 'Individualne kazne su dostupne samo za PRO i ELITE pakete';
+        
+        // Add click handler to show upgrade modal
+        el.onclick = function(e) {
+          e.preventDefault();
+          openUpgradeModal('customPenalty');
+        };
+      } else {
+        // Pro/Elite plan - enable individual penalty settings
+        el.disabled = false;
+        el.style.opacity = '1';
+        el.style.cursor = 'pointer';
+        el.title = '';
+        el.onclick = null;
+      }
+    }
+  });
+}
+
+const upgradeSvgIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="upgrade-btn-icon"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
+
+function renderPlanLimitBanners() {
+  const limits = getPlanLimits();
+  
+  // 0. Topbar & Sidebar Upgrade Buttons (For Free & Pro plans)
+  const topbarWrap = document.getElementById('topbarUpgradeWrap');
+  if (topbarWrap) {
+    if (limits.name !== 'Elite') {
+      topbarWrap.style.display = 'flex';
+      topbarWrap.innerHTML = `<button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')">${upgradeSvgIcon}<span>Nadogradi</span></button>`;
+    } else {
+      topbarWrap.style.display = 'none';
+    }
+  }
+
+  const sidebarUpgradeEl = document.getElementById('sidebarUpgradeWrap');
+  if (sidebarUpgradeEl) {
+    if (limits.name !== 'Elite') {
+      sidebarUpgradeEl.innerHTML = `<button type="button" class="plan-upgrade-btn sidebar-upgrade-btn" onclick="event.stopPropagation(); openUpgradeModal('general')">${upgradeSvgIcon}<span>Nadogradi Paket</span></button>`;
+    } else {
+      sidebarUpgradeEl.innerHTML = '';
+    }
+  }
+
+  // 1. Commands Banner
+  const cmdBanner = document.getElementById('cmdPlanLimitBanner');
+  if (cmdBanner) {
+    if (limits.maxCustomCommands === Infinity) {
+      cmdBanner.style.display = 'none';
+    } else {
+      cmdBanner.style.display = 'flex';
+      const customCount = allCommands ? allCommands.filter(c => !c.is_default && !(c.id && c.id.startsWith('builtin-'))).length : 0;
+      const max = limits.maxCustomCommands;
+      cmdBanner.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.3); color:#c084fc; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
+            ${limits.name} Paket
+          </div>
+          <div>
+            <div style="font-size:0.85rem; font-weight:700; color:#fff;">
+              Ograničenje komandi: <span style="color:#53FC18">${customCount}</span> / <strong>${max}</strong> komandi
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">
+              ${limits.name === 'Free' ? 'Free: 50 max | Pro: 200 max | Elite: Neograničeno' : 'Pro: 200 max | Elite: Neograničeno'}
+            </div>
+          </div>
+        </div>
+        <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('commands')">${upgradeSvgIcon}<span>Nadogradi za više komandi</span></button>
+      `;
+    }
+  }
+
+  // 2. Leaderboard Banner
+  const lbBanner = document.getElementById('leaderboardPlanLimitBanner');
+  if (lbBanner) {
+    if (limits.maxLeaderboardItems === Infinity) {
+      lbBanner.style.display = 'none';
+    } else {
+      lbBanner.style.display = 'flex';
+      lbBanner.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.3); color:#c084fc; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
+            ${limits.name} Paket
+          </div>
+          <div>
+            <div style="font-size:0.85rem; font-weight:700; color:#fff;">
+              Prikaz rang liste: <strong>Top 20 gledalaca max</strong>
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">
+              Free prikazuje Top 20. Nadogradi na PRO za punu rang listu sa svim korisnicima.
+            </div>
+          </div>
+        </div>
+        <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('leaderboard')">${upgradeSvgIcon}<span>Otključaj celu rang listu</span></button>
+      `;
+    }
+  }
+
+  // 3. Automatske Poruke Banner
+  const annBanner = document.getElementById('announcesPlanLimitBanner');
+  if (annBanner) {
+    if (limits.maxAutoAnnounces === Infinity) {
+      annBanner.style.display = 'none';
+    } else {
+      annBanner.style.display = 'flex';
+      const annCount = typeof localAnnounces !== 'undefined' && localAnnounces ? localAnnounces.length : 0;
+      const maxAnn = limits.maxAutoAnnounces;
+      annBanner.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.3); color:#c084fc; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
+            ${limits.name} Paket
+          </div>
+          <div>
+            <div style="font-size:0.85rem; font-weight:700; color:#fff;">
+              Ograničenje poruka: <span style="color:#53FC18">${annCount}</span> / <strong>${maxAnn}</strong>
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">
+              ${limits.name === 'Free' ? 'Free: 5 max | Pro: 50 max | Elite: Neograničeno' : 'Pro: 50 max | Elite: Neograničeno'}
+            </div>
+          </div>
+        </div>
+        <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('announces')">${upgradeSvgIcon}<span>Nadogradi za više poruka</span></button>
+      `;
+    }
+  }
+
+  // 4. Ljubav i Brakovi Banner
+  const marBanner = document.getElementById('marriagesPlanLimitBanner');
+  if (marBanner) {
+    if (limits.maxLoveMarriages === Infinity) {
+      marBanner.style.display = 'none';
+    } else {
+      marBanner.style.display = 'flex';
+      marBanner.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.3); color:#c084fc; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
+            ${limits.name} Paket
+          </div>
+          <div>
+            <div style="font-size:0.85rem; font-weight:700; color:#fff;">
+              Ograničenje brakova: <strong>Do 100 ljudi (50 parova)</strong>
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">
+              Free sprema i prikazuje do 100 venčanih lica. Nadogradi na PRO za neograničeno.
+            </div>
+          </div>
+        </div>
+        <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')">${upgradeSvgIcon}<span>Otključaj neograničeno</span></button>
+      `;
+    }
+  }
+
+  // 5. Song Request Banner
+  const songBanner = document.getElementById('songsPlanLimitBanner');
+  if (songBanner) {
+    if (limits.maxSongQueue === Infinity) {
+      songBanner.style.display = 'none';
+    } else {
+      songBanner.style.display = 'flex';
+      songBanner.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.3); color:#c084fc; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
+            ${limits.name} Paket
+          </div>
+          <div>
+            <div style="font-size:0.85rem; font-weight:700; color:#fff;">
+              Song Request Queue Limit: <strong>${limits.maxSongQueue} pesama max u queue</strong>
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">
+              ${limits.name === 'Free' ? 'Free: 5 pesama max u redu. Nadogradi na PRO za 50 ili ELITE za neograničeno.' : 'Pro: 50 pesama max u redu.'}
+            </div>
+          </div>
+        </div>
+        <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')">${upgradeSvgIcon}<span>Povećaj Queue Limit</span></button>
+      `;
+    }
+  }
+
+  // 6. Moderation Penalty Settings Banner
+  const modPenaltyBanner = document.getElementById('modPenaltyBanner');
+  if (modPenaltyBanner) {
+    if (limits.customPenaltySettings) {
+      modPenaltyBanner.style.display = 'none';
+    } else {
+      modPenaltyBanner.style.display = 'flex';
+      modPenaltyBanner.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#EF4444; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
+            Zaključano (Free)
+          </div>
+          <div>
+            <div style="font-size:0.85rem; font-weight:700; color:#fff;">
+              Individualne kazne za moderacijske filtere
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-muted);">
+              Na Free planu su dostupne samo globalne kazne. Nadogradi na PRO za individualne podešavanja.
+            </div>
+          </div>
+        </div>
+        <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('customPenalty')">${upgradeSvgIcon}<span>Otključaj individualne kazne</span></button>
+      `;
+    }
+  }
+
+  // 7. Custom Bot Banner & Card Overlay
+  const customBotBanner = document.getElementById('customBotPlanLimitBanner');
+  const customBotCard = document.getElementById('customBotCard');
+  if (customBotBanner || customBotCard) {
+    let overlay = document.getElementById('customBotLockOverlay');
+    if (limits.customBotAllowed) {
+      if (customBotBanner) customBotBanner.style.display = 'none';
+      if (overlay) overlay.style.display = 'none';
+      if (customBotCard) {
+        customBotCard.style.opacity = '1';
+        customBotCard.style.filter = 'none';
+        customBotCard.style.pointerEvents = 'auto';
+      }
+    } else {
+      if (customBotBanner) {
+        customBotBanner.style.display = 'flex';
+        customBotBanner.innerHTML = `
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#EF4444; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
+              Zaključano (Free)
+            </div>
+            <div>
+              <div style="font-size:0.85rem; font-weight:700; color:#fff;">
+                Custom Bot Account (Sopstveno ime bota)
+              </div>
+              <div style="font-size:0.78rem; color:var(--text-muted);">
+                Povezivanje bota sa tvojim imenom je PRO i ELITE funkcija.
+              </div>
+            </div>
+          </div>
+          <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('customBot')">${upgradeSvgIcon}<span>Otključaj Custom Bot</span></button>
+        `;
+      }
+
+      if (customBotCard) {
+        customBotCard.style.position = 'relative';
+        customBotCard.style.opacity = '1';
+        customBotCard.style.filter = 'none';
+
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = 'customBotLockOverlay';
+          overlay.className = 'locked-feature-overlay';
+          customBotCard.appendChild(overlay);
+        }
+        overlay.style.display = 'flex';
+        overlay.style.pointerEvents = 'auto';
+        overlay.innerHTML = `
+          <div class="locked-feature-overlay__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h4 class="locked-feature-overlay__title">Custom Bot Ime je zaključano na Free paketu</h4>
+          <p class="locked-feature-overlay__desc">Povezivanje sopstvenog bot naloga (npr. @MojKanalBot) umesto sistemskog bota je dostupno u PRO i ELITE paketima.</p>
+          <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('customBot')" style="padding: 10px 22px; font-size: 0.85rem;">${upgradeSvgIcon}<span>Nadogradi i Otključaj Custom Bot</span></button>
+        `;
+      }
+    }
+  }
+
+  // 7. Mini Games Banner & Casino Games Overlay
+  const mgBanner = document.getElementById('minigamesPlanLimitBanner');
+  const casinoWrap = document.getElementById('casinoMinigamesWrap');
+  if (mgBanner || casinoWrap) {
+    let overlay = document.getElementById('casinoMinigamesLockOverlay');
+    if (limits.name !== 'Free') {
+      if (mgBanner) mgBanner.style.display = 'none';
+      if (overlay) overlay.style.display = 'none';
+      if (casinoWrap) {
+        casinoWrap.style.opacity = '1';
+        casinoWrap.style.filter = 'none';
+        casinoWrap.style.pointerEvents = 'auto';
+      }
+    } else {
+      if (mgBanner) {
+        mgBanner.style.display = 'flex';
+        mgBanner.innerHTML = `
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#EF4444; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
+              Free Paket
+            </div>
+            <div>
+              <div style="font-size:0.85rem; font-weight:700; color:#fff;">
+                Mini Igre: <strong>Dostupne Klasične Komande za Zabavu</strong>
+              </div>
+              <div style="font-size:0.78rem; color:var(--text-muted);">
+                Na Besplatnom paketu su dostupne klasične komande (!duel, !roll, !iq...). Kazino igre sa ulogom poena i simulator su PRO i ELITE nivo!
+              </div>
+            </div>
+          </div>
+          <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')">${upgradeSvgIcon}<span>Otključaj Sve Mini Igre</span></button>
+        `;
+      }
+
+      if (casinoWrap) {
+        casinoWrap.style.position = 'relative';
+        casinoWrap.style.borderRadius = '14px';
+        casinoWrap.style.opacity = '1';
+        casinoWrap.style.filter = 'none';
+
+        if (!overlay) {
+          overlay = document.createElement('div');
+          overlay.id = 'casinoMinigamesLockOverlay';
+          overlay.className = 'locked-feature-overlay';
+          casinoWrap.appendChild(overlay);
+        }
+        overlay.style.display = 'flex';
+        overlay.style.pointerEvents = 'auto';
+        overlay.innerHTML = `
+          <div class="locked-feature-overlay__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <h4 class="locked-feature-overlay__title">Kazino Igre sa Ulogom Poena su zaključane u Free paketu</h4>
+          <p class="locked-feature-overlay__desc">Na Besplatnom paketu su vam dostupne Klasične Komande za Zabavu (!duel, !roll, !iq...). Rulet, Slot, Coinflip, Točak Sreće i Test Simulator su otključani na PRO i ELITE paketima.</p>
+          <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')" style="padding: 10px 22px; font-size: 0.85rem;">${upgradeSvgIcon}<span>Nadogradi i Otključaj Sve Igre</span></button>
+        `;
+      }
+    }
+  }
+}
+window.renderPlanLimitBanners = renderPlanLimitBanners;
 
 async function getOrFetchAvatar(username, elementId) {
   if (!username) return;
@@ -669,6 +1248,7 @@ async function initApp() {
       lastPanel = 'overview';
     }
     switchPanel(lastPanel);
+    renderPlanLimitBanners();
   } else {
     // No channel configured — prompt
     showNoChannelState();
@@ -719,8 +1299,20 @@ async function loadUserProfile() {
   let myUsername = '';
   if (data) {
     myUsername = data.display_name || '';
-    document.getElementById('sidebarPlan').textContent =
-      (data.plan || 'free').charAt(0).toUpperCase() + (data.plan || 'free').slice(1);
+    currentUserPlan = (data.plan || 'free').toLowerCase();
+    const limits = getPlanLimits();
+    const sidebarPlanEl = document.getElementById('sidebarPlan');
+    if (sidebarPlanEl) {
+      sidebarPlanEl.innerHTML = `<span class="plan-badge ${limits.badgeClass}">${limits.name}</span>`;
+    }
+    const sidebarUpgradeEl = document.getElementById('sidebarUpgradeWrap');
+    if (sidebarUpgradeEl) {
+      if (limits.name !== 'Elite') {
+        sidebarUpgradeEl.innerHTML = `<button type="button" class="plan-upgrade-btn sidebar-upgrade-btn" onclick="event.stopPropagation(); openUpgradeModal('general')">${upgradeSvgIcon}<span>Nadogradi Paket</span></button>`;
+      } else {
+        sidebarUpgradeEl.innerHTML = '';
+      }
+    }
 
     currentChannels = data.kick_channels || [];
 
@@ -1128,6 +1720,11 @@ async function resolveChatroomId(username) {
 let _addChannelPending = null; // { resolved, verificationCode }
 
 function showAddChannelModal() {
+  const limits = getPlanLimits();
+  if (limits.maxChannels !== Infinity && currentChannels.length >= limits.maxChannels) {
+    openUpgradeModal('channels');
+    return;
+  }
   openSettingsModal('channels');
 }
 
@@ -1818,7 +2415,12 @@ function filterCommands(query) {
 }
 
 function updateCmdTableMeta(n) {
-  document.getElementById('cmdTableMeta').textContent = getSerbianPlural(n, 'prilagođena komanda', 'prilagođene komande', 'prilagođenih komandi');
+  const limits = getPlanLimits();
+  const limitStr = limits.maxCustomCommands === Infinity ? '∞' : limits.maxCustomCommands;
+  const metaEl = document.getElementById('cmdTableMeta');
+  if (metaEl) {
+    metaEl.innerHTML = `${n} / ${limitStr} komandi <span class="plan-badge ${limits.badgeClass}" style="margin-left:6px;">${limits.name}</span>`;
+  }
 }
 
 function renderBuiltinCommandsGrid() {
@@ -2272,6 +2874,16 @@ function renderUnifiedLeaderboard(customRows = null) {
 
   document.getElementById('lbTableMeta').textContent = `${rows.length} korisnika`;
 
+  // Plan limits check for Leaderboard
+  const limits = getPlanLimits();
+  if (limits.maxLeaderboardItems < Infinity && rows.length > limits.maxLeaderboardItems) {
+    rows = rows.slice(0, limits.maxLeaderboardItems);
+    const metaEl = document.getElementById('lbTableMeta');
+    if (metaEl) {
+      metaEl.innerHTML = `${rows.length} korisnika <span style="color:#eab308; font-size:0.75rem; margin-left:8px;">(Besplatni plan - Top 20 \| <a href="#" onclick="openUpgradeModal('leaderboard'); return false;" style="color:#53fc18; text-decoration:underline;">Nadogradi za sve</a>)</span>`;
+    }
+  }
+
   // Paginacija proračun
   const totalPages = Math.ceil(rows.length / leaderboardLimit) || 1;
   if (leaderboardPage > totalPages) leaderboardPage = totalPages;
@@ -2291,7 +2903,7 @@ function renderUnifiedLeaderboard(customRows = null) {
   if (prevBtn) prevBtn.disabled = leaderboardPage === 1;
   if (nextBtn) nextBtn.disabled = leaderboardPage === totalPages;
 
-  tbody.innerHTML = pageRows.map((row, i) => {
+  let html = pageRows.map((row, i) => {
     const globalIndex = startIndex + i;
     const isTop3 = globalIndex < 3;
 
@@ -2310,21 +2922,21 @@ function renderUnifiedLeaderboard(customRows = null) {
       // Pokreni fetch ako nije keširano i ako imamo username
       if (!hasAvatar && row.username) {
         setTimeout(() => {
-          getOrFetchAvatar(row.username, `lb-avatar-${i}`);
-        }, 80 * i);
+          getOrFetchAvatar(row.username, `lbRowAv_${row.username}_${globalIndex}`);
+        }, 50);
       }
     }
 
-    const userCol = isTop3
-      ? `
-        <div style="display:flex;align-items:center;gap:0.5rem">
-          <div id="lb-avatar-${i}" style="width:24px;height:24px;border-radius:50%;background:var(--app-gradient);display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0;${avatarStyle}">
-            ${avatarContent}
-          </div>
-          <span style="font-weight:600">${escapeHtml(row.display_name || row.username)}</span>
-        </div>
-      `
-      : `<span style="font-weight:600">${escapeHtml(row.display_name || row.username)}</span>`;
+    const avatarHtml = isTop3
+      ? `<div id="lbRowAv_${row.username}_${globalIndex}" class="user-cell__avatar" style="${avatarStyle}">${avatarContent}</div>`
+      : '';
+
+    const userCol = `
+      <div style="display:flex;align-items:center;gap:0.5rem">
+        ${avatarHtml}
+        <span style="font-weight:600; color:${isTop3 ? '#fff' : 'var(--text-main)'}">${escapeHtml(row.display_name || row.username)}</span>
+      </div>
+    `;
 
     const rankDisplay = globalIndex === 0
       ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color: #FBBF24; filter: drop-shadow(0 1px 4px rgba(251, 191, 36, 0.4)); display: inline-block; vertical-align: middle; margin-right: 4px;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"/></svg>`
@@ -2368,6 +2980,24 @@ function renderUnifiedLeaderboard(customRows = null) {
       `;
     }
   }).join('');
+
+  if (limits.maxLeaderboardItems < Infinity && rows.length >= limits.maxLeaderboardItems) {
+    const colSpan = isCombined ? 6 : 5;
+    html += `
+      <tr class="locked-leaderboard-row">
+        <td colspan="${colSpan}" style="text-align: center; padding: 18px 12px; background: rgba(139, 92, 246, 0.04); border-top: 1px dashed rgba(139, 92, 246, 0.25);">
+          <div style="display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span style="font-size: 0.85rem; font-weight: 700; color: #fff;">Preostali gledaoci na rang listi su zaključani za Besplatni paket</span>
+            </div>
+            <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('leaderboard')">${upgradeSvgIcon}<span>Otključaj Sve Gledaoce</span></button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+  tbody.innerHTML = html;
 }
 
 function renderPodium(top3) {
@@ -2644,6 +3274,11 @@ function renderMarriages(rows) {
   const pageInfo = document.getElementById('marriagesPageInfo');
   const limitSelect = document.getElementById('marriagesLimitSelect');
 
+  const limits = getPlanLimits();
+  if (limits.maxLoveMarriages < Infinity && rows && rows.length > limits.maxLoveMarriages) {
+    rows = rows.slice(0, limits.maxLoveMarriages);
+  }
+
   if (!rows || rows.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Nema podataka za prikaz.</td></tr>';
     if (prevBtn) prevBtn.disabled = true;
@@ -2666,7 +3301,7 @@ function renderMarriages(rows) {
 
   const ringsSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><polygon points="12 3 16 7 8 7" /><path d="M8 7a6 6 0 1 0 8 0" /></svg>`;
 
-  tbody.innerHTML = pageRows.map(row => `
+  let html = pageRows.map(row => `
     <tr>
       <td style="font-weight:600; color:#fff;">${escapeHtml(row.user1_display || row.user1)}</td>
       <td style="text-align:center; vertical-align:middle;">${ringsSvg}</td>
@@ -2681,6 +3316,23 @@ function renderMarriages(rows) {
       </td>
     </tr>
   `).join('');
+
+  if (limits.maxLoveMarriages < Infinity && allMarriages && allMarriages.length >= limits.maxLoveMarriages) {
+    html += `
+      <tr class="locked-marriages-row">
+        <td colspan="5" style="text-align: center; padding: 18px 12px; background: rgba(244, 114, 182, 0.04); border-top: 1px dashed rgba(244, 114, 182, 0.25);">
+          <div style="display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span style="font-size: 0.85rem; font-weight: 700; color: #fff;">Prikazano je prvih 100 venčanih lica (50 parova). Preostali brakovi su zaključani.</span>
+            </div>
+            <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')">${upgradeSvgIcon}<span>Otključaj Neograničeno</span></button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+  tbody.innerHTML = html;
 }
 
 function getLoveStatusLabel(modifier) {
@@ -2855,6 +3507,7 @@ async function loadBotConfig() {
     // Load auto announce list
     localAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
     renderAnnounceList();
+    renderPlanLimitBanners(); // Update announces banner
 
     // Render store items and redemptions after config is loaded
     renderStoreItems();
@@ -2929,6 +3582,12 @@ async function loadBotConfig() {
     setPenaltyVal('cfgModPenaltySpam', modSettings.spam_action_type);
     setPenaltyVal('cfgModPenaltyMaxLen', modSettings.max_len_action_type);
     setPenaltyVal('cfgModPenaltyMentions', modSettings.mentions_action_type);
+
+    // Apply plan restrictions to penalty settings
+    applyPenaltySettingsRestrictions();
+    
+    // Render moderation penalty banner
+    renderPlanLimitBanners();
 
     toggleModerationPanelState();
 
@@ -3196,6 +3855,13 @@ function copyCustomBotModCmd() {
 }
 
 function promptCustomBotAuthModal() {
+  const limits = getPlanLimits();
+  if (!limits.customBotAllowed) {
+    showToast('warning', `Sopstveno bot ime je dostupan samo za korisnike PRO i ELITE paketa! Nadogradi svoj nalog.`);
+    openUpgradeModal('customBot');
+    return;
+  }
+
   const val = document.getElementById('cfgCustomBotName')?.value || '';
   const rawName = val.trim().replace(/^@+/, '');
 
@@ -3351,9 +4017,14 @@ async function saveModerationSettings(silent = false) {
   }
 
   const featureModeration = document.getElementById('cfgModeration').checked;
+  const limits = getPlanLimits();
 
   const getPenaltyVal = (id) => {
     const el = document.getElementById(id);
+    // If free plan, always return empty string (use global penalty)
+    if (!limits.customPenaltySettings) {
+      return '';
+    }
     return (el && el.value !== 'default') ? el.value : '';
   };
 
@@ -3456,7 +4127,25 @@ function applyGlobalPenaltyToAll() {
 
 function renderAnnounceList() {
   const el = document.getElementById('announceList');
+  const addBtn = document.getElementById('btnAddAnnounce');
   if (!el) return;
+
+  const limits = getPlanLimits();
+
+  // Disable add button if limit reached
+  if (addBtn) {
+    if (limits.maxAutoAnnounces !== Infinity && localAnnounces.length >= limits.maxAutoAnnounces) {
+      addBtn.disabled = true;
+      addBtn.style.opacity = '0.5';
+      addBtn.style.cursor = 'not-allowed';
+      addBtn.title = 'Dostignut je limit automatskih poruka za tvoj paket';
+    } else {
+      addBtn.disabled = false;
+      addBtn.style.opacity = '1';
+      addBtn.style.cursor = 'pointer';
+      addBtn.title = '';
+    }
+  }
 
   if (localAnnounces.length === 0) {
     el.innerHTML = '<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.015); border: 1px dashed var(--border-subtle); border-radius: var(--radius-md); font-size: 0.85rem;">Nema automatskih poruka. Unesi novu poruku iznad.</div>';
@@ -3495,9 +4184,17 @@ function addAnnounceMessage() {
     return;
   }
 
+  // Check plan limits for auto announces
+  const limits = getPlanLimits();
+  if (limits.maxAutoAnnounces !== Infinity && localAnnounces.length >= limits.maxAutoAnnounces) {
+    openUpgradeModal('announces');
+    return;
+  }
+
   localAnnounces.push(msg);
   input.value = '';
   renderAnnounceList();
+  renderPlanLimitBanners(); // Update the announce banner
   saveBotConfig(true); // Instant tihi autosave u bazu
 }
 
@@ -3520,6 +4217,7 @@ function debouncedAutoSaveConfig() {
 function deleteAnnounceMessage(i) {
   localAnnounces.splice(i, 1);
   renderAnnounceList();
+  renderPlanLimitBanners(); // Update the announce banner
   saveBotConfig(true); // Instant tihi autosave u bazu
 }
 
@@ -3539,8 +4237,8 @@ function updateBotStatusUI(active) {
   const toggleLabel = toggle?.parentElement;
 
   if (label) {
-    label.innerHTML = `<span id="botToggleDot" style="width: 7px; height: 7px; border-radius: 50%; background: ${active ? '#53FC18' : '#EF4444'}; box-shadow: 0 0 8px ${active ? '#53FC18' : '#EF4444'}; transition: all 0.3s;"></span> Bot: ${active ? 'ON' : 'OFF'}`;
-    label.style.color = active ? '#53FC18' : 'var(--text-muted)';
+    label.innerHTML = `<span id="botToggleDot" style="width: 7px; height: 7px; border-radius: 50%; background: ${active ? '#53FC18' : '#EF4444'}; box-shadow: 0 0 8px ${active ? '#53FC18' : '#EF4444'};"></span> Bot: ${active ? 'ON' : 'OFF'}`;
+    label.style.color = active ? '#53FC18' : '#EF4444';
   }
   if (toggle && toggle.checked !== active) { toggle.checked = active; }
   if (toggleLabel) { toggleLabel.setAttribute('aria-checked', active); }
@@ -3564,7 +4262,7 @@ function updateBotStatusUI(active) {
   }
   if (ctrlBtn) {
     ctrlBtn.textContent = active ? 'Zaustavi bota' : 'Pokreni bota';
-    ctrlBtn.className = active ? 'btn btn-outline btn-sm btn-danger' : 'btn btn-primary btn-sm';
+    ctrlBtn.className = active ? 'btn btn-sm btn-danger' : 'btn btn-primary btn-sm';
   }
 }
 
@@ -3828,6 +4526,14 @@ function setupRealtimeChannels() {
 // COMMANDS CRUD
 // ═══════════════════════════════════════════════════════════
 function openNewCmdModal() {
+  const limits = getPlanLimits();
+  const customCmdsCount = allCommands.filter(c => !c.is_default && !(c.id && c.id.startsWith('builtin-'))).length;
+  if (customCmdsCount >= limits.maxCustomCommands) {
+    showToast('warning', `Dostignut je limit od ${limits.maxCustomCommands} komandi za tvoj ${limits.name} paket! Nadogradi za više komandi.`);
+    openUpgradeModal('commands');
+    return;
+  }
+
   editingCmdId = null;
   document.getElementById('cmdModalTitle').textContent = 'Nova komanda';
   document.getElementById('cmdName').value = '';
@@ -3947,6 +4653,24 @@ function updateCooldownLabel() {
 }
 
 async function saveCommand() {
+  const limits = getPlanLimits();
+  const isBuiltin = editingCmdId && (editingCmdId.startsWith('builtin-') || allCommands.find(c => c.id === editingCmdId)?.is_default);
+  const existsInDb = editingCmdId && !editingCmdId.startsWith('builtin-');
+
+  if (!existsInDb && !isBuiltin) {
+    const customCmdsCount = allCommands.filter(c => !c.is_default && !(c.id && c.id.startsWith('builtin-'))).length;
+    if (customCmdsCount >= limits.maxCustomCommands) {
+      const errEl = document.getElementById('cmdModalError');
+      if (errEl) {
+        errEl.textContent = `Dostignut je limit od ${limits.maxCustomCommands} prilagođenih komandi za tvoj ${limits.name} paket. Nadogradi na PRO ili ELITE paket!`;
+        errEl.style.display = 'block';
+      }
+      showToast('warning', `Dostignut je limit komandi (${limits.maxCustomCommands}) za ${limits.name} paket!`);
+      openUpgradeModal('commands');
+      return;
+    }
+  }
+
   const rawCommand = document.getElementById('cmdName').value.trim();
   const response = document.getElementById('cmdResponse').value.trim();
   const cooldown = parseInt(document.getElementById('cmdCooldown').value) || 5000;
@@ -3954,8 +4678,6 @@ async function saveCommand() {
   const minRank = document.getElementById('cmdMinRank').value;
   const errEl = document.getElementById('cmdModalError');
   errEl.style.display = 'none';
-
-  const isBuiltin = editingCmdId && (editingCmdId.startsWith('builtin-') || allCommands.find(c => c.id === editingCmdId)?.is_default);
 
   if (!rawCommand) { errEl.textContent = 'Unesi naziv komande.'; errEl.style.display = 'block'; return; }
   if (!isBuiltin && !response) { errEl.textContent = 'Unesi odgovor bota.'; errEl.style.display = 'block'; return; }
@@ -4001,10 +4723,7 @@ async function saveCommand() {
     cooldown_ms: cooldown,
     min_rank: minRank,
     enabled,
-    updated_at: new Date().toISOString(),
   };
-
-  const existsInDb = editingCmdId && !editingCmdId.startsWith('builtin-');
 
   let error;
   if (existsInDb) {
@@ -4211,9 +4930,16 @@ function switchPanel(panelId) {
   if (panelId === 'leaderboard') { loadLeaderboard(); loadWatchtime(); }
   if (panelId === 'marriages') { loadMarriages(); loadLoveStatuses(); }
   if (panelId === 'autoresponse' && !configLoaded) loadBotConfig();
-  if (panelId === 'announces' && !configLoaded) loadBotConfig();
+  if (panelId === 'announces') {
+    if (!configLoaded) loadBotConfig();
+    renderPlanLimitBanners(); // Update announces banner
+  }
   if (panelId === 'config' && !configLoaded) loadBotConfig();
-  if (panelId === 'moderation' && !configLoaded) loadBotConfig();
+  if (panelId === 'moderation') {
+    if (!configLoaded) loadBotConfig();
+    renderPlanLimitBanners(); // Update moderation penalty banner
+    applyPenaltySettingsRestrictions(); // Apply penalty restrictions
+  }
   if (panelId === 'songs' && !configLoaded) loadBotConfig();
   if (panelId === 'economy') {
     if (!configLoaded) loadBotConfig();
@@ -4390,6 +5116,22 @@ function closeModal(id) {
   if (!modalEl) return;
   modalEl.style.pointerEvents = 'none';
   modalEl.classList.add('closing');
+  
+  // Reset inline styles for upgrade modal
+  if (id === 'upgradeModal') {
+    modalEl.style.removeProperty('display');
+    modalEl.style.removeProperty('visibility');
+    modalEl.style.removeProperty('opacity');
+    modalEl.style.removeProperty('pointer-events');
+    modalEl.style.removeProperty('z-index');
+    modalEl.style.removeProperty('position');
+    modalEl.style.removeProperty('top');
+    modalEl.style.removeProperty('left');
+    modalEl.style.removeProperty('width');
+    modalEl.style.removeProperty('height');
+    modalEl.style.removeProperty('background');
+  }
+  
   setTimeout(() => {
     modalEl.classList.remove('open', 'closing');
     modalEl.style.pointerEvents = '';
@@ -4401,7 +5143,7 @@ function handleModalBg(e, id) {
   if (e.target.id === id) closeModal(id);
 }
 
-const ALL_MODAL_IDS = ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'helpModal', 'modFilterPenaltyModal', 'docsModal', 'settingsModal', 'storeItemModal', 'referralModal', 'customBotAuthModal', 'withdrawalModal'];
+const ALL_MODAL_IDS = ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'helpModal', 'modFilterPenaltyModal', 'docsModal', 'settingsModal', 'storeItemModal', 'referralModal', 'customBotAuthModal', 'withdrawalModal', 'upgradeModal'];
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     ALL_MODAL_IDS.forEach(id => {
@@ -4828,6 +5570,20 @@ function switchSettingsTab(tabName) {
     tabChannels.classList.add('active');
     panelChannels.style.display = 'block';
     renderSettingsChannelList();
+    // Block add button if at limit
+    const addChBtn = document.getElementById('settingsAddChannelBtn');
+    const chLimits = getPlanLimits();
+    if (addChBtn && chLimits.maxChannels !== Infinity && currentChannels.length >= chLimits.maxChannels) {
+      addChBtn.disabled = true;
+      addChBtn.title = `Limit dostignut (${currentChannels.length}/${chLimits.maxChannels}). Nadogradi paket.`;
+      addChBtn.style.opacity = '0.45';
+      addChBtn.style.cursor = 'not-allowed';
+    } else if (addChBtn) {
+      addChBtn.disabled = false;
+      addChBtn.title = '';
+      addChBtn.style.opacity = '';
+      addChBtn.style.cursor = '';
+    }
   } else if (tabName === 'managers') {
     tabManagers.classList.add('active');
     panelManagers.style.display = 'block';
@@ -4854,6 +5610,49 @@ function renderSettingsManagersList() {
   listEl.innerHTML = '';
 
   const managers = activeChannel?.managers || [];
+  const limits = getPlanLimits();
+  const used = managers.length;
+  const max = limits.maxManagers;
+  const limitStr = max === Infinity ? 'Neograničeno' : max;
+  const pct = max === Infinity ? 100 : Math.min(100, Math.round((used / max) * 100));
+  const isAtLimit = max !== Infinity && used >= max;
+  const barColor = isAtLimit ? '#EF4444' : (pct >= 80 ? '#EAB308' : '#53fc18');
+
+  // Limit banner
+  const limitBannerHtml = `
+    <div style="margin-bottom: 14px; background: rgba(13, 9, 26, 0.6); border: 1px solid rgba(139,92,246,0.25); border-radius: 10px; padding: 12px 14px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;">
+        <span style="font-size:0.78rem; font-weight:700; color:#fff;">Menadžeri</span>
+        <span style="font-size:0.82rem; font-weight:800; color:${isAtLimit ? '#EF4444' : '#fff'}">${used} / ${limitStr}</span>
+      </div>
+      <div style="background:rgba(255,255,255,0.06); border-radius:6px; height:6px; overflow:hidden;">
+        <div style="height:100%; width:${pct}%; background:${barColor}; border-radius:6px; transition:width 0.4s ease;"></div>
+      </div>
+      ${isAtLimit ? `<div style="margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <span style="font-size:0.75rem; color:#EF4444; font-weight:600;">Dostignut je maksimalan broj menadžera za ${limits.name} paket.</span>
+        <button type="button" class="plan-upgrade-btn" onclick="event.stopPropagation(); openUpgradeModal('managers')" style="padding:5px 12px; font-size:0.73rem; flex-shrink:0;">${upgradeSvgIcon}<span>Nadogradi</span></button>
+      </div>` : ''}
+    </div>
+  `;
+  const managerListLabel = listEl.previousElementSibling;
+  if (managerListLabel) {
+    // Remove old banner if present
+    const existingBanner = managerListLabel.previousElementSibling;
+    if (existingBanner && existingBanner.dataset.limitBanner === 'managers') existingBanner.remove();
+    managerListLabel.insertAdjacentHTML('beforebegin', limitBannerHtml);
+    managerListLabel.previousElementSibling.dataset.limitBanner = 'managers';
+  }
+
+  // Block add manager button if at limit
+  const addMgrBtn = document.getElementById('settingsAddManagerBtn');
+  const addMgrInput = document.getElementById('settingsNewManagerInput');
+  if (isAtLimit) {
+    if (addMgrBtn) { addMgrBtn.disabled = true; addMgrBtn.style.opacity = '0.45'; addMgrBtn.style.cursor = 'not-allowed'; addMgrBtn.title = `Limit dostignut (${used}/${max}). Nadogradi paket.`; }
+    if (addMgrInput) { addMgrInput.disabled = true; addMgrInput.placeholder = `Dostignut limit od ${max} menadžera`; }
+  } else {
+    if (addMgrBtn) { addMgrBtn.disabled = false; addMgrBtn.style.opacity = ''; addMgrBtn.style.cursor = ''; addMgrBtn.title = ''; }
+    if (addMgrInput) { addMgrInput.disabled = false; addMgrInput.placeholder = 'Kick korisničko ime'; }
+  }
 
   if (managers.length === 0) {
     listEl.innerHTML = '<div style="padding:10px;font-size:0.85rem;color:var(--text-muted);text-align:center;">Nema aktivnih menadžera za ovaj kanal.</div>';
@@ -4931,6 +5730,15 @@ async function addNewManager() {
     }
 
     if (!activeChannel.managers) activeChannel.managers = [];
+
+    const limits = getPlanLimits();
+    if (limits.maxManagers !== Infinity && activeChannel.managers.length >= limits.maxManagers) {
+      errEl.textContent = `Dostignut je limit od ${limits.maxManagers} menadžera za tvoj ${limits.name} paket. Nadogradi nalog za više menadžera.`;
+      errEl.style.display = 'block';
+      if (btn) btn.disabled = false;
+      openUpgradeModal('managers');
+      return;
+    }
 
     if (activeChannel.managers.map(m => m.toLowerCase()).includes(kickUsernameLC)) {
       errEl.textContent = 'Korisnik je već menadžer ovog kanala.';
@@ -5104,6 +5912,37 @@ function renderSettingsChannelList() {
   const listEl = document.getElementById('settingsChannelList');
   if (!listEl) return;
   listEl.innerHTML = '';
+
+  const limits = getPlanLimits();
+  const used = currentChannels.length;
+  const max = limits.maxChannels;
+  const limitStr = max === Infinity ? 'Neograničeno' : max;
+  const pct = max === Infinity ? 100 : Math.min(100, Math.round((used / max) * 100));
+  const isAtLimit = max !== Infinity && used >= max;
+  const barColor = isAtLimit ? '#EF4444' : (pct >= 80 ? '#EAB308' : '#53fc18');
+
+  // Limit banner
+  const limitBannerHtml = `
+    <div style="margin-bottom: 14px; background: rgba(13, 9, 26, 0.6); border: 1px solid rgba(139,92,246,0.25); border-radius: 10px; padding: 12px 14px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;">
+        <span style="font-size:0.78rem; font-weight:700; color:#fff;">Kick Kanali</span>
+        <span style="font-size:0.82rem; font-weight:800; color:${isAtLimit ? '#EF4444' : '#fff'}">${used} / ${limitStr}</span>
+      </div>
+      <div style="background:rgba(255,255,255,0.06); border-radius:6px; height:6px; overflow:hidden;">
+        <div style="height:100%; width:${pct}%; background:${barColor}; border-radius:6px; transition:width 0.4s ease;"></div>
+      </div>
+      ${isAtLimit ? `<div style="margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <span style="font-size:0.75rem; color:#EF4444; font-weight:600;">Dostignut je maksimalan broj kanala za ${limits.name} paket.</span>
+        <button type="button" class="plan-upgrade-btn" onclick="event.stopPropagation(); openUpgradeModal('channels')" style="padding:5px 12px; font-size:0.73rem; flex-shrink:0;">${upgradeSvgIcon}<span>Nadogradi</span></button>
+      </div>` : ''}
+    </div>
+  `;
+  listEl.insertAdjacentHTML('beforebegin', limitBannerHtml);
+
+  // Remove previously injected banner if any (on re-render)
+  const prevBanner = listEl.previousElementSibling?.previousElementSibling;
+  if (prevBanner && prevBanner.dataset.limitBanner === 'channels') prevBanner.remove();
+  listEl.previousElementSibling.dataset.limitBanner = 'channels';
 
   if (currentChannels.length === 0) {
     listEl.innerHTML = '<div style="padding:10px;font-size:0.85rem;color:var(--text-muted);text-align:center;">Nema povezanih kanala.</div>';
@@ -7045,13 +7884,56 @@ async function addNewChannel() {
       function renderStoreItems() {
         const container = document.getElementById('storeItemsGrid');
         const simSelect = document.getElementById('simStoreItemSelect');
+        const addBtn = document.getElementById('btnAddStoreItem');
         if (!container) return;
 
         const items = getStoreItems();
         const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
+        const limits = getPlanLimits();
 
         if (simSelect) {
           simSelect.innerHTML = items.map(i => `<option value="${i.id}">${i.name} (${i.cost} ${valuta})</option>`).join('');
+        }
+
+        // Show store items limit banner
+        const storeLimitBanner = document.getElementById('storeLimitBanner');
+        if (storeLimitBanner) {
+          if (limits.maxStoreItems === Infinity) {
+            storeLimitBanner.style.display = 'none';
+          } else {
+            storeLimitBanner.style.display = 'flex';
+            storeLimitBanner.innerHTML = `
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.3); color:#c084fc; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
+                  ${limits.name} Paket
+                </div>
+                <div>
+                  <div style="font-size:0.85rem; font-weight:700; color:#fff;">
+                    Ograničenje artikala: <span style="color:#53FC18">${items.length}</span> / <strong>${limits.maxStoreItems}</strong> artikala
+                  </div>
+                  <div style="font-size:0.78rem; color:var(--text-muted);">
+                    ${limits.name === 'Free' ? 'Free: 10 max | Pro: 50 max | Elite: Neograničeno' : 'Pro: 50 max | Elite: Neograničeno'}
+                  </div>
+                </div>
+              </div>
+              <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('storeItems')">${upgradeSvgIcon}<span>Nadogradi za više artikala</span></button>
+            `;
+          }
+        }
+
+        // Disable add button if limit reached
+        if (addBtn) {
+          if (limits.maxStoreItems !== Infinity && items.length >= limits.maxStoreItems) {
+            addBtn.disabled = true;
+            addBtn.style.opacity = '0.5';
+            addBtn.style.cursor = 'not-allowed';
+            addBtn.title = 'Dostignut je limit artikala za tvoj paket';
+          } else {
+            addBtn.disabled = false;
+            addBtn.style.opacity = '1';
+            addBtn.style.cursor = 'pointer';
+            addBtn.title = '';
+          }
         }
 
         if (items.length === 0) {
@@ -7138,7 +8020,17 @@ async function addNewChannel() {
           return;
         }
 
+        const limits = getPlanLimits();
         let items = getStoreItems();
+        
+        // Check plan limits for new items (editing existing items doesn't count towards limit)
+        if (!editId && limits.maxStoreItems !== Infinity) {
+          if (items.length >= limits.maxStoreItems) {
+            openUpgradeModal('storeItems');
+            return;
+          }
+        }
+
         if (editId) {
           const idx = items.findIndex(i => i.id === editId);
           if (idx !== -1) {
@@ -7653,4 +8545,9 @@ async function handleWithdrawalSubmit(e) {
   }
 }
 
-      initAuth();
+// Expose referral functions globally
+window.openReferralModal = openReferralModal;
+window.openWithdrawalModal = openWithdrawalModal;
+window.copyCustomRefEmail = copyCustomRefEmail;
+
+initAuth();

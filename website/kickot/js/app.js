@@ -63,7 +63,7 @@ let currentUser = null;
 (function checkReferralParam() {
   try {
     const params = new URLSearchParams(window.location.search);
-    const ref = params.get('ref');
+    const ref = params.get('ref') || params.get('referral');
     if (ref) {
       const referralKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.USER_REFERRAL_CODE : 'user_referral_code';
       localStorage.setItem(referralKey, ref.trim().toUpperCase());

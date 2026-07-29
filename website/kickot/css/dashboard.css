@@ -284,8 +284,6 @@ body {
 
 .status-on {
   background: var(--kick-green);
-  box-shadow: 0 0 6px rgba(83, 252, 24, 0.6);
-  animation: pulse-dot 2s infinite;
 }
 
 .status-off {
@@ -528,6 +526,9 @@ body {
   border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .user-pill {
@@ -539,6 +540,8 @@ body {
   cursor: pointer;
   transition: var(--transition-fast);
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .user-pill:hover,
@@ -548,14 +551,14 @@ body {
 }
 
 .user-avatar-sm {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: var(--app-gradient);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8125rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: #fff;
   flex-shrink: 0;
@@ -564,22 +567,37 @@ body {
 .user-info {
   flex: 1;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .user-display-name {
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   letter-spacing: -0.02em;
+  color: #ffffff;
 }
 
 .user-plan {
   font-size: 0.6875rem;
   color: var(--app-primary);
   font-weight: 600;
-  margin-top: 1px;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-upgrade-btn {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  justify-content: center !important;
+  padding: 8px 12px !important;
+  margin-left: 0 !important;
+  font-size: 0.75rem !important;
+  border-radius: 10px !important;
 }
 
 
@@ -1754,7 +1772,6 @@ select option {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(4, 3, 8, 0.85);
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
   z-index: 1000;
@@ -1769,6 +1786,10 @@ select option {
 
 #confirmModal {
   z-index: 1100;
+}
+
+#upgradeModal {
+  z-index: 1200;
 }
 
 .modal-backdrop.open {
@@ -4167,3 +4188,207 @@ input[type="number"]::-webkit-inner-spin-button {
 .z-50 { z-index: 50; }
 .z-100 { z-index: 100; }
 .z-9999 { z-index: 9999; }
+
+/* ── Plan Badges & Upgrade Modal ── */
+.plan-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.plan-badge-free {
+  background: rgba(255, 255, 255, 0.1);
+  color: #a1a1aa;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.plan-badge-pro {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+}
+.plan-badge-elite {
+  background: rgba(83, 252, 24, 0.15);
+  color: #53fc18;
+  border: 1px solid rgba(83, 252, 24, 0.35);
+}
+.plan-upgrade-btn {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #3b82f6 100%);
+  background-size: 200% 200%;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 7px 16px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  text-transform: uppercase;
+  position: relative;
+  overflow: hidden;
+}
+
+.plan-upgrade-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+  transition: 0.5s;
+}
+
+.plan-upgrade-btn:hover::before {
+  left: 100%;
+}
+
+.plan-upgrade-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  background-position: right center;
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.55), 0 0 15px rgba(99, 102, 241, 0.4);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.plan-upgrade-btn:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+}
+
+.upgrade-btn-icon {
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+  color: #ffd700;
+  filter: drop-shadow(0 1px 3px rgba(255, 215, 0, 0.5));
+}
+
+.plan-upgrade-btn:hover .upgrade-btn-icon {
+  transform: rotate(12deg) scale(1.15);
+}
+
+.plan-limit-banner {
+  background: linear-gradient(135deg, rgba(13, 9, 26, 0.85) 0%, rgba(20, 14, 38, 0.95) 100%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 14px;
+  padding: 14px 20px;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.plan-limit-banner:hover {
+  border-color: rgba(139, 92, 246, 0.45);
+  box-shadow: 0 12px 36px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.upgrade-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.upgrade-plan-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.25s ease;
+}
+.upgrade-plan-card:hover {
+  transform: translateY(-4px);
+}
+.upgrade-plan-card.popular {
+  border-color: var(--app-primary);
+  background: rgba(139, 92, 246, 0.06);
+  box-shadow: 0 0 25px rgba(139, 92, 246, 0.2);
+}
+.upgrade-plan-card.elite {
+  border-color: #53fc18;
+  background: rgba(83, 252, 24, 0.04);
+  box-shadow: 0 0 25px rgba(83, 252, 24, 0.15);
+}
+
+/* ── Locked Feature Overlays ── */
+.locked-feature-container {
+  position: relative !important;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+.locked-feature-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(10, 8, 20, 0.90);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 50;
+  border-radius: 14px;
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  text-align: center;
+  padding: 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+  animation: fadeIn 0.3s ease;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.locked-feature-overlay__icon {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.22);
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  color: #c084fc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.4);
+}
+
+.locked-feature-overlay__title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff !important;
+  margin: 0;
+  letter-spacing: 0.2px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+.locked-feature-overlay__desc {
+  font-size: 0.86rem;
+  color: #e4e4e7 !important;
+  max-width: 460px;
+  margin: 0;
+  line-height: 1.55;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
