@@ -25,7 +25,6 @@
     
     <!-- Alternate Language Tags -->
     <link rel="alternate" hreflang="sr" href="https://kickall.app/">
-    <link rel="alternate" hreflang="en" href="https://kickall.app/en/">
     <link rel="alternate" hreflang="x-default" href="https://kickall.app/">
 
     <!-- Optimizacija mrežnih resursa Brže učitavanje -->
@@ -113,7 +112,7 @@
                 "contactPoint": {
                     "@type": "ContactPoint",
                     "contactType": "customer support",
-                    "email": "support@kickall.com",
+                    "email": "contact@milanwebportal.com",
                     "availableLanguage": ["sr", "en"]
                 }
             },
@@ -215,17 +214,18 @@
     </script>
     
     <!-- Mobile Performance Optimizations -->
-    <script src="js/mobile-optimization.js"></script>
+    <script src="js/mobile-optimization.js" defer></script>
     
     <!-- Toast Notification System -->
-    <script src="js/toast.js"></script>
+    <script src="js/toast.js" defer></script>
 </head>
 
 <body>
-
+    <!-- Skip Link za pristupačnost -->
+    <a href="#main-content" class="sr-only skip-link">Pređi na glavni sadržaj</a>
 
     <!-- Grid pozadinski svetlosni efekti -->
-    <div class="glow-bg">
+    <div class="glow-bg" aria-hidden="true">
         <div class="blob blob-violet"></div>
         <div class="blob blob-green"></div>
     </div>
@@ -234,7 +234,7 @@
     <header class="header" role="banner">
         <div class="container nav-container">
             <a href="index.html" class="logo" id="navLogo">
-                <img src="assets/kickall.webp" alt="KickAll Logo" class="logo-img" style="height: 48px;" loading="lazy">
+                <img src="assets/kickall.webp" alt="KickALL Logo" class="logo-img" width="160" height="48" fetchpriority="high">
             </a>
             <nav class="nav-menu" id="navMenu">
                 <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Zatvori meni">
@@ -313,7 +313,7 @@
         </div>
     </header>
 
-    <main role="main">
+    <main role="main" id="main-content">
         <!-- Hero Sekcija (100vh) -->
         <section class="hero-section">
             <div class="container hero-container">
@@ -1506,7 +1506,7 @@
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-primary w-full" id="pricingProBtn" onclick="window.location.href='kickot/index.html'">
+                            <button class="btn btn-primary w-full" id="pricingProBtn" onclick="openIndexCheckout('pro')">
                                 <span class="btn-text" data-i18n="pricing.pro.btn">Izaberi Pro</span> - <span class="btn-price">$9.99/mes</span>
                             </button>
                         </div>
@@ -1587,7 +1587,7 @@
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-secondary w-full" id="pricingEliteBtn" onclick="window.location.href='kickot/index.html'">
+                            <button class="btn btn-secondary w-full" id="pricingEliteBtn" onclick="openIndexCheckout('elite')">
                                 <span class="btn-text" data-i18n="pricing.elite.btn">Izaberi Elite</span> - <span class="btn-price">$14.99/mes</span>
                             </button>
                         </div>
@@ -1598,22 +1598,40 @@
                 <div class="pricing-annual-note">
                     <p data-i18n="pricing.annualNote">💰 <strong>2 meseca besplatno</strong> uz godišnju pretplatu! Pro: $99.99/god | Elite: $149.99/god</p>
                 </div>
-            </div>
         </section>
 
         <script>
-            // Pricing Toggle Functionality
-            const monthlyPrices = {
-                free: '$0',
-                pro: '$9.99',
-                elite: '$14.99'
+            // ── Lemon Squeezy Checkout ────────────────────────────
+            const LS_CHECKOUT_INDEX = {
+                pro:   'https://kickall.lemonsqueezy.com/checkout/buy/5cf5297e-1531-4d20-b4d7-bee2a87ce43f',
+                elite: 'https://kickall.lemonsqueezy.com/checkout/buy/49acae3b-d8ea-4fd6-a278-6daf3d9d48db'
             };
 
-            const yearlyPrices = {
-                free: '$0',
-                pro: '$99.99',
-                elite: '$149.99'
-            };
+            function openIndexCheckout(plan) {
+                const baseUrl = LS_CHECKOUT_INDEX[plan];
+                if (!baseUrl) return;
+
+                // Proveri da li je korisnik ulogovan (Supabase sesija u localStorage)
+                let userId = null;
+                try {
+                    const storageKey = 'kickbot-supabase-auth';
+                    const raw = localStorage.getItem(storageKey);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        userId = parsed && parsed.user && parsed.user.id ? parsed.user.id : null;
+                    }
+                } catch (_) {}
+
+                if (!userId) {
+                    // Ako korisnik nije ulogovan, preusmeri ga na prijavu
+                    alert('Morate biti ulogovani da biste kupili plan. Preusmeravamo vas na prijavu...');
+                    window.location.href = 'kickot/dashboard.html';
+                    return;
+                }
+
+                const url = baseUrl + '?checkout[custom][user_id]=' + encodeURIComponent(userId);
+                window.open(url, '_blank', 'noopener,noreferrer');
+            }
 
             function setPricingPeriod(period) {
                 const monthlyBtn = document.getElementById('monthlyBtn');
@@ -2037,7 +2055,7 @@
             <button type="button" class="modal-close" id="authModalClose" aria-label="Close" data-i18n-aria-label="modal.close">✕</button>
 
             <div class="modal-logo">
-                <img src="assets/kickall.webp" alt="Kickall Logo" class="logo-img" style="height: 38px;" loading="lazy">
+                <img src="assets/kickall.webp" alt="KickALL Logo" class="logo-img" width="130" height="38" loading="lazy">
             </div>
 
             <div id="loginForm" class="auth-form auth-form-centered">

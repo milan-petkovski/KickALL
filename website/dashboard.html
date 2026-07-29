@@ -59,10 +59,10 @@
   </script>
   
   <!-- Mobile Performance Optimizations -->
-  <script src="js/mobile-optimization.js"></script>
+  <script src="js/mobile-optimization.js" defer></script>
   
   <!-- Toast Notification System -->
-  <script src="js/toast.js"></script>
+  <script src="js/toast.js" defer></script>
 
   <!-- Fontovi -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -82,7 +82,7 @@
 
 
   <!-- Grid background glows -->
-  <div class="glow-bg">
+  <div class="glow-bg" aria-hidden="true">
     <div class="blob blob-violet"></div>
     <div class="blob blob-green"></div>
   </div>
@@ -91,7 +91,7 @@
   <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
     <div class="auth-gate-card">
       <div class="auth-gate-logo">
-        <img src="assets/kickall.webp" alt="KickAll Logo" class="logo-img" style="height: 52px; width: auto;" loading="lazy" />
+        <img src="assets/kickall.webp" alt="KickALL Logo" class="logo-img" width="173" height="52" fetchpriority="high" />
       </div>
       <div class="auth-gate-spinner"></div>
       <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju...</p>
@@ -102,7 +102,7 @@
   <header class="header" role="banner">
     <div class="container nav-container">
       <a href="index.html" class="logo" id="navLogo">
-        <img src="assets/kickall.webp" alt="KickAll Logo" class="logo-img" style="height: 48px;" loading="lazy">
+        <img src="assets/kickall.webp" alt="KickALL Logo" class="logo-img" width="160" height="48" fetchpriority="high">
       </a>
       <nav class="nav-menu" id="navMenu">
         <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Zatvori meni">

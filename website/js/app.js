@@ -352,32 +352,42 @@ async function setLanguage(lang) {
         posaljiljubav: 0
     };
 
+    function escapeHtml(text) {
+        if (!text) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     const roastReplies = [
-        "Uff... {ime} ima cooldown od 10 minuta na šarm i lepo ponašanje! 💀",
-        "Izgleda da je {ime} zaboravio da upali monitor pre strima. 📺",
-        "Moj procesor ne može da pronađe skil kod igrača {ime}. Traženje prekinuto... 🔎",
-        "Mislio sam da sam ja bot, ali onda sam video kako {ime} igra. 🤖"
+        "Uff... {ime} ima cooldown od 10 minuta na šarm i lepo ponašanje!",
+        "Izgleda da je {ime} zaboravio da upali monitor pre strima.",
+        "Moj procesor ne može da pronađe skil kod igrača {ime}. Traženje prekinuto...",
+        "Mislio sam da sam ja bot, ali onda sam video kako {ime} igra."
     ];
 
     const loveReplies = [
-        "Šaljemo ogromnu ljubav za {ime}! Tvoja energija drži ovaj strim! ❤️",
-        "{ime} je zvanično proglašen za najjačeg gledaoca danas! 🌟",
-        "Ljubav poslata! {ime}, ti si legenda! 🙌",
-        "Ekipa iz chata šalje zagrljaj za {ime}! Hvala što si tu! 🤗"
+        "Šaljemo ogromnu ljubav za {ime}! Tvoja energija drži ovaj strim!",
+        "{ime} je zvanično proglašen za najjačeg gledaoca danas!",
+        "Ljubav poslata! {ime}, ti si legenda!",
+        "Ekipa iz chata šalje zagrljaj za {ime}! Hvala što si tu!"
     ];
 
     const roastRepliesEn = [
-        "Uff... {ime} has a 10-minute cooldown on charm and good behavior! 💀",
-        "It seems like {ime} forgot to turn on their monitor before streaming. 📺",
-        "My processor cannot find any skill on player {ime}. Search aborted... 🔎",
-        "I thought I was the bot, but then I watched {ime} play. 🤖"
+        "Uff... {ime} has a 10-minute cooldown on charm and good behavior!",
+        "It seems like {ime} forgot to turn on their monitor before streaming.",
+        "My processor cannot find any skill on player {ime}. Search aborted...",
+        "I thought I was the bot, but then I watched {ime} play."
     ];
 
     const loveRepliesEn = [
-        "Sending huge love to {ime}! Your energy keeps this stream going! ❤️",
-        "{ime} is officially declared the absolute best viewer today! 🌟",
-        "Love sent! {ime}, you are a legend! 🙌",
-        "Chat crew sends a warm hug to {ime}! Thanks for being here! 🤗"
+        "Sending huge love to {ime}! Your energy keeps this stream going!",
+        "{ime} is officially declared the absolute best viewer today!",
+        "Love sent! {ime}, you are a legend!",
+        "Chat crew sends a warm hug to {ime}! Thanks for being here!"
     ];
 
     function addChatMessage(user, text, isBot = false, isSystem = false, userType = 'regular') {
@@ -390,22 +400,25 @@ async function setLanguage(lang) {
         if (userType === 'moderator') userClass += ' moderator';
         if (userType === 'vip') userClass += ' vip';
 
+        const safeUser = escapeHtml(user);
+        const safeText = isBot ? text : escapeHtml(text); // Bot poruke sadrže kontrolisane formatirane tagove, običan korisnik se sanitizuje
+
         if (isSystem) {
             msgDiv.innerHTML = `
                 <span class="msg-time">${time}</span>
-                <span class="msg-text">${text}</span>
+                <span class="msg-text">${safeText}</span>
             `;
         } else if (isBot) {
             msgDiv.innerHTML = `
                 <span class="msg-time">${time}</span>
                 <span class="msg-user">kickot</span>
-                <span class="msg-text">${text}</span>
+                <span class="msg-text">${safeText}</span>
             `;
         } else {
             msgDiv.innerHTML = `
                 <span class="msg-time">${time}</span>
-                <span class="${userClass}">${user}:</span>
-                <span class="msg-text">${text}</span>
+                <span class="${userClass}">${safeUser}:</span>
+                <span class="msg-text">${safeText}</span>
             `;
         }
 
@@ -487,7 +500,7 @@ async function setLanguage(lang) {
             
             if (sada - cooldowns.bacihejt < 10000) {
                 const preostalo = Math.ceil((10000 - (sada - cooldowns.bacihejt)) / 1000);
-                let errText = chatSim.cooldownError || '⚠️ Error: Command {cmd} is on cooldown for {time}s! (Originally 10m)';
+                let errText = chatSim.cooldownError || 'Error: Command {cmd} is on cooldown for {time}s! (Originally 10m)';
                 errText = errText.replace('{cmd}', '!bacihejt').replace('{time}', preostalo);
                 addChatMessage(botName, errText, true);
                 playSynthSound(150, 'sawtooth', 0.25);
@@ -502,7 +515,7 @@ async function setLanguage(lang) {
             let roast = replies[Math.floor(Math.random() * replies.length)];
             roast = roast.replace('{ime}', target);
 
-            let responseText = chatSim.bacihejtTrigger || '👿 <strong>!bacihejt</strong> triggered by {user} towards <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)';
+            let responseText = chatSim.bacihejtTrigger || '<strong>!bacihejt</strong> triggered by {user} towards <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)';
             const pointsStr = randomPoint > 0 ? '+' + randomPoint : randomPoint;
             responseText = responseText.replace('{user}', viewerName).replace('{target}', target).replace('{reply}', roast).replace('{points}', pointsStr).replace('{total}', userPoints);
 
@@ -515,7 +528,7 @@ async function setLanguage(lang) {
             
             if (sada - cooldowns.posaljiljubav < 10000) {
                 const preostalo = Math.ceil((10000 - (sada - cooldowns.posaljiljubav)) / 1000);
-                let errText = chatSim.cooldownError || '⚠️ Error: Command {cmd} is on cooldown for {time}s! (Originally 10m)';
+                let errText = chatSim.cooldownError || 'Error: Command {cmd} is on cooldown for {time}s! (Originally 10m)';
                 errText = errText.replace('{cmd}', '!posaljiljubav').replace('{time}', preostalo);
                 addChatMessage(botName, errText, true);
                 playSynthSound(150, 'sawtooth', 0.25);
@@ -530,7 +543,7 @@ async function setLanguage(lang) {
             let love = replies[Math.floor(Math.random() * replies.length)];
             love = love.replace('{ime}', target);
 
-            let responseText = chatSim.loveSent || '❤️ <strong>!posaljiljubav</strong> sent to <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)';
+            let responseText = chatSim.loveSent || '<strong>!posaljiljubav</strong> sent to <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)';
             const pointsStr = randomPoint > 0 ? '+' + randomPoint : randomPoint;
             responseText = responseText.replace('{user}', viewerName).replace('{target}', target).replace('{reply}', love).replace('{points}', pointsStr).replace('{total}', userPoints);
 
@@ -538,13 +551,13 @@ async function setLanguage(lang) {
             playSynthSound(randomPoint > 0 ? 600 : 250, 'triangle', 0.3);
 
         } else if (cmd === '!poeni') {
-            let responseText = chatSim.pointsResponse || '🏆 User {user} currently has <strong>{points}</strong> points on this channel. Rank: <strong>Chat King</strong>.';
+            let responseText = chatSim.pointsResponse || 'User {user} currently has <strong>{points}</strong> points on this channel. Rank: <strong>Chat King</strong>.';
             responseText = responseText.replace('{user}', viewerName).replace('{points}', userPoints);
             addChatMessage(botName, responseText, true);
             playSynthSound(440, 'sine', 0.2);
 
         } else if (cmd === '!vreme' || cmd === '!weather') {
-            const weatherText = chatSim.weather || '🌍 Weather in Belgrade: ⛅ Partly cloudy | 🌡️ 26°C (feels like 25°C) | 💧 Humidity: 32% | 💨 Wind: 22 km/h';
+            const weatherText = chatSim.weather || 'Weather in Belgrade: Partly cloudy | 26°C (feels like 25°C) | Humidity: 32% | Wind: 22 km/h';
             addChatMessage(botName, weatherText, true);
             playSynthSound(500, 'sine', 0.2);
 
@@ -555,21 +568,21 @@ async function setLanguage(lang) {
 
         } else {
             if (message.startsWith('!')) {
-                const responseText = chatSim.unknownCmd || '❌ Unknown command. Available commands: <strong>!vreme Beograd</strong>, <strong>!info</strong>.';
+                const responseText = chatSim.unknownCmd || 'Unknown command. Available commands: <strong>!vreme Beograd</strong>, <strong>!info</strong>.';
                 addChatMessage(botName, responseText, true);
                 playSynthSound(200, 'sawtooth', 0.2);
             } else {
                 const repliesSr = [
-                    "Slažem se sa ovim potpuno! Hype u chatu! 🚀",
+                    "Slažem se sa ovim potpuno! Hype u chatu!",
                     "Zanimljivo razmišljanje. Šta ostali misle?",
-                    "Hvala na poruci! Ne zaboravite da zapratite strim ako uživate! 💚",
-                    `${window.CONFIG.DEFAULTS.BOT_NAME} bot je uvek tu da nadgleda chat! 😎`
+                    "Hvala na poruci! Ne zaboravite da zapratite strim ako uživate!",
+                    `${window.CONFIG.DEFAULTS.BOT_NAME} bot je uvek tu da nadgleda chat!`
                 ];
                 const repliesEn = [
-                    "Totally agree with this! Chat hype! 🚀",
+                    "Totally agree with this! Chat hype!",
                     "Interesting thought. What does the rest of the chat think?",
-                    "Thanks for the message! Don't forget to follow if you're enjoying! 💚",
-                    `${window.CONFIG.DEFAULTS.BOT_NAME} bot is always here watching over the chat! 😎`
+                    "Thanks for the message! Don't forget to follow if you're enjoying!",
+                    `${window.CONFIG.DEFAULTS.BOT_NAME} bot is always here watching over the chat!`
                 ];
                 const replies = isEn ? repliesEn : repliesSr;
                 const reply = replies[Math.floor(Math.random() * replies.length)];
@@ -736,23 +749,26 @@ async function setLanguage(lang) {
         alertCard.className = `live-alert-card ${type === 'sub' ? 'alert-sub' : ''}`;
         const isEn = currentLang === 'en';
 
-        let icon = '⚡';
+        let iconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
         let title = isEn ? 'New Follower!' : 'Novi Pratilac!';
-        let message = isEn ? `User <span>${data.name}</span> is now following!` : `Korisnik <span>${data.name}</span> vas sada prati!`;
+        const safeName = escapeHtml(data.name);
+        const safeMsg = escapeHtml(data.msg);
+        let message = isEn ? `User <span>${safeName}</span> is now following!` : `Korisnik <span>${safeName}</span> vas sada prati!`;
 
         if (type === 'sub') {
-            icon = '👑';
+            iconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 4l3 12h14l3-12-6 7-4-5-4 5-6-7z"></path></svg>`;
             title = isEn ? 'New Subscriber!' : 'Novi Pretplatnik!';
-            message = isEn ? `<span>${data.name}</span> just subscribed!` : `<span>${data.name}</span> se pretplatio na kanal!`;
+            message = isEn ? `<span>${safeName}</span> just subscribed!` : `<span>${safeName}</span> se pretplatio na kanal!`;
             playSynthSound(600, 'sine', 0.1);
             setTimeout(() => playSynthSound(800, 'sine', 0.15), 100);
             setTimeout(() => playSynthSound(1000, 'sine', 0.3), 200);
         } else if (type === 'donation') {
-            icon = '💎';
+            iconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h12l4 6-10 12L2 9z"></path></svg>`;
             title = isEn ? 'New Donation!' : 'Nova Donacija!';
+            const safeAmount = escapeHtml(data.amount);
             message = isEn 
-                ? `<span>${data.name}</span> donated <span>€${data.amount}</span>! <br>"${data.msg}"`
-                : `<span>${data.name}</span> je donirao <span>€${data.amount}</span>! <br>"${data.msg}"`;
+                ? `<span>${safeName}</span> donated <span>€${safeAmount}</span>! <br>"${safeMsg}"`
+                : `<span>${safeName}</span> je donirao <span>€${safeAmount}</span>! <br>"${safeMsg}"`;
             playSynthSound(500, 'triangle', 0.1);
             setTimeout(() => playSynthSound(650, 'triangle', 0.1), 100);
             setTimeout(() => playSynthSound(850, 'triangle', 0.25), 200);
@@ -762,7 +778,7 @@ async function setLanguage(lang) {
         }
 
         alertCard.innerHTML = `
-            <div class="alert-icon-anim">${icon}</div>
+            <div class="alert-icon-anim">${iconSvg}</div>
             <div class="alert-title-text">${title}</div>
             <div class="alert-message-text">${message}</div>
         `;

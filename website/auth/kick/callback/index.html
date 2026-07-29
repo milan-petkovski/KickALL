@@ -5,11 +5,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
   <title>KickALL | OAuth Autorizacija</title>
-  <link rel="icon" href="../../../assets/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="/assets/favicon.ico" type="image/x-icon">
   <link rel="apple-touch-icon" href="/assets/logo.webp">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght=600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
   
   <!-- Configuration -->
   <script src="/js/config.js"></script>
@@ -19,7 +19,7 @@
     if (!window.CONFIG) {
       // Try to load config from parent directory if not loaded
       const script = document.createElement('script');
-      script.src = '../js/config.js';
+      script.src = '/js/config.js';
       document.head.appendChild(script);
     }
   </script>
@@ -169,9 +169,13 @@
 </head>
 
 <body>
+  <div class="glow-bg" aria-hidden="true">
+    <div class="blob blob-violet"></div>
+    <div class="blob blob-green"></div>
+  </div>
   <div class="card" id="errorCard" style="display: none;">
     <div class="logo-wrap">
-      <img src="../../../assets/kickall.webp" alt="Kickall Logo" class="logo-img" style="height: 52px; width: auto;" loading="lazy">
+      <img src="/assets/kickall.webp" alt="KickALL Logo" class="logo-img" width="173" height="52" loading="lazy">
     </div>
     <div class="status-icon">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -183,7 +187,7 @@
     <h1>Greška prilikom autorizacije</h1>
     <p class="status-msg" id="errorStatus">Došlo je do greške</p>
     <p class="status-sub" id="errorDetails">Molimo vas pokušajte ponovo</p>
-    <a href="../../../index.html" class="btn-retry">Nazad na početnu</a>
+    <a href="/index.html" class="btn-retry">Nazad na početnu</a>
   </div>
 
   <script>
@@ -285,8 +289,6 @@
           : (window.KICK_API_BASE || window.location.origin).replace(/\/+$/, ''));
 
       try {
-        console.log('Attempting token exchange:', { apiBase, codeVerifier: codeVerifier ? 'present' : 'missing', redirectUri });
-        
         // Simple single attempt with better error handling
         const response = await Promise.race([
           fetch(`${apiBase}/api/kick/exchange`, {
@@ -296,8 +298,6 @@
           }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('Exchange timeout')), 25000))
         ]);
-        
-        console.log('Exchange response status:', response.status);
         
         if (!response.ok) {
           const errorText = await response.text();
@@ -318,7 +318,6 @@
         }
 
         const tokenData = await response.json();
-        console.log('Token response:', tokenData);
         
         if (!tokenData.access_token) {
           console.error('No access token in response:', tokenData);
@@ -343,9 +342,7 @@
 
         const targets = {
           kickot: 'kickot/dashboard.html',
-          kickaj: 'kickaj/dashboard.html',
-          kickan: 'kickan/dashboard.html',
-          kickov: 'kickov/dashboard.html'
+          kickall: 'dashboard.html'
         };
 
         const targetPage = targets[originSite] || 'dashboard.html';

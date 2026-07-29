@@ -16,22 +16,7 @@
         <priority>0.8</priority>
     </url>
     
-    <!-- Kickot Dashboard (lower priority, noindex) -->
-    <url>
-        <loc>https://kickall.app/kickot/dashboard.html</loc>
-        <lastmod>2026-07-28</lastmod>
-        <changefreq>monthly</changefreq>
-        <priority>0.4</priority>
-    </url>
-    
-    <!-- Main Dashboard (lower priority, noindex) -->
-    <url>
-        <loc>https://kickall.app/dashboard.html</loc>
-        <lastmod>2026-07-28</lastmod>
-        <changefreq>monthly</changefreq>
-        <priority>0.4</priority>
-    </url>
-    
+
     <!-- Terms of Service -->
     <url>
         <loc>https://kickall.app/terms.html</loc>

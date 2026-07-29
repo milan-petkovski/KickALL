@@ -280,6 +280,30 @@ function togglePricing(type) {
 }
 window.openUpgradeModal = openUpgradeModal;
 
+// ── Lemon Squeezy Checkout ─────────────────────────────────
+const LS_CHECKOUT_URLS = {
+  pro:   'https://kickall.lemonsqueezy.com/checkout/buy/5cf5297e-1531-4d20-b4d7-bee2a87ce43f',
+  elite: 'https://kickall.lemonsqueezy.com/checkout/buy/49acae3b-d8ea-4fd6-a278-6daf3d9d48db'
+};
+
+function openCheckout(plan) {
+  const baseUrl = LS_CHECKOUT_URLS[plan];
+  if (!baseUrl) {
+    console.warn('[Checkout] Nepoznat plan:', plan);
+    return;
+  }
+
+  const userId = currentUser ? currentUser.id : null;
+  if (!userId) {
+    showToast('warning', 'Morate biti ulogovani da biste se pretplatili.', '');
+    return;
+  }
+
+  const url = `${baseUrl}?checkout[custom][user_id]=${encodeURIComponent(userId)}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+window.openCheckout = openCheckout;
+
 function applyPenaltySettingsRestrictions() {
   const limits = getPlanLimits();
   const penaltySelects = [
@@ -1295,6 +1319,19 @@ async function loadUserProfile() {
       .maybeSingle(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('Profile load timeout')), 10000))
   ]);
+
+  // Proveri i procesuiraj referral kod ako postoji i osiguraj da korisnik ima svoj kod
+  if (currentUser && currentUser.id) {
+    const refCode = localStorage.getItem('user_referral_code') || sessionStorage.getItem('user_referral_code');
+    if (refCode) {
+      try {
+        await sb.rpc('create_user_referral', { p_user_id: currentUser.id, p_referral_code: refCode });
+        localStorage.removeItem('user_referral_code');
+        sessionStorage.removeItem('user_referral_code');
+      } catch (e) {}
+    }
+    ensureUserHasReferralCode(currentUser.id).catch(() => {});
+  }
 
   let myUsername = '';
   if (data) {
@@ -6989,7 +7026,11 @@ async function addNewChannel() {
         const code = urlParams.get('code');
         if (code) {
           const verifier = localStorage.getItem('kickbot_spotify_code_verifier');
-          const clientId = localStorage.getItem('kickbot_spotify_client_id') || 'c028a385f062402db3179261a8bb2a7e';
+          let clientId = localStorage.getItem('kickbot_spotify_client_id');
+          if (!clientId || clientId === 'c028a385f062402db3179261a8bb2a7e') {
+            clientId = '09165366748740278c242eb53d4a51f1';
+            localStorage.setItem('kickbot_spotify_client_id', clientId);
+          }
           const redirectUri = window.location.origin + window.location.pathname;
 
           try {
@@ -7079,8 +7120,12 @@ async function addNewChannel() {
       }
 
       async function connectSpotifyAccount() {
-        // Koristi unapred konfigurisani Client ID — bez prompta
-        const clientId = localStorage.getItem('kickbot_spotify_client_id') || 'c028a385f062402db3179261a8bb2a7e';
+        // Koristi novi podrazumevani Client ID
+        let clientId = localStorage.getItem('kickbot_spotify_client_id');
+        if (!clientId || clientId === 'c028a385f062402db3179261a8bb2a7e') {
+          clientId = '09165366748740278c242eb53d4a51f1';
+          localStorage.setItem('kickbot_spotify_client_id', clientId);
+        }
 
         const redirectUri = window.location.origin + window.location.pathname;
         const scopes = 'user-read-playback-state user-modify-playback-state user-read-currently-playing streaming';
@@ -7174,6 +7219,26 @@ async function addNewChannel() {
         if (!queueList) return;
 
         queueCount.textContent = `${localSongQueue.length} pesama`;
+
+        // Vizuelno ograničavanje Add dugmeta na osnovu plana
+        const sqLimits = getPlanLimits();
+        const addBtn = document.getElementById('songRequestAddBtn');
+        const addInput = document.getElementById('songRequestInput');
+        const isQueueFull = sqLimits.maxSongQueue !== Infinity && localSongQueue.length >= sqLimits.maxSongQueue;
+
+        if (addBtn) {
+          addBtn.disabled = isQueueFull;
+          addBtn.style.opacity = isQueueFull ? '0.45' : '1';
+          addBtn.style.cursor = isQueueFull ? 'not-allowed' : 'pointer';
+          addBtn.title = isQueueFull ? `Queue limit dostignut (${localSongQueue.length}/${sqLimits.maxSongQueue}) — nadogradi paket` : '';
+        }
+        if (addInput) {
+          addInput.disabled = isQueueFull;
+          addInput.style.opacity = isQueueFull ? '0.5' : '1';
+          addInput.placeholder = isQueueFull
+            ? `Queue pun (${localSongQueue.length}/${sqLimits.maxSongQueue}) — nadogradi za veći queue`
+            : 'Unesi Spotify link, YouTube link ili naziv pesme...';
+        }
 
         if (localSongQueue.length === 0) {
           queueList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 24px; font-size: 0.82rem; font-style: italic;">Red za puštanje je prazan. Dodajte pesmu dole levo ili sačekajte muzičku želju iz četa.</div>';
@@ -7483,6 +7548,14 @@ async function addNewChannel() {
 
         if (!rawInput) {
           showToast('info', 'Molimo unesite naziv pesme ili YouTube / Spotify link.', '🎵');
+          return;
+        }
+
+        // Plan limit check — blokira dodavanje ako je queue pun
+        const queueLimits = getPlanLimits();
+        if (queueLimits.maxSongQueue !== Infinity && localSongQueue.length >= queueLimits.maxSongQueue) {
+          showToast('warning', `Dostignut je limit od ${queueLimits.maxSongQueue} pesama u redu za ${queueLimits.name} paket! Nadogradi za veći queue.`);
+          openUpgradeModal('general');
           return;
         }
 

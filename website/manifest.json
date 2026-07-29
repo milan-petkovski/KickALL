@@ -1,7 +1,7 @@
 {
   "name": "KickALL - Kompletan Ekosistem za Kick Streamere",
   "short_name": "KickALL",
-  "description": "Podigni svoj Kick stream na svetski nivo uz KickAll ekosistem. Napredni chatbot, nagradne igre, overlay alati i detaljna analitika.",
+  "description": "Podigni svoj Kick stream na svetski nivo uz KickALL ekosistem. Napredni chatbot, nagradne igre, overlay alati i detaljna analitika.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#06040A",
@@ -23,7 +23,15 @@
     }
   ],
   "categories": ["entertainment", "social", "productivity"],
-  "screenshots": [],
+  "screenshots": [
+    {
+      "src": "/assets/kickall.webp",
+      "sizes": "1200x630",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "KickALL Ecosystem Dashboard"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Dashboard",

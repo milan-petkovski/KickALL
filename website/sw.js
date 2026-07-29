@@ -1,15 +1,25 @@
 // KickALL Service Worker for PWA functionality
-const CACHE_NAME = 'kickall-v2';
+const CACHE_NAME = 'kickall-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/dashboard.html',
+  '/privacy.html',
+  '/terms.html',
+  '/css/base.css',
   '/css/style.css',
   '/css/dashboard.css',
   '/js/config.js',
   '/js/app.js',
   '/js/dashboard.js',
+  '/js/mobile-optimization.js',
+  '/js/toast.js',
+  '/js/data-layer.js',
+  '/js/route-tracking.js',
+  '/js/consent-banner.js',
+  '/js/analytics.js',
   '/assets/logo.webp',
+  '/assets/kickall.webp',
   '/assets/favicon.ico',
   '/locales/sr.json',
   '/locales/en.json'

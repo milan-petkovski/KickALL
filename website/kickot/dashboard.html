@@ -49,8 +49,8 @@
   </script>
   
   <!-- Mobile Performance Optimizations & Toast System -->
-  <script src="../js/mobile-optimization.js"></script>
-  <script src="../js/toast.js"></script>
+  <script src="../js/mobile-optimization.js" defer></script>
+  <script src="../js/toast.js" defer></script>
 
   <!-- Fontovi (Inter, JetBrains Mono, Space Grotesk) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -1956,7 +1956,7 @@
                 </h3>
                 <div style="display: flex; gap: 8px; margin-bottom: 10px;">
                   <input type="text" id="songRequestInput" class="form-input" style="flex-grow: 1;" placeholder="Unesi Spotify link, YouTube link ili naziv pesme..." onkeydown="if(event.key === 'Enter'){ event.preventDefault(); requestSong(); }" />
-                  <button class="btn btn-primary" onclick="requestSong()" style="padding: 10px 20px; white-space: nowrap;">Dodaj</button>
+                  <button id="songRequestAddBtn" class="btn btn-primary" onclick="requestSong()" style="padding: 10px 20px; white-space: nowrap;">Dodaj</button>
                 </div>
                 <span class="config-hint" style="line-height: 1.4; display: block;">
                   Gledaoci šalju muzičke želje direktno u četu kucanjem komande: <code style="background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; color: #1DB954; font-weight: bold;">!pesma [spotify/youtube link ili naziv pesme]</code>
@@ -4440,7 +4440,7 @@
               </div>
             </div>
           </div>
-          <a href="../index.html#pricing" target="_blank" class="btn btn-primary" style="width: 100%; margin-top: auto; text-align: center; text-decoration: none; padding: 12px; font-weight: 600;">Izaberi Pro →</a>
+          <a id="monthlyProCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('pro')" class="btn btn-primary" style="width: 100%; margin-top: auto; text-align: center; text-decoration: none; padding: 12px; font-weight: 600;">Izaberi Pro →</a>
         </div>
 
         <!-- Elite Plan -->
@@ -4468,7 +4468,7 @@
               </div>
             </div>
           </div>
-          <a href="../index.html#pricing" target="_blank" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite →</a>
+          <a id="monthlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite →</a>
         </div>
       </div>
 
@@ -4545,7 +4545,7 @@
               </div>
             </div>
           </div>
-          <a href="../index.html#pricing" target="_blank" class="btn btn-primary" style="width: 100%; margin-top: auto; text-align: center; text-decoration: none; padding: 12px; font-weight: 600;">Izaberi Pro Godišnje →</a>
+          <a id="yearlyProCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('pro')" class="btn btn-primary" style="width: 100%; margin-top: auto; text-align: center; text-decoration: none; padding: 12px; font-weight: 600;">Izaberi Pro Godišnje →</a>
         </div>
 
         <!-- Elite Plan Yearly -->
@@ -4575,7 +4575,7 @@
               </div>
             </div>
           </div>
-          <a href="../index.html#pricing" target="_blank" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite Godišnje →</a>
+          <a id="yearlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite Godišnje →</a>
         </div>
       </div>
 
