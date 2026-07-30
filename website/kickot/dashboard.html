@@ -55,12 +55,40 @@
   <!-- Fontovi (Inter, JetBrains Mono, Space Grotesk) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 
-  <!-- Dynamic Configuration -->
+  <!-- KickALL Root Configuration (seta window.CONFIG sa Supabase URL, ANON_KEY, OAuth itd.) -->
+  <script src="../js/config.js"></script>
+
+  <!-- Dynamic Configuration (Kickot-specifican, seta window.KickotConfig) -->
   <script src="js/config.js"></script>
 
   <!-- Favicon i Stilovi -->
   <link rel="icon" href="/assets/favicon.ico" type="image/x-icon" />
   <link rel="stylesheet" href="css/dashboard.css" />
+  <style>
+    .btn-botrix {
+      border-color: rgba(83, 252, 24, 0.45) !important;
+      color: #53FC18 !important;
+      background: rgba(83, 252, 24, 0.07) !important;
+      box-shadow: 0 0 10px rgba(83, 252, 24, 0.18) !important;
+    }
+    .btn-botrix:hover, .btn-botrix:focus {
+      background: rgba(83, 252, 24, 0.18) !important;
+      border-color: #53FC18 !important;
+      color: #53FC18 !important;
+      box-shadow: 0 0 18px rgba(83, 252, 24, 0.4) !important;
+    }
+    #btnExecuteBotrixImport {
+      background: #53FC18 !important;
+      color: #0E0E1D !important;
+      border: none !important;
+      box-shadow: 0 4px 16px rgba(83, 252, 24, 0.35) !important;
+    }
+    #btnExecuteBotrixImport:hover:not(:disabled) {
+      background: #46e013 !important;
+      color: #0E0E1D !important;
+      box-shadow: 0 6px 22px rgba(83, 252, 24, 0.6) !important;
+    }
+  </style>
 
   <!-- Supabase JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -616,8 +644,16 @@
                   <span class="toggle-track"></span>
                 </label>
               </div>
-              <div class="panel-actions">
+              <div class="panel-actions" style="display: flex; align-items: center; gap: 8px;">
                 <select class="select-input" id="lbMonthSelect" onchange="loadLeaderboard()"></select>
+                <button class="btn btn-outline btn-sm btn-botrix" onclick="openBotrixImportModal('watchtime')" style="display: flex; align-items: center; gap: 6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  Uvezi iz Botrix-a
+                </button>
                 <button class="btn btn-outline btn-sm" onclick="exportLeaderboard()">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -739,12 +775,22 @@
               </h1>
               <p class="panel-desc">Upravljaj prilagođenim komandama bota</p>
             </div>
-            <button class="btn btn-primary" onclick="openNewCmdModal()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Nova komanda
-            </button>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <button class="btn btn-outline btn-botrix" onclick="openBotrixImportModal()" style="display: flex; align-items: center; gap: 8px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Uvezi iz Botrix-a
+              </button>
+              <button class="btn btn-primary" onclick="openNewCmdModal()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Nova komanda
+              </button>
+            </div>
           </div>
 
           <!-- Plan Limit Status Banner -->
@@ -894,12 +940,22 @@
               </h1>
               <p class="panel-desc">Konfiguriši poruke koje bot automatski periodično šalje tokom tvog strima.</p>
             </div>
-            <div class="panel-header-toggle">
-              <span class="panel-header-toggle__label">Automatske poruke:</span>
-              <label class="toggle-switch">
-                <input type="checkbox" id="cfgFeatureAnnouncementsMaster" checked onchange="toggleModuleFromHeader('cfgAnnounceTimeEnabled', this.checked)">
-                <span class="toggle-track"></span>
-              </label>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <button class="btn btn-outline btn-sm btn-botrix" onclick="openBotrixImportModal('timers')" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Uvezi iz Botrix-a
+              </button>
+              <div class="panel-header-toggle">
+                <span class="panel-header-toggle__label">Automatske poruke:</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="cfgFeatureAnnouncementsMaster" checked onchange="toggleModuleFromHeader('cfgAnnounceTimeEnabled', this.checked)">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -2303,7 +2359,17 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2.5"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
                 <span>Artikli u Prodavnici Kanala</span>
               </h3>
-              <button id="btnAddStoreItem" class="btn btn-primary btn-sm" onclick="openCreateStoreItemModal()">+ Dodaj novi artikal</button>
+              <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-outline btn-sm btn-botrix" onclick="openBotrixImportModal('store')" style="display: flex; align-items: center; gap: 6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                  </svg>
+                  Uvezi iz Botrix-a
+                </button>
+                <button id="btnAddStoreItem" class="btn btn-primary btn-sm" onclick="openCreateStoreItemModal()">+ Dodaj novi artikal</button>
+              </div>
             </div>
             
             <div id="storeItemsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 2.25rem;">
@@ -2769,12 +2835,22 @@
               </h1>
               <p class="panel-desc">Uključi pametne filtere za čišćenje spama, linkova i zabranjenih reči iz četa.</p>
             </div>
-            <div class="panel-header-toggle">
-              <span class="panel-header-toggle__label">Moderacija:</span>
-              <label class="toggle-switch">
-                <input type="checkbox" id="cfgFeatureModerationMaster" checked onchange="toggleModuleFromHeader('cfgModeration', this.checked)">
-                <span class="toggle-track"></span>
-              </label>
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+              <button class="btn btn-outline btn-sm btn-botrix" onclick="openBotrixImportModal('blacklist')" style="display: flex; align-items: center; gap: 6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Uvezi iz Botrix-a
+              </button>
+              <div class="panel-header-toggle">
+                <span class="panel-header-toggle__label">Moderacija:</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="cfgFeatureModerationMaster" checked onchange="toggleModuleFromHeader('cfgModeration', this.checked)">
+                  <span class="toggle-track"></span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -3412,6 +3488,86 @@
     </div>
   </div>
 
+  <!-- Botrix Import Modal -->
+  <div class="modal-backdrop" id="botrixImportModal" onclick="handleModalBg(event, 'botrixImportModal')">
+    <div class="modal-box" style="max-width: 650px; width: 92%; padding: 0;">
+      <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: space-between;">
+        <h3 style="display: flex; align-items: center; gap: 10px; margin: 0;">
+          <div style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; background: rgba(83, 252, 24, 0.12); color: #53FC18;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+          </div>
+          <div>
+            <span style="font-weight: 700; color: #fff;">Uvoz Podataka iz Botrix-a</span>
+            <div style="font-size: 0.78rem; color: var(--text-muted); font-weight: 400;">Prebaci svoje komande, najave i podešavanja sa Botrix-a u Kickot u 1 kliku</div>
+          </div>
+        </h3>
+        <button type="button" class="modal-close" onclick="closeModal('botrixImportModal')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body" style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; max-height: calc(85vh - 130px); overflow-y: auto;">
+        
+        <!-- Tab Navigation for Import Type -->
+        <div style="display: flex; gap: 6px; background: rgba(0, 0, 0, 0.3); padding: 4px; border-radius: 10px; border: 1px solid var(--border-subtle); flex-wrap: wrap;">
+          <button type="button" class="btn btn-sm botrix-tab-btn active" id="botrixTabCmds" onclick="switchBotrixTab('cmds')" style="flex: 1; border: none; font-size: 0.78rem; font-weight: 600; background: var(--app-primary); color: #fff;">Komande</button>
+          <button type="button" class="btn btn-sm botrix-tab-btn" id="botrixTabTimers" onclick="switchBotrixTab('timers')" style="flex: 1; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-muted);">Najave</button>
+          <button type="button" class="btn btn-sm botrix-tab-btn" id="botrixTabBlacklist" onclick="switchBotrixTab('blacklist')" style="flex: 1; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-muted);">Reči</button>
+          <button type="button" class="btn btn-sm botrix-tab-btn" id="botrixTabWatchtime" onclick="switchBotrixTab('watchtime')" style="flex: 1; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-muted);">Watchtime</button>
+          <button type="button" class="btn btn-sm botrix-tab-btn" id="botrixTabStore" onclick="switchBotrixTab('store')" style="flex: 1; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-muted);">Prodavnica</button>
+          <button type="button" class="btn btn-sm botrix-tab-btn" id="botrixTabAlerts" onclick="switchBotrixTab('alerts')" style="flex: 1; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-muted);">Alerti</button>
+          <button type="button" class="btn btn-sm botrix-tab-btn" id="botrixTabGreetings" onclick="switchBotrixTab('greetings')" style="flex: 1; border: none; font-size: 0.78rem; font-weight: 600; background: transparent; color: var(--text-muted);">Pozdrav</button>
+        </div>
+
+        <!-- Instructions Guide -->
+        <div style="background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 10px; padding: 12px 14px; font-size: 0.82rem; line-height: 1.5; color: var(--text-main);">
+          <div style="font-weight: 700; color: #53FC18; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            Najbrže uputstvo za uvoz sa Botrix-a:
+          </div>
+          <span id="botrixGuideText">Otvori svoj Botrix Dashboard ➔ <strong>Commands</strong> ➔ Selektuj celu stranicu sa <strong>Ctrl+A</strong>, kopiraj (Ctrl+C) i nalepi u polje ispod. Kickot će automatski očistiti meni i konvertovati varijable poput <code>{user}</code> ili <code>{target}</code>!</span>
+        </div>
+
+        <!-- Paste Area or File Upload -->
+        <div class="form-group">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+            <label class="form-label" style="font-size: 0.85rem; margin: 0;" id="botrixInputLabel">Nalepi kopirani tekst sa Botrix-a:</label>
+            <label for="botrixFileInput" style="font-size: 0.78rem; color: #53FC18; cursor: pointer; text-decoration: underline; font-weight: 600;">Ili učitaj .txt / .csv fajl</label>
+            <input type="file" id="botrixFileInput" accept=".csv,.txt" style="display: none;" onchange="handleBotrixFileUpload(event)" />
+          </div>
+          <textarea class="form-input form-textarea" id="botrixInputText" rows="6" style="width: 100%; font-family: var(--font-mono); font-size: 0.82rem; resize: vertical;" 
+            placeholder="Nalepi ovde tekst kopiran sa Botrix-a (Ctrl+A ➔ Ctrl+C ➔ Ctrl+V)...&#10;Kickot će sam očistiti navigaciju i uvesti samo komande!" oninput="parseBotrixInput()"></textarea>
+        </div>
+
+        <!-- Parsed Preview Box -->
+        <div id="botrixParsedSummary" style="display: none; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(83, 252, 24, 0.3); border-radius: 10px; padding: 12px 14px; font-size: 0.82rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span style="font-weight: 700; color: #53FC18;" id="botrixParsedCount">Pronađeno: 0 komandi</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);" id="botrixVarsConvertedInfo">Varijable konvertovane u Kickot format</span>
+          </div>
+          <div id="botrixPreviewItemsList" style="max-height: 140px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;"></div>
+        </div>
+
+        <div class="form-alert" id="botrixImportError" style="display:none; margin: 0;"></div>
+      </div>
+
+      <div class="modal-foot" style="padding: 16px 24px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.78rem; color: var(--text-muted);" id="botrixImportPlanInfo">Zadržavaju se postojeće komande</span>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn btn-outline" onclick="closeModal('botrixImportModal')">Otkaži</button>
+          <button type="button" class="btn btn-primary" id="btnExecuteBotrixImport" onclick="executeBotrixImport()" disabled style="background: #53FC18; color: #0E0E1D; font-weight: 700; padding: 10px 22px;">Uvezi u Kickot →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Predlozi Komandu Modal -->
   <div class="modal-backdrop" id="feedbackModal" onclick="handleModalBg(event, 'feedbackModal')">
     <div class="modal-box pm-modal" style="max-width: 460px;">
@@ -3911,6 +4067,7 @@
           <button type="button" role="tab" aria-selected="true" class="settings-tab active" id="setTabProfile" onclick="switchSettingsTab('profile')" style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Profil</button>
           <button type="button" role="tab" aria-selected="false" class="settings-tab" id="setTabChannels" onclick="switchSettingsTab('channels')" style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Kick Kanali</button>
           <button type="button" role="tab" aria-selected="false" class="settings-tab" id="setTabManagers" onclick="switchSettingsTab('managers')" style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Menadžeri</button>
+          <button type="button" role="tab" aria-selected="false" class="settings-tab" id="setTabSubscription" onclick="switchSettingsTab('subscription')" style="flex: 1; background: none; border: none; color: var(--text-muted); padding: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; border-radius: 8px; transition: all 0.2s;">Pretplata</button>
         </div>
 
         <!-- PANEL 1: PROFIL -->
@@ -4006,6 +4163,43 @@
               <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
             <p style="font-size: 0.85rem; line-height: 1.4; margin: 0;">Samo vlasnik kanala može da upravlja menadžerima.</p>
+          </div>
+        </div>
+
+        <!-- PANEL 4: UPRAVLJANJE PRETPLATOM -->
+        <div id="settingsSubscriptionPanel" style="display: none; margin-top: 10px;">
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px;">
+            
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+              <span style="font-size: 0.85rem; color: var(--text-muted);">Aktivni Paket:</span>
+              <span id="subPlanBadge" style="font-size: 0.85rem; font-weight: 700; color: #fff;">FREE</span>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+              <span style="font-size: 0.85rem; color: var(--text-muted);">Status Pretplate:</span>
+              <span id="subStatusText" style="font-size: 0.85rem; font-weight: 600; color: #53FC18;">Besplatni paket</span>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="font-size: 0.85rem; color: var(--text-muted);" id="subDateLabel">Sledeće obnavljanje:</span>
+              <span id="subDateValue" style="font-size: 0.85rem; font-weight: 600; color: #fff;">-</span>
+            </div>
+
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <a id="btnManageSubscription" href="https://kickall.lemonsqueezy.com/billing" target="_blank" rel="noopener" class="btn btn-primary" style="display: inline-flex; justify-content: center; align-items: center; gap: 8px; text-decoration: none; font-weight: 600; padding: 10px; font-size: 0.85rem;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+              Upravljaj Pretplatom / Otkaži
+            </a>
+
+            <button type="button" class="btn btn-outline" onclick="closeSettingsModal(); openUpgradeModal('general');" style="width: 100%; justify-content: center; font-size: 0.85rem;">
+              Promeni / Nadogradi Paket
+            </button>
           </div>
         </div>
 
@@ -4415,7 +4609,7 @@
               </div>
             </div>
           </div>
-          <a id="monthlyProCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('pro')" class="btn btn-primary" style="width: 100%; margin-top: auto; text-align: center; text-decoration: none; padding: 12px; font-weight: 600;">Izaberi Pro →</a>
+          <a id="monthlyProCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('pro', 'monthly')" class="btn btn-primary" style="width: 100%; margin-top: auto; text-align: center; text-decoration: none; padding: 12px; font-weight: 600;">Izaberi Pro →</a>
         </div>
 
         <!-- Elite Plan -->
@@ -4443,7 +4637,7 @@
               </div>
             </div>
           </div>
-          <a id="monthlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite →</a>
+          <a id="monthlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite', 'monthly')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite →</a>
         </div>
       </div>
 
@@ -4520,7 +4714,7 @@
               </div>
             </div>
           </div>
-          <a id="yearlyProCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('pro')" class="btn btn-primary" style="width: 100%; margin-top: auto; text-align: center; text-decoration: none; padding: 12px; font-weight: 600;">Izaberi Pro Godišnje →</a>
+          <a id="yearlyProCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('pro', 'yearly')" class="btn btn-primary" style="width: 100%; margin-top: auto; text-align: center; text-decoration: none; padding: 12px; font-weight: 600;">Izaberi Pro Godišnje →</a>
         </div>
 
         <!-- Elite Plan Yearly -->
@@ -4550,7 +4744,7 @@
               </div>
             </div>
           </div>
-          <a id="yearlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite Godišnje →</a>
+          <a id="yearlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite', 'yearly')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite Godišnje →</a>
         </div>
       </div>
 

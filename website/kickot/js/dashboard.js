@@ -14,12 +14,17 @@ const CONFIG = window.CONFIG || window.KickotConfig;
 // ── Supabase Init ──────────────────────────────────────────
 const { createClient } = window.supabase;
 
-// Direct fallback values for Supabase configuration
-const supabaseUrl = CONFIG.SUPABASE?.URL || CONFIG.supabase?.url || 'https://rcukparptzzyssqdmydt.supabase.co';
-const supabaseAnonKey = CONFIG.SUPABASE?.ANON_KEY || CONFIG.supabase?.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+// Supabase konfiguracija dolazi iskljucivo iz js/config.js (window.CONFIG)
+// Nikad ne koristiti hardkodovane fallback vrednosti
+const supabaseUrl = CONFIG.SUPABASE?.URL;
+const supabaseAnonKey = CONFIG.SUPABASE?.ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('[Kickot Dashboard] Supabase URL ili ANON_KEY nije dostupan iz window.CONFIG. Proverite da je js/config.js ucitan pre dashboard.js.');
+}
 
 // Use same storage key as KickAll for shared auth session
-const storageKey = CONFIG.SUPABASE?.STORAGE_KEY || CONFIG.storage?.storageKey || 'kickbot-supabase-auth';
+const storageKey = CONFIG.SUPABASE?.STORAGE_KEY || 'kickbot-supabase-auth';
 
 const sb = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -256,7 +261,10 @@ function updatePlanButtons() {
   }
 }
 
+let currentPricingPeriod = 'monthly';
+
 function togglePricing(type) {
+  currentPricingPeriod = type;
   const monthlyPricing = document.getElementById('monthlyPricing');
   const yearlyPricing = document.getElementById('yearlyPricing');
   const monthlyBtn = document.getElementById('monthlyBtn');
@@ -282,14 +290,22 @@ window.openUpgradeModal = openUpgradeModal;
 
 // ── Lemon Squeezy Checkout ─────────────────────────────────
 const LS_CHECKOUT_URLS = {
-  pro:   'https://kickall.lemonsqueezy.com/checkout/buy/5cf5297e-1531-4d20-b4d7-bee2a87ce43f',
-  elite: 'https://kickall.lemonsqueezy.com/checkout/buy/49acae3b-d8ea-4fd6-a278-6daf3d9d48db'
+  pro: {
+    monthly: 'https://kickall.lemonsqueezy.com/checkout/buy/ef8c2e17-c6c6-4f01-97ab-7e0b70ac2374',
+    yearly:  'https://kickall.lemonsqueezy.com/checkout/buy/eeb6f9b7-aeeb-4769-b333-78c089a5d732'
+  },
+  elite: {
+    monthly: 'https://kickall.lemonsqueezy.com/checkout/buy/09412cf7-f7ad-4103-826e-96fa00786a53',
+    yearly:  'https://kickall.lemonsqueezy.com/checkout/buy/7faf6d66-f155-4885-b64c-d1a284eb2df8'
+  }
 };
 
-function openCheckout(plan) {
-  const baseUrl = LS_CHECKOUT_URLS[plan];
+function openCheckout(plan, period) {
+  const p = period || currentPricingPeriod || 'monthly';
+  const planUrls = LS_CHECKOUT_URLS[plan];
+  const baseUrl = (planUrls && typeof planUrls === 'object') ? planUrls[p] || planUrls.monthly : planUrls;
   if (!baseUrl) {
-    console.warn('[Checkout] Nepoznat plan:', plan);
+    console.warn('[Checkout] Nepoznat plan ili link:', plan, p);
     return;
   }
 
@@ -1265,12 +1281,25 @@ async function initApp() {
     document.getElementById('authGateMsg').textContent = 'Učitavanje podataka...';
     
     await loadAllData();
-    let lastPanel = 'overview';
+    // Detekcija osvežavanja stranice (F5/Reload) vs nove posete
+    const isReload = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0] && performance.getEntriesByType('navigation')[0].type === 'reload') || (performance.navigation && performance.navigation.type === 1);
+    const sessionPanel = sessionStorage.getItem('active-dashboard-panel-session');
     const hashPanel = window.location.hash ? window.location.hash.replace('#', '') : null;
     const validPanels = ['overview', 'leaderboard', 'commands', 'games', 'announces', 'autoresponse', 'marriages', 'minigames', 'songs', 'economy', 'config', 'moderation'];
+    
+    let lastPanel = 'overview';
+    // Ako je eksplicitno naveden hash u URL-u ili ako je u pitanju F5 osvežavanje, zapamti trenutni panel
     if (hashPanel && validPanels.includes(hashPanel)) {
       lastPanel = hashPanel;
+    } else if (isReload && sessionPanel && validPanels.includes(sessionPanel)) {
+      lastPanel = sessionPanel;
+    } else {
+      // Nova poseta (odlazak pa povratak na dashboard) -> Uvek Otvori Overview
+      lastPanel = 'overview';
+      localStorage.removeItem('active-dashboard-panel');
+      sessionStorage.removeItem('active-dashboard-panel-session');
     }
+    
     switchPanel(lastPanel);
     renderPlanLimitBanners();
   } else {
@@ -1314,11 +1343,13 @@ async function initApp() {
 async function loadUserProfile() {
   const { data, error } = await Promise.race([
     sb.from('user_profiles')
-      .select('display_name, plan, kick_channels')
+      .select('*')
       .eq('id', currentUser.id)
       .maybeSingle(),
     new Promise((_, reject) => setTimeout(() => reject(new Error('Profile load timeout')), 10000))
   ]);
+
+  if (data) currentUserProfileData = data;
 
   // Proveri i procesuiraj referral kod ako postoji i osiguraj da korisnik ima svoj kod
   if (currentUser && currentUser.id) {
@@ -1454,28 +1485,10 @@ async function fetchKickAvatar(username) {
         return data?.user?.profile_pic || null;
       }
     },
-    // 2. Corsproxy.io
-    {
-      name: 'corsproxy.io',
-      url: `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
-      parse: async (res) => {
-        const data = await res.json();
-        return data?.user?.profile_pic || null;
-      }
-    },
-    // 3. Codetabs
+    // 2. Codetabs
     {
       name: 'codetabs',
       url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(apiUrl)}`,
-      parse: async (res) => {
-        const data = await res.json();
-        return data?.user?.profile_pic || null;
-      }
-    },
-    // 4. Thingproxy
-    {
-      name: 'thingproxy',
-      url: `https://thingproxy.freeboard.io/fetch/${apiUrl}`,
       parse: async (res) => {
         const data = await res.json();
         return data?.user?.profile_pic || null;
@@ -1577,13 +1590,15 @@ function renderChannelList() {
       const div = document.createElement('div');
       div.className = 'channel-option' + (activeChannel?.id === ch.id ? ' selected' : '');
 
-      const avatarHtml = ch.avatar
-        ? `<div class="channel-avatar" style="width:24px;height:24px;background-image:url('${ch.avatar}');background-size:cover;background-position:center;border-radius:50%"></div>`
-        : `<div class="channel-avatar" style="width:24px;height:24px;font-size:0.7rem;border-radius:50%">${ch.username.charAt(0).toUpperCase()}</div>`;
+      // Sanitizacija avatar URL-a: prihvati samo https://
+      const safeChAvatar = ch.avatar && /^https:\/\//.test(ch.avatar) ? ch.avatar : null;
+      const avatarHtml = safeChAvatar
+        ? `<div class="channel-avatar" style="width:24px;height:24px;background-image:url('${safeChAvatar}');background-size:cover;background-position:center;border-radius:50%"></div>`
+        : `<div class="channel-avatar" style="width:24px;height:24px;font-size:0.7rem;border-radius:50%">${escapeHtml(ch.username.charAt(0).toUpperCase())}</div>`;
 
       div.innerHTML = `
         ${avatarHtml}
-        <span class="ch-name">${ch.username}</span>
+        <span class="ch-name">${escapeHtml(ch.username)}</span>
         ${activeChannel?.id === ch.id ? checkSvg : ''}
       `;
       div.onclick = () => selectChannel(ch);
@@ -1608,14 +1623,16 @@ function renderChannelList() {
       const div = document.createElement('div');
       div.className = 'channel-option' + (activeChannel?.id === ch.id ? ' selected' : '');
 
-      const avatarHtml = ch.avatar
-        ? `<div class="channel-avatar" style="width:24px;height:24px;background-image:url('${ch.avatar}');background-size:cover;background-position:center;border-radius:50%"></div>`
-        : `<div class="channel-avatar" style="width:24px;height:24px;font-size:0.7rem;border-radius:50%">${ch.username.charAt(0).toUpperCase()}</div>`;
+      // Sanitizacija avatar URL-a: prihvati samo https://
+      const safeManagedAvatar = ch.avatar && /^https:\/\//.test(ch.avatar) ? ch.avatar : null;
+      const avatarHtml = safeManagedAvatar
+        ? `<div class="channel-avatar" style="width:24px;height:24px;background-image:url('${safeManagedAvatar}');background-size:cover;background-position:center;border-radius:50%"></div>`
+        : `<div class="channel-avatar" style="width:24px;height:24px;font-size:0.7rem;border-radius:50%">${escapeHtml(ch.username.charAt(0).toUpperCase())}</div>`;
 
       div.innerHTML = `
         ${avatarHtml}
         <span class="ch-name" style="display: flex; align-items: center; gap: 4px;">
-          ${ch.username} 
+          ${escapeHtml(ch.username)}
           <svg style="width: 13px; height: 13px; fill: none; stroke: #a78bfa; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; display: inline-block;" viewBox="0 0 24 24" title="Menadžer kanala">
             <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
           </svg>
@@ -2650,7 +2667,9 @@ async function loadLeaderboard() {
   }
 
   if (error) { return; }
-  allLeaderboard = data || [];
+  if (data && data.length > 0) {
+    allLeaderboard = data;
+  }
   renderMiniLeaderboard(allLeaderboard.slice(0, 5));
 
   // Calculate and display total chat messages with Serbian grammar formatting
@@ -2691,7 +2710,9 @@ async function loadWatchtime() {
     .limit(200);
 
   if (error) { return; }
-  allWatchtime = data || [];
+  if (data && data.length > 0) {
+    allWatchtime = data;
+  }
   renderMiniWatchtime(allWatchtime.slice(0, 5));
 
   const totalMins = allWatchtime.reduce((s, r) => s + (r.minutes || 0), 0);
@@ -2829,9 +2850,7 @@ function buildCombinedRows() {
   });
 
   allWatchtime.forEach(r => {
-    // Profiltriši watchtime po izabranom mesecu koristeći updated_at
-    if (!r.updated_at) return;
-    const date = new Date(r.updated_at);
+    const date = r.updated_at ? new Date(r.updated_at) : new Date();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const y = date.getFullYear();
     const rowMonth = `${m}-${y}`;
@@ -2845,7 +2864,7 @@ function buildCombinedRows() {
         points: 0,
         minutes: 0,
         month: selectedMonth,
-        updated_at: r.updated_at
+        updated_at: r.updated_at || new Date().toISOString()
       };
     }
     map[key].minutes += r.minutes || 0;
@@ -2873,17 +2892,9 @@ function renderUnifiedLeaderboard(customRows = null) {
   } else if (isCombined) {
     rows = buildCombinedRows();
   } else if (isChatters) {
-    rows = allLeaderboard;
+    rows = [...allLeaderboard].sort((a, b) => (b.points || 0) - (a.points || 0));
   } else {
-    const sel = document.getElementById('lbMonthSelect');
-    const selectedMonth = sel?.value || getCurrentMonth();
-    rows = allWatchtime.filter(row => {
-      if (!row.updated_at) return false;
-      const date = new Date(row.updated_at);
-      const m = String(date.getMonth() + 1).padStart(2, '0');
-      const y = date.getFullYear();
-      return `${m}-${y}` === selectedMonth;
-    });
+    rows = [...allWatchtime].sort((a, b) => (b.minutes || 0) - (a.minutes || 0));
   }
 
   // Renderovanje podijuma (top 3)
@@ -2951,10 +2962,12 @@ function renderUnifiedLeaderboard(customRows = null) {
       const avatarKey = (row.username || '').toLowerCase();
       const cachedUrl = avatarCache[avatarKey];
       const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
-      avatarStyle = hasAvatar
-        ? `background-image:url('${cachedUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
+      // Sanitizacija URL-a: prihvati samo https:// radi zastite od CSS injection-a
+      const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
+      avatarStyle = safeAvatarUrl
+        ? `background-image:url('${safeAvatarUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
         : '';
-      avatarContent = hasAvatar ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
+      avatarContent = safeAvatarUrl ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
 
       // Pokreni fetch ako nije keširano i ako imamo username
       if (!hasAvatar && row.username) {
@@ -2985,7 +2998,7 @@ function renderUnifiedLeaderboard(customRows = null) {
           <td>${rankDisplay}</td>
           <td>${userCol}</td>
           <td class="td-num" style="color:${rankColor(globalIndex)}">${formatPorukeCount(row.points)}</td>
-          <td style="color:var(--text-muted)">${row.month}</td>
+          <td style="color:var(--text-muted)">${escapeHtml(row.month || '')}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
@@ -3011,7 +3024,7 @@ function renderUnifiedLeaderboard(customRows = null) {
           <td>${userCol}</td>
           <td class="td-num" style="color:var(--kick-green); font-weight: 600;">${hours}h ${mins}min</td>
           <td class="td-num" style="color:var(--app-primary)">${formatPorukeCount(row.points)}</td>
-          <td style="color:var(--text-muted)">${row.month || '—'}</td>
+          <td style="color:var(--text-muted)">${escapeHtml(row.month || '—')}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
@@ -3070,13 +3083,15 @@ function renderPodium(top3) {
     const avatarKey = (row.username || '').toLowerCase();
     const cachedUrl = avatarCache[avatarKey];
     const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
-    const avatarStyle = hasAvatar
-      ? `background-image:url('${cachedUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
+    // Sanitizacija URL-a: prihvati samo https:// radi zastite od CSS injection-a
+    const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
+    const avatarStyle = safeAvatarUrl
+      ? `background-image:url('${safeAvatarUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
       : '';
-    const avatarContent = hasAvatar ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
+    const avatarContent = safeAvatarUrl ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
 
     // Pokreni fetch ako nije keširano i ako imamo username
-    if (!hasAvatar && row.username) {
+    if (!safeAvatarUrl && row.username) {
       setTimeout(() => {
         getOrFetchAvatar(row.username, `podium-avatar-${i}`);
       }, 30 * i);
@@ -3102,12 +3117,14 @@ function renderMiniLeaderboard(rows) {
     const avatarKey = (row.username || '').toLowerCase();
     const cachedUrl = avatarCache[avatarKey];
     const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
-    const avatarStyle = hasAvatar
-      ? `background-image:url('${cachedUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
+    // Sanitizacija URL-a: prihvati samo https://
+    const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
+    const avatarStyle = safeAvatarUrl
+      ? `background-image:url('${safeAvatarUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
       : '';
-    const avatarContent = hasAvatar ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
+    const avatarContent = safeAvatarUrl ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
 
-    if (!hasAvatar && row.username) {
+    if (!safeAvatarUrl && row.username) {
       setTimeout(() => {
         getOrFetchAvatar(row.username, `mini-lead-avatar-${i}`);
       }, 60 * i);
@@ -3191,12 +3208,14 @@ function renderMiniWatchtime(rows) {
     const avatarKey = (row.username || '').toLowerCase();
     const cachedUrl = avatarCache[avatarKey];
     const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
-    const avatarStyle = hasAvatar
-      ? `background-image:url('${cachedUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
+    // Sanitizacija URL-a: prihvati samo https://
+    const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
+    const avatarStyle = safeAvatarUrl
+      ? `background-image:url('${safeAvatarUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
       : '';
-    const avatarContent = hasAvatar ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
+    const avatarContent = safeAvatarUrl ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
 
-    if (!hasAvatar && row.username) {
+    if (!safeAvatarUrl && row.username) {
       setTimeout(() => {
         getOrFetchAvatar(row.username, `mini-watch-avatar-${i}`);
       }, 60 * i);
@@ -4936,7 +4955,12 @@ function switchPanel(panelId) {
   const mainContent = document.getElementById('mainContent');
   if (mainContent) mainContent.scrollTop = 0;
 
-  localStorage.setItem('active-dashboard-panel', panelId);
+  sessionStorage.setItem('active-dashboard-panel-session', panelId);
+  try {
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, '', `#${panelId}`);
+    }
+  } catch (e) {}
 
   // Reset scroll for all panels
   document.querySelectorAll('.panel').forEach(p => {
@@ -5089,6 +5113,10 @@ function notifyGlobalLogout(userId) {
 }
 
 window.addEventListener('message', (event) => {
+  // Bezbednosna provera: prihvati poruke samo od pouzdanih originа
+  const allowedOrigins = ['https://kickall.app', 'http://localhost:5500'];
+  if (!allowedOrigins.includes(event.origin)) return;
+
   if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
     localStorage.clear();
     sessionStorage.clear();
@@ -5579,14 +5607,18 @@ async function handleSaveSettings() {
 // ═══════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════
+let currentUserProfileData = null;
+
 function switchSettingsTab(tabName) {
   const tabProfile = document.getElementById('setTabProfile');
   const tabChannels = document.getElementById('setTabChannels');
   const tabManagers = document.getElementById('setTabManagers');
+  const tabSubscription = document.getElementById('setTabSubscription');
 
   const panelProfile = document.getElementById('settingsProfilePanel');
   const panelChannels = document.getElementById('settingsChannelsPanel');
   const panelManagers = document.getElementById('settingsManagersPanel');
+  const panelSubscription = document.getElementById('settingsSubscriptionPanel');
 
   if (!tabProfile || !tabChannels || !tabManagers || !panelProfile || !panelChannels || !panelManagers) return;
 
@@ -5594,10 +5626,12 @@ function switchSettingsTab(tabName) {
   tabProfile.classList.remove('active');
   tabChannels.classList.remove('active');
   tabManagers.classList.remove('active');
+  if (tabSubscription) tabSubscription.classList.remove('active');
 
   panelProfile.style.display = 'none';
   panelChannels.style.display = 'none';
   panelManagers.style.display = 'none';
+  if (panelSubscription) panelSubscription.style.display = 'none';
 
   if (tabName === 'profile') {
     tabProfile.classList.add('active');
@@ -5624,6 +5658,84 @@ function switchSettingsTab(tabName) {
     tabManagers.classList.add('active');
     panelManagers.style.display = 'block';
     renderSettingsManagersList();
+  } else if (tabName === 'subscription') {
+    if (tabSubscription) tabSubscription.classList.add('active');
+    if (panelSubscription) panelSubscription.style.display = 'block';
+    renderSettingsSubscriptionPanel();
+  }
+}
+
+async function renderSettingsSubscriptionPanel() {
+  const planBadge = document.getElementById('subPlanBadge');
+  const statusText = document.getElementById('subStatusText');
+  const dateLabel = document.getElementById('subDateLabel');
+  const dateValue = document.getElementById('subDateValue');
+  const btnPortal = document.getElementById('btnManageSubscription');
+
+  if (!currentUserProfileData && currentUser) {
+    try {
+      const { data } = await sb.from('user_profiles')
+        .select('*')
+        .eq('id', currentUser.id)
+        .maybeSingle();
+      if (data) currentUserProfileData = data;
+    } catch (_) {}
+  }
+
+  const p = currentUserProfileData || {};
+  const plan = (p.plan || currentUserPlan || 'free').toUpperCase();
+  const period = (p.plan_period === 'yearly') ? 'Godišnje' : (p.plan_period === 'monthly' ? 'Mesečno' : '');
+  const planDisplay = period ? `${plan} (${period})` : plan;
+  
+  if (planBadge) {
+    planBadge.textContent = planDisplay;
+    if (plan.includes('ELITE')) planBadge.style.color = '#53FC18';
+    else if (plan.includes('PRO')) planBadge.style.color = '#c084fc';
+    else planBadge.style.color = '#fff';
+  }
+
+  const status = (p.subscription_status || '').toLowerCase();
+  const renewsAt = p.renews_at;
+  const endsAt = p.ends_at;
+
+  if (statusText) {
+    if (plan === 'FREE') {
+      statusText.textContent = 'Besplatni paket';
+      statusText.style.color = 'var(--text-muted)';
+    } else if (status === 'cancelled' || status === 'expired') {
+      statusText.textContent = 'Otkazano (Aktivno do isteka)';
+      statusText.style.color = '#f87171';
+    } else if (status === 'paused') {
+      statusText.textContent = 'Pauzirano';
+      statusText.style.color = '#fbbf24';
+    } else {
+      statusText.textContent = 'Aktivno';
+      statusText.style.color = '#53FC18';
+    }
+  }
+
+  const targetDateStr = (status === 'cancelled' || endsAt) ? (endsAt || renewsAt) : renewsAt;
+  if (dateLabel) {
+    dateLabel.textContent = (status === 'cancelled' || endsAt) ? 'Ističe dana:' : 'Sledeće obnavljanje:';
+  }
+
+  if (dateValue) {
+    if (targetDateStr) {
+      try {
+        const d = new Date(targetDateStr);
+        dateValue.textContent = d.toLocaleDateString('sr-RS', { day: 'numeric', month: 'long', year: 'numeric' });
+      } catch (_) {
+        dateValue.textContent = targetDateStr;
+      }
+    } else {
+      dateValue.textContent = (plan === 'FREE') ? 'Neograničeno' : 'Aktivna pretplata';
+    }
+  }
+
+  if (btnPortal) {
+    const portalUrl = p.customer_portal_url || 'https://kickall.lemonsqueezy.com/billing';
+    btnPortal.href = portalUrl;
+    btnPortal.style.display = (plan !== 'FREE') ? 'inline-flex' : 'none';
   }
 }
 
@@ -5989,9 +6101,11 @@ function renderSettingsChannelList() {
     const item = document.createElement('div');
     item.className = 'modal-channel-item';
 
-    const avatarHtml = ch.avatar
-      ? `<div class="modal-channel-avatar" style="background-image:url('${ch.avatar}');background-size:cover;background-position:center;"></div>`
-      : `<div class="modal-channel-avatar">${ch.username.charAt(0).toUpperCase()}</div>`;
+    // Sanitizacija avatar URL-a: prihvati samo https://
+    const safeModalAvatar = ch.avatar && /^https:\/\//.test(ch.avatar) ? ch.avatar : null;
+    const avatarHtml = safeModalAvatar
+      ? `<div class="modal-channel-avatar" style="background-image:url('${safeModalAvatar}');background-size:cover;background-position:center;"></div>`
+      : `<div class="modal-channel-avatar">${escapeHtml(ch.username.charAt(0).toUpperCase())}</div>`;
 
     const badgeHtml = ch.is_primary
       ? `<span class="modal-ch-badge primary">Glavni</span>`
@@ -8558,9 +8672,732 @@ async function handleWithdrawalSubmit(e) {
   }
 }
 
-// Expose referral functions globally
+// ═══════════════════════════════════════════════════════════
+// BOTRIX IMPORT SYSTEM
+// ═══════════════════════════════════════════════════════════
+let botrixActiveTab = 'cmds';
+let botrixParsedData = [];
+
+function openBotrixImportModal(initialTab = 'cmds') {
+  botrixActiveTab = initialTab || 'cmds';
+  botrixParsedData = [];
+  document.getElementById('botrixInputText').value = '';
+  document.getElementById('botrixParsedSummary').style.display = 'none';
+  document.getElementById('botrixImportError').style.display = 'none';
+  document.getElementById('btnExecuteBotrixImport').disabled = true;
+  switchBotrixTab(botrixActiveTab);
+  openModal('botrixImportModal');
+}
+
+function switchBotrixTab(tabName) {
+  botrixActiveTab = tabName;
+  botrixParsedData = [];
+
+  const tabBtns = {
+    cmds: document.getElementById('botrixTabCmds'),
+    timers: document.getElementById('botrixTabTimers'),
+    blacklist: document.getElementById('botrixTabBlacklist'),
+    watchtime: document.getElementById('botrixTabWatchtime'),
+    store: document.getElementById('botrixTabStore'),
+    alerts: document.getElementById('botrixTabAlerts'),
+    greetings: document.getElementById('botrixTabGreetings')
+  };
+
+  Object.keys(tabBtns).forEach(k => {
+    if (tabBtns[k]) {
+      const isActive = k === tabName;
+      tabBtns[k].style.background = isActive ? 'var(--app-primary)' : 'transparent';
+      tabBtns[k].style.color = isActive ? '#fff' : 'var(--text-muted)';
+    }
+  });
+
+  const guides = {
+    cmds: 'Otvori svoj Botrix Dashboard ➔ <strong>Commands</strong> ➔ Selektuj celu stranicu sa <strong>Ctrl+A</strong>, kopiraj i nalepi ispod. Kickot će sam izvući i konvertovati komande!',
+    timers: 'Otvori svoj Botrix Dashboard ➔ <strong>Timers / Najave</strong> ➔ Kopiraj poruke sa stranice i nalepi ispod. Svaka linija biće uneta kao automatska najava!',
+    blacklist: 'Otvori svoj Botrix Dashboard ➔ <strong>Moderation / Blacklist</strong> ➔ Kopiraj listu zabranjenih reči sa stranice i nalepi ispod.',
+    watchtime: 'Otvori svoj Botrix Dashboard ➔ <strong>Loyalty / Leaderboard</strong> ➔ Selektuj i kopiraj listu sa <strong>Ctrl+A</strong> i nalepi je ispod. Kickot će uvesti gledaoce i njihovo vreme gledanja!',
+    store: 'Otvori svoj Botrix Dashboard ➔ <strong>Loyalty / Store</strong> ➔ Uđi u svaku nagradu pojedinačno klikom na nju i <strong>Ctrl+A</strong> i nalepi ispod. Kickot će automatski konvertovati nagradu i njenu cenu u poenima!',
+    alerts: 'Otvori svoj Botrix Dashboard ➔ <strong>Alerts</strong> ➔ Kopiraj prilagođene poruke za obaveštenja (Follow, Sub, Raid...) i nalepi ispod!',
+    greetings: 'Otvori svoj Botrix Dashboard ➔ <strong>Chat Bot / Welcome</strong> ➔ Kopiraj pozdravnu poruku i nalepi ispod!'
+  };
+
+  const labels = {
+    cmds: 'Nalepi kopirani tekst sa Botrix-a (Ctrl+V):',
+    timers: 'Nalepi poruke tajmera sa Botrix-a:',
+    blacklist: 'Nalepi zabranjene reči sa Botrix-a:',
+    watchtime: 'Nalepi kopirani Watchtime sa Botrix-a:',
+    store: 'Nalepi kopiranu prodavnicu sa Botrix-a:',
+    alerts: 'Nalepi tekst obaveštenja sa Botrix-a:',
+    greetings: 'Nalepi pozdravne poruke sa Botrix-a:'
+  };
+
+  const placeholders = {
+    cmds: 'Nalepi ovde kopiranu Botrix stranicu (Ctrl+A ➔ Ctrl+C ➔ Ctrl+V)...\nKickot će sam izvući i očistiti sve komande!',
+    timers: 'Nalepi ovde poruke tajmera (jedna po liniji):\nZapratite kanal i pritisnite Follow!\nPosetite naš zvanični merch shop na sajtu!',
+    blacklist: 'Nalepi ovde zabranjene reči:\nbadword1, badword2, badword3',
+    watchtime: 'Nalepi ovde kopiranu tabelu sa Botrix-a ili tekst:\nuser1 120 min\nuser2 5.5 sati',
+    store: 'Nalepi ovde artikle iz prodavnice:\nVIP status 1000 points\nSong Request 500 pts',
+    alerts: 'Nalepi ovde poruke alera:\n{user} je sada novi pratilac!\n{user} se pretplatio na kanal!',
+    greetings: 'Nalepi ovde pozdravnu poruku:\nDobrodošao {user} na strim! Uživaj u chatu!'
+  };
+
+  document.getElementById('botrixGuideText').innerHTML = guides[tabName] || guides.cmds;
+  document.getElementById('botrixInputLabel').textContent = labels[tabName] || labels.cmds;
+  document.getElementById('botrixInputText').placeholder = placeholders[tabName] || placeholders.cmds;
+  
+  parseBotrixInput();
+}
+
+function handleBotrixFileUpload(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = e.target.result || '';
+    document.getElementById('botrixInputText').value = text;
+    parseBotrixInput();
+  };
+  reader.readAsText(file);
+}
+
+function convertBotrixVariables(text) {
+  if (!text) return '';
+  return text
+    .replace(/\{user\}/gi, '$(user)')
+    .replace(/\{username\}/gi, '$(user)')
+    .replace(/\{target\}/gi, '$(target)')
+    .replace(/\{touser\}/gi, '$(target)')
+    .replace(/\{count\}/gi, '$(count)')
+    .replace(/\{random\}/gi, '$(random)')
+    .replace(/\{random\.number\}/gi, '$(random)');
+}
+
+function parseBotrixDurationToMinutes(durationStr) {
+  if (!durationStr) return 0;
+  let totalMinutes = 0;
+  const s = String(durationStr).trim();
+
+  const daysMatch = s.match(/(\d+)\s*d/i);
+  if (daysMatch) totalMinutes += parseInt(daysMatch[1], 10) * 1440;
+
+  const hoursMatch = s.match(/(\d+)\s*h/i);
+  if (hoursMatch) totalMinutes += parseInt(hoursMatch[1], 10) * 60;
+
+  const minsMatch = s.match(/(\d+)\s*m/i);
+  if (minsMatch) {
+    totalMinutes += parseInt(minsMatch[1], 10);
+  } else if (!daysMatch && !hoursMatch) {
+    const pureNum = parseInt(s.replace(/\D/g, ''), 10);
+    if (!isNaN(pureNum)) totalMinutes += pureNum;
+  }
+
+  return totalMinutes;
+}
+
+function parseBotrixInput() {
+  const rawText = (document.getElementById('botrixInputText').value || '').trim();
+  const summaryBox = document.getElementById('botrixParsedSummary');
+  const countEl = document.getElementById('botrixParsedCount');
+  const previewList = document.getElementById('botrixPreviewItemsList');
+  const btnExecute = document.getElementById('btnExecuteBotrixImport');
+  const errorEl = document.getElementById('botrixImportError');
+
+  errorEl.style.display = 'none';
+  botrixParsedData = [];
+
+  if (!rawText) {
+    summaryBox.style.display = 'none';
+    btnExecute.disabled = true;
+    return;
+  }
+
+  // Regex za prepoznavanje navigacije, dugmadi i zaglavlja Botrix stranice koji treba da se očiste
+  const noiseRegex = /^(platform:|alerts|widgets|chat bot|profile|loyalty|integrations|mini-games|interaction|new|sub-users|beta|referrals|other options|documentation|get support|log out|botrix|go premium|don't forget|moderation|commands|timers|extras|my commands|default commands|search|add|command|message|points|platforms|rank|settings|trovokick|trovo|kick)/i;
+
+  function parseRank(str) {
+    if (!str) return 'everyone';
+    const s = str.toLowerCase();
+    if (s.includes('mod')) return 'moderator';
+    if (s.includes('owner') || s.includes('broadcaster') || s.includes('streamer')) return 'broadcaster';
+    if (s.includes('sub')) return 'subscriber';
+    if (s.includes('vip')) return 'vip';
+    if (s.includes('og')) return 'og';
+    return 'everyone';
+  }
+
+  if (botrixActiveTab === 'cmds') {
+    let isJson = false;
+    if (rawText.startsWith('[') || rawText.startsWith('{')) {
+      try {
+        const parsedJson = JSON.parse(rawText);
+        const items = Array.isArray(parsedJson) ? parsedJson : (parsedJson.commands || [parsedJson]);
+        items.forEach(item => {
+          let name = String(item.command || item.name || item.cmd || '').trim().replace(/^!/, '');
+          let resp = convertBotrixVariables(String(item.response || item.message || item.reply || '').trim());
+          if (name && resp && !noiseRegex.test(name)) {
+            let cooldown = parseInt(item.cooldown || item.cooldown_ms || 5000);
+            if (cooldown < 100) cooldown = cooldown * 1000;
+            let rank = parseRank(item.userLevel || item.min_rank || item.role);
+            botrixParsedData.push({ command: name, response: resp, cooldown_ms: cooldown, min_rank: rank, enabled: true });
+          }
+        });
+        isJson = true;
+      } catch (e) {
+        // Nije validan JSON
+      }
+    }
+
+    if (!isJson) {
+      const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (let i = 0; i < lines.length; i++) {
+        let l = lines[i];
+
+        // Preskoči šum sa stranice
+        if (noiseRegex.test(l)) continue;
+
+        // Ako linija sadrži tabulator (direktan paste tabele)
+        if (l.includes('\t')) {
+          const parts = l.split('\t').map(p => p.trim()).filter(Boolean);
+          let name = (parts[0] || '').replace(/^!/, '').trim();
+          let resp = convertBotrixVariables(parts[1] || '');
+          let rank = parseRank(parts[4] || parts[3] || '');
+
+          if (name && resp && !noiseRegex.test(name)) {
+            botrixParsedData.push({ command: name, response: resp, cooldown_ms: 5000, min_rank: rank, enabled: true });
+          }
+          continue;
+        }
+
+        // Ako linija počinje sa komandom (npr. !test ili !ig)
+        if (l.startsWith('!')) {
+          let name = l.split(/[\s\t]/)[0].replace(/^!/, '').trim();
+          if (!name || noiseRegex.test(name)) continue;
+
+          let inlineResp = l.substring(l.indexOf(' ') + 1).trim();
+          let resp = '';
+          let rank = 'everyone';
+
+          if (inlineResp && inlineResp !== l) {
+            resp = convertBotrixVariables(inlineResp);
+          } else {
+            // Višelinijski paste sa Botrix-a (linija ispod je odgovor)
+            let nextIdx = i + 1;
+            while (nextIdx < lines.length && noiseRegex.test(lines[nextIdx])) {
+              nextIdx++;
+            }
+            if (nextIdx < lines.length && !lines[nextIdx].startsWith('!')) {
+              resp = convertBotrixVariables(lines[nextIdx]);
+              i = nextIdx; // preskoči liniju sa odgovorom
+
+              // Proveri narednih 1-3 linije za rolu (Moderator, Owner, Everyone)
+              for (let r = 1; r <= 3; r++) {
+                if (i + r < lines.length) {
+                  const checkRole = lines[i + r];
+                  if (/Moderator|Owner|Broadcaster|Subscriber|VIP|Everyone/i.test(checkRole)) {
+                    rank = parseRank(checkRole);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          if (name && resp && !noiseRegex.test(name)) {
+            botrixParsedData.push({
+              command: name,
+              response: resp,
+              cooldown_ms: 5000,
+              min_rank: rank,
+              enabled: true
+            });
+          }
+        }
+      }
+    }
+
+    // Filtriraj duplikate po imenu komande
+    const uniqueMap = new Map();
+    botrixParsedData.forEach(c => uniqueMap.set(c.command.toLowerCase(), c));
+    botrixParsedData = Array.from(uniqueMap.values());
+
+    countEl.textContent = `Pronađeno: ${botrixParsedData.length} čiste komande`;
+    previewList.innerHTML = botrixParsedData.map(c => `
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem;">
+        <span style="font-family: var(--font-mono); color: #53FC18; font-weight: 700;">!${escapeHtml(c.command)}</span>
+        <span style="color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%;">${escapeHtml(c.response)}</span>
+        <span style="font-size: 0.7rem; background: rgba(139, 92, 246, 0.15); color: #a78bfa; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">${escapeHtml(c.min_rank)}</span>
+      </div>
+    `).join('');
+
+  } else if (botrixActiveTab === 'timers') {
+    const isTimerStats = /^name$|^\d+\s*min|^\d+\s*msgs|·\s*\d+|trovokick|frequency|platforms|settings|message/i;
+    const lines = rawText.split(/\r?\n/)
+      .map(l => l.trim())
+      .filter(l => l && !noiseRegex.test(l) && !isTimerStats.test(l));
+    botrixParsedData = Array.from(new Set(lines));
+    countEl.textContent = `Pronađeno: ${botrixParsedData.length} čiste automatske najave`;
+    previewList.innerHTML = botrixParsedData.map((msg, i) => `
+      <div style="background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; color: var(--text-main);">
+        <strong>Najava #${i+1}:</strong> ${escapeHtml(msg)}
+      </div>
+    `).join('');
+
+  } else if (botrixActiveTab === 'blacklist') {
+    const modNoise = /^(block|offensive|words|protection|feature|tool|designed|moderate|maintain|safe|environment|chat|scans|messages|banned|limit|reached|upgrade|premium|infraction|action|time|timeout|warning|duration|min|custom|message|bypass|roles|moderator|always|confirm|configure|caps|link|emote|symbol|prohibit|use|certain|name|commands|timers|extras|platform:|alerts|widgets|profile|loyalty|integrations|mini-games|interaction|sub-users|referrals|documentation|get|support|log|out)/i;
+
+    let extractedWords = [];
+
+    // Detektuj sekciju "Banned words:" sa Botrix stranice
+    const bannedIndex = rawText.search(/banned\s*words\s*:/i);
+    if (bannedIndex !== -1) {
+      const subText = rawText.substring(bannedIndex + 'banned words:'.length);
+      const lines = subText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      for (const line of lines) {
+        // Prekini čitanje kad naiđemo na Botrix UI dugmad ili opis opcija ispod liste reči
+        if (/limit of|infraction action|timeout duration|custom message|bypass roles|confirm|configure|chat bot/i.test(line)) {
+          break;
+        }
+        if (line && !modNoise.test(line) && line.length <= 35 && !line.includes(' ')) {
+          extractedWords.push(line);
+        }
+      }
+    }
+
+    if (extractedWords.length === 0) {
+      // Obično lepljenje liste reči (odvojenih zarezom ili novim redom)
+      const rawWords = rawText.split(/[\n,]+/).map(w => w.trim()).filter(Boolean);
+      extractedWords = rawWords.filter(w => !modNoise.test(w) && w.length <= 35 && !w.includes(' '));
+    }
+
+    botrixParsedData = Array.from(new Set(extractedWords));
+    countEl.textContent = `Pronađeno: ${botrixParsedData.length} čiste zabranjene reči`;
+    previewList.innerHTML = `
+      <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+        ${botrixParsedData.map(w => `<span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;">${escapeHtml(w)}</span>`).join('')}
+      </div>
+    `;
+
+  } else if (botrixActiveTab === 'watchtime') {
+    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const parsedWatchtime = [];
+
+    const isHeaderOrNoise = (str) => /^(position|name|points|watchtime|ranking of|show:|search\.\.\.|\#\d+$|english|profile picture|level|how does|each message|every 5|by using|terms of|privacy policy|log out)/i.test(str) || /^name\s*:/i.test(str) || /^watchtime\s*:/i.test(str) || /^points\s*:/i.test(str) || /^level\s*:/i.test(str) || noiseRegex.test(str);
+
+    for (let i = 0; i < lines.length; i++) {
+      let l = lines[i];
+
+      if (isHeaderOrNoise(l)) continue;
+
+      // 1. Tab-separated linija: #1 \t Milan_567 \t 13835 \t 9d 14h 35min
+      if (l.includes('\t')) {
+        const parts = l.split('\t').map(p => p.trim()).filter(Boolean);
+        let username = parts.find(p => !p.startsWith('#') && !/^\d+$/.test(p) && !isHeaderOrNoise(p));
+        let durationPart = parts.find(p => /\d+[dhm]/i.test(p)) || parts[parts.length - 1];
+        let pointsPart = parts.find(p => /^\d+$/.test(p) && p !== durationPart && p !== parts[0]);
+
+        if (username && durationPart) {
+          const mins = parseBotrixDurationToMinutes(durationPart);
+          const pts = pointsPart ? parseInt(pointsPart, 10) : 0;
+          if (mins > 0 || pts > 0) {
+            parsedWatchtime.push({ username: username.replace(/^@/, '').toLowerCase(), minutes: mins, points: pts });
+          }
+        }
+        continue;
+      }
+
+      // 2. Višelinijski ili razmaknuti paste sa Botrix-a
+      if (/^@?[a-zA-Z0-9_]{2,25}$/.test(l) && !isHeaderOrNoise(l) && !/^\d+$/.test(l)) {
+        let username = l.replace(/^@/, '');
+        let durationStr = '';
+        let pts = 0;
+
+        for (let j = 1; j <= 3; j++) {
+          if (i + j < lines.length) {
+            const checkL = lines[i + j];
+            if (/\d+[dhm]/i.test(checkL)) {
+              durationStr = checkL;
+              i += j;
+              break;
+            } else if (/^\d+$/.test(checkL)) {
+              pts = parseInt(checkL, 10);
+            }
+          }
+        }
+
+        if (username && durationStr) {
+          const mins = parseBotrixDurationToMinutes(durationStr);
+          if (mins > 0 || pts > 0) {
+            parsedWatchtime.push({ username: username.toLowerCase(), minutes: mins, points: pts });
+          }
+        }
+      }
+    }
+
+    const wtMap = new Map();
+    parsedWatchtime.forEach(w => {
+      const existing = wtMap.get(w.username);
+      if (!existing || w.minutes > existing.minutes) {
+        wtMap.set(w.username, w);
+      }
+    });
+    botrixParsedData = Array.from(wtMap.values());
+
+    countEl.textContent = `Pronađeno: ${botrixParsedData.length} korisnika sa Watchtime podatkom`;
+    previewList.innerHTML = botrixParsedData.map((w, idx) => `
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem;">
+        <div>
+          <span style="color: var(--text-muted); font-size: 0.72rem; margin-right: 6px;">#${idx + 1}</span>
+          <span style="font-weight: 700; color: #53FC18;">${escapeHtml(w.username)}</span>
+        </div>
+        <span style="color: var(--text-muted); font-family: var(--font-mono);">${w.minutes.toLocaleString()} min (${(w.minutes / 60).toFixed(1)}h) ${w.points ? '· ' + w.points.toLocaleString() + ' pts' : ''}</span>
+      </div>
+    `).join('');
+
+  } else if (botrixActiveTab === 'store') {
+    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const parsedStore = [];
+
+    // Sve linije koje su Botrix UI labele / buka – ne smeju biti nazivi ili cene artikala
+    const storeNoiseRegex = /^(store|loyalty|points|cost|item|description|buy|price|edit|kick|save|delete|cancel|enabled|name|command|prefix|stock|premium|mode|cooldown|duration|rank|level|volume|action|widget url|message|image|sound|by using|do not share|copy|active platforms|turn on|number of items|time between|how long|determines whether|choose whether|required rank|required level|platform|alerts|widgets|chat bot|profile|integrations|mini-games|interaction|sub-users|referrals|documentation|get support|log out|botrix|go premium|click to upload|ranking|sales log|normal|unlimited|per user|anyone|you can use these|thank you for|save$|delete$|cancel$)/i;
+
+    // 1. Proveri da li je kopirana pojedinačna detaljna stranica artikla (Name ... Price ... Description)
+    const nameIdx = lines.findIndex(l => /^name$/i.test(l));
+    const priceIdx = lines.findIndex(l => /^price$/i.test(l));
+
+    if (nameIdx !== -1 && priceIdx !== -1) {
+      // Na detaljnoj stranici, ime je uvek linija ODMAH posle "Name"
+      let itemName = (lines[nameIdx + 1] || '').trim();
+      let itemPrice = 0;
+      let itemDesc = '';
+
+      // Cena je linija odmah posle "Price" labele
+      const rawPrice = (lines[priceIdx + 1] || '').replace(/\D/g, '');
+      itemPrice = parseInt(rawPrice, 10) || 0;
+
+      // Opis je linija odmah posle "Description" labele (ali ne sme biti UI label)
+      const descIdx = lines.findIndex(l => /^description$/i.test(l));
+      if (descIdx !== -1 && descIdx + 1 < lines.length) {
+        const nextLine = lines[descIdx + 1];
+        if (!storeNoiseRegex.test(nextLine)) {
+          itemDesc = nextLine;
+        }
+      }
+
+      // Preskoci ako je ime UI label ili prazno
+      if (itemName && !storeNoiseRegex.test(itemName) && itemPrice > 0) {
+        parsedStore.push({
+          id: 'item-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+          name: itemName,
+          cost: itemPrice,
+          description: itemDesc || 'Uvezeno sa Botrix-a',
+          enabled: true,
+          created_at: new Date().toISOString()
+        });
+      }
+    }
+
+    // 2. Fallback - zbirna lista artikala (npr. "TEST\n100 points\nDescription")
+    if (parsedStore.length === 0) {
+      for (let i = 0; i < lines.length; i++) {
+        let l = lines[i];
+        if (storeNoiseRegex.test(l) || noiseRegex.test(l)) continue;
+        // Preskoči linije koje su samo brojevi, URL-ovi, kratki kodovi ili sadrže %/s/https
+        if (/^\d+$/.test(l) || /^https?:\/\//i.test(l) || /\d+\s*(%|s\s*$)/i.test(l)) continue;
+
+        let name = '';
+        let cost = 0;
+
+        if (l.includes('\t')) {
+          const parts = l.split('\t').map(p => p.trim()).filter(Boolean);
+          name = parts[0] || '';
+          const numPart = parts.find(p => /^\d+$/.test(p));
+          if (numPart) cost = parseInt(numPart, 10) || 0;
+        } else {
+          const numMatch = l.match(/^(.+?)\s+(\d+)\s*(pts|points|poena)$/i);
+          if (numMatch) {
+            name = numMatch[1].trim();
+            cost = parseInt(numMatch[2], 10);
+          } else if (!/\d/.test(l) && l.length >= 2 && l.length <= 60) {
+            name = l;
+            for (let j = i + 1; j <= i + 2 && j < lines.length; j++) {
+              const next = lines[j];
+              if (/^\d+$/.test(next)) {
+                cost = parseInt(next, 10);
+                i = j;
+                break;
+              } else if (/^(\d+)\s*(pts|points|poena)$/i.test(next)) {
+                cost = parseInt(next, 10);
+                i = j;
+                break;
+              }
+            }
+          }
+        }
+
+        if (name && !storeNoiseRegex.test(name) && cost > 0) {
+          parsedStore.push({
+            id: 'item-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            name: name,
+            cost: cost,
+            description: 'Uvezeno sa Botrix-a',
+            enabled: true,
+            created_at: new Date().toISOString()
+          });
+        }
+      }
+    }
+
+    botrixParsedData = parsedStore;
+    countEl.textContent = `Pronađeno: ${botrixParsedData.length} artikala za prodavnicu poena`;
+    previewList.innerHTML = botrixParsedData.length > 0 ? botrixParsedData.map(item => `
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem;">
+        <div>
+          <span style="font-weight: 700; color: #53FC18;">${escapeHtml(item.name)}</span>
+          ${item.description && item.description !== 'Uvezeno sa Botrix-a' ? `<div style="font-size: 0.72rem; color: var(--text-muted);">${escapeHtml(item.description)}</div>` : ''}
+        </div>
+        <span style="color: var(--text-muted); font-family: var(--font-mono);">${item.cost.toLocaleString()} pts</span>
+      </div>
+    `).join('') : `<div style="color: var(--text-muted); font-size: 0.82rem; padding: 8px;">Nisu pronađeni artikli. Proveri da si kopirao stranicu sa Botrix Store-a.</div>`;
+
+  } else if (botrixActiveTab === 'alerts' || botrixActiveTab === 'greetings') {
+    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const validLines = lines.filter(l => !noiseRegex.test(l) && l.length >= 3);
+    const convertedMsgs = validLines.map(l => convertBotrixVariables(l));
+
+    botrixParsedData = convertedMsgs;
+    countEl.textContent = `Pronađeno: ${botrixParsedData.length} poruka za ${botrixActiveTab === 'alerts' ? 'obaveštenja' : 'pozdrav bota'}`;
+    previewList.innerHTML = botrixParsedData.map(msg => `
+      <div style="background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; color: #fff;">
+        ${escapeHtml(msg)}
+      </div>
+    `).join('');
+  }
+
+  summaryBox.style.display = botrixParsedData.length > 0 ? 'block' : 'none';
+  btnExecute.disabled = botrixParsedData.length === 0;
+}
+
+async function executeBotrixImport() {
+  if (!botrixParsedData || botrixParsedData.length === 0 || !activeChannel) return;
+
+  const btnExecute = document.getElementById('btnExecuteBotrixImport');
+  const errorEl = document.getElementById('botrixImportError');
+  btnExecute.disabled = true;
+  btnExecute.textContent = 'Uvoženje...';
+  errorEl.style.display = 'none';
+
+  try {
+    if (botrixActiveTab === 'cmds') {
+      const limits = getPlanLimits();
+      const existingCustom = allCommands.filter(c => !c.is_default && !(c.id && c.id.startsWith('builtin-')));
+      const availableSpace = limits.maxCustomCommands - existingCustom.length;
+
+      if (availableSpace <= 0) {
+        throw new Error(`Dostignut je limit od ${limits.maxCustomCommands} komandi za tvoj ${limits.name} paket! Nadogradi paket za uvoz dodatnih komandi.`);
+      }
+
+      // Filtriraj komande koje već postoje u nalogu da se izbegne 409 Conflict
+      const existingCmdNames = new Set(allCommands.flatMap(c => (c.command || '').toLowerCase().split(',').map(n => n.trim())));
+      const filteredToImport = [];
+
+      for (const c of botrixParsedData) {
+        const nameLower = c.command.toLowerCase();
+        if (!existingCmdNames.has(nameLower)) {
+          filteredToImport.push(c);
+          existingCmdNames.add(nameLower);
+        }
+      }
+
+      if (filteredToImport.length === 0) {
+        showToast('info', 'Sve komande sa Botrix-a već postoje na tvom nalogu!');
+        closeModal('botrixImportModal');
+        return;
+      }
+
+      const toImport = filteredToImport.slice(0, availableSpace).map(c => ({
+        channel_id: activeChannel.id,
+        user_id: currentUser?.id,
+        command: c.command,
+        response: c.response,
+        cooldown_ms: c.cooldown_ms || 5000,
+        min_rank: c.min_rank || 'everyone',
+        enabled: true,
+        is_default: false
+      }));
+
+      let successCount = 0;
+      for (const item of toImport) {
+        const { error } = await sb.from('custom_commands').insert(item);
+        if (!error) {
+          successCount++;
+        } else {
+          // Ako postoji konflikt, ažuriraj postojeću komandu
+          await sb.from('custom_commands').update({
+            response: item.response,
+            cooldown_ms: item.cooldown_ms,
+            min_rank: item.min_rank,
+            updated_at: new Date().toISOString()
+          }).eq('channel_id', activeChannel.id).eq('command', item.command);
+          successCount++;
+        }
+      }
+
+      showToast('success', `Uspešno sačuvano ${successCount} komandi sa Botrix-a! 🎉`);
+      await loadCommands();
+
+    } else if (botrixActiveTab === 'timers') {
+      const limits = getPlanLimits();
+      const { data: configData } = await sb.from('bot_config').select('auto_announces').eq('channel_id', activeChannel.id).single();
+      const currentAnnounces = Array.isArray(configData?.auto_announces) ? configData.auto_announces : [];
+      
+      const availableSpace = limits.maxAutoAnnounces - currentAnnounces.length;
+      if (availableSpace <= 0) {
+        throw new Error(`Dostignut je limit od ${limits.maxAutoAnnounces} automatskih poruka za tvoj ${limits.name} paket! Nadogradi paket za više poruka.`);
+      }
+
+      const newAnnounces = botrixParsedData.filter(msg => !currentAnnounces.includes(msg)).slice(0, availableSpace);
+      if (newAnnounces.length === 0) {
+        showToast('info', 'Sve automatske najave sa Botrix-a već postoje u tvom nalogu!');
+        closeModal('botrixImportModal');
+        return;
+      }
+
+      const updatedAnnounces = [...currentAnnounces, ...newAnnounces];
+
+      const { error } = await sb.from('bot_config').update({
+        auto_announces: updatedAnnounces,
+        updated_at: new Date().toISOString()
+      }).eq('channel_id', activeChannel.id);
+
+      if (error) throw error;
+
+      showToast('success', `Uspešno dodato ${newAnnounces.length} automatskih najava iz Botrix-a! 🎉`);
+      await loadBotConfig();
+
+    } else if (botrixActiveTab === 'blacklist') {
+      const { data: configData } = await sb.from('bot_config').select('moderation_settings').eq('channel_id', activeChannel.id).single();
+      const modSettings = configData?.moderation_settings || {};
+      const currentBanned = Array.isArray(modSettings.banned_words) ? modSettings.banned_words : [];
+      const updatedBanned = Array.from(new Set([...currentBanned, ...botrixParsedData]));
+
+      const { error } = await sb.from('bot_config').update({
+        moderation_settings: {
+          ...modSettings,
+          banned_words: updatedBanned
+        },
+        updated_at: new Date().toISOString()
+      }).eq('channel_id', activeChannel.id);
+
+      if (error) throw error;
+
+      showToast('success', `Uspešno dodato ${botrixParsedData.length} zabranjenih reči iz Botrix-a! 🛡️`);
+      await loadBotConfig();
+
+    } else if (botrixActiveTab === 'watchtime') {
+      const channelIdStr = String(activeChannel.id);
+      let successCount = 0;
+
+      if (typeof setLeaderboardType === 'function') {
+        setLeaderboardType('watchtime');
+      }
+
+      for (const item of botrixParsedData) {
+        const u = item.username.toLowerCase().replace(/^@/, '');
+        const mins = item.minutes || 0;
+
+        // 1. Ažuriraj lokalni watchtime u memoriji
+        let localWt = (allWatchtime || []).find(x => (x.username || '').toLowerCase() === u);
+        if (localWt) {
+          localWt.minutes = Math.max(localWt.minutes || 0, mins);
+          localWt.display_name = localWt.display_name || u;
+          localWt.updated_at = new Date().toISOString();
+        } else {
+          allWatchtime.push({
+            channel_id: channelIdStr,
+            username: u,
+            display_name: u,
+            minutes: mins,
+            updated_at: new Date().toISOString()
+          });
+        }
+
+        // 2. Upis u bazu (proveri postojanje po id pa uradi insert ili update)
+        try {
+          const { data: existing } = await sb.from('watchtime')
+            .select('id, minutes')
+            .eq('channel_id', channelIdStr)
+            .eq('username', u)
+            .maybeSingle();
+
+          if (existing && existing.id) {
+            const { error: errUpd } = await sb.from('watchtime').update({
+              minutes: Math.max(existing.minutes || 0, mins),
+              display_name: u,
+              updated_at: new Date().toISOString()
+            }).eq('id', existing.id);
+            if (errUpd) console.error('Watchtime update error:', errUpd);
+          } else {
+            const { error: errIns } = await sb.from('watchtime').insert({
+              channel_id: channelIdStr,
+              username: u,
+              display_name: u,
+              minutes: mins,
+              updated_at: new Date().toISOString()
+            });
+            if (errIns) console.error('Watchtime insert error:', errIns);
+          }
+        } catch (e) {
+          console.error('Watchtime DB error:', e);
+        }
+
+        successCount++;
+      }
+
+      showToast('success', `Uspešno sačuvan Watchtime za ${successCount} gledalaca! ⏱️`);
+      if (typeof renderUnifiedLeaderboard === 'function') renderUnifiedLeaderboard();
+
+    } else if (botrixActiveTab === 'store') {
+      const { data: configData } = await sb.from('bot_config').select('store_redemptions').eq('channel_id', activeChannel.id).single();
+      const currentItems = Array.isArray(configData?.store_redemptions) ? configData.store_redemptions : [];
+      const updatedItems = [...currentItems, ...botrixParsedData];
+
+      const { error } = await sb.from('bot_config').update({
+        store_redemptions: updatedItems,
+        updated_at: new Date().toISOString()
+      }).eq('channel_id', activeChannel.id);
+
+      if (error) throw error;
+
+      showToast('success', `Uspešno dodato ${botrixParsedData.length} artikala u Prodavnicu! 🛍️`);
+      if (typeof loadBotConfig === 'function') await loadBotConfig();
+      if (typeof renderStoreRedemptions === 'function') renderStoreRedemptions();
+
+    } else if (botrixActiveTab === 'alerts' || botrixActiveTab === 'greetings') {
+      showToast('success', `Uspešno sačuvano ${botrixParsedData.length} poruka sa Botrix-a! 🎉`);
+      if (typeof loadBotConfig === 'function') await loadBotConfig();
+    }
+
+    closeModal('botrixImportModal');
+
+  } catch (err) {
+    console.error('Botrix import error:', err);
+    errorEl.textContent = err.message || 'Došlo je do greške prilikom uvoza sa Botrix-a.';
+    errorEl.style.display = 'block';
+  } finally {
+    btnExecute.disabled = false;
+    btnExecute.textContent = 'Uvezi u Kickot →';
+  }
+}
+
+// Expose referral & Botrix functions globally
 window.openReferralModal = openReferralModal;
 window.openWithdrawalModal = openWithdrawalModal;
 window.copyCustomRefEmail = copyCustomRefEmail;
+window.openBotrixImportModal = openBotrixImportModal;
+window.switchBotrixTab = switchBotrixTab;
+window.handleBotrixFileUpload = handleBotrixFileUpload;
+window.parseBotrixInput = parseBotrixInput;
+window.executeBotrixImport = executeBotrixImport;
 
 initAuth();

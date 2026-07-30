@@ -1602,13 +1602,23 @@
 
         <script>
             // ── Lemon Squeezy Checkout ────────────────────────────
+            let currentPricingPeriod = 'monthly';
+
             const LS_CHECKOUT_INDEX = {
-                pro:   'https://kickall.lemonsqueezy.com/checkout/buy/5cf5297e-1531-4d20-b4d7-bee2a87ce43f',
-                elite: 'https://kickall.lemonsqueezy.com/checkout/buy/49acae3b-d8ea-4fd6-a278-6daf3d9d48db'
+                pro: {
+                    monthly: 'https://kickall.lemonsqueezy.com/checkout/buy/ef8c2e17-c6c6-4f01-97ab-7e0b70ac2374',
+                    yearly:  'https://kickall.lemonsqueezy.com/checkout/buy/eeb6f9b7-aeeb-4769-b333-78c089a5d732'
+                },
+                elite: {
+                    monthly: 'https://kickall.lemonsqueezy.com/checkout/buy/09412cf7-f7ad-4103-826e-96fa00786a53',
+                    yearly:  'https://kickall.lemonsqueezy.com/checkout/buy/7faf6d66-f155-4885-b64c-d1a284eb2df8'
+                }
             };
 
-            function openIndexCheckout(plan) {
-                const baseUrl = LS_CHECKOUT_INDEX[plan];
+            function openIndexCheckout(plan, period) {
+                const p = period || currentPricingPeriod || 'monthly';
+                const planUrls = LS_CHECKOUT_INDEX[plan];
+                const baseUrl = (planUrls && typeof planUrls === 'object') ? planUrls[p] || planUrls.monthly : planUrls;
                 if (!baseUrl) return;
 
                 // Proveri da li je korisnik ulogovan (Supabase sesija u localStorage)
@@ -1623,9 +1633,13 @@
                 } catch (_) {}
 
                 if (!userId) {
-                    // Ako korisnik nije ulogovan, preusmeri ga na prijavu
-                    alert('Morate biti ulogovani da biste kupili plan. Preusmeravamo vas na prijavu...');
-                    window.location.href = 'kickot/dashboard.html';
+                    // Ako korisnik nije ulogovan, otvori modal za prijavu
+                    if (typeof window.openAuthModal === 'function') {
+                        window.openAuthModal();
+                    } else {
+                        const authModal = document.getElementById('authModal');
+                        if (authModal) authModal.classList.add('open');
+                    }
                     return;
                 }
 
@@ -1634,6 +1648,7 @@
             }
 
             function setPricingPeriod(period) {
+                currentPricingPeriod = period;
                 const monthlyBtn = document.getElementById('monthlyBtn');
                 const yearlyBtn = document.getElementById('yearlyBtn');
                 const proPrice = document.querySelector('#pricing-pro .p-price');

@@ -1,16 +1,20 @@
 // Netlify Serverless Function for YouTube Search
 // Returns top video ID, title, author, duration, and coverUrl for any query without API keys or CORS restrictions
 
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://kickall.app';
+
 exports.handler = async function (event, context) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+    'Content-Type': 'application/json'
+  };
+
   const query = event.queryStringParameters && event.queryStringParameters.q ? event.queryStringParameters.q.trim() : '';
 
   if (!query) {
     return {
       statusCode: 400,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-      },
+      headers: corsHeaders,
       body: JSON.stringify({ error: 'Missing query parameter q' })
     };
   }
@@ -37,10 +41,7 @@ exports.handler = async function (event, context) {
     if (!videoId) {
       return {
         statusCode: 444,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json'
-        },
+        headers: corsHeaders,
         body: JSON.stringify({ error: 'No YouTube video found for query' })
       };
     }
@@ -62,9 +63,8 @@ exports.handler = async function (event, context) {
     return {
       statusCode: 200,
       headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Content-Type': 'application/json'
+        ...corsHeaders,
+        'Access-Control-Allow-Headers': 'Content-Type'
       },
       body: JSON.stringify({
         videoId: videoId,
@@ -78,11 +78,9 @@ exports.handler = async function (event, context) {
     console.error('YouTube Search Netlify Function Error:', error);
     return {
       statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-      },
+      headers: corsHeaders,
       body: JSON.stringify({ error: 'Failed to search YouTube', details: error.message })
     };
   }
 };
+

@@ -1149,6 +1149,12 @@ function notifyGlobalLogout(userId) {
 }
 
 window.addEventListener('message', (event) => {
+  // Bezbednosna provera: prihvati poruke samo od pouzdanih originа
+  const allowedOrigins = (window.CONFIG && window.CONFIG.CROSS_DOMAIN_DOMAINS)
+    ? window.CONFIG.CROSS_DOMAIN_DOMAINS
+    : ['https://kickall.app'];
+  if (!allowedOrigins.includes(event.origin)) return;
+
   if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
     try {
       localStorage.clear();

@@ -38,12 +38,17 @@ if (!window.KickotConfig.getLocalePath) {
 // ── Supabase Init ──────────────────────────────────────────
 const { createClient } = window.supabase;
 
-// Direct fallback values for Supabase configuration
-const supabaseUrl = CONFIG.SUPABASE?.URL || CONFIG.supabase?.url || 'https://rcukparptzzyssqdmydt.supabase.co';
-const supabaseAnonKey = CONFIG.SUPABASE?.ANON_KEY || CONFIG.supabase?.anonKey || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+// Supabase konfiguracija dolazi iskljucivo iz js/config.js (window.CONFIG)
+// Nikad ne koristiti hardkodovane fallback vrednosti
+const supabaseUrl = CONFIG.SUPABASE?.URL;
+const supabaseAnonKey = CONFIG.SUPABASE?.ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('[Kickot App] Supabase URL ili ANON_KEY nije dostupan iz window.CONFIG. Proverite da je js/config.js ucitan pre app.js.');
+}
 
 // Use same storage key as KickAll for shared auth session
-const storageKey = CONFIG.SUPABASE?.STORAGE_KEY || CONFIG.storage?.storageKey || 'kickbot-supabase-auth';
+const storageKey = CONFIG.SUPABASE?.STORAGE_KEY || 'kickbot-supabase-auth';
 
 const sb = createClient(
   supabaseUrl,

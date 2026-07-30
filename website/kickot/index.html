@@ -895,7 +895,7 @@
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-primary w-full" id="pricingProBtn" onclick="window.location.href='../index.html'">
+                            <button class="btn btn-primary w-full" id="pricingProBtn" onclick="openIndexCheckout('pro')">
                                 <span class="btn-text" data-i18n="pricing.pro.btn">Izaberi Pro</span> - <span class="btn-price">$9.99/mes</span>
                             </button>
                         </div>
@@ -976,7 +976,7 @@
                             </ul>
                         </div>
                         <div class="p-card-footer">
-                            <button class="btn btn-secondary w-full" id="pricingEliteBtn" onclick="window.location.href='../index.html'">
+                            <button class="btn btn-secondary w-full" id="pricingEliteBtn" onclick="openIndexCheckout('elite')">
                                 <span class="btn-text" data-i18n="pricing.elite.btn">Izaberi Elite</span> - <span class="btn-price">$14.99/mes</span>
                             </button>
                         </div>
@@ -992,6 +992,50 @@
 
         <script>
             // Pricing Toggle Functionality
+            let currentPricingPeriod = 'monthly';
+
+            const LS_CHECKOUT_INDEX = {
+                pro: {
+                    monthly: 'https://kickall.lemonsqueezy.com/checkout/buy/ef8c2e17-c6c6-4f01-97ab-7e0b70ac2374',
+                    yearly:  'https://kickall.lemonsqueezy.com/checkout/buy/eeb6f9b7-aeeb-4769-b333-78c089a5d732'
+                },
+                elite: {
+                    monthly: 'https://kickall.lemonsqueezy.com/checkout/buy/09412cf7-f7ad-4103-826e-96fa00786a53',
+                    yearly:  'https://kickall.lemonsqueezy.com/checkout/buy/7faf6d66-f155-4885-b64c-d1a284eb2df8'
+                }
+            };
+
+            function openIndexCheckout(plan, period) {
+                const p = period || currentPricingPeriod || 'monthly';
+                const planUrls = LS_CHECKOUT_INDEX[plan];
+                const baseUrl = (planUrls && typeof planUrls === 'object') ? planUrls[p] || planUrls.monthly : planUrls;
+                if (!baseUrl) return;
+
+                let userId = null;
+                try {
+                    const storageKey = 'kickbot-supabase-auth';
+                    const raw = localStorage.getItem(storageKey);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        userId = parsed && parsed.user && parsed.user.id ? parsed.user.id : null;
+                    }
+                } catch (_) {}
+
+                if (!userId) {
+                    if (typeof window.openAuthModal === 'function') {
+                        window.openAuthModal();
+                    } else {
+                        const authModal = document.getElementById('authModal');
+                        if (authModal) authModal.classList.add('open');
+                        else window.location.href = '../index.html';
+                    }
+                    return;
+                }
+
+                const url = baseUrl + '?custom[user_id]=' + encodeURIComponent(userId) + '&checkout[custom][user_id]=' + encodeURIComponent(userId);
+                window.open(url, '_blank', 'noopener,noreferrer');
+            }
+
             const monthlyPrices = {
                 free: '$0',
                 pro: '$9.99',
@@ -1005,6 +1049,7 @@
             };
 
             function setPricingPeriod(period) {
+                currentPricingPeriod = period;
                 const monthlyBtn = document.getElementById('monthlyBtn');
                 const yearlyBtn = document.getElementById('yearlyBtn');
                 const proPrice = document.querySelector('#pricing-pro .p-price');

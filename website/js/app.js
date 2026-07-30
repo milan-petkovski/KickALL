@@ -1136,6 +1136,12 @@ function notifyGlobalLogout(userId) {
 }
 
 window.addEventListener('message', (event) => {
+    // Bezbednosna provera: prihvati poruke samo od pouzdanih originа
+    const allowedOrigins = (window.CONFIG && window.CONFIG.CROSS_DOMAIN_DOMAINS)
+        ? window.CONFIG.CROSS_DOMAIN_DOMAINS
+        : ['https://kickall.app'];
+    if (!allowedOrigins.includes(event.origin)) return;
+
     if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
         try {
             localStorage.clear();
@@ -1209,6 +1215,10 @@ window.addEventListener('storage', (event) => {
             window.scrollTo(0, parseInt(scrollY));
         }
     }
+
+    window.openAuthModal = openAuthModal;
+    window.closeAuthModal = closeAuthModal;
+
 
     async function checkAuthSession() {
         try {
@@ -1351,8 +1361,8 @@ window.addEventListener('storage', (event) => {
                             <span class="badge ${userBotActive ? 'badge-active' : 'badge-soon'}">${userBotActive ? botActiveText : botInactiveText}</span>
                         </div>
                         <div class="hero-user-card">
-                            <div class="hero-avatar" style="${avatarUrl ? `background-image: url('${avatarUrl}');` : ''}">
-                                ${!avatarUrl ? kickChannelName.charAt(0).toUpperCase() : ''}
+                            <div class="hero-avatar" style="${(avatarUrl && /^https:\/\//.test(avatarUrl)) ? `background-image: url('${avatarUrl}');` : ''}">
+                                ${!(avatarUrl && /^https:\/\//.test(avatarUrl)) ? kickChannelName.charAt(0).toUpperCase() : ''}
                             </div>
                             <div>
                                 <h3 class="hero-user-name">@${kickChannelName}</h3>

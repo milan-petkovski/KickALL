@@ -6,6 +6,9 @@
 
 window.CONFIG = {
   // Supabase Configuration
+  // NAPOMENA: Ovo je jedini izvor Supabase URL-a za ceo frontend (browser ne moze citati process.env).
+  // Supabase URL i ANON_KEY su dizajnirani da budu javni — pristup podacima kontrolise RLS (Row Level Security).
+  // Da promenite projekat, izmenite SAMO ovde — kickot/js/ fajlovi citaju odavde preko window.CONFIG.
   SUPABASE: {
     URL: 'https://rcukparptzzyssqdmydt.supabase.co',
     ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc',

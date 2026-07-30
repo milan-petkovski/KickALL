@@ -1,6 +1,7 @@
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW_MS = 60000;
 const MAX_REQUESTS_PER_WINDOW = 10; // Max 10 exchange attempts per minute per IP
+const MAX_BODY_BYTES = 10000;       // Max 10KB payload za OAuth exchange
 
 function isRateLimited(clientIp) {
   if (clientIp === '127.0.0.1' || clientIp === 'localhost' || clientIp === '::1' || clientIp.includes('127.0.0.1')) {
@@ -47,6 +48,15 @@ exports.handler = async (event) => {
       statusCode: 429,
       headers: { ...headers, 'Retry-After': '60' },
       body: JSON.stringify({ error: 'Rate limit exceeded. Please wait 60 seconds.' })
+    };
+  }
+
+  // Provera velicine payload-a
+  if (event.body && event.body.length > MAX_BODY_BYTES) {
+    return {
+      statusCode: 413,
+      headers,
+      body: JSON.stringify({ error: 'Payload too large', detail: 'Request body exceeds 10KB size limit' })
     };
   }
 
