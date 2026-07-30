@@ -533,6 +533,57 @@ async function sacuvajBackupUGist(mesec, stariPodaci) {
     }
 }
 
+async function ucitajUserPlan(userId, chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return config.PLAN_LIMITS.free;
+
+    if (!KORISTI_SUPABASE || !userId) {
+        channelState.userPlan = 'free';
+        channelState.subscriptionStatus = 'active';
+        channelState.planLimits = config.PLAN_LIMITS.free;
+        return config.PLAN_LIMITS.free;
+    }
+
+    try {
+        const { data, error } = await supabase
+            .from('user_profiles')
+            .select('plan, subscription_status, ends_at, renews_at')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        let rawPlan = 'free';
+        let subStatus = 'active';
+
+        if (data) {
+            rawPlan = (data.plan || 'free').toLowerCase();
+            subStatus = (data.subscription_status || 'active').toLowerCase();
+
+            if (subStatus === 'expired' || (subStatus === 'cancelled' && data.ends_at && new Date(data.ends_at) < new Date())) {
+                rawPlan = 'free';
+            }
+        }
+
+        const planKey = (rawPlan.includes('elite') ? 'elite' : (rawPlan.includes('pro') ? 'pro' : 'free'));
+        const limits = config.PLAN_LIMITS[planKey] || config.PLAN_LIMITS.free;
+
+        channelState.userId = userId;
+        channelState.userPlan = planKey;
+        channelState.subscriptionStatus = subStatus;
+        channelState.planLimits = limits;
+
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Detektovan plan korisnika: ${limits.name} (Status: ${subStatus})`);
+        return limits;
+    } catch (err) {
+        log('WARN', `Greška pri učitavanju plana za korisnika ${userId}: ${err.message}`);
+        channelState.userPlan = 'free';
+        channelState.subscriptionStatus = 'active';
+        channelState.planLimits = config.PLAN_LIMITS.free;
+        return config.PLAN_LIMITS.free;
+    }
+}
+
 async function ucitajCustomKomande(chatroomId) {
     try {
         if (!KORISTI_SUPABASE) return;
@@ -540,7 +591,6 @@ async function ucitajCustomKomande(chatroomId) {
         if (!channelState) return;
         const channelUsername = channelState.channelUsername || chatroomId;
 
-        log('INFO', `[${channelUsername}] Učitavam custom komande sa Supabase...`);
         const { data, error } = await supabase
             .from('custom_commands')
             .select('command, response, cooldown_ms, enabled, min_rank, is_default')
@@ -551,20 +601,23 @@ async function ucitajCustomKomande(chatroomId) {
 
         channelState.customCommands = {};
         if (data) {
-            data.forEach(row => {
+            const maxCmds = channelState.planLimits?.maxCustomCommands || 50;
+            const limitedData = data.slice(0, maxCmds);
+            limitedData.forEach(row => {
                 const aliases = row.command.split(',').map(c => c.trim().toLowerCase());
                 aliases.forEach(alias => {
                     if (alias) {
+                        const minCd = channelState.planLimits?.minCooldownMs || 1000;
                         channelState.customCommands[alias] = {
                             response: row.response,
-                            cooldown_ms: row.cooldown_ms || 5000,
+                            cooldown_ms: Math.max(row.cooldown_ms || 5000, minCd),
                             min_rank: row.min_rank || 'everyone',
                             is_default: row.is_default || false
                         };
                     }
                 });
             });
-            log('INFO', `[${channelUsername}] Custom komande učitane: ${data.length} redova.`);
+            log('INFO', `⚡ Custom komande učitane za @${channelUsername} (${limitedData.length} komandi).`);
         }
     } catch (err) {
         log('ERR', `Greška pri učitavanju custom komandi za ${chatroomId}: ${err.message}`);
@@ -578,7 +631,6 @@ async function ucitajBotConfig(chatroomId) {
         if (!channelState) return;
         const channelUsername = channelState.channelUsername || 'Nepoznat';
 
-        log('INFO', `[${channelUsername}] Učitavam bot konfiguraciju sa Supabase...`);
         const { data, error } = await supabase
             .from('bot_config')
             .select('*')
@@ -588,9 +640,15 @@ async function ucitajBotConfig(chatroomId) {
         if (error) throw error;
 
         if (data) {
-            // Dinamički override u stanju kanala
+            if (data.user_id) {
+                await ucitajUserPlan(data.user_id, chatroomId);
+            }
+
+            const limits = channelState.planLimits || config.PLAN_LIMITS.free;
+
+            // Dinamički override u stanju kanala uz poštovanje limita plana
             channelState.PREFIX = data.prefix || '!';
-            channelState.COOLDOWN_MS = data.cooldown_ms ?? 3000;
+            channelState.COOLDOWN_MS = Math.max(data.cooldown_ms ?? 3000, limits.minCooldownMs || 3000);
             channelState.SPAM_THRESHOLD = data.spam_threshold ?? 3;
             channelState.SPAM_WINDOW_MS = data.spam_window_ms ?? 15000;
             
@@ -600,30 +658,47 @@ async function ucitajBotConfig(chatroomId) {
                 channelState.STREAM_START_PIN_MESSAGE = '';
             }
             
-            channelState.feature_leaderboard = data.feature_leaderboard ?? true;
-            channelState.feature_watchtime = data.feature_watchtime ?? true;
-            channelState.feature_games = data.feature_games ?? true;
-            channelState.feature_love = data.feature_love ?? true;
-            channelState.feature_moderation = data.feature_moderation ?? false;
+            channelState.feature_leaderboard = limits.allowLeaderboard && (data.feature_leaderboard ?? true);
+            channelState.feature_watchtime = limits.allowWatchtime && (data.feature_watchtime ?? true);
+            channelState.feature_games = limits.allowGambling && (data.feature_games ?? true);
+            channelState.feature_love = limits.allowLove && (data.feature_love ?? true);
+            channelState.feature_moderation = limits.allowAdvancedModeration && (data.feature_moderation ?? false);
             channelState.feature_autoresponse = data.feature_autoresponse ?? true;
-            channelState.feature_songrequest = data.feature_songrequest ?? false;
+            channelState.feature_songrequest = limits.allowSongRequest && (data.feature_songrequest ?? false);
             channelState.songrequest_settings = data.songrequest_settings || {};
             channelState.welcome_message = data.welcome_message || '';
             
             channelState.botActive = data.bot_active || false;
-            channelState.autoAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
+
+            const rawAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
+            channelState.autoAnnounces = rawAnnounces.slice(0, limits.maxAutoAnnounces || 2);
             
             channelState.announce_interval_mins = data.announce_interval_mins ?? 15;
             channelState.announce_message_threshold = data.announce_message_threshold ?? 30;
             channelState.announce_time_enabled = data.announce_time_enabled ?? true;
             channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
             channelState.moderationSettings = data.moderation_settings || {};
+            channelState.currency_name = data.currency_name || 'Koins';
+            channelState.max_gamble_amount = data.max_gamble_amount || 5000;
+            channelState.gamble_enabled = data.gamble_enabled ?? true;
+            channelState.first_interaction_bonus = data.first_interaction_bonus ?? 100;
+            channelState.sub_multiplier = data.sub_multiplier ?? 2.0;
+            channelState.sub_bonus_per_msg = data.sub_bonus_per_msg ?? 10;
+            channelState.points_per_sub = data.points_per_sub ?? 1000;
+            channelState.points_per_gift_sub = data.points_per_gift_sub ?? 2000;
+            channelState.points_per_100_kicks = data.points_per_100_kicks ?? 500;
+            channelState.daily_streak_bonus = data.daily_streak_bonus ?? 150;
+            channelState.host_raid_bonus = data.host_raid_bonus ?? 300;
+
+            const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
+            const rawStore = Array.isArray(data.store_items) ? data.store_items : [];
+            channelState.store_items = rawStore.slice(0, maxStoreItems);
 
             if (data.channel_name && data.channel_name !== channelState.channelUsername) {
                 channelState.channelUsername = data.channel_name;
             }
             
-            log('INFO', `[${channelState.channelUsername}] Bot konfiguracija uspešno učitana. Prefix: '${channelState.PREFIX}', Cooldown: ${channelState.COOLDOWN_MS}ms, Aktivnost: ${channelState.botActive}, Auto poruke: ${channelState.autoAnnounces.length}`);
+            log('INFO', `⚙️ Bot konfiguracija sinhronizovana za @${channelState.channelUsername} (${limits.name} Plan). Prefix: '${channelState.PREFIX}', Aktivan: ${channelState.botActive}`);
         } else {
             channelState.botActive = false;
             channelState.autoAnnounces = [];
@@ -687,5 +762,7 @@ module.exports = {
     smanjiPoruku,
     ucitajCustomKomande,
     ucitajBotConfig,
+    ucitajUserPlan,
     ucitajSveAktivneKanale
 };
+

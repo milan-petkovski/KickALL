@@ -43,5 +43,54 @@ module.exports = {
     // Fajl banze i keš
     LEADERBOARD_FILE: './leaderboard.json',
     LOVE_DATA_FILE: './love_data.json',
+
+    // Pricing planovi i ograničenja
+    PLAN_LIMITS: {
+        free: {
+            name: 'FREE',
+            maxCustomCommands: 50,
+            maxAutoAnnounces: 5,
+            minCooldownMs: 1000,
+            allowAdvancedModeration: false,
+            allowSongRequest: true,
+            allowStore: true,
+            allowGambling: true,
+            allowLove: true,
+            allowWatchtime: true,
+            allowLeaderboard: true,
+            priority: 1
+        },
+        pro: {
+            name: 'PRO',
+            maxCustomCommands: 200,
+            maxAutoAnnounces: 50,
+            minCooldownMs: 1000,
+            allowAdvancedModeration: true,
+            allowSongRequest: true,
+            allowStore: true,
+            allowGambling: true,
+            allowLove: true,
+            allowWatchtime: true,
+            allowLeaderboard: true,
+            priority: 2
+        },
+        elite: {
+            name: 'ELITE',
+            maxCustomCommands: 999999,
+            maxAutoAnnounces: 999999,
+            minCooldownMs: 1000,
+            allowAdvancedModeration: true,
+            allowSongRequest: true,
+            allowStore: true,
+            allowGambling: true,
+            allowLove: true,
+            allowWatchtime: true,
+            allowLeaderboard: true,
+            allowAiResponses: true,
+            priority: 3
+        }
+    }
 };
+
+
 

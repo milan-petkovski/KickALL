@@ -1,62 +1,55 @@
-/**
- * Toast Notification System
- * Modern, accessible toast notifications to replace alert()
- */
-
 class ToastSystem {
   constructor() {
     this.container = null;
     this.toasts = [];
     this.maxToasts = 5;
     this.defaultDuration = 5000;
-    
-    // Wait for DOM to be ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => this.init());
-    } else {
-      this.init();
-    }
+    this.init();
   }
 
   init() {
-    // Try to use existing container, or create one
-    this.container = document.getElementById('toastContainer');
-    if (!this.container) {
-      this.container = document.createElement('div');
-      this.container.className = 'toast-container';
-      this.container.id = 'toastContainer';
-      document.body.appendChild(this.container);
+    if (this.container) return;
+    
+    const setupContainer = () => {
+      this.container = document.getElementById('toastContainer');
+      if (!this.container) {
+        this.container = document.createElement('div');
+        this.container.className = 'toast-container';
+        this.container.id = 'toastContainer';
+        document.body.appendChild(this.container);
+      }
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', setupContainer);
+    } else {
+      setupContainer();
     }
   }
 
-  /**
-   * Show a toast notification
-   * @param {string} message - The message to display
-   * @param {string} type - 'success', 'error', 'warning', or 'info'
-   * @param {number} duration - Auto-dismiss duration in ms (0 for no auto-dismiss)
-   */
   show(message, type = 'info', duration = this.defaultDuration) {
     if (!this.container) {
       this.init();
     }
 
-    // Remove oldest toast if max limit reached
     if (this.toasts.length >= this.maxToasts) {
       this.dismiss(this.toasts[0].element);
     }
 
     const toast = this.createToast(message, type, duration);
-    this.container.appendChild(toast);
-    
-    // Force reflow for animation
+    if (this.container) {
+      this.container.appendChild(toast);
+    } else {
+      document.body.appendChild(toast);
+    }
+
     toast.offsetHeight;
-    
-    // Show toast
+
     requestAnimationFrame(() => {
       toast.classList.add('show');
+      toast.classList.add('toast-show');
     });
 
-    // Add to tracking
     const toastData = {
       element: toast,
       timeout: null,
@@ -64,7 +57,6 @@ class ToastSystem {
     };
     this.toasts.push(toastData);
 
-    // Auto-dismiss if duration > 0
     if (duration > 0) {
       toastData.timeout = setTimeout(() => {
         this.dismiss(toast);
@@ -76,18 +68,18 @@ class ToastSystem {
 
   createToast(message, type, duration) {
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
+    toast.className = `toast toast-${type} ${type}`;
     toast.setAttribute('role', type === 'error' || type === 'warning' ? 'alert' : 'status');
     toast.setAttribute('aria-live', 'polite');
     toast.setAttribute('aria-atomic', 'true');
 
     const icon = this.getIcon(type);
-    
+
     toast.innerHTML = `
       <div class="toast-content">
-        <div class="toast-icon">${icon}</div>
-        <div class="toast-message">${this.escapeHtml(message)}</div>
-        <button class="toast-close" aria-label="Close" onclick="window.toastSystem.dismiss(this.closest('.toast'))">
+        <div class="toast-icon-wrap toast-icon">${icon}</div>
+        <div class="toast-msg toast-message">${this.escapeHtml(message)}</div>
+        <button class="toast-close" aria-label="Zatvori" onclick="window.toastSystem.dismiss(this.closest('.toast'))">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -127,20 +119,17 @@ class ToastSystem {
   dismiss(toast) {
     if (!toast) return;
 
-    // Find and remove from tracking
     const index = this.toasts.findIndex(t => t.element === toast);
     if (index > -1) {
       clearTimeout(this.toasts[index].timeout);
       this.toasts.splice(index, 1);
     }
 
-    // Hide animation
-    toast.classList.remove('show');
+    toast.classList.remove('show', 'toast-show');
     toast.classList.add('hide');
 
-    // Remove from DOM after animation
     setTimeout(() => {
-      if (toast.parentNode) {
+      if (toast && toast.parentNode) {
         toast.parentNode.removeChild(toast);
       }
     }, 300);
@@ -163,7 +152,6 @@ class ToastSystem {
       .replace(/'/g, '&#39;');
   }
 
-  // Convenience methods
   success(message, duration) {
     return this.show(message, 'success', duration);
   }
@@ -181,34 +169,34 @@ class ToastSystem {
   }
 }
 
-// Initialize globally
-// Initialize toast system when DOM is ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    window.toastSystem = new ToastSystem();
-  });
-} else {
-  window.toastSystem = new ToastSystem();
-}
+window.toastSystem = new ToastSystem();
 
-// Global convenience functions for backward compatibility
-window.showToast = (arg1, arg2, arg3) => {
+window.showToast = (a, b, c) => {
   if (!window.toastSystem) return;
-  if (['success', 'error', 'warning', 'info'].includes(arg1) && typeof arg2 === 'string') {
-    return window.toastSystem.show(arg2, arg1, arg3);
+
+  const types = ['success', 'error', 'warning', 'info'];
+  let message = '';
+  let type = 'info';
+  let duration = 5000;
+
+  if (types.includes(a)) {
+    type = a;
+    message = b;
+    duration = typeof c === 'number' ? c : 5000;
+  } else {
+    message = a;
+    if (types.includes(b)) {
+      type = b;
+      duration = typeof c === 'number' ? c : 5000;
+    } else if (typeof b === 'number') {
+      duration = b;
+    }
   }
-  return window.toastSystem.show(arg1, arg2, arg3);
+
+  return window.toastSystem.show(message, type, duration);
 };
+
 window.showSuccess = (message, duration) => window.toastSystem.success(message, duration);
 window.showError = (message, duration) => window.toastSystem.error(message, duration);
 window.showWarning = (message, duration) => window.toastSystem.warning(message, duration);
 window.showInfo = (message, duration) => window.toastSystem.info(message, duration);
-
-// Replace alert with non-blocking toast notification
-if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-  window.alert = function(message) {
-    if (window.toastSystem) {
-      window.toastSystem.warning(message, 6000);
-    }
-  };
-}

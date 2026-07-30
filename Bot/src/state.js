@@ -1,3 +1,4 @@
+const config = require('./config');
 const channels = {};
 
 function getChannelState(chatroomId) {
@@ -5,6 +6,12 @@ function getChannelState(chatroomId) {
     const id = String(chatroomId);
     if (!channels[id]) {
         channels[id] = {
+            // Pricing Plan & Korisnički Podaci
+            userId: null,
+            userPlan: 'free',
+            subscriptionStatus: 'active',
+            planLimits: config.PLAN_LIMITS.free,
+
             // In-memory data
             leaderboard: {},
             leaderboardDeltas: {},
@@ -48,6 +55,9 @@ function getChannelState(chatroomId) {
             porukePosleAnnounce: 0,
             zadnjaAutoPorukaTs: 0,
             zadnjiAutoPorukaIdx: -1,
+            cachedIgra: null,
+            cachedIgraTs: 0,
+            smart_chat_validation: true,
 
             // Dinamičke konfiguracione vrednosti iz baze
             PREFIX: '!',

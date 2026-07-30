@@ -1,6 +1,6 @@
 const config = require('./config');
 const state = require('./state');
-const { log, isValidUsername, sanitizeInput, proveraKulauna, prevediVreme, dobijTrenutniMesec } = require('./utils');
+const { log, isValidUsername, sanitizeInput, proveraKulauna, prevediVreme, dobijTrenutniMesec, fetchKickAPI } = require('./utils');
 const { supabase, KORISTI_SUPABASE, osigurajCuvanjeLjubavi, sacuvajLeaderboard } = require('./database');
 const { posaljiPoruku, posaljiIPinujPoruku, odpinujPoruku } = require('./messenger');
 
@@ -225,6 +225,30 @@ function handleRulet(chatroomId, sender) {
     }
 }
 
+// ─── ALKOTEST ─────────────────────────────────────────────────────────────────
+function handleAlkotest(chatroomId, sender, targetRaw) {
+    if (!isValidUsername(sender)) return;
+    const cleanSender = sanitizeInput(sender);
+    let target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : '';
+
+    if (target && !isValidUsername(target)) {
+        posaljiPoruku(chatroomId, '❌ Nevalidno korisničko ime.');
+        return;
+    }
+
+    const user = target ? sanitizeInput(target) : cleanSender;
+    const promili = (Math.random() * 3.5).toFixed(2);
+
+    let status = '';
+    if (promili < 0.3) status = 'Trezan kao novorođenče! 🥛';
+    else if (promili < 0.8) status = 'Veseo i spreman za pesmu! 🍻';
+    else if (promili < 1.5) status = 'Pletu mu se noge i maši slova u chatu! 🍷';
+    else if (promili < 2.5) status = 'Vidi dva strimera i tri chata! 😵';
+    else status = 'Kritično! Spava pod stolom uz kafanski reprizni hit! 🚑🍺';
+
+    posaljiPoruku(chatroomId, `🍺 Alkotest za @${user}: izmereno je **${promili}‰** alkohola u krvi! Status: ${status}`);
+}
+
 // ─── LJUBAVNI KALKULATOR ──────────────────────────────────────────────────────
 function handleLove(chatroomId, sender, args) {
     const channelState = state.getChannelState(chatroomId);
@@ -420,6 +444,13 @@ function handlePrihvatiBrak(chatroomId, receiver) {
         return;
     }
 
+    const maxCouples = channelState.userPlan === 'free' ? 50 : 999999;
+    if (Object.keys(channelState.marriedCouples || {}).length >= maxCouples) {
+        delete channelState.pendingProposals[rLower];
+        posaljiPoruku(chatroomId, `❌ Dostignuto je ograničenje od 50 bračnih parova (100 venčanih lica) za FREE paket. Nadogradi na PRO za neograničeno na Kickot Dashboard-u!`);
+        return;
+    }
+
     const cleanSender = sanitizeInput(proposal.sender);
     const cleanTarget = sanitizeInput(proposal.target);
     const kljucBrak = [cleanSender.toLowerCase(), cleanTarget.toLowerCase()].sort().join('::');
@@ -543,11 +574,15 @@ function handleBrakovi(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
-    const parovi = Object.values(channelState.marriedCouples);
+    let parovi = Object.values(channelState.marriedCouples);
 
     if (parovi.length === 0) {
         posaljiPoruku(chatroomId, '💍 Niko na strimu još nije u braku! Budite prvi: skupite 90%+ ljubavi i kucajte !vencaj @user!');
         return;
+    }
+
+    if (channelState.userPlan === 'free' && parovi.length > 50) {
+        parovi = parovi.slice(0, 50);
     }
 
     const lista = parovi.map(p => `@${p.user1} ❤️ @${p.user2} (od ${p.datum})`).join(', ');
@@ -832,37 +867,7 @@ async function handleVreme(chatroomId, grad) {
         log('ERR', `handleVreme greška: ${err.message}`);
         if (err.message && (err.message.includes('404') || err.message.includes('Unknown location'))) {
             posaljiPoruku(chatroomId, `❌ Grad "${cleanGrad}" nije pronađen. Provjeri naziv grada.`);
-        } else {
-            posaljiPoruku(chatroomId, `❌ Nije moguće dohvatiti vreme za "${cleanGrad}". Pokušaj ponovo za koji trenutak.`);
         }
-    }
-}
-
-// Pomoćna funkcija za got-scraping API pozive
-async function fetchKickAPI(url) {
-    const { gotScraping } = await import('got-scraping');
-    try {
-        const response = await gotScraping({
-            url: url,
-            responseType: 'json',
-            headers: {
-                'cookie': config.BOT_COOKIE,
-                'authorization': config.BEARER_TOKEN
-            },
-            retry: { limit: 0 }
-        });
-        return {
-            ok: response.statusCode >= 200 && response.statusCode < 300,
-            status: response.statusCode,
-            json: async () => response.body
-        };
-    } catch (error) {
-        log('ERR', `gotScraping greška za ${url}: ${error.message}`);
-        return {
-            ok: false,
-            status: error.response ? error.response.statusCode : 500,
-            json: async () => { throw new Error(error.message); }
-        };
     }
 }
 
@@ -1129,6 +1134,11 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
+    if (channelState.planLimits && channelState.planLimits.allowSongRequest === false) {
+        posaljiPoruku(chatroomId, `❌ @${sender}, Song Request funkcija je dostupna u PRO i ELITE paketima.`);
+        return;
+    }
+
     if (channelState.feature_songrequest === false) return;
 
     const userKey = sender.toLowerCase();
@@ -1155,9 +1165,33 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
         return;
     }
 
-    const duration = Math.floor(Math.random() * (300 - 120 + 1)) + 120; // 2 do 5 minuta nasumično
+    const userPlan = channelState.userPlan || 'free';
+    const maxQueue = userPlan === 'free' ? 5 : (userPlan === 'pro' ? 50 : 999999);
     const queue = channelState.songrequest_settings.queue || [];
-    
+
+    if (queue.length >= maxQueue) {
+        posaljiPoruku(chatroomId, `❌ Dostignuto je maksimalno ograničenje od ${maxQueue} pesama u redu za ${userPlan.toUpperCase()} paket. Nadogradi paket na Kickot Dashboard-u!`);
+        return;
+    }
+
+    // Provera poena ako je definisana cena u poenima
+    const cenaPoena = channelState.songrequest_settings?.points_price || 0;
+    if (cenaPoena > 0) {
+        const economy = require('./economy');
+        const valuta = economy.dobijNazivValute(channelState);
+        const user = channelState.leaderboard[userKey];
+        const trenutniPoeni = user ? (user.points || 0) : 0;
+
+        if (trenutniPoeni < cenaPoena) {
+            posaljiPoruku(chatroomId, `❌ @${sender}, nemaš dovoljno poena za muzičku želju! Potrebno: ${cenaPoena} ${valuta}, a ti imaš: ${trenutniPoeni} ${valuta}.`);
+            return;
+        }
+
+        user.points -= cenaPoena;
+        channelState.leaderboardDeltas[userKey] = (channelState.leaderboardDeltas[userKey] || 0) - cenaPoena;
+        channelState.leaderboardDirty = true;
+    }
+
     // Provera da li je pesma već u redu
     const exists = queue.some(s => s.title.toLowerCase() === songName.trim().toLowerCase());
     if (exists) {
@@ -1165,6 +1199,7 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
         return;
     }
 
+    const duration = Math.floor(Math.random() * (300 - 120 + 1)) + 120; // 2 do 5 minuta
     queue.push({
         title: songName.trim(),
         requester: sender,
@@ -1181,6 +1216,11 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
 function handleStoreList(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
+
+    if (channelState.planLimits && channelState.planLimits.allowStore === false) {
+        posaljiPoruku(chatroomId, `🛍️ Prodavnica je dostupna u PRO i ELITE paketima.`);
+        return;
+    }
 
     if (channelState.store_enabled === false) {
         posaljiPoruku(chatroomId, `🛍️ Prodavnica je trenutno zatvorena.`);
@@ -1201,6 +1241,12 @@ function handleStoreList(chatroomId) {
 function handleRedeemStore(chatroomId, sender, itemQueryRaw) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
+
+    if (channelState.planLimits && channelState.planLimits.allowStore === false) {
+        posaljiPoruku(chatroomId, `🛍️ Prodavnica je dostupna u PRO i ELITE paketima.`);
+        return;
+    }
+
 
     if (channelState.store_enabled === false) {
         posaljiPoruku(chatroomId, `🛍️ Prodavnica je trenutno zatvorena.`);
@@ -1255,13 +1301,166 @@ function handleRedeemStore(chatroomId, sender, itemQueryRaw) {
     posaljiPoruku(chatroomId, `🎉 @${cleanSender} je kupio **"${item.name}"** za **${item.cost} ${valuta}**! Vaš zahtev je poslat streamer-u na odobrenje! 🚀`);
 }
 
+async function handleAddCommand(chatroomId, sender, textRaw, senderObj) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const userKey = sender.toLowerCase();
+    const isStreamer = userKey === channelState.channelUsername.toLowerCase();
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || [];
+    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+
+    if (!isMod) {
+        posaljiPoruku(chatroomId, `❌ @${sender}, samo moderatori i strimer mogu dodavati custom komande.`);
+        return;
+    }
+
+    if (!textRaw || !textRaw.trim()) {
+        posaljiPoruku(chatroomId, `⚠️ Upotreba: !dodajkomandu !komanda Odgovor (ili !addcom !komanda Odgovor) — npr. !addcom !ig Instagram: @mojprofile`);
+        return;
+    }
+
+    const parts = textRaw.trim().split(/\s+/);
+    let cmdName = parts[0].toLowerCase();
+    if (!cmdName.startsWith('!')) cmdName = '!' + cmdName;
+
+    const responseText = parts.slice(1).join(' ');
+    if (!responseText) {
+        posaljiPoruku(chatroomId, `⚠️ Unesite tekst odgovora za komandu ${cmdName}.`);
+        return;
+    }
+
+    const currentCount = Object.keys(channelState.customCommands || {}).length;
+    const maxAllowed = channelState.planLimits?.maxCustomCommands || 5;
+
+    if (currentCount >= maxAllowed) {
+        posaljiPoruku(chatroomId, `❌ Dostignut je maksimum od ${maxAllowed} custom komandi za ${channelState.userPlan.toUpperCase()} paket. Unapredi paket na Kickot Dashboard-u!`);
+        return;
+    }
+
+    const database = require('./database');
+    if (database.KORISTI_SUPABASE && database.supabase) {
+        try {
+            const cleanCmdName = cmdName.slice(1);
+            const { error } = await database.supabase
+                .from('custom_commands')
+                .upsert({
+                    channel_id: chatroomId,
+                    command: cleanCmdName,
+                    response: responseText,
+                    cooldown_ms: channelState.planLimits?.minCooldownMs || 3000,
+                    enabled: true,
+                    min_rank: 'everyone',
+                    is_default: false
+                }, { onConflict: 'channel_id,command' });
+
+            if (error) throw error;
+
+            await database.ucitajCustomKomande(chatroomId);
+            posaljiPoruku(chatroomId, `✅ Custom komanda ${cmdName} je uspešno dodata!`);
+        } catch (err) {
+            posaljiPoruku(chatroomId, `❌ Greška pri čuvanju komande: ${err.message}`);
+        }
+    } else {
+        posaljiPoruku(chatroomId, `❌ Supabase baza nije dostupna.`);
+    }
+}
+
+async function handleDelCommand(chatroomId, sender, cmdRaw, senderObj) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const userKey = sender.toLowerCase();
+    const isStreamer = userKey === channelState.channelUsername.toLowerCase();
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || [];
+    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+
+    if (!isMod) {
+        posaljiPoruku(chatroomId, `❌ @${sender}, samo moderatori i strimer mogu brisati custom komande.`);
+        return;
+    }
+
+    if (!cmdRaw || !cmdRaw.trim()) {
+        posaljiPoruku(chatroomId, `⚠️ Upotreba: !obrisikomandu !komanda (ili !delcom !komanda) — npr. !delcom !ig`);
+        return;
+    }
+
+    let cmdName = cmdRaw.trim().toLowerCase();
+    if (cmdName.startsWith('!')) cmdName = cmdName.slice(1);
+
+    const database = require('./database');
+    if (database.KORISTI_SUPABASE && database.supabase) {
+        try {
+            const { error } = await database.supabase
+                .from('custom_commands')
+                .delete()
+                .eq('channel_id', chatroomId)
+                .eq('command', cmdName);
+
+            if (error) throw error;
+
+            await database.ucitajCustomKomande(chatroomId);
+            posaljiPoruku(chatroomId, `✅ Custom komanda !${cmdName} je uspešno obrisana.`);
+        } catch (err) {
+            posaljiPoruku(chatroomId, `❌ Greška pri brisanju komande: ${err.message}`);
+        }
+    } else {
+        posaljiPoruku(chatroomId, `❌ Supabase baza nije dostupna.`);
+    }
+}
+
+function handleHelp(chatroomId, username) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const prefix = channelState.PREFIX || '!';
+    const parts = [];
+
+    // Zabava
+    if (channelState.feature_games !== false) {
+        parts.push(`Zabava: ${prefix}iq, ${prefix}samar, ${prefix}roll, ${prefix}duel, ${prefix}rulet, ${prefix}alkotest`);
+    }
+
+    // Kockanje
+    if (channelState.feature_games !== false && channelState.gamble_enabled !== false) {
+        parts.push(`Kazino: ${prefix}slots, ${prefix}rulet, ${prefix}coinflip, ${prefix}tocak`);
+    }
+
+    // Ekonomija & Stats
+    if (channelState.feature_leaderboard !== false) {
+        parts.push(`Stats: ${prefix}rank, ${prefix}points, ${prefix}daily, ${prefix}top, ${prefix}toplevel, ${prefix}topcoins`);
+    }
+
+    // Watchtime
+    if (channelState.feature_watchtime !== false) {
+        parts.push(`Gledanje: ${prefix}watchtime, ${prefix}topwatchtime`);
+    }
+
+    // Ljubav & Brak
+    if (channelState.feature_love !== false) {
+        parts.push(`Ljubav: ${prefix}love, ${prefix}vencaj, ${prefix}brakovi, ${prefix}razvod`);
+    }
+
+    // Muzika & Store
+    if (channelState.feature_songrequest) {
+        parts.push(`Muzika: ${prefix}pesma (${prefix}sr)`);
+    }
+
+    const spisak = parts.join(' | ');
+    posaljiPoruku(chatroomId, `🤖 @${username}, ugrađene komande: ${spisak}`);
+}
+
 module.exports = {
+    handleHelp,
     handlePesma,
     handleIq,
     handleSamar,
     handleRoll,
     handleDuel,
     handleRulet,
+    handleAlkotest,
     handleLove,
     handleModifyLove,
     handleVencaj,
@@ -1280,5 +1479,8 @@ module.exports = {
     handleOsvezi,
     handlePermit,
     handleStoreList,
-    handleRedeemStore
+    handleRedeemStore,
+    handleAddCommand,
+    handleDelCommand
 };
+

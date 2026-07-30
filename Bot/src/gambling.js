@@ -13,6 +13,11 @@ function proveriUlog(chatroomId, sender, amountRaw) {
         return { valid: false };
     }
 
+    if (channelState.planLimits && channelState.planLimits.priority < 2) {
+        posaljiPoruku(chatroomId, `🎰 Kazino igre sa ulogom poena (!slots, !rulet, !coinflip, !tocak) su otključane u PRO i ELITE paketima. Nadogradi paket na Kickot Dashboard-u!`);
+        return { valid: false };
+    }
+
     if (!isValidUsername(sender)) return { valid: false };
     const clean = sanitizeInput(sender);
     const key = clean.toLowerCase();

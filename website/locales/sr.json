@@ -219,7 +219,7 @@
     "discount": "17% POPUST",
     "freeMonths": "2 meseca besplatno",
     "saveMonths": "Ušteda 2 meseca",
-    "annualNote": "💰 <strong>2 meseca besplatno</strong> uz godišnju pretplatu! Pro: $99.99/god | Elite: $149.99/god",
+    "annualNote": "💰 <strong>2 meseca besplatno</strong> uz godišnju pretplatu! Pro: $49.99/god | Elite: $99.99/god",
     "annualNoteYearly": "💰 <strong>Ušteda 2 meseca</strong> uz godišnju pretplatu!",
     "active": "AKTIVNO",
     "soon": "USKORO",
@@ -297,7 +297,7 @@
       "personalSetup": "<strong>Ja</strong> lično nameštam bota umesto tebe",
       "customBotVip": "Custom bot (VIP + Lično podešavanje)",
       "eliteSupport": "Elitna podrška putem WhatsApp-a",
-      "pricing.annualNote": "💰 <strong>2 meseca besplatno</strong> uz godišnju pretplatu! Pro: $99.99/god | Elite: $149.99/god"
+      "pricing.annualNote": "💰 <strong>2 meseca besplatno</strong> uz godišnju pretplatu! Pro: $49.99/god | Elite: $99.99/god"
     }
   },
   "modules": {

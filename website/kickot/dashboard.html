@@ -88,6 +88,162 @@
       color: #0E0E1D !important;
       box-shadow: 0 6px 22px rgba(83, 252, 24, 0.6) !important;
     }
+
+    /* Mobile Unsupported Overlay (<=768px) */
+    .mobile-unsupported-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      background: #090514;
+      background-image: 
+        radial-gradient(circle at 50% 20%, rgba(83, 252, 24, 0.12) 0%, transparent 60%),
+        radial-gradient(circle at 80% 80%, rgba(138, 43, 226, 0.15) 0%, transparent 50%);
+      padding: 24px 18px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      text-align: center;
+      color: #ffffff;
+      font-family: 'Inter', system-ui, sans-serif;
+      overflow-y: auto;
+    }
+
+    @media (max-width: 768px) {
+      .mobile-unsupported-overlay {
+        display: flex !important;
+      }
+    }
+
+    .mobile-unsupported-card {
+      background: rgba(18, 12, 36, 0.95);
+      border: 1px solid rgba(83, 252, 24, 0.3);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 35px rgba(83, 252, 24, 0.15);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 32px 24px;
+      max-width: 460px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .mobile-unsupported-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: rgba(83, 252, 24, 0.1);
+      border: 1px solid rgba(83, 252, 24, 0.3);
+      color: #53FC18;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 20px;
+    }
+
+    .mobile-unsupported-icon {
+      width: 76px;
+      height: 76px;
+      border-radius: 22px;
+      background: rgba(83, 252, 24, 0.08);
+      border: 1px solid rgba(83, 252, 24, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #53FC18;
+      margin-bottom: 22px;
+      box-shadow: 0 0 30px rgba(83, 252, 24, 0.25);
+    }
+
+    .mobile-unsupported-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 12px;
+      line-height: 1.25;
+    }
+
+    .mobile-unsupported-desc {
+      font-size: 0.93rem;
+      color: rgba(255, 255, 255, 0.78);
+      line-height: 1.55;
+      margin-bottom: 24px;
+    }
+
+    .mobile-steps-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      text-align: left;
+    }
+
+    .mobile-step-item {
+      background: rgba(255, 255, 255, 0.035);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .mobile-step-num {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #53FC18;
+      color: #0b0716;
+      font-weight: 800;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .mobile-step-text {
+      font-size: 0.86rem;
+      color: rgba(255, 255, 255, 0.88);
+      line-height: 1.45;
+    }
+
+    .mobile-step-text strong {
+      color: #53FC18;
+    }
+
+    .mobile-home-btn {
+      margin-top: 22px;
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 13px 20px;
+      border-radius: 14px;
+      background: #53FC18;
+      color: #0b0716;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-decoration: none;
+      box-shadow: 0 4px 20px rgba(83, 252, 24, 0.35);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+    }
+    .mobile-home-btn:hover, .mobile-home-btn:active {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(83, 252, 24, 0.55);
+      color: #0b0716;
+    }
   </style>
 
   <!-- Supabase JS -->
@@ -98,6 +254,48 @@
 </head>
 
 <body>
+
+  <!-- ══════════ MOBILE UNSUPPORTED OVERLAY (<=768px) ══════════ -->
+  <div class="mobile-unsupported-overlay" role="alertdialog" aria-labelledby="mobileOverlayTitle" aria-describedby="mobileOverlayDesc">
+    <div class="mobile-unsupported-card">
+
+      <div class="mobile-unsupported-icon">
+        <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+          <line x1="8" y1="21" x2="16" y2="21" />
+          <line x1="12" y1="17" x2="12" y2="21" />
+        </svg>
+      </div>
+
+      <h2 id="mobileOverlayTitle" class="mobile-unsupported-title">Kickot Dashboard zahteva veći ekran</h2>
+      <p id="mobileOverlayDesc" class="mobile-unsupported-desc">
+        Dashboard sa kompletnom kontrolom bota nije prilagođen za rad na mobilnim uređajima.
+      </p>
+
+      <div class="mobile-steps-container">
+        <div class="mobile-step-item">
+          <div class="mobile-step-num">1</div>
+          <div class="mobile-step-text">
+            Pređite na <strong>PC, Laptop</strong> ili <strong>Tablet</strong> i ponovo osvežite stranicu.
+          </div>
+        </div>
+        <div class="mobile-step-item">
+          <div class="mobile-step-num">2</div>
+          <div class="mobile-step-text">
+            Ili u meniju mobilnog pregledača (tri tačkice) uključite opciju <strong>"Verzija sajta za računare" (Desktop site)</strong>.
+          </div>
+        </div>
+      </div>
+
+      <a href="../index.html" class="mobile-home-btn" onclick="try { window.location.href = (window.KickotConfig && window.KickotConfig.paths && window.KickotConfig.paths.kickallIndex) ? window.KickotConfig.paths.kickallIndex : '../index.html'; } catch(e) { window.location.href = '../index.html'; } return false;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span>Nazad na početnu</span>
+      </a>
+    </div>
+  </div>
 
 
   <!-- ══════════ AUTH GATE ══════════ -->
@@ -796,6 +994,21 @@
           <!-- Plan Limit Status Banner -->
           <div class="plan-limit-banner" id="cmdPlanLimitBanner" style="background: rgba(13, 9, 26, 0.6); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 12px; padding: 12px 16px; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;"></div>
 
+          <!-- Chat Command Info Banner -->
+          <div class="info-banner" style="margin-bottom: 1rem; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.2); border-left: 4px solid var(--kick-green); padding: 14px 18px; border-radius: var(--radius-md); display: flex; align-items: flex-start; gap: 12px; width: 100%;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--kick-green)" stroke-width="2.5" style="flex-shrink: 0; margin-top: 2px;">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+              <strong style="color: #fff;">Upravljanje komandama direktno iz Chata:</strong> Moderatori i strimer mogu upravljati custom komandama tokom lajva:
+              <ul style="margin: 6px 0 0 18px; padding: 0; list-style-type: disc; color: var(--text-muted);">
+                <li><strong>Dodavanje komande:</strong> <code style="color: var(--kick-green); background: rgba(83, 252, 24, 0.1); padding: 2px 6px; border-radius: 4px;">!dodajkomandu !komanda Odgovor</code> ili <code style="color: var(--kick-green); background: rgba(83, 252, 24, 0.1); padding: 2px 6px; border-radius: 4px;">!addcom !komanda Odgovor</code></li>
+                <li><strong>Brisanje komande:</strong> <code style="color: #EF4444; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px;">!obrisikomandu !komanda</code> ili <code style="color: #EF4444; background: rgba(239, 68, 68, 0.1); padding: 2px 6px; border-radius: 4px;">!delcom !komanda</code></li>
+              </ul>
+            </div>
+          </div>
+
+
           <div class="table-toolbar" id="cmdTableToolbar">
             <div class="search-wrap">
               <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -905,18 +1118,6 @@
             <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Kockanje', this)">Kockanje</button>
             <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Prodavnica', this)">Prodavnica</button>
             <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Muzika', this)">Muzika</button>
-          </div>
-
-          <!-- Napomena -->
-          <div style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color: #FBBF24; flex-shrink: 0; margin-top: 2px;">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
-            <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
-              <strong style="color: #FBBF24;">Napomena:</strong> Neke komande mogu imati moguće razlike između opisa i stvarne funkcionalnosti. Takođe postoji mogućnost da ima još neke komande koja se ne ovde ne prikazuje.
-            </div>
           </div>
 
           <div class="builtin-commands-grid" id="builtinCommandsGrid"
@@ -4583,7 +4784,7 @@
           <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #8B5CF6, #A78BFA); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);">POPULARNO</div>
           <div>
             <div style="font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 4px;">PRO PAKET</div>
-            <div style="font-size: 2rem; font-weight: 800; color: #53FC18; margin: 12px 0;">$9.99 <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">/ mesec</span></div>
+            <div style="font-size: 2rem; font-weight: 800; color: #53FC18; margin: 12px 0;">$4.99 <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">/ mesec</span></div>
             
             <div style="margin-bottom: 20px;">
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.9rem; color: #e4e4e7;">
@@ -4617,7 +4818,7 @@
           <div>
             <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #53FC18; margin-bottom: 8px;">VIP ULTRA</div>
             <div style="font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 4px;">ELITE PAKET</div>
-            <div style="font-size: 2rem; font-weight: 800; color: #53FC18; margin: 12px 0;">$14.99 <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">/ mesec</span></div>
+            <div style="font-size: 2rem; font-weight: 800; color: #53FC18; margin: 12px 0;">$9.99 <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">/ mesec</span></div>
             
             <div style="margin-bottom: 20px;">
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.9rem; color: #e4e4e7;">
@@ -4686,9 +4887,9 @@
           <div style="position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #8B5CF6, #A78BFA); color: white; padding: 6px 16px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);">POPULARNO</div>
           <div>
             <div style="font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 4px;">PRO PAKET</div>
-            <div style="font-size: 2rem; font-weight: 800; color: #53FC18; margin: 12px 0;">$99.90 <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">/ godinu</span></div>
-            <div style="font-size: 0.85rem; color: #53FC18; margin-bottom: 8px; font-weight: 600;">= $8.33/mesec + 2 meseca BESPLATNO</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); text-decoration: line-through; margin-bottom: 16px;">Uobičajno $119.88 (12 meseci)</div>
+            <div style="font-size: 2rem; font-weight: 800; color: #53FC18; margin: 12px 0;">$49.99 <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">/ godinu</span></div>
+            <div style="font-size: 0.85rem; color: #53FC18; margin-bottom: 8px; font-weight: 600;">= $4.16/mesec + 2 meseca BESPLATNO</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-decoration: line-through; margin-bottom: 16px;">Uobičajno $59.88 (12 meseci)</div>
             
             <div style="margin-bottom: 20px;">
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.9rem; color: #e4e4e7;">
@@ -4722,9 +4923,9 @@
           <div>
             <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: #53FC18; margin-bottom: 8px;">VIP ULTRA</div>
             <div style="font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 4px;">ELITE PAKET</div>
-            <div style="font-size: 2rem; font-weight: 800; color: #53FC18; margin: 12px 0;">$149.90 <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">/ godinu</span></div>
-            <div style="font-size: 0.85rem; color: #53FC18; margin-bottom: 8px; font-weight: 600;">= $12.49/mesec + 2 meseca BESPLATNO</div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); text-decoration: line-through; margin-bottom: 16px;">Uobičajno $179.88 (12 meseci)</div>
+            <div style="font-size: 2rem; font-weight: 800; color: #53FC18; margin: 12px 0;">$99.99 <span style="font-size:0.85rem; font-weight:400; color:var(--text-muted);">/ godinu</span></div>
+            <div style="font-size: 0.85rem; color: #53FC18; margin-bottom: 8px; font-weight: 600;">= $8.33/mesec + 2 meseca BESPLATNO</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-decoration: line-through; margin-bottom: 16px;">Uobičajno $119.88 (12 meseci)</div>
             
             <div style="margin-bottom: 20px;">
               <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.9rem; color: #e4e4e7;">

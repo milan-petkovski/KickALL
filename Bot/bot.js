@@ -78,6 +78,8 @@ const defaultBuiltinRanks = {
     'roll': 'everyone',
     'duel': 'everyone',
     'rulet': 'everyone',
+    'ruskirulet': 'everyone',
+    'alkotest': 'everyone',
     'cinjenica': 'everyone',
     
     // Ljubav & Brak
@@ -101,6 +103,10 @@ const defaultBuiltinRanks = {
     'coldown': 'everyone',
     
     // Strim Info
+    'komande': 'everyone',
+    'help': 'everyone',
+    'pomoc': 'everyone',
+    'commands': 'everyone',
     'vreme': 'everyone',
     'vrijeme': 'everyone',
     'uptime': 'everyone',
@@ -110,6 +116,10 @@ const defaultBuiltinRanks = {
     // Moderacija
     'permit': 'moderator',
     'dozvoli': 'moderator',
+    'addcom': 'moderator',
+    'dodajkomandu': 'moderator',
+    'delcom': 'moderator',
+    'obrisikomandu': 'moderator',
     'osvezi': 'broadcaster',
     'pin': 'moderator',
     'unpin': 'broadcaster',
@@ -167,7 +177,9 @@ const defaultBuiltinRanks = {
     'kupi': 'everyone',
     
     // Muzika
-    'pesma': 'everyone'
+    'pesma': 'everyone',
+    'sr': 'everyone',
+    'song': 'everyone'
 };
 
 function getUserRankLevel(username, senderObj, channelUsername) {
@@ -622,14 +634,6 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!duel ')) {
-                if (channelState.feature_games === false) return;
-                const meta = porukaSredjena.slice(6).trim();
-                if (utils.proveraKulauna(chatroomId, '!duel', username)) return;
-                commands.handleDuel(chatroomId, username, meta);
-                return;
-            }
-
             if (porukaNormalized.startsWith('!roll')) {
                 if (channelState.feature_games === false) return;
                 const target = porukaSredjena.slice(5).trim();
@@ -654,10 +658,18 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!rulet')) {
+            if (porukaNormalized.startsWith('!ruskirulet') || porukaNormalized === '!rulet') {
                 if (channelState.feature_games === false) return;
-                if (utils.proveraKulauna(chatroomId, '!rulet', username)) return;
+                if (utils.proveraKulauna(chatroomId, '!ruskirulet', username)) return;
                 commands.handleRulet(chatroomId, username);
+                return;
+            }
+
+            if (porukaNormalized.startsWith('!alkotest')) {
+                if (channelState.feature_games === false) return;
+                const target = porukaSredjena.slice(9).trim();
+                if (utils.proveraKulauna(chatroomId, '!alkotest', username)) return;
+                commands.handleAlkotest(chatroomId, username, target);
                 return;
             }
 
@@ -668,9 +680,18 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!pesma ')) {
+            if (porukaNormalized === '!komande' || porukaNormalized === '!help' || porukaNormalized === '!pomoc' || porukaNormalized === '!commands') {
+                if (utils.proveraKulauna(chatroomId, '!komande', username)) return;
+                commands.handleHelp(chatroomId, username);
+                return;
+            }
+
+            if (porukaNormalized.startsWith('!pesma ') || porukaNormalized.startsWith('!sr ') || porukaNormalized.startsWith('!song ')) {
                 if (channelState.feature_songrequest === false) return;
-                const songQuery = porukaSredjena.slice(7).trim();
+                let songQuery = '';
+                if (porukaNormalized.startsWith('!pesma ')) songQuery = porukaSredjena.slice(7).trim();
+                else if (porukaNormalized.startsWith('!sr ')) songQuery = porukaSredjena.slice(4).trim();
+                else songQuery = porukaSredjena.slice(6).trim();
                 if (utils.proveraKulauna(chatroomId, '!pesma', username)) return;
                 commands.handlePesma(chatroomId, username, songQuery, chatData.sender);
                 return;
@@ -917,10 +938,23 @@ function povezi() {
                 return;
             }
 
+            if (porukaNormalized.startsWith('!addcom ') || porukaNormalized.startsWith('!dodajkomandu ')) {
+                const textRaw = porukaNormalized.startsWith('!addcom ') ? porukaSredjena.slice(8).trim() : porukaSredjena.slice(14).trim();
+                await commands.handleAddCommand(chatroomId, username, textRaw, chatData.sender);
+                return;
+            }
+
+            if (porukaNormalized.startsWith('!delcom ') || porukaNormalized.startsWith('!obrisikomandu ')) {
+                const cmdRaw = porukaNormalized.startsWith('!delcom ') ? porukaSredjena.slice(8).trim() : porukaSredjena.slice(15).trim();
+                await commands.handleDelCommand(chatroomId, username, cmdRaw, chatData.sender);
+                return;
+            }
+
             // Custom komande iz baze podataka
             if (await obradiCustomKomandu(chatroomId, username, porukaNormalized, channelState, chatData.sender)) {
                 return;
             }
+
 
             // Pošto su statičke komande uklonjene, komande koje se ne prepoznaju biće potpuno ignorisane.
         }
@@ -956,7 +990,9 @@ function startHeartbeat() {
 }
 
 function scheduleReconnect() {
-    const cekanje = Math.min((config.RECONNECT_BASE_MS || 3000) * Math.pow(2, state.reconnectAttempt), config.RECONNECT_MAX_MS || 60000);
+    const baseCekanje = Math.min((config.RECONNECT_BASE_MS || 3000) * Math.pow(2, state.reconnectAttempt), config.RECONNECT_MAX_MS || 60000);
+    const jitter = Math.floor(Math.random() * 1000);
+    const cekanje = baseCekanje + jitter;
     state.reconnectAttempt++;
     utils.log('INFO', `Pokušavam ponovo za ${(cekanje / 1000).toFixed(1)}s...`);
     setTimeout(povezi, cekanje);
@@ -1081,8 +1117,8 @@ async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
     }
     channelState.realChatroomId = realChatroomId;
 
-    // Primenjujemo konfiguraciju iz baze
-    azurirajKonfiguracijuKanala(channelState, dbConfig);
+    // Primenjujemo konfiguraciju iz baze uz prolinkovani plan
+    await azurirajKonfiguracijuKanala(channelState, dbConfig);
 
     // Učitavamo in-memory podatke za ovaj kanal
     await database.ucitajLeaderboard(chatroomId);
@@ -1139,32 +1175,55 @@ async function zaustaviKanal(chatroomId) {
     delete state.channels[chatroomId];
 }
 
-function azurirajKonfiguracijuKanala(channelState, dbConfig) {
+async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
+    if (dbConfig.user_id) {
+        await database.ucitajUserPlan(dbConfig.user_id, dbConfig.channel_id);
+    }
+    const limits = channelState.planLimits || config.PLAN_LIMITS.free;
+
     channelState.PREFIX = dbConfig.prefix || '!';
-    channelState.COOLDOWN_MS = dbConfig.cooldown_ms ?? 3000;
+    channelState.COOLDOWN_MS = Math.max(dbConfig.cooldown_ms ?? 3000, limits.minCooldownMs || 3000);
     channelState.SPAM_THRESHOLD = dbConfig.spam_threshold ?? 3;
     channelState.SPAM_WINDOW_MS = dbConfig.spam_window_ms ?? 15000;
 
     channelState.STREAM_START_PIN_MESSAGE = dbConfig.stream_pin_msg || '';
     channelState.welcome_message = dbConfig.welcome_message || '';
 
-    channelState.feature_leaderboard = dbConfig.feature_leaderboard ?? true;
-    channelState.feature_watchtime = dbConfig.feature_watchtime ?? true;
-    channelState.feature_games = dbConfig.feature_games ?? true;
-    channelState.feature_love = dbConfig.feature_love ?? true;
-    channelState.feature_moderation = dbConfig.feature_moderation ?? false;
+    channelState.feature_leaderboard = limits.allowLeaderboard && (dbConfig.feature_leaderboard ?? true);
+    channelState.feature_watchtime = limits.allowWatchtime && (dbConfig.feature_watchtime ?? true);
+    channelState.feature_games = limits.allowGambling && (dbConfig.feature_games ?? true);
+    channelState.feature_love = limits.allowLove && (dbConfig.feature_love ?? true);
+    channelState.feature_moderation = limits.allowAdvancedModeration && (dbConfig.feature_moderation ?? false);
     channelState.feature_autoresponse = dbConfig.feature_autoresponse ?? true;
-    channelState.feature_songrequest = dbConfig.feature_songrequest ?? false;
+    channelState.feature_songrequest = limits.allowSongRequest && (dbConfig.feature_songrequest ?? false);
     channelState.songrequest_settings = dbConfig.songrequest_settings || {};
     channelState.botActive = dbConfig.bot_active || false;
-    channelState.autoAnnounces = Array.isArray(dbConfig.auto_announces) ? dbConfig.auto_announces : [];
+
+    const rawAnnounces = Array.isArray(dbConfig.auto_announces) ? dbConfig.auto_announces : [];
+    channelState.autoAnnounces = rawAnnounces.slice(0, limits.maxAutoAnnounces || 2);
 
     channelState.announce_interval_mins = dbConfig.announce_interval_mins ?? 15;
     channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 30;
     channelState.announce_time_enabled = dbConfig.announce_time_enabled ?? true;
     channelState.announce_msg_enabled = dbConfig.announce_msg_enabled ?? true;
     channelState.moderationSettings = dbConfig.moderation_settings || {};
+    channelState.currency_name = dbConfig.currency_name || 'Koins';
+    channelState.max_gamble_amount = dbConfig.max_gamble_amount || 5000;
+    channelState.gamble_enabled = dbConfig.gamble_enabled ?? true;
+    channelState.first_interaction_bonus = dbConfig.first_interaction_bonus ?? 100;
+    channelState.sub_multiplier = dbConfig.sub_multiplier ?? 2.0;
+    channelState.sub_bonus_per_msg = dbConfig.sub_bonus_per_msg ?? 10;
+    channelState.points_per_sub = dbConfig.points_per_sub ?? 1000;
+    channelState.points_per_gift_sub = dbConfig.points_per_gift_sub ?? 2000;
+    channelState.points_per_100_kicks = dbConfig.points_per_100_kicks ?? 500;
+    channelState.daily_streak_bonus = dbConfig.daily_streak_bonus ?? 150;
+    channelState.host_raid_bonus = dbConfig.host_raid_bonus ?? 300;
+
+    const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
+    const rawStore = Array.isArray(dbConfig.store_items) ? dbConfig.store_items : [];
+    channelState.store_items = rawStore.slice(0, maxStoreItems);
 }
+
 
 // ─── SHUTDOWN HANDLER ─────────────────────────────────────────────────────────
 let isShuttingDown = false;
@@ -1654,6 +1713,37 @@ http.createServer(async (req, res) => {
             }
             return;
         }
+
+        if (parsedUrl.pathname === '/api/channels' && req.method === 'GET') {
+            try {
+                const channelsSummary = Object.keys(state.channels).map(id => {
+                    const c = state.channels[id];
+                    return {
+                        id: id,
+                        username: c.channelUsername,
+                        realChatroomId: c.realChatroomId || id,
+                        botActive: c.botActive,
+                        isStreamLive: c.isStreamLive,
+                        userPlan: c.userPlan || 'free',
+                        subscriptionStatus: c.subscriptionStatus || 'active',
+                        customCommandsCount: Object.keys(c.customCommands || {}).length,
+                        autoAnnouncesCount: (c.autoAnnounces || []).length,
+                        prefix: c.PREFIX
+                    };
+                });
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    success: true,
+                    totalActiveChannels: channelsSummary.length,
+                    isConnectedToKick: state.isConnected,
+                    channels: channelsSummary
+                }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to fetch channels summary', detail: err.message }));
+            }
+            return;
+        }
     } catch (err) {
         console.error('Error handling HTTP request in bot.js:', err);
     }
@@ -1715,6 +1805,16 @@ async function start() {
         setInterval(proveriDaLiSuLiveSvi, 2 * 60 * 1000);
 
         // 6. Osluškuj izmene konfiguracije u realnom vremenu
+        const lastUpdateLogs = new Map();
+        function logDebouncedUpdate(key, msg) {
+            const now = Date.now();
+            const last = lastUpdateLogs.get(key) || 0;
+            if (now - last > 2000) {
+                lastUpdateLogs.set(key, now);
+                utils.log('INFO', msg);
+            }
+        }
+
         database.supabase.channel('public:bot_config')
             .on('postgres_changes', {
                 event: '*',
@@ -1726,7 +1826,7 @@ async function start() {
                 if (eventType === 'DELETE') {
                     const chatroomId = String(oldRow.channel_id);
                     if (state.channels[chatroomId]) {
-                        utils.log('INFO', `Kanal @${oldRow.channel_name} obrisan iz bot_config. Gasim bota za taj kanal...`);
+                        utils.log('INFO', `🔴 Kanal @${oldRow.channel_name} je uklonjen iz bot konfiguracije.`);
                         await zaustaviKanal(chatroomId);
                     }
                 } else {
@@ -1736,16 +1836,16 @@ async function start() {
 
                     if (botActive) {
                         if (!state.channels[chatroomId]) {
-                            utils.log('INFO', `Kanal @${channelUsername} je aktiviran na dashboard-u! Pokrećem...`);
+                            utils.log('INFO', `🟢 Bot je uspešno aktiviran za kanal @${channelUsername}!`);
                             await pokreniKanal(chatroomId, channelUsername, newRow);
                         } else {
-                            utils.log('INFO', `Ažuriram konfiguraciju za kanal @${channelUsername} (promena na dashboard-u)...`);
-                            azurirajKonfiguracijuKanala(state.getChannelState(chatroomId), newRow);
+                            logDebouncedUpdate(`config::${chatroomId}`, `✨ Podešavanja bota za kanal @${channelUsername} su ažurirana sa Dashboard-a.`);
+                            await azurirajKonfiguracijuKanala(state.getChannelState(chatroomId), newRow);
                             pokreniAutoAnnounceTajmer(chatroomId);
                         }
                     } else {
                         if (state.channels[chatroomId]) {
-                            utils.log('INFO', `Kanal @${channelUsername} je deaktiviran na dashboard-u. Gasim...`);
+                            utils.log('INFO', `⚪ Bot je zaustavljen za kanal @${channelUsername} sa Dashboard-a.`);
                             await zaustaviKanal(chatroomId);
                         }
                     }
@@ -1765,12 +1865,35 @@ async function start() {
                 if (row) {
                     const chatroomId = String(row.channel_id);
                     if (state.channels[chatroomId]) {
-                        utils.log('INFO', `Detektovana izmena u custom komandama za kanal ID: ${chatroomId}. Osvežavam...`);
                         await database.ucitajCustomKomande(chatroomId);
                     }
                 }
             })
             .subscribe();
+
+        // 8. Osluškuj izmene korisničkih profila (promene pretplate/plana)
+        database.supabase.channel('public:user_profiles')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'user_profiles'
+            }, async (payload) => {
+                const { new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (row && row.id) {
+                    const userId = row.id;
+                    for (const chatroomId of Object.keys(state.channels)) {
+                        const channelState = state.channels[chatroomId];
+                        if (channelState && channelState.userId === userId) {
+                            utils.log('INFO', `Detektovana promena paketa za korisnika ${userId} (@${channelState.channelUsername}). Osvežavam plan...`);
+                            await database.ucitajUserPlan(userId, chatroomId);
+                            await database.ucitajCustomKomande(chatroomId);
+                        }
+                    }
+                }
+            })
+            .subscribe();
+
 
     } else {
         utils.log('ERR', 'Kritična greška: Supabase nije konfigurisan! Multi-channel bot zahteva bazu podataka.');
