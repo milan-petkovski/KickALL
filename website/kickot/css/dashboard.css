@@ -4358,15 +4358,17 @@ input[type="number"]::-webkit-inner-spin-button {
 .upgrade-plan-card:hover {
   transform: translateY(-4px);
 }
-.upgrade-plan-card.popular {
-  border-color: var(--app-primary);
-  background: rgba(139, 92, 246, 0.06);
-  box-shadow: 0 0 25px rgba(139, 92, 246, 0.2);
+.upgrade-plan-card.popular:hover {
+  box-shadow: 0 0 35px rgba(139, 92, 246, 0.4);
 }
 .upgrade-plan-card.elite {
   border-color: #53fc18;
   background: rgba(83, 252, 24, 0.04);
-  box-shadow: 0 0 25px rgba(83, 252, 24, 0.15);
+  box-shadow: 0 0 25px rgba(83, 252, 24, 0.2);
+}
+.upgrade-plan-card.elite:hover {
+  box-shadow: 0 0 40px rgba(83, 252, 24, 0.5);
+  border-color: #53fc18;
 }
 
 /* ── Locked Feature Overlays ── */

@@ -572,8 +572,6 @@ async function ucitajUserPlan(userId, chatroomId) {
         channelState.userPlan = planKey;
         channelState.subscriptionStatus = subStatus;
         channelState.planLimits = limits;
-
-        log('INFO', `[${channelState.channelUsername || chatroomId}] Detektovan plan korisnika: ${limits.name} (Status: ${subStatus})`);
         return limits;
     } catch (err) {
         log('WARN', `Greška pri učitavanju plana za korisnika ${userId}: ${err.message}`);
@@ -589,7 +587,6 @@ async function ucitajCustomKomande(chatroomId) {
         if (!KORISTI_SUPABASE) return;
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
-        const channelUsername = channelState.channelUsername || chatroomId;
 
         const { data, error } = await supabase
             .from('custom_commands')
@@ -617,7 +614,6 @@ async function ucitajCustomKomande(chatroomId) {
                     }
                 });
             });
-            log('INFO', `⚡ Custom komande učitane za @${channelUsername} (${limitedData.length} komandi).`);
         }
     } catch (err) {
         log('ERR', `Greška pri učitavanju custom komandi za ${chatroomId}: ${err.message}`);

@@ -1199,17 +1199,102 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
         return;
     }
 
-    const duration = Math.floor(Math.random() * (300 - 120 + 1)) + 120; // 2 do 5 minuta
+    const query = songName.trim();
+
+    // Pametno pretraživanje YouTube-a za bot komandu !pesma
+    let ytId = null;
+    let title = query;
+    let artist = '';
+    let coverUrl = '';
+    let duration = 210;
+
+    // 1. Provera da li je unet direktan YouTube URL / ID
+    const ytMatch = query.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    if (ytMatch && ytMatch[1]) {
+        ytId = ytMatch[1];
+    } else {
+        // 2. Pretraga YouTube-a preko HTTPS hendlera
+        try {
+            const https = require('https');
+            const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+            const html = await new Promise((res, rej) => {
+                const req = https.get(searchUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                        'Accept-Language': 'en-US,en;q=0.9'
+                    }
+                }, (response) => {
+                    let data = '';
+                    response.on('data', chunk => data += chunk);
+                    response.on('end', () => res(data));
+                });
+                req.on('error', err => rej(err));
+                req.setTimeout(4000, () => { req.destroy(); rej(new Error('Timeout')); });
+            });
+
+            // Pronađi prvi videoId u renderovanim podacima YouTube-a
+            const matches = html.match(/"videoId":"([\w-]{11})"/g);
+            if (matches && matches.length > 0) {
+                for (const m of matches) {
+                    const idMatch = m.match(/"videoId":"([\w-]{11})"/);
+                    if (idMatch && idMatch[1] && idMatch[1] !== 'dQw4w9WgXcQ') {
+                        ytId = idMatch[1];
+                        break;
+                    }
+                }
+            }
+        } catch (_) {}
+    }
+
+    if (!ytId) {
+        posaljiPoruku(chatroomId, `❌ @${sender}, nije bilo moguće pronaći pesmu "${query}" na YouTube-u. Pokušaj sa tačnim nazivom ili YouTube linkom.`);
+        return;
+    }
+
+    coverUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+    try {
+        const https = require('https');
+        const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytId}&format=json`;
+        const oembedRaw = await new Promise((res) => {
+            const req = https.get(oembedUrl, (response) => {
+                let data = '';
+                response.on('data', chunk => data += chunk);
+                response.on('end', () => res(data));
+            });
+            req.on('error', () => res(''));
+            req.setTimeout(3000, () => { req.destroy(); res(''); });
+        });
+        if (oembedRaw) {
+            const oembed = JSON.parse(oembedRaw);
+            if (oembed.title) {
+                const rawTitle = oembed.title;
+                if (rawTitle.includes(' - ')) {
+                    const parts = rawTitle.split(' - ');
+                    artist = parts[0].trim();
+                    title = parts.slice(1).join(' - ').trim();
+                } else {
+                    title = rawTitle;
+                    artist = oembed.author_name || 'YouTube';
+                }
+            }
+        }
+    } catch (_) {}
+
     queue.push({
-        title: songName.trim(),
+        id: 'yt_' + ytId,
+        ytId: ytId,
+        title: title,
+        artist: artist || 'YouTube',
         requester: sender,
-        duration: duration
+        duration: duration,
+        source: 'youtube',
+        coverUrl: coverUrl
     });
 
     const database = require('./database');
     await database.sacuvajSongQueue(chatroomId, queue);
 
-    posaljiPoruku(chatroomId, `🎵 @${sender}, pesma "${songName.trim()}" je uspešno dodata u red za puštanje! (Pozicija: #${queue.length})`);
+    posaljiPoruku(chatroomId, `🎵 @${sender}, pesma "${artist ? artist + ' - ' : ''}${title}" je uspešno dodata u red za puštanje! (Pozicija: #${queue.length})`);
 }
 
 // ─── PRODAVNICA & NAGRADE ─────────────────────────────────────────────

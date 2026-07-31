@@ -24,14 +24,14 @@
     "systemOn": "SYSTEM ON",
     "processedMsgs": "Processed Messages",
     "websocket": "Kick WebSocket",
-    "latency": "&lt; 12ms Latency",
+    "latency": "<12ms Latency",
     "activeWidgets": "Active Widgets",
     "widgetsCount": "8,120 Widgets",
     "fastOAuthBtn": "Fast Kick OAuth Login",
     "guestTelemetry": "LIVE SYSTEM STATISTICS",
     "guestUptime": "99.98% UPTIME",
     "guestProcessedMsgs": "Processed Chat Messages",
-    "guestLatency": "&lt; 15ms Response",
+    "guestLatency": "<15ms Response",
     "guestStreams": "Active Kick Streams"
   },
   "statsBar": {
@@ -143,7 +143,7 @@
     "title": "World-Class Technology",
     "subtitle": "Built for maximum load and 100% compatibility with streaming software.",
     "card1": {
-      "title": "&lt; 15ms WebSockets Speed",
+      "title": "<15ms WebSockets Speed",
       "desc": "Direct WebSocket connection with Kick servers ensures instant chatbot response and on-screen notifications."
     },
     "card2": {
@@ -242,6 +242,8 @@
       "kickovOverlays": "Basic <strong>Kickov</strong> Overlays",
       "leaderboard": "Leaderboard (Top 20)",
       "customCommands": "50 custom commands",
+      "channelsLimit": "1 Kick channel",
+      "managersLimit": "Up to 5 managers",
       "builtInCommands": "All built-in commands",
       "autoMessages": "5 auto messages",
       "botInteraction": "Bot interaction (alerts)",
@@ -270,6 +272,8 @@
       "kickovOverlays": "<strong>Kickov</strong> Overlays",
       "leaderboard": "Leaderboard",
       "customCommands": "200 custom commands",
+      "channelsLimit": "Up to 5 Kick channels",
+      "managersLimit": "Up to 10 managers",
       "autoMessages": "50 auto messages",
       "loveMarriage": "Love and marriage",
       "miniGames": "Mini games",
@@ -293,6 +297,8 @@
       "btnWithPrice": "Choose Elite",
       "fullEcosystem": "Full <strong>KickALL</strong> ecosystem",
       "unlimitedCommands": "Unlimited commands",
+      "channelsLimit": "Unlimited Kick channels",
+      "managersLimit": "Unlimited managers",
       "unlimitedMessages": "Unlimited auto messages",
       "personalSetup": "<strong>I</strong> personally set up the bot for you",
       "customBotVip": "Custom bot (VIP + Personal setup)",

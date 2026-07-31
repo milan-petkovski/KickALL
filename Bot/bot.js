@@ -1023,7 +1023,7 @@ async function proveriDaLiJeLive(chatroomId) {
                             username: channelUsername,
                             is_active: liveState,
                             updated_at: new Date().toISOString()
-                        }, { onConflict: 'username' });
+                        }, { onConflict: 'id' });
                 } catch (dbErr) {
                     utils.log('ERR', `[${channelUsername}] Greška pri upisu statusa strima u bazu: ${dbErr.message}`);
                 }
@@ -1406,8 +1406,6 @@ http.createServer(async (req, res) => {
                         res.end(JSON.stringify({ error: 'redirect_uri is not allowed' }));
                         return;
                     }
-
-                    console.log('Token exchange debug:', { redirectUri, codeVerifier: codeVerifier.substring(0, 20) + '...', code: code.substring(0, 20) + '...' });
 
                     const tokenRes = await fetch('https://id.kick.com/oauth/token', {
                         method: 'POST',
@@ -1809,7 +1807,7 @@ async function start() {
         function logDebouncedUpdate(key, msg) {
             const now = Date.now();
             const last = lastUpdateLogs.get(key) || 0;
-            if (now - last > 2000) {
+            if (now - last > 15000) {
                 lastUpdateLogs.set(key, now);
                 utils.log('INFO', msg);
             }
@@ -1839,13 +1837,14 @@ async function start() {
                             utils.log('INFO', `🟢 Bot je uspešno aktiviran za kanal @${channelUsername}!`);
                             await pokreniKanal(chatroomId, channelUsername, newRow);
                         } else {
-                            logDebouncedUpdate(`config::${chatroomId}`, `✨ Podešavanja bota za kanal @${channelUsername} su ažurirana sa Dashboard-a.`);
-                            await azurirajKonfiguracijuKanala(state.getChannelState(chatroomId), newRow);
+                            const cs = state.getChannelState(chatroomId);
+                            logDebouncedUpdate(`config::${chatroomId}`, `⚙️ [PRO Plan] Podešavanja i komande sinhronizovane za @${channelUsername}.`);
+                            await azurirajKonfiguracijuKanala(cs, newRow);
                             pokreniAutoAnnounceTajmer(chatroomId);
                         }
                     } else {
                         if (state.channels[chatroomId]) {
-                            utils.log('INFO', `⚪ Bot je zaustavljen za kanal @${channelUsername} sa Dashboard-a.`);
+                            utils.log('INFO', `⚪ Bot je zaustavljen za kanal @${channelUsername}.`);
                             await zaustaviKanal(chatroomId);
                         }
                     }
@@ -1865,6 +1864,7 @@ async function start() {
                 if (row) {
                     const chatroomId = String(row.channel_id);
                     if (state.channels[chatroomId]) {
+                        logDebouncedUpdate(`custom_cmds::${chatroomId}`, `⚡ Custom komande osvežene za kanal.`);
                         await database.ucitajCustomKomande(chatroomId);
                     }
                 }

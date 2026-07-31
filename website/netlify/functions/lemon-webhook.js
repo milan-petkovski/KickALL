@@ -209,80 +209,136 @@ exports.handler = async (event) => {
 
   console.log('[LS Webhook] Uspešno ažuriran plan na "' + newPlan + '" za korisnika ' + userId + ' (događaj: ' + eventName + ')');
 
-  // 7. Obrada referral nagrade (ako je korisnik pozvan preko referral linka)
-  if (eventName === 'order_created' || eventName === 'subscription_created' || (eventName === 'subscription_updated' && (newPlan === 'pro' || newPlan === 'elite'))) {
+  // 7. Obrada referral nagrade (samo pri novoj porudžbini/pretplati da se izbegnu duplikati)
+  if (eventName === 'order_created' || eventName === 'subscription_created') {
     try {
+      let refRecord = null;
+      
+      // A) Proveri postojanje referral zapisa po kupcu (referred_id)
       const refRes = await fetch(`${supabaseUrl}/rest/v1/referrals?referred_id=eq.${encodeURIComponent(userId)}&select=id,referrer_id,status`, {
         headers: sbHeaders
       });
 
       if (refRes.ok) {
         const refRecords = await refRes.json();
-        const refRecord = refRecords && refRecords.length > 0 ? refRecords[0] : null;
+        if (refRecords && refRecords.length > 0) {
+          refRecord = refRecords[0];
+        }
+      }
 
-        if (refRecord && refRecord.referrer_id && refRecord.referrer_id !== userId) {
+      // B) Ako nema zapisa po referred_id, ali imamo uneti ref_code iz checkout-a
+      const passedRefCode = customData.ref_code || 
+                            customData['ref_code'] || 
+                            customData['custom[ref_code]'] || 
+                            (payload && payload.data && payload.data.attributes && payload.data.attributes.custom_data && payload.data.attributes.custom_data.ref_code);
 
-          // IDEMPOTENCIJA: Preskoči ako je nagrada već dodeljena
-          if (refRecord.status === 'purchased') {
-            console.log('[LS Webhook] Referral nagrada vec dodeljena za referred_id:', userId, '- preskacemo duplikat.');
-            // Nastavi bez dodele nagrade
-          } else {
-            const referrerId = refRecord.referrer_id;
-            const rewardVal = newPlan === 'elite' ? 3.00 : 2.00;
-
-            await fetch(`${supabaseUrl}/rest/v1/referrals?id=eq.${encodeURIComponent(refRecord.id)}`, {
-              method: 'PATCH',
-              headers: sbHeaders,
-              body: JSON.stringify({
-                status: 'purchased',
-                purchased_at: new Date().toISOString(),
-                reward_amount: rewardVal,
-                reward_currency: 'EUR',
-                reward_status: 'credited',
-                updated_at: new Date().toISOString()
-              })
-            });
-
-            await fetch(`${supabaseUrl}/rest/v1/referral_rewards`, {
+      if (!refRecord && passedRefCode) {
+        // Nađi vlasnika referral koda
+        const statRes = await fetch(`${supabaseUrl}/rest/v1/referral_stats?referral_code=eq.${encodeURIComponent(String(passedRefCode).trim().toUpperCase())}&select=user_id`, {
+          headers: sbHeaders
+        });
+        if (statRes.ok) {
+          const statData = await statRes.json();
+          if (statData && statData.length > 0 && statData[0].user_id !== userId) {
+            const referrerId = statData[0].user_id;
+            // Kreiraj novi referral zapis
+            const newRefRes = await fetch(`${supabaseUrl}/rest/v1/referrals`, {
               method: 'POST',
               headers: sbHeaders,
               body: JSON.stringify({
-                user_id: referrerId,
-                referral_id: refRecord.id,
-                reward_type: 'commission',
-                reward_value: rewardVal,
-                reward_description: 'Provizija za ' + newPlan.toUpperCase() + ' pretplatu',
-                status: 'Dostupno',
+                referrer_id: referrerId,
+                referred_id: userId,
+                referral_code: String(passedRefCode).trim().toUpperCase(),
+                status: 'pending',
                 created_at: new Date().toISOString()
               })
             });
-
-            const statsRes = await fetch(`${supabaseUrl}/rest/v1/referral_stats?user_id=eq.${encodeURIComponent(referrerId)}&select=*`, {
-              headers: sbHeaders
-            });
-            if (statsRes.ok) {
-              const statsData = await statsRes.json();
-              const refStats = statsData && statsData.length > 0 ? statsData[0] : null;
-              if (refStats) {
-                await fetch(`${supabaseUrl}/rest/v1/referral_stats?user_id=eq.${encodeURIComponent(referrerId)}`, {
-                  method: 'PATCH',
-                  headers: sbHeaders,
-                  body: JSON.stringify({
-                    total_earned: (Number(refStats.total_earned) || 0) + rewardVal,
-                    available_balance: (Number(refStats.available_balance) || 0) + rewardVal,
-                    successful_referrals: (Number(refStats.successful_referrals) || 0) + 1,
-                    updated_at: new Date().toISOString()
-                  })
-                });
+            if (newRefRes.ok) {
+              const createdRefs = await newRefRes.json();
+              if (createdRefs && createdRefs.length > 0) {
+                refRecord = createdRefs[0];
               }
             }
-
-            console.log('[LS Webhook] Dodeljena nagrada €' + rewardVal + ' korisniku ' + referrerId + ' za referral ' + userId);
           }
         }
       }
+
+      if (refRecord && refRecord.referrer_id && refRecord.referrer_id !== userId) {
+
+        // IDEMPOTENCIJA: Preskoči ako je nagrada već dodeljena za ovaj isti događaj
+        if (refRecord.status === 'purchased') {
+          console.log('[LS Webhook] Referral nagrada već dodeljena za referred_id:', userId, '- preskačemo duplikat.');
+        } else {
+          const referrerId = refRecord.referrer_id;
+
+          // Izračunaj tačnih 20% provizije od cene plana
+          // Cene: PRO Mesečni $4.99, PRO Godišnji $49.99, ELITE Mesečni $9.99, ELITE Godišnji $99.99
+          const totalPaid = Number(attr.total || attr.first_order_item?.price || 0) / 100;
+          let calculatedReward = 0;
+
+          if (totalPaid > 0) {
+            calculatedReward = Number((totalPaid * 0.20).toFixed(2));
+          } else {
+            // Fallback po planu i periodu ako total stigne kao 0
+            if (newPlan === 'elite') {
+              calculatedReward = isYearly ? 19.99 : 2.00;
+            } else {
+              calculatedReward = isYearly ? 9.99 : 1.00;
+            }
+          }
+
+          await fetch(`${supabaseUrl}/rest/v1/referrals?id=eq.${encodeURIComponent(refRecord.id)}`, {
+            method: 'PATCH',
+            headers: sbHeaders,
+            body: JSON.stringify({
+              status: 'purchased',
+              purchased_at: new Date().toISOString(),
+              reward_amount: calculatedReward,
+              reward_currency: 'EUR',
+              updated_at: new Date().toISOString()
+            })
+          });
+
+          const planNameLabel = `${newPlan.toUpperCase()} (${isYearly ? 'Godišnje' : 'Mesečno'})`;
+
+          await fetch(`${supabaseUrl}/rest/v1/referral_rewards`, {
+            method: 'POST',
+            headers: sbHeaders,
+            body: JSON.stringify({
+              user_id: referrerId,
+              referral_id: refRecord.id,
+              reward_value: calculatedReward,
+              reward_description: `20% provizije za kupovinu ${planNameLabel} plana`,
+              status: 'Dostupno',
+              created_at: new Date().toISOString()
+            })
+          });
+
+          const statsRes = await fetch(`${supabaseUrl}/rest/v1/referral_stats?user_id=eq.${encodeURIComponent(referrerId)}&select=*`, {
+            headers: sbHeaders
+          });
+          if (statsRes.ok) {
+            const statsData = await statsRes.json();
+            const refStats = statsData && statsData.length > 0 ? statsData[0] : null;
+            if (refStats) {
+              await fetch(`${supabaseUrl}/rest/v1/referral_stats?user_id=eq.${encodeURIComponent(referrerId)}`, {
+                method: 'PATCH',
+                headers: sbHeaders,
+                body: JSON.stringify({
+                  total_earned: (Number(refStats.total_earned) || 0) + calculatedReward,
+                  available_balance: (Number(refStats.available_balance) || 0) + calculatedReward,
+                  successful_referrals: (Number(refStats.successful_referrals) || 0) + 1,
+                  updated_at: new Date().toISOString()
+                })
+              });
+            }
+          }
+
+          console.log('[LS Webhook] Dodeljena nagrada €' + calculatedReward + ' korisniku ' + referrerId + ' za referral ' + userId);
+        }
+      }
     } catch (refErr) {
-      console.error('[LS Webhook] Greska pri obradi referral nagrade:', refErr);
+      console.error('[LS Webhook] Greška pri obradi referral nagrade:', refErr);
     }
   }
 

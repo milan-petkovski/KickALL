@@ -4141,24 +4141,36 @@
           <div class="pm-docs-step">
             <div class="pm-docs-step-num">15</div>
             <div class="pm-docs-step-content">
-              <div class="pm-docs-step-title">👥 Podešavanja Naloga</div>
-              <p class="pm-docs-text">Upravljanje nalogom:</p>
+              <div class="pm-docs-step-title">👥 Podešavanja Naloga & Custom Bot</div>
+              <p class="pm-docs-text">Upravljanje nalogom i brendiranjem:</p>
               <ul class="pm-docs-list">
-                <li><strong>Profil</strong> - Promeni display name</li>
-                <li><strong>Kick Kanali</strong> - Dodaj/ukloni kanale</li>
-                <li><strong>Menadžeri</strong> - Dodaj menadžere za pristup</li>
+                <li><strong>Profil & Kanali</strong> - Dodaj ili ukloni Kick kanale</li>
+                <li><strong>Menadžeri</strong> - Dodeljivanje prava pristupa menadžerima</li>
+                <li><strong>Custom Bot Account</strong> - Povežite sopstveni bot nalog (npr. @MojKanalBot) u PRO i ELITE paketu</li>
               </ul>
             </div>
           </div>
           <div class="pm-docs-step">
             <div class="pm-docs-step-num">16</div>
             <div class="pm-docs-step-content">
+              <div class="pm-docs-step-title">🎁 Referral Program & Zarada</div>
+              <p class="pm-docs-text">Zaradi proviziju preporučivanjem sistema:</p>
+              <ul class="pm-docs-list">
+                <li><strong>Moj Kod & Link</strong> - Generišite ili prilagodite sopstveni referral kod</li>
+                <li><strong>20% Provizije</strong> - Ostvarite 20% zarade od svih pretplata vaših preporučenih korisnika</li>
+                <li><strong>Isplata sredstava</strong> - Isplatite zaradu direktno kada pređete €5.00</li>
+              </ul>
+            </div>
+          </div>
+          <div class="pm-docs-step">
+            <div class="pm-docs-step-num">17</div>
+            <div class="pm-docs-step-content">
               <div class="pm-docs-step-title">💡 Korisni Saveti</div>
               <ul class="pm-docs-list">
                 <li>Koristi <strong>Tab</strong> i <strong>Shift+Tab</strong> za navigaciju tastaturom</li>
                 <li><strong>Escape</strong> zatvara sve modalne prozore</li>
-                <li>Sve promene se automatski čuvaju</li>
-                <li>Bot se automatski reload-uje nakon promena config-a</li>
+                <li>Sve promene se automatski čuvaju i primenjuju u realnom vremenu</li>
+                <li>Bot se automatski reload-uje nakon promena u konfiguraciji</li>
                 <li>Leaderboard se resetuje svakog 1. u mesecu</li>
               </ul>
             </div>
@@ -4838,7 +4850,7 @@
               </div>
             </div>
           </div>
-          <a id="monthlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite', 'monthly')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite →</a>
+          <a id="monthlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite', 'monthly')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: var(--app-primary); color: #ffffff; text-align: center; text-decoration: none; font-weight: 700; padding: 12px; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);">Izaberi Elite →</a>
         </div>
       </div>
 
@@ -4945,7 +4957,7 @@
               </div>
             </div>
           </div>
-          <a id="yearlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite', 'yearly')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; text-decoration: none; font-weight: 700; padding: 12px;">Izaberi Elite Godišnje →</a>
+          <a id="yearlyEliteCheckoutBtn" href="#" onclick="event.preventDefault(); openCheckout('elite', 'yearly')" class="btn btn-primary" style="width: 100%; margin-top: auto; background: var(--app-primary); color: #ffffff; text-align: center; text-decoration: none; font-weight: 700; padding: 12px; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);">Izaberi Elite Godišnje →</a>
         </div>
       </div>
 
@@ -4955,6 +4967,47 @@
           Pogledaj sve opcije
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
         </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pre-Checkout Referral Modal -->
+  <div class="modal-backdrop" id="preCheckoutReferralModal" onclick="handleModalBg(event, 'preCheckoutReferralModal')" role="dialog" aria-labelledby="preCheckoutReferralTitle" aria-modal="true">
+    <div class="modal-box" style="max-width: 480px; width: 92%; padding: 0;">
+      <div class="modal-head" style="padding: 20px 24px; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center;">
+        <h3 id="preCheckoutReferralTitle" style="display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.1rem; color: #fff;">
+          🎁 <span>Referral / Promo Kod (Opciono)</span>
+        </h3>
+        <button type="button" class="modal-close-btn" onclick="closeModal('preCheckoutReferralModal')" aria-label="Zatvori modal" style="background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0; line-height: 1.5;">
+          Ukoliko te je prijatelj ili strimer preporučio, unesi njegov <strong>Referral kod</strong> ispod. Tvoj prijatelj dobija <strong>20% provizije</strong> od tvoje pretplate!
+        </p>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" style="font-weight: 700;">Referral Kod Prijatelja</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="checkoutReferralCodeInput" class="form-input" placeholder="npr. STRIMER123" style="width: 100%; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
+          </div>
+          <div id="checkoutReferralMsg" style="font-size: 0.78rem; margin-top: 6px; color: var(--text-muted);">
+            Kod je opcionalan. Ukoliko ga nemate, možete nastaviti direktno na plaćanje.
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+          <button type="button" class="btn btn-outline" onclick="closeModal('preCheckoutReferralModal')">Otkaži</button>
+          <button type="button" class="btn btn-primary" onclick="proceedToLemonSqueezyCheckout()" style="font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+            <span>Nastavi na Plaćanje</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>

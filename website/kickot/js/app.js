@@ -198,6 +198,12 @@ async function setLang(lang) {
   
   // Dispatch language change event for consent banner
   document.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lang } }));
+
+  // Refresh active command preview with new language
+  const activeCmd = document.querySelector('.cmd-item.active');
+  if (activeCmd && typeof updateCommandPreview === 'function') {
+    updateCommandPreview(activeCmd);
+  }
 }
 
 // ── Navbar Scroll ──────────────────────────────────────────
@@ -899,7 +905,7 @@ function onUserChange(user) {
 
 // ── Toast Notifications ────────────────────────────────────
 let toastId = 0;
-function showToast(type, msg, iconEmoji = '💬', duration = 4000) {
+function showToast(type, msg, iconEmoji = '💬', duration = null) {
   let container = document.getElementById('toastContainer');
   // Ensure container is a direct child of body (fixes DOM nesting issues)
   if (!container || container.parentElement !== document.body) {
@@ -908,6 +914,12 @@ function showToast(type, msg, iconEmoji = '💬', duration = 4000) {
     container.className = 'toast-container';
     container.id = 'toastContainer';
     document.body.appendChild(container);
+  }
+
+  if (!duration) {
+    const textLength = (msg || '').length;
+    const baseDuration = Math.max(2500, Math.min(8000, 2200 + textLength * 55));
+    duration = (type === 'error' || type === 'warning') ? baseDuration + 1200 : baseDuration;
   }
 
   const id = ++toastId;

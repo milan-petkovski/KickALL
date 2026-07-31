@@ -928,10 +928,11 @@
                                                 d="M 0 150 L 100 120 L 200 140 L 300 80 L 400 90 L 500 40" fill="none"
                                                 stroke="url(#graphLineGrad)" stroke-width="4" stroke-linecap="round" />
 
-                                            <circle cx="100" cy="120" r="6" class="graph-dot dot-green-glow" />
-                                            <circle cx="300" cy="80" r="6" class="graph-dot dot-green-glow" />
-                                            <circle cx="500" cy="40" r="7" class="graph-dot dot-green-glow"
-                                                id="lastGraphDot" />
+                                            <g id="graphDotsGroup">
+                                                <circle cx="100" cy="120" r="6" class="graph-dot dot-green-glow" />
+                                                <circle cx="300" cy="80" r="6" class="graph-dot dot-green-glow" />
+                                                <circle cx="500" cy="40" r="7" class="graph-dot dot-green-glow" id="lastGraphDot" />
+                                            </g>
                                         </svg>
                                     </div>
                                     <div class="chart-footer-labels" id="chartLabels">
@@ -1310,13 +1311,13 @@
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span>1 Kick kanal</span>
+                                        <span data-i18n="pricing.free.channelsLimit">1 Kick kanal</span>
                                     </span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span>Do 5 menadžera</span>
+                                        <span data-i18n="pricing.free.managersLimit">Do 5 menadžera</span>
                                     </span>
                                 </li>
                                 <li>
@@ -1446,13 +1447,13 @@
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span>Do 5 Kick kanala</span>
+                                        <span data-i18n="pricing.pro.channelsLimit">Do 5 Kick kanala</span>
                                     </span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span>Do 10 menadžera</span>
+                                        <span data-i18n="pricing.pro.managersLimit">Do 10 menadžera</span>
                                     </span>
                                 </li>
                                 <li>
@@ -1548,13 +1549,13 @@
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span>Neograničeno Kick kanala</span>
+                                        <span data-i18n="pricing.elite.channelsLimit">Neograničeno Kick kanala</span>
                                     </span>
                                 </li>
                                 <li>
                                     <span>
                                         <span class="p-check">✓</span>
-                                        <span>Neograničeno menadžera</span>
+                                        <span data-i18n="pricing.elite.managersLimit">Neograničeno menadžera</span>
                                     </span>
                                 </li>
                                 <li>

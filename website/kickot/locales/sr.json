@@ -58,10 +58,10 @@
     },
     "eco": {
       "title": "Ranking Sistem i Koins",
-      "desc": "Prilagodi naziv valute, podesi nagrade za gledanje, subskripcije i KICKs donacije. Uključi prodavnicu nagrada i kazino igre."
+      "desc": "Prilagodi naziv valute, podesi nagrade za gledanje, sabove i KICKs donacije. Uključi prodavnicu nagrada i kazino igre."
     },
     "games": {
-      "title": "Mini-igre i Brakovi",
+      "title": "Mini igre i Brakovi",
       "desc": "Zabavi chat sa !duel, !roll, !iq, !rulet, ili pokreni ljubavni sistem sa sklapanjem brakova i praćenjem kompatibilnosti."
     },
     "song": {
@@ -80,6 +80,8 @@
     }
   },
   "cmd": {
+    "viewer": "Gledalac",
+    "preview": "// Live chat bot simulacija",
     "desc": {
       "topwt": "Top lista po satima gledanja strima",
       "topchat": "Top lista po porukama u četu",
@@ -93,6 +95,19 @@
       "uptime": "Proveri vreme strima",
       "followage": "Proveri broj pratilaca",
       "preview": "Testiraj odgovor komande"
+    },
+    "reply": {
+      "topwt": "📊 🏆 Top 3 po Watchtime-u: 1. @Kralj_Chata (142h) | 2. @Stefan_BG (98h) | 3. @Milica_01 (76h)",
+      "topchat": "💬 🏆 Top 3 po Porukama: 1. @Dusan_K (4.120) | 2. @Zverko (3.890) | 3. @Bata_Pera (2.750)",
+      "rank": "🏅 @Gledalac Tvoj Rang: #4 | Watchtime: 48h 12m | Nivo: 12 (Vatreni Fan) | Koini: 1,450 🪙",
+      "koins": "🪙 @Gledalac Trenutno imaš 1,450 Koina! Osvoji više gledanjem strima ili pobedama u duelima.",
+      "duel": "⚔️ @Gledalac je izazvao @Zverko na duel! @Gledalac je zadao kritičan udarac i pobedio! (+50 Koina)",
+      "roll": "🎲 @Gledalac je bacio kockicu i dobio [67]! BINGO! 🎯 Srećni pogodak! (+100 Koina)",
+      "iq": "🧠 @Gledalac tvoj izmereni IQ iznosi 138 (Genije u chatu)! 🚀",
+      "vencaj": "❤️ @Gledalac + @Milica_01 = 98% Ljubavne Kompatibilnosti! Savršen par! 💍",
+      "song": "🎵 Pesma 'GTA VI Main Theme' je uspešno dodana u red reprodukcije! (Pozicija #2)",
+      "uptime": "⏰ Strim je UŽIVO već 3 sata, 24 minuta i 12 sekundi!",
+      "followage": "📅 @Gledalac prati ovaj kanal već 8 meseci i 14 dana! Hvala na podršci! ❤️"
     }
   },
   "pricing": {
@@ -119,9 +134,11 @@
       "kickotChatbot": "Osnovni <strong>Kickot</strong> Chatbot",
       "kickajGiveaway": "Osnovni <strong>Kickaj</strong> Giveaway",
       "kickanAnalytics": "Osnovna <strong>Kickan</strong> Analitika",
-      "kickovOverlays": "Osnovni <strong>Kickov</strong> Overlayevi",
+      "kickovOverlays": "Osnovni <strong>Kickov</strong> overleji",
       "leaderboard": "Leaderboard (Top 20)",
       "customCommands": "50 custom komandi",
+      "channelsLimit": "1 Kick kanal",
+      "managersLimit": "Do 5 menadžera",
       "builtInCommands": "Sve ugrađene komande",
       "autoMessages": "5 automatskih poruka",
       "botInteraction": "Bot interakcija (alertovi)",
@@ -140,9 +157,11 @@
       "kickotChatbot": "Napredni <strong>Kickot</strong> Chatbot",
       "kickajGiveaway": "<strong>Kickaj</strong> Giveaway",
       "kickanAnalytics": "<strong>Kickan</strong> Analitika",
-      "kickovOverlays": "<strong>Kickov</strong> Overlayevi",
+      "kickovOverlays": "<strong>Kickov</strong> overleji",
       "leaderboard": "Leaderboard",
       "customCommands": "200 custom komandi",
+      "channelsLimit": "Do 5 Kick kanala",
+      "managersLimit": "Do 10 menadžera",
       "autoMessages": "50 automatskih poruka",
       "loveMarriage": "Ljubav i brakovi",
       "miniGames": "Mini igre",
@@ -150,7 +169,7 @@
       "rankingSystem": "Ranking sistem",
       "moderation": "Moderacija",
       "customBotName": "Custom bot ime",
-      "support": "Podrška - putem emaila i discord-a"
+      "support": "Podrška - putem emaila i discorda"
     },
     "elite": {
       "title": "ELITE",
@@ -158,7 +177,9 @@
       "btn": "Izaberi Elite",
       "btnWithPrice": "Izaberi Elite",
       "fullEcosystem": "Pun <strong>KickALL</strong> ekosistem",
-      "unlimitedCommands": "Neograničeno komanda",
+      "unlimitedCommands": "Neograničeno komandi",
+      "channelsLimit": "Neograničeno Kick kanala",
+      "managersLimit": "Neograničeno menadžera",
       "unlimitedMessages": "Neograničeno automatskih poruka",
       "personalSetup": "<strong>Ja</strong> lično nameštam bota umesto tebe",
       "customBotVip": "Custom bot (VIP + Lično podešavanje)",
@@ -167,7 +188,8 @@
   },
   "cta": {
     "title": "Spreman da povećaš nivo svog Kick strima?",
-    "desc": "Poveži svoj Kick nalog u samo tri klika i aktiviraj Kickot chatbot potpuno besplatno!"
+    "desc": "Poveži svoj Kick nalog u samo tri klika i aktiviraj Kickot chatbot potpuno besplatno!",
+    "login": "Prijavi se"
   },
   "footer": {
     "tagline": "Sve što tvoj Kick strim ikada treba na jednom mestu. Kompletan ekosistem alata i automatizacije.",
@@ -179,7 +201,7 @@
     "shortcutTry": "Isprobaj",
     "shortcutPricing": "Cene",
     "rights": "Sva prava zadržana.",
-    "createdBy": "Kreirao",
+    "createdBy": "Napravio",
     "privacy": "Privatnost",
     "terms": "Uslovi"
   },

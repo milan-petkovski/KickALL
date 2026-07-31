@@ -62,7 +62,7 @@
     },
     "games": {
       "title": "Mini-games & Marriages",
-      "desc": "Entertain chat with !duel, !roll, !iq, !rulet, or start love system with matchmaking and compatibility tracking."
+      "desc": "Entertain chat with !duel, !roll, !iq, !roulette, or start love system with matchmaking and compatibility tracking."
     },
     "song": {
       "title": "Song Request (YouTube Music)",
@@ -80,6 +80,8 @@
     }
   },
   "cmd": {
+    "viewer": "Viewer",
+    "preview": "// Live chat bot simulation",
     "desc": {
       "topwt": "Top list by stream watch time",
       "topchat": "Top list by chat messages",
@@ -93,6 +95,19 @@
       "uptime": "Check stream uptime",
       "followage": "Check follower count",
       "preview": "Test command response"
+    },
+    "reply": {
+      "topwt": "📊 🏆 Top 3 by Watchtime: 1. @Chat_King (142h) | 2. @Stefan_BG (98h) | 3. @Milica_01 (76h)",
+      "topchat": "💬 🏆 Top 3 by Messages: 1. @Dusan_K (4,120) | 2. @Zverko (3,890) | 3. @Bata_Pera (2,750)",
+      "rank": "🏅 @Viewer Your Rank: #4 | Watchtime: 48h 12m | Level: 12 (Fire Fan) | Coins: 1,450 🪙",
+      "koins": "🪙 @Viewer You currently have 1,450 Coins! Earn more by watching or winning duels.",
+      "duel": "⚔️ @Viewer challenged @Zverko to a duel! @Viewer landed a critical hit and won! (+50 Coins)",
+      "roll": "🎲 @Viewer rolled a dice and got [67]! BINGO! 🎯 Lucky hit! (+100 Coins)",
+      "iq": "🧠 @Viewer your tested IQ is 138 (Genius in chat)! 🚀",
+      "vencaj": "❤️ @Viewer + @Milica_01 = 98% Love Compatibility! Perfect match! 💍",
+      "song": "🎵 Song 'GTA VI Main Theme' added to queue! (Position #2)",
+      "uptime": "⏰ Stream has been LIVE for 3 hours, 24 minutes and 12 seconds!",
+      "followage": "📅 @Viewer has been following this channel for 8 months and 14 days! Thanks for the support! ❤️"
     }
   },
   "pricing": {
@@ -122,6 +137,8 @@
       "kickovOverlays": "Basic <strong>Kickov</strong> Overlays",
       "leaderboard": "Leaderboard (Top 20)",
       "customCommands": "50 custom commands",
+      "channelsLimit": "1 Kick channel",
+      "managersLimit": "Up to 5 managers",
       "builtInCommands": "All built-in commands",
       "autoMessages": "5 auto messages",
       "botInteraction": "Bot interaction (alerts)",
@@ -143,6 +160,8 @@
       "kickovOverlays": "<strong>Kickov</strong> Overlays",
       "leaderboard": "Leaderboard",
       "customCommands": "200 custom commands",
+      "channelsLimit": "Up to 5 Kick channels",
+      "managersLimit": "Up to 10 managers",
       "autoMessages": "50 auto messages",
       "loveMarriage": "Love and marriage",
       "miniGames": "Mini games",
@@ -159,6 +178,8 @@
       "btnWithPrice": "Choose Elite",
       "fullEcosystem": "Full <strong>KickALL</strong> ecosystem",
       "unlimitedCommands": "Unlimited commands",
+      "channelsLimit": "Unlimited Kick channels",
+      "managersLimit": "Unlimited managers",
       "unlimitedMessages": "Unlimited auto messages",
       "personalSetup": "<strong>I</strong> personally set up the bot for you",
       "customBotVip": "Custom bot (VIP + Personal setup)",
@@ -167,7 +188,8 @@
   },
   "cta": {
     "title": "Ready to level up your Kick stream?",
-    "desc": "Connect your Kick account in just three clicks and activate Kickot chatbot completely free!"
+    "desc": "Connect your Kick account in just three clicks and activate Kickot chatbot completely free!",
+    "login": "Log in"
   },
   "footer": {
     "tagline": "Everything your Kick stream will ever need in one place. Complete ecosystem of tools and automation.",

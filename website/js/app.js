@@ -747,6 +747,18 @@ async function setLanguage(lang) {
 
         const alertCard = document.createElement('div');
         alertCard.className = `live-alert-card ${type === 'sub' ? 'alert-sub' : ''}`;
+        
+        // Primeni izabranu temu vidžeta
+        const themeStyles = {
+            green: { border: '#53FC18', shadow: '0 0 25px rgba(83, 252, 24, 0.45)' },
+            violet: { border: '#8B5CF6', shadow: '0 0 25px rgba(139, 92, 246, 0.45)' },
+            dark: { border: '#475569', shadow: '0 0 20px rgba(255, 255, 255, 0.15)' },
+            gold: { border: '#F59E0B', shadow: '0 0 25px rgba(245, 158, 11, 0.45)' }
+        };
+        const activeTheme = themeStyles[currentOverlayTheme] || themeStyles.green;
+        alertCard.style.borderColor = activeTheme.border;
+        alertCard.style.boxShadow = activeTheme.shadow;
+
         const isEn = currentLang === 'en';
 
         let iconSvg = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
@@ -827,7 +839,7 @@ async function setLanguage(lang) {
     const periodButtons = document.querySelectorAll('.period-btn');
     const graphPathLine = document.getElementById('graphPathLine');
     const graphPathArea = document.getElementById('graphPathArea');
-    const lastGraphDot = document.getElementById('lastGraphDot');
+    const graphDotsGroup = document.getElementById('graphDotsGroup');
     const avgViewersVal = document.getElementById('avgViewersVal');
     const totalFollowersVal = document.getElementById('totalFollowersVal');
 
@@ -835,7 +847,13 @@ async function setLanguage(lang) {
         today: {
             linePath: "M 0 150 L 100 120 L 200 140 L 300 80 L 400 90 L 500 40",
             areaPath: "M 0 200 L 0 150 L 100 120 L 200 140 L 300 80 L 400 90 L 500 40 L 500 200 Z",
-            lastDot: { cx: 500, cy: 40 },
+            points: [
+                { cx: 100, cy: 120 },
+                { cx: 200, cy: 140 },
+                { cx: 300, cy: 80 },
+                { cx: 400, cy: 90 },
+                { cx: 500, cy: 40 }
+            ],
             avg: "724",
             followers: "+148",
             labels: ["18:00", "19:00", "20:00", "21:00", "22:00", "23:00"]
@@ -843,7 +861,13 @@ async function setLanguage(lang) {
         week: {
             linePath: "M 0 170 L 100 150 L 200 100 L 300 130 L 400 70 L 500 30",
             areaPath: "M 0 200 L 0 170 L 100 150 L 200 100 L 300 130 L 400 70 L 500 30 L 500 200 Z",
-            lastDot: { cx: 500, cy: 30 },
+            points: [
+                { cx: 100, cy: 150 },
+                { cx: 200, cy: 100 },
+                { cx: 300, cy: 130 },
+                { cx: 400, cy: 70 },
+                { cx: 500, cy: 30 }
+            ],
             avg: "890",
             followers: "+1,250",
             labels: ["Pon", "Uto", "Sre", "Čet", "Pet", "Vikend"]
@@ -851,7 +875,13 @@ async function setLanguage(lang) {
         month: {
             linePath: "M 0 190 L 100 160 L 200 130 L 300 90 L 400 50 L 500 15",
             areaPath: "M 0 200 L 0 190 L 100 160 L 200 130 L 300 90 L 400 50 L 500 15 L 500 200 Z",
-            lastDot: { cx: 500, cy: 15 },
+            points: [
+                { cx: 100, cy: 160 },
+                { cx: 200, cy: 130 },
+                { cx: 300, cy: 90 },
+                { cx: 400, cy: 50 },
+                { cx: 500, cy: 15 }
+            ],
             avg: "1,120",
             followers: "+4,820",
             labels: ["Nedelja 1", "Nedelja 2", "Nedelja 3", "Nedelja 4", "Danas", "Kraj"]
@@ -867,6 +897,15 @@ async function setLanguage(lang) {
         graphPathArea.style.animation = 'none';
         graphPathArea.offsetHeight;
         graphPathArea.style.animation = 'fadeArea 1s ease-out 0.8s forwards';
+
+        if (graphDotsGroup) {
+            const dots = graphDotsGroup.querySelectorAll('.graph-dot');
+            dots.forEach(d => {
+                d.style.animation = 'none';
+                d.offsetHeight;
+                d.style.animation = '';
+            });
+        }
     }
 
     periodButtons.forEach(btn => {
@@ -881,9 +920,13 @@ async function setLanguage(lang) {
             graphPathLine.setAttribute('d', data.linePath);
             graphPathArea.setAttribute('d', data.areaPath);
             
-            if (lastGraphDot) {
-                lastGraphDot.setAttribute('cx', data.lastDot.cx);
-                lastGraphDot.setAttribute('cy', data.lastDot.cy);
+            if (graphDotsGroup && data.points) {
+                graphDotsGroup.innerHTML = data.points.map((pt, idx) => {
+                    const isLast = idx === data.points.length - 1;
+                    const r = isLast ? 7 : 6;
+                    const idAttr = isLast ? ' id="lastGraphDot"' : '';
+                    return `<circle cx="${pt.cx}" cy="${pt.cy}" r="${r}" class="graph-dot dot-green-glow"${idAttr} />`;
+                }).join('');
             }
 
             const chartLabels = document.getElementById('chartLabels');
@@ -2006,23 +2049,39 @@ window.addEventListener('storage', (event) => {
     // ─────────────────────────────────────────────────────────────
     const themePills = document.querySelectorAll('.theme-pill');
     const streamScreenMockup = document.querySelector('.stream-screen-mockup');
+    const webcamBoxMock = document.querySelector('.webcam-box-mock');
+
+    let currentOverlayTheme = 'green';
 
     themePills.forEach(pill => {
         pill.addEventListener('click', () => {
             themePills.forEach(p => p.classList.remove('active'));
             pill.classList.add('active');
             const theme = pill.getAttribute('data-theme');
+            currentOverlayTheme = theme;
+
+            const themeColors = {
+                green: { border: '#53FC18', glow: 'rgba(83, 252, 24, 0.4)' },
+                violet: { border: '#8B5CF6', glow: 'rgba(139, 92, 246, 0.4)' },
+                dark: { border: 'rgba(255, 255, 255, 0.3)', glow: 'rgba(255, 255, 255, 0.1)' },
+                gold: { border: '#F59E0B', glow: 'rgba(245, 158, 11, 0.4)' }
+            };
+
+            const selected = themeColors[theme] || themeColors.green;
 
             if (streamScreenMockup) {
-                if (theme === 'green') {
-                    streamScreenMockup.style.borderColor = 'var(--color-green)';
-                } else if (theme === 'violet') {
-                    streamScreenMockup.style.borderColor = 'var(--color-violet)';
-                } else if (theme === 'dark') {
-                    streamScreenMockup.style.borderColor = 'rgba(255,255,255,0.2)';
-                } else if (theme === 'gold') {
-                    streamScreenMockup.style.borderColor = '#fbbf24';
-                }
+                streamScreenMockup.style.borderColor = selected.border;
+                streamScreenMockup.style.boxShadow = `0 0 20px ${selected.glow}`;
+            }
+
+            if (webcamBoxMock) {
+                webcamBoxMock.style.borderColor = selected.border;
+                webcamBoxMock.style.boxShadow = `0 0 12px ${selected.glow}`;
+            }
+
+            // Automatski prikaži alert u novoj temi radi vizuelnog odziva
+            if (typeof showLiveAlert === 'function') {
+                showLiveAlert('follow', { name: 'KickALL_Demonstracija' });
             }
         });
     });

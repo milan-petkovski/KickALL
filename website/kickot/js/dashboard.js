@@ -288,7 +288,7 @@ function togglePricing(type) {
 }
 window.openUpgradeModal = openUpgradeModal;
 
-// ── Lemon Squeezy Checkout ─────────────────────────────────
+// ── Lemon Squeezy Checkout & Referral Modal ────────────────
 const LS_CHECKOUT_URLS = {
   pro: {
     monthly: 'https://kickall.lemonsqueezy.com/checkout/buy/ef8c2e17-c6c6-4f01-97ab-7e0b70ac2374',
@@ -300,14 +300,12 @@ const LS_CHECKOUT_URLS = {
   }
 };
 
+let pendingCheckoutPlan = null;
+let pendingCheckoutPeriod = null;
+
 function openCheckout(plan, period) {
-  const p = period || currentPricingPeriod || 'monthly';
-  const planUrls = LS_CHECKOUT_URLS[plan];
-  const baseUrl = (planUrls && typeof planUrls === 'object') ? planUrls[p] || planUrls.monthly : planUrls;
-  if (!baseUrl) {
-    console.warn('[Checkout] Nepoznat plan ili link:', plan, p);
-    return;
-  }
+  pendingCheckoutPlan = plan;
+  pendingCheckoutPeriod = period || currentPricingPeriod || 'monthly';
 
   const userId = currentUser ? currentUser.id : null;
   if (!userId) {
@@ -315,9 +313,65 @@ function openCheckout(plan, period) {
     return;
   }
 
-  const url = `${baseUrl}?custom[user_id]=${encodeURIComponent(userId)}&checkout[custom][user_id]=${encodeURIComponent(userId)}`;
+  // Učitaj zapamćeni kod iz storage-a u modal polje ako postoji
+  const savedRef = localStorage.getItem('user_referral_code') || sessionStorage.getItem('user_referral_code') || '';
+  const refInput = document.getElementById('checkoutReferralCodeInput');
+  const refMsg = document.getElementById('checkoutReferralMsg');
+  if (refInput) refInput.value = savedRef;
+  if (refMsg) {
+    if (savedRef) {
+      refMsg.style.color = '#53FC18';
+      refMsg.textContent = `Pronađen primenjeni kod: ${savedRef} (20% provizije za tvog prijatelja)`;
+    } else {
+      refMsg.style.color = 'var(--text-muted)';
+      refMsg.textContent = 'Kod je opcion. Ukoliko ga nemate, možete nastaviti direktno na plaćanje.';
+    }
+  }
+
+  // Pre zatvaranja upgradeModala i odlaska na checkout, otvori modal za unos/potvrdu referral koda
+  closeModal('upgradeModal');
+  openModal('preCheckoutReferralModal');
+}
+
+async function proceedToLemonSqueezyCheckout() {
+  const plan = pendingCheckoutPlan;
+  const p = pendingCheckoutPeriod || 'monthly';
+  const planUrls = LS_CHECKOUT_URLS[plan];
+  const baseUrl = (planUrls && typeof planUrls === 'object') ? planUrls[p] || planUrls.monthly : planUrls;
+
+  if (!baseUrl) {
+    console.warn('[Checkout] Nepoznat plan ili link:', plan, p);
+    return;
+  }
+
+  const userId = currentUser ? currentUser.id : null;
+  if (!userId) return;
+
+  const refInput = document.getElementById('checkoutReferralCodeInput');
+  const refCode = refInput ? refInput.value.trim().toUpperCase() : '';
+
+  if (refCode) {
+    localStorage.setItem('user_referral_code', refCode);
+    sessionStorage.setItem('user_referral_code', refCode);
+    try {
+      await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: refCode });
+    } catch (_) {}
+  }
+
+  closeModal('preCheckoutReferralModal');
+
+  // Sastavi LemonSqueezy URL sa custom parametrima (dodaj ref_code samo ako nije prazan da sprečimo 422 grešku od LemonSqueezy-a)
+  const params = new URLSearchParams();
+  params.set('checkout[custom][user_id]', userId);
+  if (refCode) {
+    params.set('checkout[custom][ref_code]', refCode);
+  }
+
+  const url = `${baseUrl}?${params.toString()}`;
   window.open(url, '_blank', 'noopener,noreferrer');
 }
+
+window.proceedToLemonSqueezyCheckout = proceedToLemonSqueezyCheckout;
 window.openCheckout = openCheckout;
 
 function applyPenaltySettingsRestrictions() {
@@ -1565,6 +1619,45 @@ function setActiveChannel(ch) {
   if (mainContent && mainContent.style.gridColumn) {
     mainContent.style.gridColumn = '';
   }
+
+  // Pretplati se na Supabase Realtime izmene iz baze za ažuriranje Song Request reda i bot podešavanja u realnom vremenu
+  setupRealtimeSongQueueSubscription(ch.id);
+}
+
+let activeConfigSubscription = null;
+function setupRealtimeSongQueueSubscription(channelId) {
+  if (activeConfigSubscription) {
+    sb.removeChannel(activeConfigSubscription);
+    activeConfigSubscription = null;
+  }
+
+  if (!channelId) return;
+
+  // Učitaj odmah trenutno stanje iz bot_config tabele
+  sb.from('bot_config').select('songrequest_settings').eq('channel_id', channelId).single()
+    .then(({ data }) => {
+      if (data && data.songrequest_settings && Array.isArray(data.songrequest_settings.queue)) {
+        localSongQueue = data.songrequest_settings.queue;
+        if (typeof renderSongQueue === 'function') renderSongQueue();
+        if (typeof updatePlayerUI === 'function') updatePlayerUI();
+      }
+    }).catch(() => {});
+
+  // Pretplata na bazu u realnom vremenu (Realtime UPDATE na bot_config)
+  activeConfigSubscription = sb.channel(`bot_config_${channelId}`)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'bot_config',
+      filter: `channel_id=eq.${channelId}`
+    }, payload => {
+      if (payload.new && payload.new.songrequest_settings && Array.isArray(payload.new.songrequest_settings.queue)) {
+        localSongQueue = payload.new.songrequest_settings.queue;
+        if (typeof renderSongQueue === 'function') renderSongQueue();
+        if (typeof updatePlayerUI === 'function') updatePlayerUI();
+      }
+    })
+    .subscribe();
 }
 
 function renderChannelList() {
@@ -5223,7 +5316,7 @@ window.addEventListener('keydown', e => {
 // TOASTS (Old glassmorphism system)
 // ═══════════════════════════════════════════════════════════
 let toastId = 0;
-function showToast(type, msg, iconEmoji = '💬', duration = 4000) {
+function showToast(type, msg, iconEmoji = '💬', duration = null) {
   let container = document.getElementById('toastContainer');
   // Ensure container is a direct child of body (fixes DOM nesting issues)
   if (!container || container.parentElement !== document.body) {
@@ -5232,6 +5325,15 @@ function showToast(type, msg, iconEmoji = '💬', duration = 4000) {
     container.className = 'toast-container';
     container.id = 'toastContainer';
     document.body.appendChild(container);
+  }
+
+  // Dinamičko izračunavanje trajanja ako nije eksplicitno prosleđeno:
+  // Osnovno vreme čitanja: ~60ms po karakteru + baznih 2500ms
+  // Greške i upozorenja se zadržavaju duže (+1000ms) radi bolje uočljivosti
+  if (!duration) {
+    const textLength = (msg || '').length;
+    const baseDuration = Math.max(2500, Math.min(8000, 2200 + textLength * 55));
+    duration = (type === 'error' || type === 'warning') ? baseDuration + 1200 : baseDuration;
   }
 
   const id = ++toastId;
@@ -5767,8 +5869,8 @@ function renderSettingsManagersList() {
   const isAtLimit = max !== Infinity && used >= max;
   const barColor = isAtLimit ? '#EF4444' : (pct >= 80 ? '#EAB308' : '#53fc18');
 
-  // Limit banner
-  const limitBannerHtml = `
+  // Limit banner (prikazuj samo ako NIJE neograničeno/ELITE)
+  const limitBannerHtml = max === Infinity ? '' : `
     <div style="margin-bottom: 14px; background: rgba(13, 9, 26, 0.6); border: 1px solid rgba(139,92,246,0.25); border-radius: 10px; padding: 12px 14px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;">
         <span style="font-size:0.78rem; font-weight:700; color:#fff;">Menadžeri</span>
@@ -5788,8 +5890,10 @@ function renderSettingsManagersList() {
     // Remove old banner if present
     const existingBanner = managerListLabel.previousElementSibling;
     if (existingBanner && existingBanner.dataset.limitBanner === 'managers') existingBanner.remove();
-    managerListLabel.insertAdjacentHTML('beforebegin', limitBannerHtml);
-    managerListLabel.previousElementSibling.dataset.limitBanner = 'managers';
+    if (limitBannerHtml) {
+      managerListLabel.insertAdjacentHTML('beforebegin', limitBannerHtml);
+      managerListLabel.previousElementSibling.dataset.limitBanner = 'managers';
+    }
   }
 
   // Block add manager button if at limit
@@ -6070,8 +6174,8 @@ function renderSettingsChannelList() {
   const isAtLimit = max !== Infinity && used >= max;
   const barColor = isAtLimit ? '#EF4444' : (pct >= 80 ? '#EAB308' : '#53fc18');
 
-  // Limit banner
-  const limitBannerHtml = `
+  // Limit banner (prikazuj samo ako NIJE neograničeno/ELITE)
+  const limitBannerHtml = max === Infinity ? '' : `
     <div style="margin-bottom: 14px; background: rgba(13, 9, 26, 0.6); border: 1px solid rgba(139,92,246,0.25); border-radius: 10px; padding: 12px 14px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 8px;">
         <span style="font-size:0.78rem; font-weight:700; color:#fff;">Kick Kanali</span>
@@ -6086,12 +6190,15 @@ function renderSettingsChannelList() {
       </div>` : ''}
     </div>
   `;
-  listEl.insertAdjacentHTML('beforebegin', limitBannerHtml);
 
   // Remove previously injected banner if any (on re-render)
   const prevBanner = listEl.previousElementSibling?.previousElementSibling;
   if (prevBanner && prevBanner.dataset.limitBanner === 'channels') prevBanner.remove();
-  listEl.previousElementSibling.dataset.limitBanner = 'channels';
+
+  if (limitBannerHtml) {
+    listEl.insertAdjacentHTML('beforebegin', limitBannerHtml);
+    listEl.previousElementSibling.dataset.limitBanner = 'channels';
+  }
 
   if (currentChannels.length === 0) {
     listEl.innerHTML = '<div style="padding:10px;font-size:0.85rem;color:var(--text-muted);text-align:center;">Nema povezanih kanala.</div>';
@@ -7326,9 +7433,14 @@ async function addNewChannel() {
         let ytId = currentSong.ytId || extractYouTubeId(currentSong.id) || extractYouTubeId(currentSong.title);
 
         if (!ytId) {
-          const query = `${currentSong.artist ? currentSong.artist + ' ' : ''}${currentSong.title}`;
+          const query = `${currentSong.artist && currentSong.artist !== 'YouTube' ? currentSong.artist + ' ' : ''}${currentSong.title}`;
           ytId = await searchYouTubeVideoId(query);
-          if (ytId) currentSong.ytId = ytId;
+          if (ytId) {
+            currentSong.ytId = ytId;
+            currentSong.coverUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+          }
+        } else if (!currentSong.coverUrl) {
+          currentSong.coverUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
         }
 
         if (ytPlayer && ytId) {

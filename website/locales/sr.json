@@ -24,14 +24,14 @@
     "systemOn": "SISTEM UKLJUČEN",
     "processedMsgs": "Obrađenih Poruka",
     "websocket": "Kick WebSocket",
-    "latency": "&lt; 12ms Latencija",
+    "latency": "<12ms Latencija",
     "activeWidgets": "Aktivni Vidžeti",
     "widgetsCount": "8,120 Vidžeta",
     "fastOAuthBtn": "Brza Kick OAuth Prijava",
     "guestTelemetry": "LIVE STATISTIKA SISTEMA",
     "guestUptime": "99.98% UPTIME",
     "guestProcessedMsgs": "Obrađenih Poruka u Chatu",
-    "guestLatency": "&lt; 15ms Odziv",
+    "guestLatency": "<15ms Odziv",
     "guestStreams": "Aktivnih Kick Strimova"
   },
   "statsBar": {
@@ -60,7 +60,7 @@
     },
     "kickaj": {
       "f1": "Ulazak u giveaway preko čata",
-      "f2": "Filteri za pratioce i subere",
+      "f2": "Filteri za pratioce i sabove",
       "f3": "Prelepa animacija izvlačenja",
       "overlay": "Sistem nagradnih igara je u razvoju. Klikni ispod da pogledaš i testiraš simulaciju."
     },
@@ -74,7 +74,7 @@
       "f1": "Dinamični alerti sa zvukom",
       "f2": "Moderni čet boksovi i emotikoni",
       "f3": "Laka OBS podešavanja",
-      "overlay": "Integracija overlayeva je u razvoju. Klikni ispod da pogledaš i testiraš simulaciju."
+      "overlay": "Integracija overleja je u razvoju. Klikni ispod da pogledaš i testiraš simulaciju."
     }
   },
   "tabs": {
@@ -126,7 +126,7 @@
   "kickot": {
     "status": "AKTIVAN I DOSTUPAN",
     "heading": "Interaktivni chatbot",
-    "desc": "Simulirali smo tvoj strim čet. Pošalji neku od komandi ili unesi svoju poruku i vidi kako bot reaguje.",
+    "desc": "Simulirali smo tvoj strim chat. Pošalji neku od komandi ili unesi svoju poruku i vidi kako bot reaguje.",
     "quickCmds": "Brze komande:",
     "cmdWeather": "!vreme Beograd",
     "connectBtn": "Poveži kickot za svoj kanal"
@@ -143,7 +143,7 @@
     "title": "Tehnologija svetskog nivoa",
     "subtitle": "Stvoreno za najveće opterećenje i 100% kompatibilnost sa striming softverom.",
     "card1": {
-      "title": "&lt; 15ms WebSockets Brzina",
+      "title": "<15ms WebSockets Brzina",
       "desc": "Direktna WebSocket veza sa Kick serverima obezbeđuje trenutno reagovanje chatbota i obaveštenja na ekranu."
     },
     "card2": {
@@ -187,7 +187,7 @@
     },
     "q5": {
       "question": "Mogu li praviti sopstvene komande i alertove?",
-      "answer": "Da! Kroz Dashboard možete kreirati do 50 komandi na besplatnom planu, dok na ostalima možete neograničeno. Samo posetite komandePanel u okviru Dashboard-a!"
+      "answer": "Da! Kroz Dashboard možete kreirati do 50 komandi na besplatnom planu, 200 na pro planu i neograničeno na elite planu. Samo posetite komande panel u okviru Dashboard-a!"
     }
   },
   "support": {
@@ -242,6 +242,8 @@
       "kickovOverlays": "Osnovni <strong>Kickov</strong> Overlayevi",
       "leaderboard": "Leaderboard (Top 20)",
       "customCommands": "50 custom komandi",
+      "channelsLimit": "1 Kick kanal",
+      "managersLimit": "Do 5 menadžera",
       "builtInCommands": "Sve ugrađene komande",
       "autoMessages": "5 automatskih poruka",
       "botInteraction": "Bot interakcija (alertovi)",
@@ -256,7 +258,7 @@
       "title": "PRO",
       "desc": "Sve što je potrebno ozbiljnom strimeru za brzi rast kanala i punu interakciju.",
       "f1": "Napredni <strong>kickot</strong> bot",
-      "f2": "Sve čet mini igre i komande",
+      "f2": "Sve chat mini igre i komande",
       "f3": "<strong>kickaj</strong> giveaway sistem",
       "f4": "<strong>kickov</strong> overleji",
       "f5": "Osnovna mesečna analitika",
@@ -270,6 +272,8 @@
       "kickovOverlays": "<strong>Kickov</strong> Overlayevi",
       "leaderboard": "Leaderboard",
       "customCommands": "200 custom komandi",
+      "channelsLimit": "Do 5 Kick kanala",
+      "managersLimit": "Do 10 menadžera",
       "autoMessages": "50 automatskih poruka",
       "loveMarriage": "Ljubav i brakovi",
       "miniGames": "Mini igre",
@@ -277,7 +281,7 @@
       "rankingSystem": "Ranking sistem",
       "moderation": "Moderacija",
       "customBotName": "Custom bot ime",
-      "support": "Podrška - putem emaila i discord-a"
+      "support": "Podrška - putem emaila i discorda"
     },
     "elite": {
       "title": "ELITE",
@@ -292,7 +296,9 @@
       "btn": "Izaberi Elite",
       "btnWithPrice": "Izaberi Elite",
       "fullEcosystem": "Pun <strong>KickALL</strong> ekosistem",
-      "unlimitedCommands": "Neograničeno komanda",
+      "unlimitedCommands": "Neograničeno komandi",
+      "channelsLimit": "Neograničeno Kick kanala",
+      "managersLimit": "Neograničeno menadžera",
       "unlimitedMessages": "Neograničeno automatskih poruka",
       "personalSetup": "<strong>Ja</strong> lično nameštam bota umesto tebe",
       "customBotVip": "Custom bot (VIP + Lično podešavanje)",
