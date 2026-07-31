@@ -132,9 +132,9 @@ html {
 /* Zasebne klase za širinu i kontejnere */
 .container {
     width: 100%;
-    max-width: 1200px;
+    max-width: 1420px;
     margin: 0 auto;
-    padding: 0 24px;
+    padding: 0 28px;
     box-sizing: border-box;
 }
 

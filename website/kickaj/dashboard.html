@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>KICKAJ - Giveaway Tool</title>
+  <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon">
+  <meta name="description" content="Izvlači pobednike nagradnih igara uživo iz chat poruka gledalaca uz prelepi Točak Sreće i uslove za pretplatnike." />
+  <meta name="theme-color" content="#0B0816" />
+
+  <!-- Fonts & Core Styles -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="../css/base.css" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/dashboard.css" />
+  <link rel="stylesheet" href="css/kickaj.css" />
+
+  <!-- Supabase JS CDN & Global System Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/toast.js" defer></script>
+  <script src="../js/mobile-optimization.js" defer></script>
+</head>
+<body class="kickaj-page auth-loading">
+
+  <!-- Ambient Glow Blobs -->
+  <div class="glow-bg" aria-hidden="true">
+    <div class="blob blob-violet"></div>
+    <div class="blob blob-green"></div>
+  </div>
+
+  <!-- Fullscreen Auth Loading Gate -->
+  <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
+    <div class="auth-gate-card">
+      <div class="auth-gate-logo">
+        <img src="../assets/kickaj.webp" alt="Kickaj Logo" class="logo-img" width="173" height="52" fetchpriority="high">
+      </div>
+      <div class="auth-gate-spinner"></div>
+      <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju...</p>
+    </div>
+  </div>
+
+  <!-- Header / Navigation -->
+  <header class="header" role="banner">
+    <div class="container nav-container">
+      <a href="#" class="logo" id="navLogo">
+        <img src="../assets/kickaj.webp" alt="Kickaj Logo" class="logo-img" width="160" height="48" fetchpriority="high">
+      </a>
+
+      <nav class="nav-menu" id="navMenu">
+        <a href="../dashboard.html" class="nav-link nav-logo-link" title="Ekosistem">
+          <img src="../assets/kickall.webp" alt="KickALL" class="nav-module-img" height="26">
+        </a>
+        <a href="../kickot/dashboard.html" class="nav-link nav-logo-link" title="Kickot">
+          <img src="../assets/kickot.webp" alt="Kickot" class="nav-module-img" height="26">
+        </a>
+        <a href="../kickan/dashboard.html" class="nav-link nav-logo-link" title="Kickan">
+          <img src="../assets/kickan.webp" alt="Kickan" class="nav-module-img" height="26">
+        </a>
+        <a href="../kickov/dashboard.html" class="nav-link nav-logo-link" title="Kickov">
+          <img src="../assets/kickov.webp" alt="Kickov" class="nav-module-img" height="26">
+        </a>
+      </nav>
+
+      <div class="nav-actions">
+        <!-- Language Switcher -->
+        <div class="lang-switcher">
+          <button class="lang-btn active" id="btn-sr">SR</button>
+          <button class="lang-btn" id="btn-en">EN</button>
+        </div>
+
+        <!-- User Dropdown Menu -->
+        <div class="user-menu visible" id="userMenu">
+          <button class="user-menu-trigger" id="userMenuTrigger">
+            <div class="user-avatar" id="userAvatarDisplay" style="background:var(--kickaj-accent-green); color:#000; font-weight:700;">K</div>
+            <span class="user-name" id="userNameDisplay">Streamer</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="chevron-icon">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          <div class="user-dropdown" id="userDropdown">
+            <a href="../dashboard.html" class="dropdown-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+              <span>Centralni Dashboard</span>
+            </a>
+            <button class="dropdown-item danger" id="btnLogout">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>Odjavi se</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="kickaj-container">
+
+    <!-- Hero Card Banner Section -->
+    <section class="kickaj-hero-card">
+      <div class="kickaj-hero-top">
+        <div>
+          <div class="hero-tag-pill">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+            Kickaj Giveaway Studio
+          </div>
+          <h1 class="kickaj-hero-title">
+            <span class="gradient-text-glow">Kickaj </span>Giveaway Studio <span style="display:inline-block; font-size:0.8rem; padding:4px 10px; border-radius:9999px; background:rgba(6,182,212,0.15); border:1px solid rgba(6,182,212,0.4); color:#06b6d4; vertical-align:middle; margin-left:8px; font-weight:800;">BETA</span>
+          </h1>
+          <p class="kickaj-hero-subtitle">Izvlači pobednike nagradnih igara uživo na ekranu direktno iz chat poruka gledalaca uz animirani Točak Sreće i prilagođene uslove.</p>
+        </div>
+
+        <div class="kickaj-channel-pill" id="channelStatusPill">
+          <span class="channel-dot"></span>
+          <span>Connected to: <strong id="connectedChannelName" style="color:#fff;">Učitavanje...</strong></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Stats Grid -->
+    <section class="kickaj-stats-grid">
+      <div class="kickaj-stat-card">
+        <div class="kickaj-stat-icon" style="color:var(--kickaj-accent-green);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div>
+          <div class="kickaj-stat-val" id="statParticipantsCount">0</div>
+          <div class="kickaj-stat-lbl">Učesnici (Participants)</div>
+        </div>
+      </div>
+
+      <div class="kickaj-stat-card">
+        <div class="kickaj-stat-icon" style="color:var(--kickaj-accent-amber);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+        </div>
+        <div>
+          <div class="kickaj-stat-val" id="statWinnersCount">0</div>
+          <div class="kickaj-stat-lbl">Izvučeni Pobednici (Winners)</div>
+        </div>
+      </div>
+
+      <div class="kickaj-stat-card">
+        <div class="kickaj-stat-icon" style="color:var(--kickaj-accent-violet);">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </div>
+        <div>
+          <div class="kickaj-stat-val" id="statSubMultiplierDisplay">1x</div>
+          <div class="kickaj-stat-lbl">Sub Množilac Šanse</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Studio Main Core Layout -->
+    <section class="kickaj-studio-layout">
+
+      <!-- Left Column: Giveaway Settings & Controls -->
+      <aside class="kickaj-config-panel">
+        <div class="panel-header">
+          <h2 class="panel-title">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickaj-accent-green)" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            Podešavanja Nagradne Igre
+          </h2>
+        </div>
+
+        <!-- Keyword (optional) -->
+        <div class="form-group">
+          <label class="form-label">
+            <span>Keyword (optional):</span>
+            <span class="form-label-hint">Ključna reč u chatu</span>
+          </label>
+          <input type="text" id="inputKeyword" class="form-control" placeholder="npr. !giveaway ili ostavi prazno za sve poruke">
+        </div>
+
+        <!-- Number of Winners & Sub Duration -->
+        <div class="form-grid-2">
+          <div class="form-group">
+            <label class="form-label">Number of Winners:</label>
+            <input type="number" id="inputNumWinners" class="form-control" min="1" max="20" value="1">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Subscription Duration:</label>
+            <input type="number" id="inputSubDuration" class="form-control" min="0" max="60" value="0" placeholder="0 Months">
+          </div>
+        </div>
+
+        <!-- Subscriber Multiplier -->
+        <div class="form-group">
+          <label class="form-label">Subscriber Multiplier:</label>
+          <div class="multiplier-grid" id="multiplierChipsContainer">
+            <div class="multiplier-chip active" data-mult="1">1x</div>
+            <div class="multiplier-chip" data-mult="2">2x</div>
+            <div class="multiplier-chip" data-mult="3">3x</div>
+            <div class="multiplier-chip" data-mult="5">5x</div>
+          </div>
+        </div>
+
+        <!-- Follow Duration -->
+        <div class="form-group">
+          <label class="form-label">Follow Duration (Days):</label>
+          <input type="number" id="inputFollowDuration" class="form-control" min="0" max="365" value="0" placeholder="0 Days !">
+        </div>
+
+        <!-- Subscribers only toggle -->
+        <div class="toggle-switch-row">
+          <div>
+            <h4 style="margin:0 0 2px 0; font-size:0.95rem;">Subscribers only</h4>
+            <p style="margin:0; font-size:0.8rem; color:var(--kickaj-text-muted);">Samo pretplatnici mogu učestvovati</p>
+          </div>
+          <label class="custom-toggle">
+            <input type="checkbox" id="toggleSubscribersOnly">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Winner confirmation (for single winner) -->
+        <div class="form-group" style="background:rgba(255,255,255,0.02); border:1px solid var(--kickaj-card-border); padding:16px; border-radius:var(--kickaj-radius-md);">
+          <label class="form-label" style="margin-bottom:8px;">Winner confirmation (for single winner)</label>
+          <div class="form-group" style="margin:0;">
+            <label class="form-label-hint" style="margin-bottom:6px;">Confirm Time (s):</label>
+            <input type="number" id="inputConfirmTime" class="form-control" min="5" max="300" value="30">
+          </div>
+        </div>
+
+        <!-- Animation Choice -->
+        <div class="form-group">
+          <label class="form-label">Animation:</label>
+          <select id="selectAnimation" class="form-control">
+            <option value="wheel" selected>Wheel of Fortune (Točak Sreće)</option>
+            <option value="slot">Slot Machine (Brzo Okretanje)</option>
+            <option value="roulette">Neon Roulette (Traka Pobednika)</option>
+          </select>
+        </div>
+
+        <!-- Action Control Buttons -->
+        <div class="action-buttons-group">
+          <button class="btn-icon-text btn-start-giveaway" id="btnStartGiveaway">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Start Giveaway
+          </button>
+          
+          <button class="btn-icon-text btn-draw-winner" id="btnDrawWinner">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+            Draw Winner
+          </button>
+
+          <button class="btn-icon-text btn-reset-giveaway" id="btnResetGiveaway">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            Reset Učesnike & Pobednike
+          </button>
+        </div>
+
+        <p style="font-size:0.8rem; color:var(--kickaj-text-muted); text-align:center; margin:0;">Press "Start" to connect to the chat and start accepting entries.</p>
+      </aside>
+
+      <!-- Right Column: Interactive Wheel Stage & Participants / Winners Lists -->
+      <div class="kickaj-stage-workspace">
+
+        <!-- Giveaway Wheel Stage Viewport -->
+        <div class="giveaway-visualizer-card" id="giveawayStageViewport">
+          <!-- Pointer Needle -->
+          <svg class="wheel-pointer" viewBox="0 0 24 24" fill="#53fc18" stroke="#07050f" stroke-width="2">
+            <polygon points="12 24 4 0 20 0 12 24"/>
+          </svg>
+
+          <!-- Wheel Canvas -->
+          <div class="wheel-canvas-container">
+            <canvas id="wheelCanvas" width="500" height="500"></canvas>
+          </div>
+        </div>
+
+        <!-- Participants (X) & Winners (X) Grid -->
+        <div class="lists-grid-2">
+
+          <!-- Participants Card -->
+          <div class="list-card">
+            <div class="list-header">
+              <div class="list-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kickaj-accent-green)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                <span>Participants</span>
+              </div>
+              <span class="list-count-badge" id="badgeParticipantsCount">0</span>
+            </div>
+
+            <div class="participants-items-container" id="participantsListContainer">
+              <div style="text-align:center; padding:30px 10px; color:var(--kickaj-text-muted); font-size:0.9rem;">
+                Nema prijavljenih učesnika.<br>Klikni <strong>"Start Giveaway"</strong> da započneš skupljanje prijava iz chata.
+              </div>
+            </div>
+          </div>
+
+          <!-- Winners Card -->
+          <div class="list-card">
+            <div class="list-header">
+              <div class="list-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kickaj-accent-amber)" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+                <span>Winners</span>
+              </div>
+              <span class="list-count-badge" id="badgeWinnersCount" style="background:rgba(245,158,11,0.15); border-color:rgba(245,158,11,0.4); color:var(--kickaj-accent-amber);">0</span>
+            </div>
+
+            <div class="participants-items-container" id="winnersListContainer">
+              <div style="text-align:center; padding:30px 10px; color:var(--kickaj-text-muted); font-size:0.9rem;">
+                Pobednici će se pojaviti ovde nakon klikom na <strong>"Draw Winner"</strong>.
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Script -->
+  <script src="js/kickaj-dashboard.js" defer></script>
+</body>
+</html>

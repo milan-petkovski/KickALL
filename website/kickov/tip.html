@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KICKOV - Pošalji donaciju strimeru</title>
+  <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon">
+  <meta name="description" content="Podrži svog omiljenog Kick streamer-a direktnom donacijom preko PayPal-a uz 0% provizije i prikaz poruke uživo na streamu." />
+  <meta name="theme-color" content="#0B0816" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="../css/base.css" />
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="css/kickov.css" />
+
+  <!-- Supabase JS & PayPal JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=EUR&enable-funding=venmo,paylater" data-sdk-integration-source="button-factory"></script>
+  <script src="../js/config.js"></script>
+</head>
+<body class="tip-page-body">
+
+  <div class="tip-card" id="mainTipCard">
+    <div class="tip-streamer-header">
+      <div class="tip-avatar" id="tipStreamerAvatar">S</div>
+      <h1 style="font-size:1.6rem; font-weight:800; margin:0 0 4px 0;" id="tipStreamerName">Streamer</h1>
+      <p style="color:var(--kickov-text-muted); font-size:0.9rem; margin:0;">Podrži kanal i pošalji poruku koja će se prikazati uživo na streamu!</p>
+    </div>
+
+    <!-- PayPal Direct Notice Banner -->
+    <div class="paypal-notice-banner" style="padding:14px 16px; margin-bottom:20px;">
+      <div class="paypal-notice-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0070ba" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <div class="paypal-notice-content">
+        <h4 style="font-size:0.9rem; margin-bottom:2px; color:#ffffff;">100% Direktno na PayPal Streamera</h4>
+        <p style="font-size:0.8rem; margin:0;">Donacija ide u potpunosti na nalog streamer-a bez posrednika i bez provizije servisa.</p>
+      </div>
+    </div>
+
+    <!-- Step 1: Form Fill -->
+    <form id="tipSubmissionForm">
+      <div class="form-group">
+        <label class="form-label">Tvoje Ime ili Nadimak (Za Alert)</label>
+        <input type="text" id="donorNameInput" class="form-control" placeholder="Primer: Marko123" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Izaberi Iznos Donacije (€)</label>
+        <div class="amount-presets-grid">
+          <div class="amount-chip" data-amount="2">2 €</div>
+          <div class="amount-chip active" data-amount="5">5 €</div>
+          <div class="amount-chip" data-amount="10">10 €</div>
+          <div class="amount-chip" data-amount="20">20 €</div>
+          <div class="amount-chip" data-amount="50">50 €</div>
+        </div>
+        <input type="number" id="tipAmountInput" class="form-control" min="1" step="0.5" value="5" placeholder="Proizvoljan iznos (€)" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Poruka za Streamer-a (TTS čitanje na streamu)</label>
+        <textarea id="donorMessageInput" class="form-control" rows="3" placeholder="Napiši poruku koja će se pročitati uživo na streamu..."></textarea>
+      </div>
+
+      <!-- Submit Step 1 Button -->
+      <button type="submit" id="btnProceedToPaypal" class="btn-icon-text btn-primary-green" style="width:100%; justify-content:center; padding:16px; font-size:1.05rem; font-weight:700;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        Nastavi na PayPal Plaćanje
+      </button>
+    </form>
+
+    <!-- Step 2: PayPal Smart Buttons & Direct Checkout Stage (Hidden by default) -->
+    <div id="paypalCheckoutStage" style="display:none; margin-top:20px; flex-direction:column; gap:16px; border-top:1px solid rgba(255,255,255,0.1); padding-top:20px;">
+      <div style="background:rgba(0,112,186,0.12); border:1px solid rgba(0,112,186,0.35); border-radius:14px; padding:16px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <span style="font-size:0.8rem; color:var(--kickov-text-muted); display:block;">Pregled donacije za <strong id="summaryStreamer">Streamer</strong></span>
+          <span style="font-size:1.3rem; font-weight:800; color:#53fc18;" id="summaryAmount">5.00 €</span>
+        </div>
+        <span style="font-size:0.85rem; color:#60a5fa; font-weight:700;" id="summaryDonor">Od: Anoniman</span>
+      </div>
+
+      <!-- Real PayPal Buttons Container -->
+      <div id="paypal-button-container" style="width:100%; min-height:50px;"></div>
+
+      <!-- Direct PayPal.me Express Button -->
+      <a id="btnPaypalMeDirect" href="#" target="_blank" rel="noopener noreferrer" class="btn-icon-text" style="display:none; width:100%; justify-content:center; padding:14px; background:#0070ba; color:#ffffff; font-weight:700; text-decoration:none; border-radius:12px; font-size:0.95rem;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944 3.72a.77.77 0 0 1 .761-.643h7.245c2.4 0 4.19.577 5.176 1.666.924 1.02 1.258 2.455.992 4.267-.53 3.616-2.906 6.012-6.52 6.012H9.524a.77.77 0 0 0-.76.643l-.973 5.485a.641.641 0 0 1-.715.187z"/></svg>
+        Plati odmah preko PayPal.me
+      </a>
+
+      <!-- Hidden Standard PayPal Form for Direct Form Submit -->
+      <form id="paypalStandardForm" action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank" style="display:none;">
+        <input type="hidden" name="cmd" value="_donations">
+        <input type="hidden" name="business" id="paypalBusinessInput" value="">
+        <input type="hidden" name="item_name" id="paypalItemNameInput" value="Donacija na Streamer kanal">
+        <input type="hidden" name="amount" id="paypalAmountInput" value="5">
+        <input type="hidden" name="currency_code" value="EUR">
+      </form>
+    </div>
+
+    <!-- Step 3: Success Confirmation Screen -->
+    <div id="tipSuccessScreen" style="display:none; text-align:center; padding:30px 10px; flex-direction:column; align-items:center; gap:16px;">
+      <div style="width:70px; height:70px; border-radius:50%; background:rgba(83,252,24,0.15); border:2px solid #53fc18; display:flex; align-items:center; justify-content:center; color:#53fc18; box-shadow:0 0 30px rgba(83,252,24,0.3);">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h2 style="font-size:1.6rem; font-weight:800; margin:0; color:#53fc18;">Donacija je Uspešna!</h2>
+      <p style="color:var(--kickov-text-muted); font-size:0.95rem; margin:0; max-width:400px; line-height:1.5;">Hvala na podršci! Tvoj alert i poruka se u ovom trenutku prikazuju uživo na streamu.</p>
+    </div>
+
+  </div>
+
+  <script src="js/kickov-tip.js" defer></script>
+</body>
+</html>

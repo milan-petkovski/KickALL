@@ -744,6 +744,25 @@ async function sacuvajSongQueue(chatroomId, queue) {
     }
 }
 
+async function posaljiKickovAlert(userId, alertType, payloadData) {
+    if (!KORISTI_SUPABASE || !supabase || !userId) return;
+    try {
+        const channelName = `kickov_alerts:${userId}`;
+        const channel = supabase.channel(channelName);
+        await channel.send({
+            type: 'broadcast',
+            event: 'alert',
+            payload: {
+                type: alertType,
+                ...payloadData,
+                timestamp: Date.now()
+            }
+        });
+    } catch (err) {
+        log('ERR', `Greška pri slanju Kickov alerta za ${userId}: ${err.message}`);
+    }
+}
+
 module.exports = {
     supabase,
     KORISTI_SUPABASE,
@@ -759,6 +778,7 @@ module.exports = {
     ucitajCustomKomande,
     ucitajBotConfig,
     ucitajUserPlan,
-    ucitajSveAktivneKanale
+    ucitajSveAktivneKanale,
+    posaljiKickovAlert
 };
 

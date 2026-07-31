@@ -263,8 +263,11 @@ async function checkAuth() {
     }
   }
 
-  // Standard Supabase session check
-  const { data: { session } } = await sb.auth.getSession();
+  // Standard Supabase session check with retry for PC reboot / network latency
+  const session = window.CONFIG?.getValidSessionWithRetry 
+    ? await window.CONFIG.getValidSessionWithRetry(sb, 3, 1500)
+    : (await sb.auth.getSession())?.data?.session;
+
   if (!session) {
     window.location.href = 'index.html';
   } else {
@@ -279,6 +282,14 @@ async function checkAuth() {
       console.warn('Failed to set origin flags:', e);
     }
     
+    if (window.CONFIG?.setupCrossTabSync) {
+      window.CONFIG.setupCrossTabSync(sb, (newSession, eventType) => {
+        if (!newSession || eventType === 'GLOBAL_LOGOUT' || eventType === 'SIGNED_OUT') {
+          window.location.href = 'index.html';
+        }
+      });
+    }
+
     initDashboardWithRetry(currentUser);
   }
 }

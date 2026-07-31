@@ -125,9 +125,9 @@ body.auth-loading {
 
 .dashboard-main-container {
   width: 100%;
-  max-width: 1400px !important;
+  max-width: 1420px !important;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 28px;
 }
 
 /* Module Header Logo Navigation */
@@ -349,14 +349,18 @@ body.auth-loading {
 }
 
 .btn-green-fill {
-  background: var(--color-green);
-  color: var(--color-text-dark);
+  background: var(--color-green) !important;
+  color: var(--color-text-dark) !important;
+  -webkit-text-fill-color: var(--color-text-dark) !important;
   border: none;
   box-shadow: 0 4px 15px rgba(83, 252, 24, 0.25);
 }
 
 .btn-green-fill:hover {
-  box-shadow: 0 4px 25px var(--color-green-glow);
+  background: #6eff35 !important;
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  box-shadow: 0 4px 25px rgba(83, 252, 24, 0.45);
   transform: translateY(-2px);
 }
 

@@ -29,6 +29,8 @@ const storageKey = CONFIG.SUPABASE?.STORAGE_KEY || 'kickbot-supabase-auth';
 const sb = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
     storage: window.localStorage,
     storageKey: storageKey
   }
@@ -1070,13 +1072,12 @@ async function initAuth() {
       }
     }
 
-    // ── Standardna Supabase sesija ─────────────────────────────────────
+    // ── Standardna Supabase sesija sa retry logikom za restart kompa ─────
     document.getElementById('authGateMsg').textContent = 'Proveravamo sesiju...';
     
-    const { data: { session: authSession } } = await Promise.race([
-      sb.auth.getSession(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Session check timeout')), 5000))
-    ]);
+    const authSession = CONFIG.getValidSessionWithRetry 
+      ? await CONFIG.getValidSessionWithRetry(sb, 3, 1500)
+      : (await sb.auth.getSession())?.data?.session;
     
     if (!authSession) {
       document.getElementById('authGateMsg').textContent = 'Preusmeravanje na prijavu...';
@@ -1294,8 +1295,21 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
 }
 
 sb.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_OUT') { window.location.href = window.KickotConfig.paths.indexUrl; }
+  if (event === 'SIGNED_OUT') {
+    const hasSavedToken = !!localStorage.getItem(storageKey);
+    if (!hasSavedToken) {
+      window.location.href = window.KickotConfig.paths.indexUrl;
+    }
+  }
 });
+
+if (CONFIG?.setupCrossTabSync) {
+  CONFIG.setupCrossTabSync(sb, (newSession, eventType) => {
+    if (!newSession || eventType === 'GLOBAL_LOGOUT' || eventType === 'SIGNED_OUT') {
+      window.location.href = window.KickotConfig.paths.indexUrl;
+    }
+  });
+}
 
 // ═══════════════════════════════════════════════════════════
 // APP INIT

@@ -136,6 +136,72 @@ window.CONFIG = {
     PING_INTERVAL: 600000,
     HEALTH_ENDPOINT: '/api/health',
     ENABLED: !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1')
+  },
+
+  // Resilient Session Retriever for PC Reboots / Network Cold Starts
+  getValidSessionWithRetry: async (sbClient, maxRetries = 3, retryDelayMs = 1500) => {
+    if (!sbClient || !sbClient.auth) return null;
+    
+    const storageKey = window.CONFIG?.SUPABASE?.STORAGE_KEY || 'kickbot-supabase-auth';
+    let hasSavedSession = false;
+    try {
+      const item = localStorage.getItem(storageKey);
+      if (item && item.length > 10) {
+        hasSavedSession = true;
+      }
+    } catch (e) {}
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const { data, error } = await sbClient.auth.getSession();
+        if (data?.session?.user) {
+          return data.session;
+        }
+        
+        if (!hasSavedSession && !error) {
+          return null;
+        }
+      } catch (err) {
+        console.warn(`[KickAuth] Session check attempt ${attempt}/${maxRetries} failed:`, err);
+      }
+
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, retryDelayMs * attempt));
+      }
+    }
+
+    try {
+      const { data } = await sbClient.auth.getSession();
+      return data?.session || null;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  // Real-time Crosspage / Cross-Tab Session Sync Helper
+  setupCrossTabSync: (sbClient, onSessionChange) => {
+    try {
+      window.addEventListener('storage', async (event) => {
+        const storageKey = window.CONFIG?.SUPABASE?.STORAGE_KEY || 'kickbot-supabase-auth';
+        const logoutKey = window.CONFIG?.STORAGE_KEYS?.GLOBAL_LOGOUT || 'kickbot_global_logout';
+
+        if (event.key === logoutKey) {
+          if (sbClient && sbClient.auth) {
+            try { await sbClient.auth.signOut(); } catch (_) {}
+          }
+          if (typeof onSessionChange === 'function') {
+            onSessionChange(null, 'GLOBAL_LOGOUT');
+          }
+        } else if (event.key === storageKey) {
+          const session = await window.CONFIG.getValidSessionWithRetry(sbClient, 2, 800);
+          if (typeof onSessionChange === 'function') {
+            onSessionChange(session, session ? 'SESSION_UPDATED' : 'SIGNED_OUT');
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('[KickAuth] Cross-tab listener error:', e);
+    }
   }
 };
 

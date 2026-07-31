@@ -1076,13 +1076,17 @@ async function setLanguage(lang) {
     const sb = window.supabase.createClient(window.CONFIG.SUPABASE.URL, window.CONFIG.SUPABASE.ANON_KEY, {
       auth: {
         persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
         storage: window.localStorage,
         storageKey: window.CONFIG.SUPABASE.STORAGE_KEY
       }
     });
 
     async function isUserLoggedIn() {
-        const { data: { session } } = await sb.auth.getSession();
+        const session = window.CONFIG?.getValidSessionWithRetry
+            ? await window.CONFIG.getValidSessionWithRetry(sb, 2, 800)
+            : (await sb.auth.getSession())?.data?.session;
         return !!session;
     }
 
@@ -1265,7 +1269,17 @@ window.addEventListener('storage', (event) => {
 
     async function checkAuthSession() {
         try {
-            const { data: { session } } = await sb.auth.getSession();
+            const session = window.CONFIG?.getValidSessionWithRetry 
+                ? await window.CONFIG.getValidSessionWithRetry(sb, 3, 1000)
+                : (await sb.auth.getSession())?.data?.session;
+
+            if (window.CONFIG?.setupCrossTabSync && !window._crossTabSyncInitialized) {
+                window._crossTabSyncInitialized = true;
+                window.CONFIG.setupCrossTabSync(sb, () => {
+                    checkAuthSession();
+                });
+            }
+
             const userMenu = document.getElementById('userMenu');
             const userAvatar = document.getElementById('userAvatar');
             const userName = document.getElementById('userName');

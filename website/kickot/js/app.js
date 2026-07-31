@@ -56,6 +56,8 @@ const sb = createClient(
   {
     auth: {
       persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
       storage: window.localStorage,
       storageKey: storageKey
     }
@@ -1017,13 +1019,23 @@ sb.auth.onAuthStateChange((event, session) => {
   onUserChange(session?.user || null);
 });
 
+if (CONFIG?.setupCrossTabSync) {
+  CONFIG.setupCrossTabSync(sb, (newSession) => {
+    onUserChange(newSession?.user || null);
+  });
+}
+
 // ── Initial Session Check ──────────────────────────────────
 (async function checkInitialSession() {
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session?.user) {
+    const session = CONFIG.getValidSessionWithRetry 
+      ? await CONFIG.getValidSessionWithRetry(sb, 3, 1000)
+      : (await sb.auth.getSession())?.data?.session;
 
+    if (session?.user) {
       onUserChange(session.user);
+    } else {
+      onUserChange(null);
     }
   } catch (error) {
     console.error('Kickot: Error checking initial session', error);

@@ -166,12 +166,15 @@ a {
 
 .btn-primary {
     background-color: var(--color-green);
-    color: var(--color-text-dark);
+    color: var(--color-text-dark) !important;
+    -webkit-text-fill-color: var(--color-text-dark) !important;
     box-shadow: 0 4px 15px rgba(83, 252, 24, 0.2);
 }
 
 .btn-primary:hover {
-    background-color: var(--color-green-hover);
+    background-color: #6eff35 !important;
+    color: #000000 !important;
+    -webkit-text-fill-color: #000000 !important;
     transform: translateY(-2px);
     box-shadow: 0 6px 25px rgba(83, 252, 24, 0.45);
 }
