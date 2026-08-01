@@ -11,14 +11,13 @@
   <!-- Fonts & Core Styles -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
-
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../css/base.css" />
   <link rel="stylesheet" href="../css/style.css" />
   <link rel="stylesheet" href="../css/dashboard.css" />
   <link rel="stylesheet" href="css/kickan.css" />
 
-  <!-- Supabase JS CDN & Global System Config -->
+  <!-- Supabase JS CDN & Config -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/config.js"></script>
   <script src="../js/toast.js" defer></script>
@@ -28,7 +27,7 @@
 
   <!-- Ambient Glow Blobs -->
   <div class="glow-bg" aria-hidden="true">
-    <div class="blob blob-violet"></div>
+    <div class="blob blob-cyan"></div>
     <div class="blob blob-green"></div>
   </div>
 
@@ -36,10 +35,10 @@
   <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
     <div class="auth-gate-card">
       <div class="auth-gate-logo">
-        <img src="../assets/kickan.webp" alt="Kickan Logo" class="logo-img" width="173" height="52" fetchpriority="high">
+        <img src="../assets/kickan.webp" alt="Kickan Logo" class="logo-img" fetchpriority="high">
       </div>
       <div class="auth-gate-spinner"></div>
-      <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju...</p>
+      <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju i povezujemo chat...</p>
     </div>
   </div>
 
@@ -47,9 +46,9 @@
   <header class="header" role="banner">
     <div class="container nav-container">
       <a href="#" class="logo" id="navLogo">
-        <img src="../assets/kickan.webp" alt="Kickan Logo" class="logo-img" width="160" height="48" fetchpriority="high">
+        <img src="../assets/kickan.webp" alt="Kickan Logo" class="logo-img" fetchpriority="high">
       </a>
-
+      
       <nav class="nav-menu" id="navMenu">
         <a href="../dashboard.html" class="nav-link nav-logo-link" title="Ekosistem">
           <img src="../assets/kickall.webp" alt="KickALL" class="nav-module-img" height="26">
@@ -66,32 +65,29 @@
       </nav>
 
       <div class="nav-actions">
-        <!-- Language Switcher -->
         <div class="lang-switcher">
           <button class="lang-btn active" id="btn-sr">SR</button>
           <button class="lang-btn" id="btn-en">EN</button>
         </div>
-
-        <!-- User Dropdown Menu -->
+        
         <div class="user-menu visible" id="userMenu">
           <button class="user-menu-trigger" id="userMenuTrigger">
-            <div class="user-avatar" id="userAvatarDisplay" style="background:var(--kickan-accent-cyan); color:#000; font-weight:700;">K</div>
+            <div class="user-avatar" id="userAvatarDisplay" style="background:var(--kickan-accent-cyan); color:#000;">K</div>
             <span class="user-name" id="userNameDisplay">Streamer</span>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="chevron-icon">
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
-
           <div class="user-dropdown" id="userDropdown">
             <a href="../dashboard.html" class="dropdown-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
-              <span>Centralni Dashboard</span>
+              <span>Dashboard</span>
             </a>
             <button class="dropdown-item danger" id="btnLogout">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
@@ -106,74 +102,79 @@
 
   <!-- Main Workspace -->
   <main class="kickan-container">
-
-    <!-- Hero Card Banner Section -->
+    
+    <!-- Hero Banner Section -->
     <section class="kickan-hero-card">
       <div class="kickan-hero-top">
         <div>
           <div class="hero-tag-pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-            Kickan Stream Analytics
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            Ultimativna Analitika Strimova
           </div>
           <h1 class="kickan-hero-title">
-            <span class="gradient-text-glow">Kickan </span>Analytics Studio <span style="display:inline-block; font-size:0.8rem; padding:4px 10px; border-radius:9999px; background:rgba(6,182,212,0.15); border:1px solid rgba(6,182,212,0.4); color:#06b6d4; vertical-align:middle; margin-left:8px; font-weight:800;">BETA</span>
+            <span class="gradient-text-glow">Kickan </span>Analytics Studio
+            <span class="beta-badge">BETA</span>
           </h1>
-          <p class="kickan-hero-subtitle">Detaljna statistika i analitika tvog Kick kanala u realnom vremenu: poruke, aktivnost gledalaca, pretplatnici, emoti i moderacija.</p>
+          <p class="kickan-hero-subtitle">Detaljna statistika tvog Kick kanala u realnom vremenu: chat poruke, aktivnost gledalaca, popularni emoti i nadzor moderacije.</p>
         </div>
-
-          <div style="display:flex; flex-direction:column; align-items:flex-end; gap:10px;">
-            <div class="kickan-rank-pill">
-              <span>Channel ID: <strong id="kickanChannelIdDisplay">...</strong></span>
-            </div>
-
-            <a href="https://kick.com" id="btnVisitKickChannel" target="_blank" rel="noopener noreferrer" class="btn-icon-text" style="background:rgba(83,252,24,0.15); border:1px solid rgba(83,252,24,0.35); color:var(--kickan-accent-green); text-decoration:none; padding:8px 16px; border-radius:9999px; font-size:0.85rem; font-weight:700;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-              Poseti Kick Kanal (<span id="kickChannelSlug">Učitavanje...</span>)
-            </a>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:10px;">
+          <div class="kickan-channel-pill" id="channelStatusPill">
+            <span class="channel-dot"></span>
+            <span>Povezan kanal: <strong id="connectedChannelName">Učitavanje...</strong></span>
           </div>
+        </div>
       </div>
     </section>
 
-    <!-- Key Metrics Grid -->
+    <!-- Top Key Metrics Grid -->
     <section class="metrics-grid-4">
       <div class="metric-card">
         <div class="metric-header">
-          <div class="metric-label">Ukupno Poruka (Sesija Uživo)</div>
+          <div class="metric-label">Ukupno Poruka</div>
           <div class="metric-icon" style="color:var(--kickan-accent-cyan);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
           </div>
         </div>
         <div class="metric-value" id="valTotalMessages">0</div>
-        <div class="metric-footer">Praćenje uživo u chatu</div>
+        <div class="metric-footer">Automatsko praćenje u chatu</div>
       </div>
-
       <div class="metric-card">
         <div class="metric-header">
-          <div class="metric-label">Status Stream-a (Live Viewers)</div>
+          <div class="metric-label">Status Strima</div>
           <div class="metric-icon" style="color:var(--kickan-accent-green);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
           </div>
         </div>
         <div class="metric-value" id="valAvgViewers">Offline</div>
         <div class="metric-footer">Kick API Telemetrija</div>
       </div>
-
       <div class="metric-card">
         <div class="metric-header">
           <div class="metric-label">Pratioci & Pretplatnici</div>
           <div class="metric-icon" style="color:var(--kickan-accent-violet);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
           </div>
         </div>
         <div class="metric-value" id="valActiveSubs">0</div>
         <div class="metric-footer">Ukupna zajednica</div>
       </div>
-
       <div class="metric-card">
         <div class="metric-header">
-          <div class="metric-label">Jedinstveni Gledaoci (Unique Chatters)</div>
+          <div class="metric-label">Jedinstveni Gledaoci</div>
           <div class="metric-icon" style="color:var(--kickan-accent-amber);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+            </svg>
           </div>
         </div>
         <div class="metric-value" id="valUniqueChatters">0</div>
@@ -181,42 +182,43 @@
       </div>
     </section>
 
-    <!-- Additional Quick Metrics Grid -->
+    <!-- Secondary Metrics Strip -->
     <section class="metrics-grid-4" style="margin-bottom:36px;">
       <div class="metric-card">
-        <div class="metric-label">Vrednost KICKs (Bits)</div>
+        <div class="metric-label">Vrednost KICKs-a</div>
         <div class="metric-value" style="color:var(--kickan-accent-green);" id="valTotalKicks">0</div>
+        <div class="metric-footer">Chat donacije</div>
       </div>
-
       <div class="metric-card">
-        <div class="metric-label">Ukupno Banova (Total Bans)</div>
+        <div class="metric-label">Ukupno Banova</div>
         <div class="metric-value" style="color:var(--kickan-accent-red);" id="valTotalBans">0</div>
+        <div class="metric-footer">Sankcije moderacije</div>
       </div>
-
       <div class="metric-card">
         <div class="metric-label">Hostovi & Raidovi</div>
         <div class="metric-value" style="color:var(--kickan-accent-cyan);" id="valTotalHosts">0</div>
+        <div class="metric-footer">Dolazna podrška</div>
       </div>
-
       <div class="metric-card">
         <div class="metric-label">Korišćenje Emotea</div>
         <div class="metric-value" style="color:var(--kickan-accent-violet);" id="valTotalEmotes">0</div>
+        <div class="metric-footer">Aktivnost emojija</div>
       </div>
     </section>
 
     <!-- Charts & Analytics Section -->
     <section class="charts-grid-2">
-
       <!-- Hourly Message Activity Chart -->
       <div class="chart-card">
         <div class="chart-header">
           <div class="chart-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-cyan)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            <span>Hourly Message Activity (Po Satima)</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-cyan)" stroke-width="2.5">
+              <path d="M12 20V10M18 20V4M6 20v-4" />
+            </svg>
+            <span>Aktivnost Poruka Po Satima (24h)</span>
           </div>
-          <span style="font-size:0.8rem; color:var(--kickan-text-muted);" id="hourlyPeakLabel">Najaktivniji period: Čekanje poruka...</span>
+          <span style="font-size:0.85rem; color:var(--kickan-text-muted);" id="hourlyPeakLabel">Čeka se aktivnost chata...</span>
         </div>
-
         <div class="chart-viewport" id="hourlyChartViewport">
           <!-- Dynamically generated bar graph via JS -->
         </div>
@@ -226,70 +228,81 @@
       <div class="chart-card">
         <div class="chart-header">
           <div class="chart-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-amber)" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-            <span>Most Popular Emotes (Omiljeni Emoti u Chatu)</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-amber)" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10"/>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+              <line x1="9" y1="9" x2="9.01" y2="9"/>
+              <line x1="15" y1="9" x2="15.01" y2="9"/>
+            </svg>
+            <span>Omiljeni Emoti u Chatu</span>
           </div>
-          <span style="font-size:0.8rem; color:var(--kickan-text-muted);" id="emotesTotalLabel">Ukupno: 0 emotea</span>
+          <span style="font-size:0.85rem; color:var(--kickan-text-muted);" id="emotesTotalLabel">Ukupno: 0 emotea</span>
         </div>
-
         <div class="progress-list-container" id="popularEmotesContainer">
           <!-- Dynamically rendered emotes list via JS -->
         </div>
       </div>
-
     </section>
 
     <!-- Detailed Intelligence Tables -->
     <section class="tables-grid-2">
-
       <!-- Most Active Viewers Table -->
       <div class="table-card">
         <div class="table-header">
           <div class="table-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-green)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <span>Most Active Viewers (Najaktivniji Gledaoci)</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-green)" stroke-width="2.5">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+            </svg>
+            <span>Najaktivniji Gledaoci</span>
           </div>
         </div>
-
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Rang</th>
-              <th>Korisnik</th>
-              <th>Poruke</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="tableMostActiveViewers">
-            <!-- Dynamically injected rows via JS -->
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:60px;">Rang</th>
+                <th>Korisnik</th>
+                <th>Poruke</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="tableMostActiveViewers">
+              <tr>
+                <td colspan="4" class="table-empty-state">Učitavamo prve chat poruke sa kanala uživo...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Moderation & Ban History Log -->
       <div class="table-card">
         <div class="table-header">
           <div class="table-title">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-red)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span>Moderation & Ban History (Istorija Banova)</span>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-red)" stroke-width="2.5">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            <span>Istorija Banova & Moderacije</span>
           </div>
         </div>
-
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Korisnik</th>
-              <th>Moderator</th>
-              <th>Razlog</th>
-              <th>Vreme</th>
-            </tr>
-          </thead>
-          <tbody id="tableBanHistory">
-            <!-- Dynamically injected rows via JS -->
-          </tbody>
-        </table>
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Korisnik</th>
+                <th>Moderator</th>
+                <th>Vreme</th>
+              </tr>
+            </thead>
+            <tbody id="tableBanHistory">
+              <tr>
+                <td colspan="3" class="table-empty-state">Nema nedavnih zabranjenih poruka ili banova.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-
     </section>
 
   </main>

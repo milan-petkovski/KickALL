@@ -100,7 +100,10 @@
       selectedAmount = parseFloat(document.getElementById('tipAmountInput').value) || selectedAmount;
       donorMessage = document.getElementById('donorMessageInput').value.trim();
 
-      if (selectedAmount <= 0) return;
+      if (selectedAmount < 1) {
+        showToast('error', 'Minimalan iznos donacije je 1 €.');
+        return;
+      }
 
       // Reveal PayPal Stage 2
       form.style.display = 'none';
@@ -115,6 +118,10 @@
       if (summaryDonor) summaryDonor.textContent = `Od: ${donorName}`;
 
       if (stage2) stage2.style.display = 'flex';
+
+      const btn = document.getElementById('btnProceedToPaypal');
+      btn.disabled = true;
+      btn.textContent = 'Pripremam PayPal...';
 
       // Initialize real PayPal SDK Smart Payment Buttons
       renderPaypalSmartButtons();
