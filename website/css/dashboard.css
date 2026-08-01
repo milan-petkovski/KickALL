@@ -131,25 +131,60 @@ body.auth-loading {
 }
 
 /* Module Header Logo Navigation */
+.nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    background: none;
+}
+
+/* Linkovi za logotipe */
 .nav-logo-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 8px;
+  padding: 4px 6px;
   border-radius: 8px;
-  transition: transform 0.25s ease, opacity 0.25s ease, filter 0.25s ease;
+  background: transparent;
+  border: none;
+  text-decoration: none;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.nav-logo-link:hover {
-  transform: translateY(-2px);
-  filter: drop-shadow(0 0 10px rgba(83, 252, 24, 0.4));
-}
-
+/* Slike logotipa sa punom vidljivošću */
 .nav-module-img {
-  height: 28px;
+  height: 35px;
   width: auto;
   object-fit: contain;
   display: block;
+  opacity: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
+  transition: filter 0.25s ease, transform 0.25s ease;
+}
+
+/* Hover efekat sa neon zelenim sjajem */
+.nav-logo-link:hover {
+  transform: translateY(-3px);
+}
+
+.nav-logo-link:hover .nav-module-img {
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 10px rgba(83, 252, 24, 0.85)) 
+          drop-shadow(0 0 20px rgba(83, 252, 24, 0.4));
+}
+
+/* Kada je modul aktivan */
+.nav-logo-link.active .nav-module-img {
+  filter: drop-shadow(0 0 12px rgba(83, 252, 24, 0.9));
 }
 
 /* Module Grid */
