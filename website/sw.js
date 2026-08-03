@@ -4,6 +4,8 @@ const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/dashboard.html',
+  '/pricing.html',
+  '/refund.html',
   '/privacy.html',
   '/terms.html',
   '/css/base.css',
@@ -65,30 +67,30 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Skip ALL external API calls and third-party services
-  if (event.request.url.includes('/api/') || 
-      event.request.url.includes('/auth/') ||
-      event.request.url.includes('supabase') ||
-      event.request.url.includes('kick.com') ||
-      event.request.url.includes('allorigins.win') ||
-      event.request.url.includes('corsproxy.io') ||
-      event.request.url.includes('render.com') ||
-      event.request.url.includes('onrender.com') ||
-      event.request.url.includes('youtube.com') ||
-      event.request.url.includes('googlevideo.com')) {
+  if (event.request.url.includes('/api/') ||
+    event.request.url.includes('/auth/') ||
+    event.request.url.includes('supabase') ||
+    event.request.url.includes('kick.com') ||
+    event.request.url.includes('allorigins.win') ||
+    event.request.url.includes('corsproxy.io') ||
+    event.request.url.includes('render.com') ||
+    event.request.url.includes('onrender.com') ||
+    event.request.url.includes('youtube.com') ||
+    event.request.url.includes('googlevideo.com')) {
     return;
   }
 
   // Skip anything that's not from our own domain
   const url = new URL(event.request.url);
-  if (!url.hostname.includes('localhost') && 
-      !url.hostname.includes('kickall.app') &&
-      !url.hostname.includes('netlify.app')) {
+  if (!url.hostname.includes('localhost') &&
+    !url.hostname.includes('kickall.app') &&
+    !url.hostname.includes('netlify.app')) {
     return;
   }
 
   // Check if this is an HTML file
-  const isHtmlRequest = event.request.headers.get('accept') && 
-                        event.request.headers.get('accept').includes('text/html');
+  const isHtmlRequest = event.request.headers.get('accept') &&
+    event.request.headers.get('accept').includes('text/html');
 
   if (isHtmlRequest) {
     // Network-first strategy for HTML files
@@ -168,8 +170,8 @@ self.addEventListener('fetch', (event) => {
             })
             .catch((error) => {
               // Return offline fallback for CSS/JS
-              if (event.request.url.endsWith('.css') || 
-                  event.request.url.endsWith('.js')) {
+              if (event.request.url.endsWith('.css') ||
+                event.request.url.endsWith('.js')) {
                 return new Response('Offline - Resource not available', {
                   status: 503,
                   headers: { 'Content-Type': 'text/plain' }

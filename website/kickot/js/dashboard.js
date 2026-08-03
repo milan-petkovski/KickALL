@@ -131,7 +131,7 @@ function getPlanLimits() {
 
 function openUpgradeModal(feature) {
   const modalNote = document.getElementById('upgradeModalNote');
-  
+
   if (feature === 'commands') {
     if (modalNote) modalNote.textContent = 'Dostignut je limit prilagođenih komandi za tvoj paket (Free: 50 | Pro: 200 | Elite: Neograničeno). Nadogradi nalog za više komandi!';
   } else if (feature === 'announces') {
@@ -151,10 +151,10 @@ function openUpgradeModal(feature) {
   } else {
     if (modalNote) modalNote.textContent = 'Nadogradi svoj paket za veće limite, napredne funkcije i neograničenu automatizaciju!';
   }
-  
+
   // Update plan buttons based on current plan
   updatePlanButtons();
-  
+
   // Reset to monthly view
   togglePricing('monthly');
   openModal('upgradeModal');
@@ -163,17 +163,17 @@ function openUpgradeModal(feature) {
 function updatePlanButtons() {
   const currentPlan = (currentUserPlan || 'free').toLowerCase();
   if (currentPlan === 'business') currentPlan = 'elite';
-  
+
   // Monthly pricing buttons
   const monthlyFreeBtn = document.querySelector('#monthlyPricing .upgrade-plan-card:nth-child(1) button');
   const monthlyProBtn = document.querySelector('#monthlyPricing .upgrade-plan-card:nth-child(2) a');
   const monthlyEliteBtn = document.querySelector('#monthlyPricing .upgrade-plan-card:nth-child(3) a');
-  
+
   // Yearly pricing buttons
   const yearlyFreeBtn = document.querySelector('#yearlyPricing .upgrade-plan-card:nth-child(1) button');
   const yearlyProBtn = document.querySelector('#yearlyPricing .upgrade-plan-card:nth-child(2) a');
   const yearlyEliteBtn = document.querySelector('#yearlyPricing .upgrade-plan-card:nth-child(3) a');
-  
+
   // Update Free button
   if (monthlyFreeBtn) {
     if (currentPlan === 'free') {
@@ -188,7 +188,7 @@ function updatePlanButtons() {
       monthlyFreeBtn.style.cursor = '';
     }
   }
-  
+
   if (yearlyFreeBtn) {
     if (currentPlan === 'free') {
       yearlyFreeBtn.textContent = 'Tvoj trenutni paket';
@@ -202,7 +202,7 @@ function updatePlanButtons() {
       yearlyFreeBtn.style.cursor = '';
     }
   }
-  
+
   // Update Pro button
   if (monthlyProBtn) {
     if (currentPlan === 'pro') {
@@ -218,7 +218,7 @@ function updatePlanButtons() {
       monthlyProBtn.style.display = 'inline-flex';
     }
   }
-  
+
   if (yearlyProBtn) {
     if (currentPlan === 'pro') {
       const button = document.createElement('button');
@@ -232,7 +232,7 @@ function updatePlanButtons() {
       yearlyProBtn.style.display = 'inline-flex';
     }
   }
-  
+
   // Update Elite button
   if (monthlyEliteBtn) {
     if (currentPlan === 'elite') {
@@ -247,7 +247,7 @@ function updatePlanButtons() {
       monthlyEliteBtn.style.display = 'inline-flex';
     }
   }
-  
+
   if (yearlyEliteBtn) {
     if (currentPlan === 'elite') {
       const button = document.createElement('button');
@@ -271,7 +271,7 @@ function togglePricing(type) {
   const yearlyPricing = document.getElementById('yearlyPricing');
   const monthlyBtn = document.getElementById('monthlyBtn');
   const yearlyBtn = document.getElementById('yearlyBtn');
-  
+
   if (type === 'monthly') {
     monthlyPricing.style.display = 'grid';
     yearlyPricing.style.display = 'none';
@@ -290,15 +290,15 @@ function togglePricing(type) {
 }
 window.openUpgradeModal = openUpgradeModal;
 
-// ── Lemon Squeezy Checkout & Referral Modal ────────────────
-const LS_CHECKOUT_URLS = {
+// ── Paddle Billing Checkout & Referral Modal ────────────────
+const PADDLE_PRICE_IDS = {
   pro: {
-    monthly: 'https://kickall.lemonsqueezy.com/checkout/buy/ef8c2e17-c6c6-4f01-97ab-7e0b70ac2374',
-    yearly:  'https://kickall.lemonsqueezy.com/checkout/buy/eeb6f9b7-aeeb-4769-b333-78c089a5d732'
+    monthly: window.CONFIG?.PADDLE?.PRICE_IDS?.pro?.monthly || '',
+    yearly: window.CONFIG?.PADDLE?.PRICE_IDS?.pro?.yearly || ''
   },
   elite: {
-    monthly: 'https://kickall.lemonsqueezy.com/checkout/buy/09412cf7-f7ad-4103-826e-96fa00786a53',
-    yearly:  'https://kickall.lemonsqueezy.com/checkout/buy/7faf6d66-f155-4885-b64c-d1a284eb2df8'
+    monthly: window.CONFIG?.PADDLE?.PRICE_IDS?.elite?.monthly || '',
+    yearly: window.CONFIG?.PADDLE?.PRICE_IDS?.elite?.yearly || ''
   }
 };
 
@@ -335,14 +335,14 @@ function openCheckout(plan, period) {
   openModal('preCheckoutReferralModal');
 }
 
-async function proceedToLemonSqueezyCheckout() {
+async function proceedToPaddleCheckout() {
   const plan = pendingCheckoutPlan;
   const p = pendingCheckoutPeriod || 'monthly';
-  const planUrls = LS_CHECKOUT_URLS[plan];
-  const baseUrl = (planUrls && typeof planUrls === 'object') ? planUrls[p] || planUrls.monthly : planUrls;
+  const planPrices = PADDLE_PRICE_IDS[plan];
+  const priceId = (planPrices && typeof planPrices === 'object') ? planPrices[p] || planPrices.monthly : planPrices;
 
-  if (!baseUrl) {
-    console.warn('[Checkout] Nepoznat plan ili link:', plan, p);
+  if (!priceId) {
+    console.warn('[Checkout] Nepoznat plan ili Paddle price ID:', plan, p);
     return;
   }
 
@@ -357,30 +357,33 @@ async function proceedToLemonSqueezyCheckout() {
     sessionStorage.setItem('user_referral_code', refCode);
     try {
       await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: refCode });
-    } catch (_) {}
+    } catch (_) { }
   }
 
   closeModal('preCheckoutReferralModal');
 
-  // Sastavi LemonSqueezy URL sa custom parametrima (dodaj ref_code samo ako nije prazan da sprečimo 422 grešku od LemonSqueezy-a)
-  const params = new URLSearchParams();
-  params.set('checkout[custom][user_id]', userId);
-  if (refCode) {
-    params.set('checkout[custom][ref_code]', refCode);
+  if (typeof Paddle === 'undefined' || !Paddle.Checkout) {
+    console.error('[Paddle Checkout] Paddle SDK nije učitan.');
+    return;
   }
 
-  const url = `${baseUrl}?${params.toString()}`;
-  window.open(url, '_blank', 'noopener,noreferrer');
+  Paddle.Checkout.open({
+    items: [{ priceId, quantity: 1 }],
+    customData: {
+      user_id: userId,
+      ref_code: refCode || undefined
+    }
+  });
 }
 
-window.proceedToLemonSqueezyCheckout = proceedToLemonSqueezyCheckout;
+window.proceedToPaddleCheckout = proceedToPaddleCheckout;
 window.openCheckout = openCheckout;
 
 function applyPenaltySettingsRestrictions() {
   const limits = getPlanLimits();
   const penaltySelects = [
     'cfgModPenaltyCaps',
-    'cfgModPenaltyLinks', 
+    'cfgModPenaltyLinks',
     'cfgModPenaltyEmotes',
     'cfgModPenaltySymbols',
     'cfgModPenaltyWords',
@@ -398,12 +401,12 @@ function applyPenaltySettingsRestrictions() {
         el.value = 'default';
         el.style.opacity = '0.5';
         el.style.cursor = 'not-allowed';
-        
+
         // Add title to explain restriction
         el.title = 'Individualne kazne su dostupne samo za PRO i ELITE pakete';
-        
+
         // Add click handler to show upgrade modal
-        el.onclick = function(e) {
+        el.onclick = function (e) {
           e.preventDefault();
           openUpgradeModal('customPenalty');
         };
@@ -423,7 +426,7 @@ const upgradeSvgIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="no
 
 function renderPlanLimitBanners() {
   const limits = getPlanLimits();
-  
+
   // 0. Topbar & Sidebar Upgrade Buttons (For Free & Pro plans)
   const topbarWrap = document.getElementById('topbarUpgradeWrap');
   if (topbarWrap) {
@@ -827,7 +830,7 @@ let marriagesQuery = '';
 // ═══════════════════════════════════════════════════════════
 
 // Global function declaration to ensure it's available everywhere
-window.hideAuthGate = function() {
+window.hideAuthGate = function () {
   const authGate = document.getElementById('authGate');
   const app = document.getElementById('app');
   if (authGate) {
@@ -851,12 +854,12 @@ async function initAuth() {
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code') || sessionStorage.getItem('kick_oauth_code');
     const oauthError = urlParams.get('error');
-    
+
     // Check if coming from kickall (multiple sources with fallbacks)
     const fromKickAll = sessionStorage.getItem('from_kickall') === 'true' ||
-                        localStorage.getItem('kick_origin_site') === 'kickall' ||
-                        (document.referrer && document.referrer.includes('kickall.app')) ||
-                        (document.referrer && document.referrer.includes('localhost'));
+      localStorage.getItem('kick_origin_site') === 'kickall' ||
+      (document.referrer && document.referrer.includes('kickall.app')) ||
+      (document.referrer && document.referrer.includes('localhost'));
 
     if (oauthError) {
       document.getElementById('authGateMsg').textContent = 'Kick odbio autorizaciju...';
@@ -894,7 +897,7 @@ async function initAuth() {
       // Use CONFIG storage keys if available
       const codeVerifierKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.KICK_CODE_VERIFIER : 'kick_code_verifier';
       const codeVerifier = sessionStorage.getItem(codeVerifierKey) || localStorage.getItem(codeVerifierKey) || '';
-      
+
       const redirectUri = window.KickotConfig.api.kickOAuthRedirect;
       const kickApiBase = window.KickotConfig.api.baseUrl;
 
@@ -917,7 +920,7 @@ async function initAuth() {
         if (!res.ok) {
           const err = await res.json().catch(() => ({ error: 'Nepoznata greška' }));
           console.error('Kickot exchange failed:', err);
-          
+
           // Better error handling for Render cold starts
           if (res.status === 502) {
             document.getElementById('authGateMsg').textContent = 'Server se budi...';
@@ -1074,20 +1077,20 @@ async function initAuth() {
 
     // ── Standardna Supabase sesija sa retry logikom za restart kompa ─────
     document.getElementById('authGateMsg').textContent = 'Proveravamo sesiju...';
-    
-    const authSession = CONFIG.getValidSessionWithRetry 
+
+    const authSession = CONFIG.getValidSessionWithRetry
       ? await CONFIG.getValidSessionWithRetry(sb, 3, 1500)
       : (await sb.auth.getSession())?.data?.session;
-    
+
     if (!authSession) {
       document.getElementById('authGateMsg').textContent = 'Preusmeravanje na prijavu...';
       setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl + '?login=1'; }, 1200);
       return;
     }
-    
+
 
     currentUser = authSession.user;
-    
+
     // Set origin site for cross-dashboard navigation
     try {
       sessionStorage.setItem('kick_origin_site', 'kickot');
@@ -1095,7 +1098,7 @@ async function initAuth() {
     } catch (e) {
       console.warn('Failed to set origin flags:', e);
     }
-    
+
     await initApp();
   } catch (err) {
     console.error('Auth error:', err);
@@ -1347,14 +1350,14 @@ async function initApp() {
   if (activeChannel) {
     // Update auth gate message to show loading state
     document.getElementById('authGateMsg').textContent = 'Učitavanje podataka...';
-    
+
     await loadAllData();
     // Detekcija osvežavanja stranice (F5/Reload) vs nove posete
     const isReload = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0] && performance.getEntriesByType('navigation')[0].type === 'reload') || (performance.navigation && performance.navigation.type === 1);
     const sessionPanel = sessionStorage.getItem('active-dashboard-panel-session');
     const hashPanel = window.location.hash ? window.location.hash.replace('#', '') : null;
     const validPanels = ['overview', 'leaderboard', 'commands', 'games', 'announces', 'autoresponse', 'marriages', 'minigames', 'songs', 'economy', 'config', 'moderation'];
-    
+
     let lastPanel = 'overview';
     // Ako je eksplicitno naveden hash u URL-u ili ako je u pitanju F5 osvežavanje, zapamti trenutni panel
     if (hashPanel && validPanels.includes(hashPanel)) {
@@ -1367,7 +1370,7 @@ async function initApp() {
       localStorage.removeItem('active-dashboard-panel');
       sessionStorage.removeItem('active-dashboard-panel-session');
     }
-    
+
     switchPanel(lastPanel);
     renderPlanLimitBanners();
   } else {
@@ -1427,9 +1430,9 @@ async function loadUserProfile() {
         await sb.rpc('create_user_referral', { p_user_id: currentUser.id, p_referral_code: refCode });
         localStorage.removeItem('user_referral_code');
         sessionStorage.removeItem('user_referral_code');
-      } catch (e) {}
+      } catch (e) { }
     }
-    ensureUserHasReferralCode(currentUser.id).catch(() => {});
+    ensureUserHasReferralCode(currentUser.id).catch(() => { });
   }
 
   let myUsername = '';
@@ -1655,7 +1658,7 @@ function setupRealtimeSongQueueSubscription(channelId) {
         if (typeof renderSongQueue === 'function') renderSongQueue();
         if (typeof updatePlayerUI === 'function') updatePlayerUI();
       }
-    }).catch(() => {});
+    }).catch(() => { });
 
   // Pretplata na bazu u realnom vremenu (Realtime UPDATE na bot_config)
   activeConfigSubscription = sb.channel(`bot_config_${channelId}`)
@@ -2181,7 +2184,7 @@ async function refreshAllData() {
   if (!btn) return;
 
   const originalHtml = btn.innerHTML;
-  
+
   // Onemogućavamo višestruke klikove i pokrećemo rotaciju
   btn.style.pointerEvents = 'none';
   const icon = btn.querySelector('.refresh-icon');
@@ -2224,7 +2227,7 @@ const defaultBuiltinCommands = [
   { id: 'builtin-rulet', command: 'rulet, ruskirulet', response: 'Igraj ruski rulet sa botom — 1 u 6 šansa za privremeni timeout.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rulet', category: 'Zabava' },
   { id: 'builtin-alkotest', command: 'alkotest [@user]', response: 'Izračunava količinu promila u krvi i opisuje stanje korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'alkotest', category: 'Zabava' },
   { id: 'builtin-cinjenica', command: 'cinjenica', response: 'Ispisuje nasumičnu zanimljivu činjenicu u četu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'cinjenica', category: 'Zabava' },
-  
+
   // Ljubav & Brak
   { id: 'builtin-love', command: 'love @user, love @user @user', response: 'Izračunaj ljubavnu kompatibilnost sa drugim korisnikom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'love', category: 'Ljubav & Brak' },
   { id: 'builtin-marry', command: 'vencaj @user', response: 'Pošalji bračnu ponudu drugom članu četa za ulazak u virtuelni brak.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vencaj', category: 'Ljubav & Brak' },
@@ -2237,14 +2240,14 @@ const defaultBuiltinCommands = [
   { id: 'builtin-prihvati', command: 'prihvati, da, pristajem', response: 'Prihvati bračnu ponudu, ponudu za ljubav ili poziv na dvoboj.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'prihvati', category: 'Ljubav & Brak' },
   { id: 'builtin-odbij', command: 'odbij, ne, odbijam', response: 'Odbij bračnu ponudu, ponudu za ljubav ili poziv na dvoboj.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'odbij', category: 'Ljubav & Brak' },
   { id: 'builtin-cooldown', command: 'cooldown, coldown', response: 'Proveri cooldown za ljubavne akcije (posaljiljubav, bacihejt).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'cooldown', category: 'Ljubav & Brak' },
-  
+
   // Strim Info
   { id: 'builtin-komande', command: 'komande, help, pomoc, commands', response: 'Prikazuje spisak svih ugrađenih komandi bota prilagođenih ovom kanalu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'komande', category: 'Strim Info' },
   { id: 'builtin-igra', command: 'igra', response: 'Prikazuje trenutnu igru ili kategoriju na strimu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'igra', category: 'Strim Info' },
   { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje tačno vreme koliko je strim aktivan uživo.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'uptime', category: 'Strim Info' },
   { id: 'builtin-vreme', command: 'vreme [grad], vrijeme [grad]', response: 'Prikazuje trenutnu vremensku prognozu i temperaturu za uneti grad.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'vreme', category: 'Strim Info' },
   { id: 'builtin-info', command: 'info', response: 'Prikazuje osnovne informacije, verziju i status bota.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'info', category: 'Strim Info' },
-  
+
   // Moderacija
   { id: 'builtin-permit', command: 'permit @user, dozvoli @user', response: 'Dozvoljava izabranom korisniku slanje 1 linka u četu bez brisanja.', cooldown_ms: 5000, min_rank: 'moderator', enabled: true, is_default: true, uses_count: 0, db_match_key: 'permit', category: 'Moderacija' },
   { id: 'builtin-addcom', command: 'dodajkomandu !naziv Odgovor, addcom !naziv Odgovor', response: 'Kratica za moderatore: dodaje novu komandu direktno iz četa.', cooldown_ms: 5000, min_rank: 'moderator', enabled: true, is_default: true, uses_count: 0, db_match_key: 'addcom', category: 'Moderacija' },
@@ -2254,7 +2257,7 @@ const defaultBuiltinCommands = [
   { id: 'builtin-unpin', command: 'unpin', response: 'Uklanja trenutno pinovanu poruku iz četa.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'unpin', category: 'Moderacija' },
   { id: 'builtin-setlive', command: 'setlive [true/false]', response: 'Ručno postavlja status strima na live (uključeno) ili offline.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'setlive', category: 'Moderacija' },
   { id: 'builtin-setgame', command: 'setgame [naziv]', response: 'Ručno postavlja naziv igre koja se prikazuje u informacijama strima.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'setgame', category: 'Moderacija' },
-  
+
   // Statistika
   { id: 'builtin-topwatchtime', command: 'top watchtime [broj], topwatch [broj]', response: 'Prikazuje top listu gledalaca sa najviše provedenih sati na strimu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top watchtime', category: 'Statistika' },
   { id: 'builtin-topchat', command: 'top chat [broj], top [broj], leaderboard [broj]', response: 'Prikazuje rang listu najaktivnijih korisnika po broju poruka u četu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'top', category: 'Statistika' },
@@ -2264,7 +2267,7 @@ const defaultBuiltinCommands = [
   { id: 'builtin-followage', command: 'followage', response: 'Prikazuje tačno koliko dana/meseci prate vaš kanal.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'followage', category: 'Statistika' },
   { id: 'builtin-resetleaderboard', command: 'resetleaderboard', response: 'Komanda za strimera: resetuje tabele aktivnosti i poena za novi mesec.', cooldown_ms: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, uses_count: 0, db_match_key: 'resetleaderboard', category: 'Statistika' },
   { id: 'builtin-leaderboard', command: 'leaderboard [broj]', response: 'Prikazuje top listu najaktivnijih korisnika u četu (alternativa za !top).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'leaderboard', category: 'Statistika' },
-  
+
   // Ekonomija
   { id: 'builtin-rank', command: 'rank, level, xp [@user]', response: 'Prikazuje tvoj nivo, skupljeni XP i trenutu titulu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rank', category: 'Ekonomija' },
   { id: 'builtin-points-eco', command: 'points, poeni, bal, coins [@user]', response: 'Prikazuje stanje novčanika poena i zlatnika u ekonomiji kanala.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'points', category: 'Ekonomija' },
@@ -2272,7 +2275,7 @@ const defaultBuiltinCommands = [
   { id: 'builtin-givepoints', command: 'givepoints, dajpoene, pay @user [iznos]', response: 'Prenaša poene drugom članu četa.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'givepoints', category: 'Ekonomija' },
   { id: 'builtin-toplevel', command: 'toplevel, topxp [broj]', response: 'Prikazuje top listu korisnika sa najvećim nivoima i iskustvom.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'toplevel', category: 'Ekonomija' },
   { id: 'builtin-topcoins', command: 'topcoins, toppoeni [broj]', response: 'Prikazuje top listu najbogatijih korisnika po broju poena.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'topcoins', category: 'Ekonomija' },
-  
+
   // Kockanje
   { id: 'builtin-slots', command: 'slots, slot [iznos]', response: 'Igraj slot mašinu sa poenima i osvoji do 10x nagrade.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'slots', category: 'Kockanje' },
   { id: 'builtin-roulette', command: 'roulette, rulet [opcija] [iznos]', response: 'Igraj rulet (crvena, crna, zelena ili broj) i uvećaj poene.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'roulette', category: 'Kockanje' },
@@ -2280,11 +2283,11 @@ const defaultBuiltinCommands = [
   { id: 'builtin-wheel', command: 'tocak, wheel [iznos]', response: 'Zavrti točak sreće za nasumične multiplikatore poena.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'tocak', category: 'Kockanje' },
   { id: 'builtin-duelgamble', command: 'duel, dvoboj @user [iznos]', response: 'Izazovi drugog člana na kockaški dvoboj u poene.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'duel', category: 'Kockanje' },
   { id: 'builtin-acceptgamble', command: 'accept', response: 'Prihvati poziv na kockaški dvoboj za poene.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'accept', category: 'Kockanje' },
-  
+
   // Prodavnica
   { id: 'builtin-store', command: 'store, prodavnica, shop', response: 'Prikazuje spisak svih dostupnih nagrada u prodavnici kanala.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'store', category: 'Prodavnica' },
   { id: 'builtin-redeem', command: 'redeem, kupi [naziv]', response: 'Kupi željenu nagradu iz prodavnice menjajući poene.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'redeem', category: 'Prodavnica' },
-  
+
   // Muzika
   { id: 'builtin-pesma', command: 'pesma [naziv], sr [naziv], song [naziv]', response: 'Zatraži puštanje pesme na strimu po nazivu ili linku.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'pesma', category: 'Muzika' }
 ];
@@ -3589,7 +3592,7 @@ async function loadBotConfig() {
     if (document.getElementById('cfgLeaderboard')) document.getElementById('cfgLeaderboard').checked = data.feature_leaderboard ?? true;
     if (document.getElementById('cfgGames')) document.getElementById('cfgGames').checked = data.feature_games ?? true;
     if (document.getElementById('cfgLove')) document.getElementById('cfgLove').checked = data.feature_love ?? true;
-    if (document.getElementById('cfgModeration')) document.getElementById('cfgModeration').checked = data.feature_moderation ?? false;
+    if (document.getElementById('cfgModeration')) document.getElementById('cfgModeration').checked = data.feature_moderation ?? true;
     if (document.getElementById('cfgAutoresponse')) document.getElementById('cfgAutoresponse').checked = data.feature_autoresponse ?? true;
     const masterAutoSwitch = document.getElementById('cfgFeatureAutoresponseMaster');
     if (masterAutoSwitch) masterAutoSwitch.checked = data.feature_autoresponse ?? true;
@@ -3748,7 +3751,7 @@ async function loadBotConfig() {
 
     // Apply plan restrictions to penalty settings
     applyPenaltySettingsRestrictions();
-    
+
     // Render moderation penalty banner
     renderPlanLimitBanners();
 
@@ -3846,7 +3849,7 @@ async function saveBotConfig(silent = false) {
     feature_watchtime: document.getElementById('cfgGambleEnabled')?.checked ?? true,
     feature_games: document.getElementById('cfgGames')?.checked ?? true,
     feature_love: document.getElementById('cfgLove')?.checked ?? true,
-    feature_moderation: document.getElementById('cfgModeration')?.checked ?? false,
+    feature_moderation: document.getElementById('cfgModeration')?.checked ?? true,
     feature_autoresponse: (function () {
       const master = document.getElementById('cfgFeatureAutoresponseMaster');
       const slave = document.getElementById('cfgAutoresponse');
@@ -3962,7 +3965,7 @@ async function saveBotConfigFields(fieldsToUpdate) {
   }
 
   const { error } = await sb.from('bot_config')
-    .update(fieldsToUpdate, { 
+    .update(fieldsToUpdate, {
       channel_id: activeChannel.id,
       user_id: getChannelOwnerId()
     })
@@ -4530,7 +4533,7 @@ async function toggleBotActive() {
     showToast('error', 'Greška pri promeni statusa', '❌');
     document.getElementById('botActiveToggle').checked = !active;
     updateBotStatusUI(!active);
-    
+
     // Track bot action failure
     if (window.KickALLDataLayer) {
       window.KickALLDataLayer.trackError('bot_toggle_error', {
@@ -4543,7 +4546,7 @@ async function toggleBotActive() {
     showToast(active ? 'success' : 'info', `Bot je ${active ? 'pokrenut' : 'zaustavljen'}`, active ? '🟢' : '⭕');
     addLocalLog('INFO', active ? 'Korisnik je pokrenuo bota' : 'Korisnik je zaustavio bota');
     notifyBotToReload();
-    
+
     // Track bot action success
     if (window.KickALLAnalytics) {
       window.KickALLAnalytics.trackBotAction(
@@ -5068,7 +5071,7 @@ function switchPanel(panelId) {
     if (window.history && window.history.replaceState) {
       window.history.replaceState(null, '', `#${panelId}`);
     }
-  } catch (e) {}
+  } catch (e) { }
 
   // Reset scroll for all panels
   document.querySelectorAll('.panel').forEach(p => {
@@ -5288,7 +5291,7 @@ function closeModal(id) {
   if (!modalEl) return;
   modalEl.style.pointerEvents = 'none';
   modalEl.classList.add('closing');
-  
+
   // Reset inline styles for upgrade modal
   if (id === 'upgradeModal') {
     modalEl.style.removeProperty('display');
@@ -5303,7 +5306,7 @@ function closeModal(id) {
     modalEl.style.removeProperty('height');
     modalEl.style.removeProperty('background');
   }
-  
+
   setTimeout(() => {
     modalEl.classList.remove('open', 'closing');
     modalEl.style.pointerEvents = '';
@@ -5796,14 +5799,14 @@ async function renderSettingsSubscriptionPanel() {
         .eq('id', currentUser.id)
         .maybeSingle();
       if (data) currentUserProfileData = data;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const p = currentUserProfileData || {};
   const plan = (p.plan || currentUserPlan || 'free').toUpperCase();
   const period = (p.plan_period === 'yearly') ? 'Godišnje' : (p.plan_period === 'monthly' ? 'Mesečno' : '');
   const planDisplay = period ? `${plan} (${period})` : plan;
-  
+
   if (planBadge) {
     planBadge.textContent = planDisplay;
     if (plan.includes('ELITE')) planBadge.style.color = '#53FC18';
@@ -5850,9 +5853,9 @@ async function renderSettingsSubscriptionPanel() {
   }
 
   if (btnPortal) {
-    const portalUrl = p.customer_portal_url || 'https://kickall.lemonsqueezy.com/billing';
-    btnPortal.href = portalUrl;
-    btnPortal.style.display = (plan !== 'FREE') ? 'inline-flex' : 'none';
+    const portalUrl = p.customer_portal_url || window.CONFIG?.PADDLE?.BILLING_PORTAL_URL || '';
+    btnPortal.href = portalUrl || '#';
+    btnPortal.style.display = (plan !== 'FREE' && portalUrl) ? 'inline-flex' : 'none';
   }
 }
 
@@ -6313,206 +6316,206 @@ async function addNewChannel() {
   showToast('success', `Kanal @${newCh.username} je dodat!`, '✅');
 }
 
-      function syncOverviewCardsHeight() {
-        const ctrlCard = document.getElementById('ovCtrlCard');
-        const liveCard = document.getElementById('ovLiveCard');
-        const liveFeed = document.getElementById('botLiveFeed');
-        if (ctrlCard && liveCard && liveFeed) {
-          // Allow ctrlCard to measure its exact natural compact height
-          ctrlCard.style.height = 'auto';
-          const targetHeight = ctrlCard.offsetHeight;
-          
-          if (window.innerWidth >= 768) {
-            liveCard.style.height = targetHeight + 'px';
-            const headHeight = liveCard.querySelector('.ov-card-head')?.offsetHeight || 30;
-            const availableFeedHeight = Math.max(100, targetHeight - headHeight - 44);
-            liveFeed.style.maxHeight = availableFeedHeight + 'px';
-            liveFeed.style.height = availableFeedHeight + 'px';
-          } else {
-            liveCard.style.height = 'auto';
-            liveFeed.style.maxHeight = '250px';
-            liveFeed.style.height = 'auto';
-          }
-        }
-      }
+function syncOverviewCardsHeight() {
+  const ctrlCard = document.getElementById('ovCtrlCard');
+  const liveCard = document.getElementById('ovLiveCard');
+  const liveFeed = document.getElementById('botLiveFeed');
+  if (ctrlCard && liveCard && liveFeed) {
+    // Allow ctrlCard to measure its exact natural compact height
+    ctrlCard.style.height = 'auto';
+    const targetHeight = ctrlCard.offsetHeight;
 
-      window.addEventListener('resize', syncOverviewCardsHeight);
+    if (window.innerWidth >= 768) {
+      liveCard.style.height = targetHeight + 'px';
+      const headHeight = liveCard.querySelector('.ov-card-head')?.offsetHeight || 30;
+      const availableFeedHeight = Math.max(100, targetHeight - headHeight - 44);
+      liveFeed.style.maxHeight = availableFeedHeight + 'px';
+      liveFeed.style.height = availableFeedHeight + 'px';
+    } else {
+      liveCard.style.height = 'auto';
+      liveFeed.style.maxHeight = '250px';
+      liveFeed.style.height = 'auto';
+    }
+  }
+}
 
-      function updateOverviewModulesUI() {
-        const modules = [
-          { id: 'ovStatusLeaderboard', toggleId: 'cfgLeaderboard', label: 'Leaderboard', panelId: 'panel-leaderboard' },
-          { id: 'ovStatusAnnouncements', toggleId: 'cfgAnnounceTimeEnabled', label: 'Automatske poruke', panelId: 'panel-announces' },
-          { id: 'ovStatusInteraction', toggleId: 'cfgAutoresponse', label: 'Bot interakcija', panelId: 'panel-autoresponse' },
-          { id: 'ovStatusLove', toggleId: 'cfgLove', label: 'Ljubav i brakovi', panelId: 'panel-marriages' },
-          { id: 'ovStatusGames', toggleId: 'cfgGames', label: 'Mini igre', panelId: 'panel-minigames' },
-          { id: 'ovStatusSongRequest', toggleId: 'cfgSongRequestEnabled', label: 'Song request', panelId: 'panel-songs' },
-          { id: 'ovStatusEconomy', toggleId: 'cfgGambleEnabled', label: 'Ranking sistem', panelId: 'panel-economy' },
-          { id: 'ovStatusModeration', toggleId: 'cfgModeration', label: 'Moderacija', panelId: 'panel-moderation' }
-        ];
+window.addEventListener('resize', syncOverviewCardsHeight);
 
-        const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-        const crossSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+function updateOverviewModulesUI() {
+  const modules = [
+    { id: 'ovStatusLeaderboard', toggleId: 'cfgLeaderboard', label: 'Leaderboard', panelId: 'panel-leaderboard' },
+    { id: 'ovStatusAnnouncements', toggleId: 'cfgAnnounceTimeEnabled', label: 'Automatske poruke', panelId: 'panel-announces' },
+    { id: 'ovStatusInteraction', toggleId: 'cfgAutoresponse', label: 'Bot interakcija', panelId: 'panel-autoresponse' },
+    { id: 'ovStatusLove', toggleId: 'cfgLove', label: 'Ljubav i brakovi', panelId: 'panel-marriages' },
+    { id: 'ovStatusGames', toggleId: 'cfgGames', label: 'Mini igre', panelId: 'panel-minigames' },
+    { id: 'ovStatusSongRequest', toggleId: 'cfgSongRequestEnabled', label: 'Song request', panelId: 'panel-songs' },
+    { id: 'ovStatusEconomy', toggleId: 'cfgGambleEnabled', label: 'Ranking sistem', panelId: 'panel-economy' },
+    { id: 'ovStatusModeration', toggleId: 'cfgModeration', label: 'Moderacija', panelId: 'panel-moderation' }
+  ];
 
-        // Synchronize all header master toggles
-        const masterMap = {
-          cfgLeaderboard: 'cfgFeatureLeaderboardMaster',
-          cfgLove: 'cfgFeatureLoveMaster',
-          cfgGames: 'cfgFeatureGamesMaster',
-          cfgAutoresponse: 'cfgFeatureAutoresponseMaster',
-          cfgAnnounceTimeEnabled: 'cfgFeatureAnnouncementsMaster',
-          cfgModeration: 'cfgFeatureModerationMaster',
-          cfgSongRequestEnabled: 'cfgFeatureSongRequestMaster',
-          cfgGambleEnabled: 'cfgFeatureEconomyMaster'
-        };
-        Object.keys(masterMap).forEach(key => {
-          const toggle = document.getElementById(key);
-          const master = document.getElementById(masterMap[key]);
-          if (toggle && master) {
-            master.checked = toggle.checked;
-          }
-        });
+  const checkSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+  const crossSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
 
-        modules.forEach(m => {
-          const el = document.getElementById(m.id);
-          const toggle = document.getElementById(m.toggleId);
-          if (!el) return;
+  // Synchronize all header master toggles
+  const masterMap = {
+    cfgLeaderboard: 'cfgFeatureLeaderboardMaster',
+    cfgLove: 'cfgFeatureLoveMaster',
+    cfgGames: 'cfgFeatureGamesMaster',
+    cfgAutoresponse: 'cfgFeatureAutoresponseMaster',
+    cfgAnnounceTimeEnabled: 'cfgFeatureAnnouncementsMaster',
+    cfgModeration: 'cfgFeatureModerationMaster',
+    cfgSongRequestEnabled: 'cfgFeatureSongRequestMaster',
+    cfgGambleEnabled: 'cfgFeatureEconomyMaster'
+  };
+  Object.keys(masterMap).forEach(key => {
+    const toggle = document.getElementById(key);
+    const master = document.getElementById(masterMap[key]);
+    if (toggle && master) {
+      master.checked = toggle.checked;
+    }
+  });
 
-          const isEnabled = toggle ? toggle.checked : true;
-          if (isEnabled) {
-            el.innerHTML = `<span>${m.label}</span> ${checkSvg}`;
-            el.className = 'module-status-badge active';
-          } else {
-            el.innerHTML = `<span>${m.label}</span> ${crossSvg}`;
-            el.className = 'module-status-badge inactive';
-          }
+  modules.forEach(m => {
+    const el = document.getElementById(m.id);
+    const toggle = document.getElementById(m.toggleId);
+    if (!el) return;
 
-          if (m.panelId) {
-            toggleModuleOverlay(m.panelId, isEnabled);
-          }
-        });
+    const isEnabled = toggle ? toggle.checked : true;
+    if (isEnabled) {
+      el.innerHTML = `<span>${m.label}</span> ${checkSvg}`;
+      el.className = 'module-status-badge active';
+    } else {
+      el.innerHTML = `<span>${m.label}</span> ${crossSvg}`;
+      el.className = 'module-status-badge inactive';
+    }
 
-        setTimeout(syncOverviewCardsHeight, 20);
-      }
+    if (m.panelId) {
+      toggleModuleOverlay(m.panelId, isEnabled);
+    }
+  });
 
-      async function toggleModuleFromHeader(toggleId, isChecked) {
-        const toggle = document.getElementById(toggleId);
-        if (toggle) toggle.checked = isChecked;
+  setTimeout(syncOverviewCardsHeight, 20);
+}
 
-        // INSTANT SYNCHRONOUS UI UPDATE
-        updateOverviewModulesUI();
+async function toggleModuleFromHeader(toggleId, isChecked) {
+  const toggle = document.getElementById(toggleId);
+  if (toggle) toggle.checked = isChecked;
 
-        if (toggleId === 'cfgModeration') {
-          if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
-          await saveModerationSettings(true);
-          await saveBotConfig(true);
-        } else if (toggleId === 'cfgSongRequestEnabled') {
-          await saveSongRequestConfig(true);
-          await saveBotConfig(true);
-        } else if (toggleId === 'cfgGambleEnabled') {
-          await saveEconomyConfig(true);
-          await saveBotConfig(true);
-        } else {
-          await saveBotConfig(true);
-        }
-        updateOverviewModulesUI();
-      }
+  // INSTANT SYNCHRONOUS UI UPDATE
+  updateOverviewModulesUI();
 
-      async function toggleModuleFromOverview(toggleId) {
-        const toggle = document.getElementById(toggleId);
-        if (!toggle) return;
+  if (toggleId === 'cfgModeration') {
+    if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
+    await saveModerationSettings(true);
+    await saveBotConfig(true);
+  } else if (toggleId === 'cfgSongRequestEnabled') {
+    await saveSongRequestConfig(true);
+    await saveBotConfig(true);
+  } else if (toggleId === 'cfgGambleEnabled') {
+    await saveEconomyConfig(true);
+    await saveBotConfig(true);
+  } else {
+    await saveBotConfig(true);
+  }
+  updateOverviewModulesUI();
+}
 
-        // Pronadji badge element za ovaj modul
-        const moduleToOvId = {
-          cfgLeaderboard: 'ovStatusLeaderboard',
-          cfgAnnounceTimeEnabled: 'ovStatusAnnouncements',
-          cfgAutoresponse: 'ovStatusInteraction',
-          cfgLove: 'ovStatusLove',
-          cfgGames: 'ovStatusGames',
-          cfgSongRequestEnabled: 'ovStatusSongRequest',
-          cfgGambleEnabled: 'ovStatusEconomy',
-          cfgModeration: 'ovStatusModeration'
-        };
+async function toggleModuleFromOverview(toggleId) {
+  const toggle = document.getElementById(toggleId);
+  if (!toggle) return;
 
-        const moduleNames = {
-          cfgLeaderboard: 'Leaderboard',
-          cfgAnnounceTimeEnabled: 'Automatske poruke',
-          cfgAutoresponse: 'Bot interakcija',
-          cfgLove: 'Ljubav i brakovi',
-          cfgGames: 'Mini igre',
-          cfgSongRequestEnabled: 'Song request',
-          cfgGambleEnabled: 'Ranking sistem',
-          cfgModeration: 'Moderacija'
-        };
+  // Pronadji badge element za ovaj modul
+  const moduleToOvId = {
+    cfgLeaderboard: 'ovStatusLeaderboard',
+    cfgAnnounceTimeEnabled: 'ovStatusAnnouncements',
+    cfgAutoresponse: 'ovStatusInteraction',
+    cfgLove: 'ovStatusLove',
+    cfgGames: 'ovStatusGames',
+    cfgSongRequestEnabled: 'ovStatusSongRequest',
+    cfgGambleEnabled: 'ovStatusEconomy',
+    cfgModeration: 'ovStatusModeration'
+  };
 
-        // Zapamti prethodni state pre izmene
-        const prevState = toggle.checked;
-        const newState = !prevState;
-        const name = moduleNames[toggleId] || 'Modul';
+  const moduleNames = {
+    cfgLeaderboard: 'Leaderboard',
+    cfgAnnounceTimeEnabled: 'Automatske poruke',
+    cfgAutoresponse: 'Bot interakcija',
+    cfgLove: 'Ljubav i brakovi',
+    cfgGames: 'Mini igre',
+    cfgSongRequestEnabled: 'Song request',
+    cfgGambleEnabled: 'Ranking sistem',
+    cfgModeration: 'Moderacija'
+  };
 
-        // OPTIMISTIČNI UPDATE — odmah primeni novu vrednost u UI
-        toggle.checked = newState;
+  // Zapamti prethodni state pre izmene
+  const prevState = toggle.checked;
+  const newState = !prevState;
+  const name = moduleNames[toggleId] || 'Modul';
 
-        // Sinhroniziraj master toggle ako postoji
-        if (toggleId === 'cfgAutoresponse') {
-          const master = document.getElementById('cfgFeatureAutoresponseMaster');
-          if (master) master.checked = newState;
-        } else if (toggleId === 'cfgSongRequestEnabled') {
-          const master = document.getElementById('cfgFeatureSongRequestMaster');
-          if (master) master.checked = newState;
-        }
+  // OPTIMISTIČNI UPDATE — odmah primeni novu vrednost u UI
+  toggle.checked = newState;
 
-        // Odmah osveži izgled znački (on/off) bez loading stanja
-        updateOverviewModulesUI();
+  // Sinhroniziraj master toggle ako postoji
+  if (toggleId === 'cfgAutoresponse') {
+    const master = document.getElementById('cfgFeatureAutoresponseMaster');
+    if (master) master.checked = newState;
+  } else if (toggleId === 'cfgSongRequestEnabled') {
+    const master = document.getElementById('cfgFeatureSongRequestMaster');
+    if (master) master.checked = newState;
+  }
 
-        try {
-          // Sačuvaj u bazu u pozadini
-          if (toggleId === 'cfgSongRequestEnabled') {
-            await saveSongRequestConfig(true);
-            await saveBotConfig(true);
-          } else if (toggleId === 'cfgGambleEnabled') {
-            await saveEconomyConfig(true);
-            await saveBotConfig(true);
-          } else if (toggleId === 'cfgModeration') {
-            if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
-            await saveModerationSettings(true);
-            await saveBotConfig(true);
-          } else {
-            await saveBotConfig(true);
-          }
+  // Odmah osveži izgled znački (on/off) bez loading stanja
+  updateOverviewModulesUI();
 
-          showToast(newState ? 'success' : 'info', `Modul "${name}" je ${newState ? 'uključen' : 'isključen'}.`);
+  try {
+    // Sačuvaj u bazu u pozadini
+    if (toggleId === 'cfgSongRequestEnabled') {
+      await saveSongRequestConfig(true);
+      await saveBotConfig(true);
+    } else if (toggleId === 'cfgGambleEnabled') {
+      await saveEconomyConfig(true);
+      await saveBotConfig(true);
+    } else if (toggleId === 'cfgModeration') {
+      if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
+      await saveModerationSettings(true);
+      await saveBotConfig(true);
+    } else {
+      await saveBotConfig(true);
+    }
 
-        } catch (err) {
-          toggle.checked = prevState;
-          if (toggleId === 'cfgAutoresponse') {
-            const master = document.getElementById('cfgFeatureAutoresponseMaster');
-            if (master) master.checked = prevState;
-          } else if (toggleId === 'cfgSongRequestEnabled') {
-            const master = document.getElementById('cfgFeatureSongRequestMaster');
-            if (master) master.checked = prevState;
-          }
-          updateOverviewModulesUI();
-          showToast('error', `Greška pri promeni modula "${name}". Pokušaj ponovo.`);
-        }
-      }
+    showToast(newState ? 'success' : 'info', `Modul "${name}" je ${newState ? 'uključen' : 'isključen'}.`);
 
-      function toggleModuleOverlay(panelId, active) {
-        const panel = document.getElementById(panelId);
-        if (!panel) return;
+  } catch (err) {
+    toggle.checked = prevState;
+    if (toggleId === 'cfgAutoresponse') {
+      const master = document.getElementById('cfgFeatureAutoresponseMaster');
+      if (master) master.checked = prevState;
+    } else if (toggleId === 'cfgSongRequestEnabled') {
+      const master = document.getElementById('cfgFeatureSongRequestMaster');
+      if (master) master.checked = prevState;
+    }
+    updateOverviewModulesUI();
+    showToast('error', `Greška pri promeni modula "${name}". Pokušaj ponovo.`);
+  }
+}
 
-        const existingOverlay = panel.querySelector('.module-disabled-overlay');
+function toggleModuleOverlay(panelId, active) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
 
-        if (active) {
-          panel.classList.remove('module-disabled-panel');
-          if (existingOverlay) {
-            existingOverlay.remove();
-          }
-        } else {
-          panel.classList.add('module-disabled-panel');
-          if (!existingOverlay) {
-            const overlay = document.createElement('div');
-            overlay.className = 'module-disabled-overlay';
-            overlay.innerHTML = `
+  const existingOverlay = panel.querySelector('.module-disabled-overlay');
+
+  if (active) {
+    panel.classList.remove('module-disabled-panel');
+    if (existingOverlay) {
+      existingOverlay.remove();
+    }
+  } else {
+    panel.classList.add('module-disabled-panel');
+    if (!existingOverlay) {
+      const overlay = document.createElement('div');
+      overlay.className = 'module-disabled-overlay';
+      overlay.innerHTML = `
         <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 0 20px rgba(239, 68, 68, 0.15);">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
@@ -6528,439 +6531,439 @@ async function addNewChannel() {
           <span>Aktiviraj</span>
         </button>
       `;
-            panel.appendChild(overlay);
-          }
-        }
-      }
+      panel.appendChild(overlay);
+    }
+  }
+}
 
-      async function enableCurrentPanelModule(btn) {
-        const activePanel = document.querySelector('.panel.active');
-        if (!activePanel) return;
+async function enableCurrentPanelModule(btn) {
+  const activePanel = document.querySelector('.panel.active');
+  if (!activePanel) return;
 
-        const panelId = activePanel.id;
-        const panelToToggleId = {
-          'panel-leaderboard': 'cfgLeaderboard',
-          'panel-announces': 'cfgAnnounceTimeEnabled',
-          'panel-autoresponse': 'cfgAutoresponse',
-          'panel-marriages': 'cfgLove',
-          'panel-minigames': 'cfgGames',
-          'panel-songs': 'cfgSongRequestEnabled',
-          'panel-economy': 'cfgGambleEnabled',
-          'panel-moderation': 'cfgModeration'
-        };
+  const panelId = activePanel.id;
+  const panelToToggleId = {
+    'panel-leaderboard': 'cfgLeaderboard',
+    'panel-announces': 'cfgAnnounceTimeEnabled',
+    'panel-autoresponse': 'cfgAutoresponse',
+    'panel-marriages': 'cfgLove',
+    'panel-minigames': 'cfgGames',
+    'panel-songs': 'cfgSongRequestEnabled',
+    'panel-economy': 'cfgGambleEnabled',
+    'panel-moderation': 'cfgModeration'
+  };
 
-        const toggleId = panelToToggleId[panelId];
-        if (!toggleId) return;
+  const toggleId = panelToToggleId[panelId];
+  if (!toggleId) return;
 
-        if (btn) {
-          btn.disabled = true;
-          btn.textContent = 'Aktiviram...';
-        }
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Aktiviram...';
+  }
 
-        await toggleModuleFromHeader(toggleId, true);
+  await toggleModuleFromHeader(toggleId, true);
 
-        const notice = activePanel.querySelector('#modDisabledNotice');
-        if (notice) notice.style.display = 'none';
+  const notice = activePanel.querySelector('#modDisabledNotice');
+  if (notice) notice.style.display = 'none';
 
-        showToast('success', 'Modul je uspešno aktiviran!', '⚡');
-      }
+  showToast('success', 'Modul je uspešno aktiviran!', '⚡');
+}
 
-      let liveFeedInterval = null;
-      let liveFeedUserScrolledUp = false;
-      let liveFeedScrollDebounce = null;
+let liveFeedInterval = null;
+let liveFeedUserScrolledUp = false;
+let liveFeedScrollDebounce = null;
 
-      function startLiveActivityFeed() {
-        const feed = document.getElementById('botLiveFeed');
-        if (!feed) return;
+function startLiveActivityFeed() {
+  const feed = document.getElementById('botLiveFeed');
+  if (!feed) return;
 
-        if (liveFeedInterval) {
-          clearInterval(liveFeedInterval);
-          liveFeedInterval = null;
-        }
+  if (liveFeedInterval) {
+    clearInterval(liveFeedInterval);
+    liveFeedInterval = null;
+  }
 
-        // Resetuj scroll state
+  // Resetuj scroll state
+  liveFeedUserScrolledUp = false;
+  if (liveFeedScrollDebounce) clearTimeout(liveFeedScrollDebounce);
+
+  // Stilovi za feed
+  feed.style.overflowY = 'auto';
+  feed.style.display = 'flex';
+  feed.style.flexDirection = 'column';
+  feed.style.gap = '2px';
+
+  // Wrapper za hint button — pronađi ili kreiraj
+  let feedWrap = feed.parentElement;
+  if (!feedWrap || !feedWrap.classList.contains('live-feed-wrap')) {
+    feedWrap = feed.parentElement;
+  }
+
+  // Helper za scroll hint dugme
+  function showScrollHint() {
+    if (!feedWrap) return;
+    let hint = feedWrap.querySelector('.live-feed-scroll-hint');
+    if (!hint) {
+      hint = document.createElement('button');
+      hint.className = 'live-feed-scroll-hint';
+      hint.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg> Najnoviji`;
+      hint.onclick = () => {
         liveFeedUserScrolledUp = false;
-        if (liveFeedScrollDebounce) clearTimeout(liveFeedScrollDebounce);
+        feed.scrollTop = feed.scrollHeight;
+        hint.remove();
+      };
+      feedWrap.style.position = 'relative';
+      feedWrap.appendChild(hint);
+    }
+  }
 
-        // Stilovi za feed
-        feed.style.overflowY = 'auto';
-        feed.style.display = 'flex';
-        feed.style.flexDirection = 'column';
-        feed.style.gap = '2px';
+  function hideScrollHint() {
+    if (!feedWrap) return;
+    const hint = feedWrap.querySelector('.live-feed-scroll-hint');
+    if (hint) hint.remove();
+  }
 
-        // Wrapper za hint button — pronađi ili kreiraj
-        let feedWrap = feed.parentElement;
-        if (!feedWrap || !feedWrap.classList.contains('live-feed-wrap')) {
-          feedWrap = feed.parentElement;
+  // Scroll listener sa debounce pauzom
+  feed.addEventListener('scroll', () => {
+    const isAtBottom = (feed.scrollHeight - feed.clientHeight - feed.scrollTop) < 60;
+    if (!isAtBottom) {
+      liveFeedUserScrolledUp = true;
+      showScrollHint();
+      // Pauziraj auto-scroll 8 sekundi od poslednjeg skrolovanja
+      clearTimeout(liveFeedScrollDebounce);
+      liveFeedScrollDebounce = setTimeout(() => {
+        liveFeedUserScrolledUp = false;
+        hideScrollHint();
+      }, 8000);
+    } else {
+      liveFeedUserScrolledUp = false;
+      clearTimeout(liveFeedScrollDebounce);
+      hideScrollHint();
+    }
+  }, { passive: true });
+
+  async function fetchLogs() {
+    if (!activeChannel) return;
+
+    try {
+      const res = await fetch(`${getBotApiBase()}/api/kick/logs?chatroom_id=${activeChannel.id}`);
+      const dot = document.getElementById('botLiveFeedDot');
+      if (res.ok) {
+        if (dot) {
+          dot.style.background = 'var(--kick-green)';
+          dot.style.boxShadow = '0 0 8px var(--kick-green)';
         }
-
-        // Helper za scroll hint dugme
-        function showScrollHint() {
-          if (!feedWrap) return;
-          let hint = feedWrap.querySelector('.live-feed-scroll-hint');
-          if (!hint) {
-            hint = document.createElement('button');
-            hint.className = 'live-feed-scroll-hint';
-            hint.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg> Najnoviji`;
-            hint.onclick = () => {
-              liveFeedUserScrolledUp = false;
-              feed.scrollTop = feed.scrollHeight;
-              hint.remove();
-            };
-            feedWrap.style.position = 'relative';
-            feedWrap.appendChild(hint);
-          }
-        }
-
-        function hideScrollHint() {
-          if (!feedWrap) return;
-          const hint = feedWrap.querySelector('.live-feed-scroll-hint');
-          if (hint) hint.remove();
-        }
-
-        // Scroll listener sa debounce pauzom
-        feed.addEventListener('scroll', () => {
-          const isAtBottom = (feed.scrollHeight - feed.clientHeight - feed.scrollTop) < 60;
-          if (!isAtBottom) {
-            liveFeedUserScrolledUp = true;
-            showScrollHint();
-            // Pauziraj auto-scroll 8 sekundi od poslednjeg skrolovanja
-            clearTimeout(liveFeedScrollDebounce);
-            liveFeedScrollDebounce = setTimeout(() => {
-              liveFeedUserScrolledUp = false;
-              hideScrollHint();
-            }, 8000);
-          } else {
-            liveFeedUserScrolledUp = false;
-            clearTimeout(liveFeedScrollDebounce);
-            hideScrollHint();
-          }
-        }, { passive: true });
-
-        async function fetchLogs() {
-          if (!activeChannel) return;
-
-          try {
-            const res = await fetch(`${getBotApiBase()}/api/kick/logs?chatroom_id=${activeChannel.id}`);
-            const dot = document.getElementById('botLiveFeedDot');
-            if (res.ok) {
-              if (dot) {
-                dot.style.background = 'var(--kick-green)';
-                dot.style.boxShadow = '0 0 8px var(--kick-green)';
-              }
-              const logs = await res.json();
-              if (logs.length === 0) {
-                feed.innerHTML = `
+        const logs = await res.json();
+        if (logs.length === 0) {
+          feed.innerHTML = `
             <div style="color: var(--text-muted); text-align: center; padding-top: 60px; font-style: italic; font-size: 0.85rem;">
               Čekam prve aktivnosti...
             </div>
           `;
-                return;
-              }
+          return;
+        }
 
-              // Renderuj logove
-              feed.innerHTML = logs.map(log => {
-                let badgeColor = 'var(--text-muted)';
-                if (log.type === 'ERR') badgeColor = '#EF4444';
-                else if (log.type === 'WARN') badgeColor = '#F59E0B';
-                else if (log.type === 'INFO') badgeColor = '#3B82F6';
-                else if (log.type === 'BOT') badgeColor = 'var(--kick-green)';
-                else if (log.type === 'CHAT') badgeColor = '#10B981';
+        // Renderuj logove
+        feed.innerHTML = logs.map(log => {
+          let badgeColor = 'var(--text-muted)';
+          if (log.type === 'ERR') badgeColor = '#EF4444';
+          else if (log.type === 'WARN') badgeColor = '#F59E0B';
+          else if (log.type === 'INFO') badgeColor = '#3B82F6';
+          else if (log.type === 'BOT') badgeColor = 'var(--kick-green)';
+          else if (log.type === 'CHAT') badgeColor = '#10B981';
 
-                // Očisti poruku od prefiksa kanala
-                let cleanMessage = log.message || '';
-                if (activeChannel) {
-                  const prefixRegex = new RegExp(`^\\[${activeChannel.username}\\]\\s*`, 'i');
-                  cleanMessage = cleanMessage.replace(prefixRegex, '');
-                  const atPrefixRegex = new RegExp(`^\\[@${activeChannel.username}\\]\\s*`, 'i');
-                  cleanMessage = cleanMessage.replace(atPrefixRegex, '');
-                }
+          // Očisti poruku od prefiksa kanala
+          let cleanMessage = log.message || '';
+          if (activeChannel) {
+            const prefixRegex = new RegExp(`^\\[${activeChannel.username}\\]\\s*`, 'i');
+            cleanMessage = cleanMessage.replace(prefixRegex, '');
+            const atPrefixRegex = new RegExp(`^\\[@${activeChannel.username}\\]\\s*`, 'i');
+            cleanMessage = cleanMessage.replace(atPrefixRegex, '');
+          }
 
-                return `
+          return `
             <div class="log-item" style="display: flex; gap: 8px; align-items: flex-start; text-align: left; font-family: monospace; font-size: 0.78rem; padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.02); line-height: 1.4; width: 100%; box-sizing: border-box;">
               <span style="color: var(--text-muted); flex-shrink: 0;">[${log.timestamp}]</span>
               <span style="color: ${badgeColor}; font-weight: bold; flex-shrink: 0;">[${log.type}]</span>
               <span style="color: #E2E8F0; word-break: break-all; flex-grow: 1;">${escapeHtml(cleanMessage)}</span>
             </div>
           `;
-              }).join('');
+        }).join('');
 
-              // Auto-scroll na dno samo ako korisnik nije skrolovao gore
-              if (!liveFeedUserScrolledUp) {
-                feed.scrollTop = feed.scrollHeight;
-              }
-            } else {
-              if (dot) {
-                dot.style.background = 'red';
-                dot.style.boxShadow = '0 0 8px red';
-              }
-            }
-          } catch (_) {
-            const dot = document.getElementById('botLiveFeedDot');
-            if (dot) {
-              dot.style.background = 'red';
-              dot.style.boxShadow = '0 0 8px red';
-            }
+        // Auto-scroll na dno samo ako korisnik nije skrolovao gore
+        if (!liveFeedUserScrolledUp) {
+          feed.scrollTop = feed.scrollHeight;
+        }
+      } else {
+        if (dot) {
+          dot.style.background = 'red';
+          dot.style.boxShadow = '0 0 8px red';
+        }
+      }
+    } catch (_) {
+      const dot = document.getElementById('botLiveFeedDot');
+      if (dot) {
+        dot.style.background = 'red';
+        dot.style.boxShadow = '0 0 8px red';
+      }
+    }
+  }
+
+  // Povuci odmah, pa na svake 3 sekunde
+  fetchLogs();
+  liveFeedInterval = setInterval(fetchLogs, 3000);
+}
+
+// ── Kick OAuth Helperi za dodavanje kanala ─────────────────────────────────
+function generateRandomString(length) {
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  let text = '';
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+}
+
+async function sha256(plain) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(plain);
+  return window.crypto.subtle.digest('SHA-256', data);
+}
+
+function base64urlencode(a) {
+  let str = "";
+  const bytes = new Uint8Array(a);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    str += String.fromCharCode(bytes[i]);
+  }
+  return btoa(str)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+}
+
+async function generateCodeChallenge(v) {
+  const hashed = await sha256(v);
+  return base64urlencode(hashed);
+}
+
+function getKickRedirectUri() {
+  return window.KickotConfig.api.kickOAuthRedirect;
+}
+
+async function openKickLoginForChannel() {
+  if (!currentUser) return;
+  const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
+  const KICK_REDIRECT_URI = getKickRedirectUri();
+  const KICK_SCOPE = 'user:read channel:read chat:read chat:write moderation:read moderation:write';
+
+  const state = generateRandomString(16);
+  const codeVerifier = generateRandomString(64);
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+  sessionStorage.setItem('kick_oauth_state', state);
+  sessionStorage.setItem('kick_code_verifier', codeVerifier);
+  sessionStorage.setItem('kick_oauth_intent', 'add_channel');
+  sessionStorage.setItem('kick_add_channel_uid', currentUser.id);
+  sessionStorage.setItem('kick_oauth_source', 'dashboard');
+  sessionStorage.setItem('kick_origin_site', 'kickot');
+
+  localStorage.setItem('kick_oauth_state', state);
+  localStorage.setItem('kick_code_verifier', codeVerifier);
+  localStorage.setItem('kick_origin_site', 'kickot');
+
+  const authUrl = 'https://id.kick.com/oauth/authorize?' + new URLSearchParams({
+    response_type: 'code',
+    client_id: KICK_CLIENT_ID,
+    redirect_uri: KICK_REDIRECT_URI,
+    scope: KICK_SCOPE,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256'
+  }).toString();
+
+  window.location.href = authUrl;
+}
+
+let autosaveConfigDebounce = null;
+let autosaveModDebounce = null;
+
+function triggerAutosaveConfig() {
+  if (!configLoaded) return;
+  if (autosaveConfigDebounce) clearTimeout(autosaveConfigDebounce);
+  autosaveConfigDebounce = setTimeout(() => {
+    saveBotConfig(true);
+  }, 1000); // 1 sekunda debounce za stabilnost
+}
+
+function triggerAutosaveMod() {
+  if (!configLoaded) return;
+  if (autosaveModDebounce) clearTimeout(autosaveModDebounce);
+  autosaveModDebounce = setTimeout(() => {
+    saveModerationSettings(true);
+  }, 1000); // 1 sekunda debounce za stabilnost
+}
+
+function setupAutosave() {
+  // 1. Inputs koji okidaju saveBotConfig
+  const configInputIds = [
+    'cfgPrefix', 'cfgLanguage', 'cfgCooldown', 'cfgLeaderboard', 'cfgWatchtime',
+    'cfgGames', 'cfgLove', 'cfgModeration', 'cfgAutoresponse', 'cfgSpamThreshold',
+    'cfgSpamWindow', 'cfgPinMsg', 'cfgWelcomeMsg', 'cfgAnnounceInterval',
+    'cfgAnnounceThreshold', 'cfgAnnounceTimeEnabled', 'cfgAnnounceMsgEnabled',
+    'cfgAlertFollowEnabled', 'cfgAlertFollowMsg',
+    'cfgAlertKicksEnabled', 'cfgAlertKicksMsg', 'cfgAlertKicksMin',
+    'cfgAlertSubEnabled', 'cfgAlertSubMsg',
+    'cfgAlertResubEnabled', 'cfgAlertResubMsg',
+    'cfgAlertGiftsubEnabled', 'cfgAlertGiftsubMsg',
+    'cfgAlertHostEnabled', 'cfgAlertHostMsg', 'cfgAlertHostMin',
+    'cfgAlertWelcomeEnabled', 'cfgAlertWelcomeMsg', 'cfgCustomBotName',
+    'cfgSongRequestEnabled', 'cfgSongRequestRank', 'cfgSongRequestCost', 'cfgSongRequestMaxDuration'
+  ];
+
+  configInputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        // Instant vizuelni feedback za module
+        if (el.type === 'checkbox') {
+          updateOverviewModulesUI();
+          if (id === 'cfgModeration') {
+            toggleModerationPanelState();
           }
         }
+        triggerAutosaveConfig();
+      });
+      el.addEventListener('change', triggerAutosaveConfig);
+    }
+  });
 
-        // Povuci odmah, pa na svake 3 sekunde
-        fetchLogs();
-        liveFeedInterval = setInterval(fetchLogs, 3000);
-      }
+  // 2. Inputs koji okidaju saveModerationSettings
+  const modInputIds = [
+    'cfgModCapsEnabled', 'cfgModCapsPct', 'cfgModCapsMinLen',
+    'cfgModLinksEnabled', 'cfgModLinksWhitelist', 'cfgModLinksPermitEnabled',
+    'cfgModEmotesEnabled', 'cfgModEmotesMax',
+    'cfgModSymbolsEnabled', 'cfgModSymbolsPct', 'cfgModSymbolsMinLen',
+    'cfgModWordsEnabled', 'cfgModWordsList',
+    'cfgModSpamEnabled', 'cfgModSpamMaxDuplicates',
+    'cfgModMaxLenEnabled', 'cfgModMaxLenLimit',
+    'cfgModMentionsEnabled', 'cfgModMentionsLimit',
+    'cfgModActionType', 'cfgModTimeoutDuration',
+    'cfgModExemptVip', 'cfgModExemptSub'
+  ];
 
-      // ── Kick OAuth Helperi za dodavanje kanala ─────────────────────────────────
-      function generateRandomString(length) {
-        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-        let text = '';
-        for (let i = 0; i < length; i++) {
-          text += possible.charAt(Math.floor(Math.random() * possible.length));
-        }
-        return text;
-      }
+  modInputIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', () => {
+        triggerAutosaveMod();
+      });
+      el.addEventListener('change', triggerAutosaveMod);
+    }
+  });
+}
 
-      async function sha256(plain) {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(plain);
-        return window.crypto.subtle.digest('SHA-256', data);
-      }
+// ── Notification Center ────────────────────────────────────────────────────
+let readNotifIds = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+let activeNotifTab = 'obaveštenja';
 
-      function base64urlencode(a) {
-        let str = "";
-        const bytes = new Uint8Array(a);
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-          str += String.fromCharCode(bytes[i]);
-        }
-        return btoa(str)
-          .replace(/\+/g, "-")
-          .replace(/\//g, "_")
-          .replace(/=+$/, "");
-      }
+// Notifications will be loaded from database
+let notifications = [];
 
-      async function generateCodeChallenge(v) {
-        const hashed = await sha256(v);
-        return base64urlencode(hashed);
-      }
+// Changelogs will be loaded from database
+let changelogs = [];
 
-      function getKickRedirectUri() {
-        return window.KickotConfig.api.kickOAuthRedirect;
-      }
+// Pomoćna funkcija za prirodno relativno vreme
+function formatRelativeTime(isoString) {
+  const date = new Date(isoString);
+  const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHours = Math.floor(diffMin / 60);
+  const diffDays = Math.floor(diffHours / 24);
 
-      async function openKickLoginForChannel() {
-        if (!currentUser) return;
-        const KICK_CLIENT_ID = '01KXN4YW8GF6DPXSC1JMMJ25QN';
-        const KICK_REDIRECT_URI = getKickRedirectUri();
-        const KICK_SCOPE = 'user:read channel:read chat:read chat:write moderation:read moderation:write';
+  if (diffSec < 60) return 'Upravo sada';
+  if (diffMin < 60) return `Pre ${diffMin} min`;
+  if (diffHours < 24) return `Pre ${diffHours} h`;
+  return `Pre ${diffDays} d`;
+}
 
-        const state = generateRandomString(16);
-        const codeVerifier = generateRandomString(64);
-        const codeChallenge = await generateCodeChallenge(codeVerifier);
+function initNotificationCenter() {
+  updateNotifBadgeUI();
+}
 
-        sessionStorage.setItem('kick_oauth_state', state);
-        sessionStorage.setItem('kick_code_verifier', codeVerifier);
-        sessionStorage.setItem('kick_oauth_intent', 'add_channel');
-        sessionStorage.setItem('kick_add_channel_uid', currentUser.id);
-        sessionStorage.setItem('kick_oauth_source', 'dashboard');
-        sessionStorage.setItem('kick_origin_site', 'kickot');
+function toggleNotifCenter() {
+  const popover = document.getElementById('notifPopover');
+  if (!popover) return;
+  const isHidden = popover.style.display === 'none' || !popover.style.display;
+  popover.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) {
+    renderNotifContent();
+  }
+}
 
-        localStorage.setItem('kick_oauth_state', state);
-        localStorage.setItem('kick_code_verifier', codeVerifier);
-        localStorage.setItem('kick_origin_site', 'kickot');
+function switchNotifTab(tab) {
+  activeNotifTab = tab;
+  const tabOb = document.getElementById('notifTabObaveštenja');
+  const tabCh = document.getElementById('notifTabChangelog');
+  if (!tabOb || !tabCh) return;
 
-        const authUrl = 'https://id.kick.com/oauth/authorize?' + new URLSearchParams({
-          response_type: 'code',
-          client_id: KICK_CLIENT_ID,
-          redirect_uri: KICK_REDIRECT_URI,
-          scope: KICK_SCOPE,
-          state,
-          code_challenge: codeChallenge,
-          code_challenge_method: 'S256'
-        }).toString();
+  const activeStyle = {
+    color: '#fff',
+    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1))',
+    border: '1px solid rgba(139, 92, 246, 0.3)',
+    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)',
+    fontWeight: '700'
+  };
 
-        window.location.href = authUrl;
-      }
+  const inactiveStyle = {
+    color: 'var(--text-muted)',
+    background: 'transparent',
+    border: '1px solid transparent',
+    boxShadow: 'none',
+    fontWeight: '600'
+  };
 
-      let autosaveConfigDebounce = null;
-      let autosaveModDebounce = null;
+  Object.assign(tabOb.style, tab === 'obaveštenja' ? activeStyle : inactiveStyle);
+  Object.assign(tabCh.style, tab === 'changelog' ? activeStyle : inactiveStyle);
 
-      function triggerAutosaveConfig() {
-        if (!configLoaded) return;
-        if (autosaveConfigDebounce) clearTimeout(autosaveConfigDebounce);
-        autosaveConfigDebounce = setTimeout(() => {
-          saveBotConfig(true);
-        }, 1000); // 1 sekunda debounce za stabilnost
-      }
+  renderNotifContent();
+}
 
-      function triggerAutosaveMod() {
-        if (!configLoaded) return;
-        if (autosaveModDebounce) clearTimeout(autosaveModDebounce);
-        autosaveModDebounce = setTimeout(() => {
-          saveModerationSettings(true);
-        }, 1000); // 1 sekunda debounce za stabilnost
-      }
+function renderNotifContent() {
+  const list = document.getElementById('notifContentList');
+  if (!list) return;
 
-      function setupAutosave() {
-        // 1. Inputs koji okidaju saveBotConfig
-        const configInputIds = [
-          'cfgPrefix', 'cfgLanguage', 'cfgCooldown', 'cfgLeaderboard', 'cfgWatchtime',
-          'cfgGames', 'cfgLove', 'cfgModeration', 'cfgAutoresponse', 'cfgSpamThreshold',
-          'cfgSpamWindow', 'cfgPinMsg', 'cfgWelcomeMsg', 'cfgAnnounceInterval',
-          'cfgAnnounceThreshold', 'cfgAnnounceTimeEnabled', 'cfgAnnounceMsgEnabled',
-          'cfgAlertFollowEnabled', 'cfgAlertFollowMsg',
-          'cfgAlertKicksEnabled', 'cfgAlertKicksMsg', 'cfgAlertKicksMin',
-          'cfgAlertSubEnabled', 'cfgAlertSubMsg',
-          'cfgAlertResubEnabled', 'cfgAlertResubMsg',
-          'cfgAlertGiftsubEnabled', 'cfgAlertGiftsubMsg',
-          'cfgAlertHostEnabled', 'cfgAlertHostMsg', 'cfgAlertHostMin',
-          'cfgAlertWelcomeEnabled', 'cfgAlertWelcomeMsg', 'cfgCustomBotName',
-          'cfgSongRequestEnabled', 'cfgSongRequestRank', 'cfgSongRequestCost', 'cfgSongRequestMaxDuration'
-        ];
-
-        configInputIds.forEach(id => {
-          const el = document.getElementById(id);
-          if (el) {
-            el.addEventListener('input', () => {
-              // Instant vizuelni feedback za module
-              if (el.type === 'checkbox') {
-                updateOverviewModulesUI();
-                if (id === 'cfgModeration') {
-                  toggleModerationPanelState();
-                }
-              }
-              triggerAutosaveConfig();
-            });
-            el.addEventListener('change', triggerAutosaveConfig);
-          }
-        });
-
-        // 2. Inputs koji okidaju saveModerationSettings
-        const modInputIds = [
-          'cfgModCapsEnabled', 'cfgModCapsPct', 'cfgModCapsMinLen',
-          'cfgModLinksEnabled', 'cfgModLinksWhitelist', 'cfgModLinksPermitEnabled',
-          'cfgModEmotesEnabled', 'cfgModEmotesMax',
-          'cfgModSymbolsEnabled', 'cfgModSymbolsPct', 'cfgModSymbolsMinLen',
-          'cfgModWordsEnabled', 'cfgModWordsList',
-          'cfgModSpamEnabled', 'cfgModSpamMaxDuplicates',
-          'cfgModMaxLenEnabled', 'cfgModMaxLenLimit',
-          'cfgModMentionsEnabled', 'cfgModMentionsLimit',
-          'cfgModActionType', 'cfgModTimeoutDuration',
-          'cfgModExemptVip', 'cfgModExemptSub'
-        ];
-
-        modInputIds.forEach(id => {
-          const el = document.getElementById(id);
-          if (el) {
-            el.addEventListener('input', () => {
-              triggerAutosaveMod();
-            });
-            el.addEventListener('change', triggerAutosaveMod);
-          }
-        });
-      }
-
-      // ── Notification Center ────────────────────────────────────────────────────
-      let readNotifIds = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
-      let activeNotifTab = 'obaveštenja';
-
-      // Notifications will be loaded from database
-      let notifications = [];
-
-      // Changelogs will be loaded from database
-      let changelogs = [];
-
-      // Pomoćna funkcija za prirodno relativno vreme
-      function formatRelativeTime(isoString) {
-        const date = new Date(isoString);
-        const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
-        const diffMin = Math.floor(diffSec / 60);
-        const diffHours = Math.floor(diffMin / 60);
-        const diffDays = Math.floor(diffHours / 24);
-
-        if (diffSec < 60) return 'Upravo sada';
-        if (diffMin < 60) return `Pre ${diffMin} min`;
-        if (diffHours < 24) return `Pre ${diffHours} h`;
-        return `Pre ${diffDays} d`;
-      }
-
-      function initNotificationCenter() {
-        updateNotifBadgeUI();
-      }
-
-      function toggleNotifCenter() {
-        const popover = document.getElementById('notifPopover');
-        if (!popover) return;
-        const isHidden = popover.style.display === 'none' || !popover.style.display;
-        popover.style.display = isHidden ? 'block' : 'none';
-        if (isHidden) {
-          renderNotifContent();
-        }
-      }
-
-      function switchNotifTab(tab) {
-        activeNotifTab = tab;
-        const tabOb = document.getElementById('notifTabObaveštenja');
-        const tabCh = document.getElementById('notifTabChangelog');
-        if (!tabOb || !tabCh) return;
-
-        const activeStyle = {
-          color: '#fff',
-          background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1))',
-          border: '1px solid rgba(139, 92, 246, 0.3)',
-          boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)',
-          fontWeight: '700'
-        };
-
-        const inactiveStyle = {
-          color: 'var(--text-muted)',
-          background: 'transparent',
-          border: '1px solid transparent',
-          boxShadow: 'none',
-          fontWeight: '600'
-        };
-
-        Object.assign(tabOb.style, tab === 'obaveštenja' ? activeStyle : inactiveStyle);
-        Object.assign(tabCh.style, tab === 'changelog' ? activeStyle : inactiveStyle);
-
-        renderNotifContent();
-      }
-
-      function renderNotifContent() {
-        const list = document.getElementById('notifContentList');
-        if (!list) return;
-
-        if (activeNotifTab === 'obaveštenja') {
-          if (notifications.length === 0) {
-            list.innerHTML = `
+  if (activeNotifTab === 'obaveštenja') {
+    if (notifications.length === 0) {
+      list.innerHTML = `
               <div style="color: var(--text-muted); text-align: center; padding: 32px 16px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.5;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
                 <span>Trenutno nema novih obaveštenja.</span>
               </div>`;
-            return;
-          }
+      return;
+    }
 
-          const sortedNotifications = [...notifications].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const sortedNotifications = [...notifications].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-          list.innerHTML = sortedNotifications.map(n => {
-            // Provera po String vrednosti sprečava greške sa tipovima
-            const isRead = readNotifIds.includes(String(n.id));
-            let color = '#3B82F6';
-            let iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+    list.innerHTML = sortedNotifications.map(n => {
+      // Provera po String vrednosti sprečava greške sa tipovima
+      const isRead = readNotifIds.includes(String(n.id));
+      let color = '#3B82F6';
+      let iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
 
-            if (n.type === 'success') {
-              color = '#10B981';
-              iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
-            } else if (n.type === 'warning') {
-              color = '#F59E0B';
-              iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.03 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-            }
+      if (n.type === 'success') {
+        color = '#10B981';
+        iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+      } else if (n.type === 'warning') {
+        color = '#F59E0B';
+        iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.03 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+      }
 
-            const opacityStyle = isRead ? 'opacity: 0.55;' : '';
-            const borderStyle = isRead ? 'border: 1px solid rgba(255,255,255,0.05);' : `border: 1px solid ${color}40; box-shadow: 0 4px 14px ${color}15;`;
-            const bgStyle = isRead ? 'background: rgba(255,255,255,0.02);' : 'background: rgba(255,255,255,0.04);';
-            const formattedTime = formatRelativeTime(n.timestamp);
+      const opacityStyle = isRead ? 'opacity: 0.55;' : '';
+      const borderStyle = isRead ? 'border: 1px solid rgba(255,255,255,0.05);' : `border: 1px solid ${color}40; box-shadow: 0 4px 14px ${color}15;`;
+      const bgStyle = isRead ? 'background: rgba(255,255,255,0.02);' : 'background: rgba(255,255,255,0.04);';
+      const formattedTime = formatRelativeTime(n.timestamp);
 
-            return `
+      return `
               <div onclick="markNotifAsRead('${n.id}')" style="padding: 12px 14px; border-radius: 12px; ${bgStyle} ${borderStyle} transition: all 0.2s; cursor: pointer; ${opacityStyle}">
                 <div style="display: flex; gap: 10px; align-items: flex-start; text-align: left;">
                   <div style="width: 24px; height: 24px; border-radius: 50%; background: ${color}20; color: ${color}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; border: 1px solid ${color}35;">
@@ -6976,18 +6979,18 @@ async function addNewChannel() {
                 </div>
               </div>
             `;
-          }).join('');
-        } else {
-          if (changelogs.length === 0) {
-            list.innerHTML = `
+    }).join('');
+  } else {
+    if (changelogs.length === 0) {
+      list.innerHTML = `
               <div style="color: var(--text-muted); text-align: center; padding: 32px 16px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.5;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 <span>Trenutno nema novih changelog informacija.</span>
               </div>`;
-            return;
-          }
+      return;
+    }
 
-          list.innerHTML = changelogs.map(c => `
+    list.innerHTML = changelogs.map(c => `
             <div style="padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); transition: all 0.2s;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                 <span style="font-size: 0.72rem; font-weight: 800; color: #a78bfa; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px;">${c.version}</span>
@@ -7000,358 +7003,358 @@ async function addNewChannel() {
               <div style="font-size: 0.77rem; color: var(--text-secondary); line-height: 1.45; text-align: left;">${escapeHtml(c.details)}</div>
             </div>
           `).join('');
-        }
+  }
+}
+
+function addNotification(title, desc, type = 'info') {
+  const newNotif = {
+    id: 'notif_' + Date.now(),
+    title: title,
+    desc: desc,
+    timestamp: new Date().toISOString(),
+    type: type
+  };
+
+  notifications.push(newNotif);
+  updateNotifBadgeUI();
+  renderNotifContent();
+}
+
+function updateNotifBadgeUI() {
+  const unreadCount = notifications.filter(n => !readNotifIds.includes(String(n.id))).length;
+  const badge = document.getElementById('notifBadge');
+  const btn = document.getElementById('notifBellBtn');
+
+  if (badge) {
+    badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+    badge.innerText = unreadCount > 9 ? '9+' : unreadCount;
+  }
+
+  if (btn) {
+    if (unreadCount > 0) {
+      btn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+      btn.style.color = '#EF4444';
+      btn.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.25)';
+    } else {
+      btn.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+      btn.style.color = 'var(--text-secondary)';
+      btn.style.boxShadow = 'none';
+    }
+  }
+}
+
+function markAllNotifsAsRead() {
+  notifications.forEach(n => {
+    if (!readNotifIds.includes(n.id)) readNotifIds.push(n.id);
+  });
+  localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
+
+  updateNotifBadgeUI();
+  renderNotifContent();
+  if (typeof showToast === 'function') {
+    showToast('success', 'Sva obaveštenja su označena kao pročitana.', '✔');
+  }
+}
+
+// Zatvaranje popovera na klik sa strane ili na taster Esc
+document.addEventListener('click', (e) => {
+  const popover = document.getElementById('notifPopover');
+  const btn = document.getElementById('notifBellBtn');
+  if (!popover || !btn) return;
+
+  // Ako kliknuti element više nije u dokumentu (re-render), ignorišemo
+  if (!document.body.contains(e.target)) return;
+
+  if (popover.style.display === 'block') {
+    if (!popover.contains(e.target) && !btn.contains(e.target)) {
+      popover.style.display = 'none';
+    }
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    const popover = document.getElementById('notifPopover');
+    if (popover && popover.style.display === 'block') {
+      popover.style.display = 'none';
+    }
+  }
+});
+
+function markNotifAsRead(id) {
+  const strId = String(id);
+
+  if (!readNotifIds.includes(strId)) {
+    readNotifIds.push(strId);
+    localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
+
+    updateNotifBadgeUI();
+    renderNotifContent();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', initNotificationCenter);
+
+function openFeedbackModal() {
+  const typeSelect = document.getElementById('feedbackType');
+  if (typeSelect) {
+    typeSelect.value = 'predlog';
+    onFeedbackTypeChange('predlog');
+  }
+  openModal('feedbackModal');
+}
+
+function openHelpModal() {
+  openModal('helpModal');
+}
+
+function openDocsModal() {
+  openModal('docsModal');
+}
+
+function onFeedbackTypeChange(type) {
+  const titleLbl = document.getElementById('lblFeedbackTitle');
+  const titleInput = document.getElementById('feedbackTitle');
+  const usageGroup = document.getElementById('groupCmdUsage');
+  const textLbl = document.getElementById('lblFeedbackText');
+  const textInput = document.getElementById('feedbackText');
+
+  if (type === 'predlog') {
+    if (titleLbl) titleLbl.textContent = 'Naziv komande / opcije';
+    if (titleInput) titleInput.placeholder = '!kokice';
+    if (usageGroup) usageGroup.style.display = 'block';
+    if (textLbl) textLbl.textContent = 'Kako komanda funkcioniše?';
+    if (textInput) textInput.placeholder = 'Opis komande...';
+  } else if (type === 'utisak') {
+    if (titleLbl) titleLbl.textContent = 'Naslov utiska / Ocena';
+    if (titleInput) titleInput.placeholder = 'Odličan bot';
+    if (usageGroup) usageGroup.style.display = 'none';
+    if (textLbl) textLbl.textContent = 'Tvoji utisci i sugestije';
+    if (textInput) textInput.placeholder = 'Napiši utiske...';
+  } else if (type === 'prijavabuga') {
+    if (titleLbl) titleLbl.textContent = 'Gde se greška pojavila?';
+    if (titleInput) titleInput.placeholder = 'Komanda !top ne radi';
+    if (usageGroup) usageGroup.style.display = 'none';
+    if (textLbl) textLbl.textContent = 'Opis greške';
+    if (textInput) textInput.placeholder = 'Opis problema...';
+  }
+}
+
+function handleFeedbackFormSubmit(event) {
+  event.preventDefault();
+
+  const form = document.getElementById('feedbackForm');
+  const typeSelect = document.getElementById('feedbackType');
+  const typeText = typeSelect?.options[typeSelect.selectedIndex]?.text || 'Predlog';
+  const title = document.getElementById('feedbackTitle')?.value.trim();
+  const text = document.getElementById('feedbackText')?.value.trim();
+
+  if (!title || !text) {
+    showToast('error', 'Molimo popunite sva obavezna polja pre slanja.');
+    return false;
+  }
+
+  const channelInput = document.getElementById('feedbackFormChannel');
+  if (channelInput) {
+    channelInput.value = window.activeChannel || 'Nepoznat kanal';
+  }
+
+  const subjectInput = document.getElementById('feedbackFormSubject');
+  if (subjectInput) {
+    subjectInput.value = `[Kickot Bot - ${typeText}] ${title}`;
+  }
+
+  const btn = document.getElementById('feedbackSubmitBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Slanje...';
+  }
+
+  // Submit form via background iframe
+  form.submit();
+
+  showToast('success', 'Hvala ti! Tvoj predlog je uspešno poslat Milanu.');
+
+  setTimeout(() => {
+    // Reset form fields
+    const titleInput = document.getElementById('feedbackTitle');
+    const usageInput = document.getElementById('feedbackCmdUsage');
+    const textInput = document.getElementById('feedbackText');
+    if (titleInput) titleInput.value = '';
+    if (usageInput) usageInput.value = '';
+    if (textInput) textInput.value = '';
+
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Pošalji`;
+    }
+
+    closeModal('feedbackModal');
+  }, 800);
+}
+
+// ── Song Request & YouTube Audio Player Logic ─────────────────────────────
+let localSongQueue = [
+  {
+    id: 'yt_dQw4w9WgXcQ',
+    ytId: 'dQw4w9WgXcQ',
+    title: 'Never Gonna Give You Up',
+    artist: 'Rick Astley',
+    requester: 'Strimer',
+    duration: 212,
+    source: 'youtube',
+    coverUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
+  }
+];
+
+let currentSongIndex = 0;
+let isPlaying = false;
+let playbackInterval = null;
+let currentTimeSeconds = 0;
+let playerVolume = 80;
+
+let ytPlayer = null;
+let isYtReady = false;
+
+// YouTube Iframe API callback
+window.onYouTubeIframeAPIReady = function () {
+  try {
+    ytPlayer = new YT.Player('ytAudioPlayer', {
+      height: '100%',
+      width: '100%',
+      playerVars: {
+        autoplay: 1,
+        controls: 1,
+        disablekb: 0,
+        fs: 0,
+        rel: 0,
+        playsinline: 1,
+        origin: window.location.origin
+      },
+      events: {
+        'onReady': onYtPlayerReady,
+        'onStateChange': onYtPlayerStateChange,
+        'onError': onYtPlayerError
       }
+    });
+  } catch (e) {
+    console.warn('[YouTube Audio Engine] API error:', e);
+  }
+};
 
-      function addNotification(title, desc, type = 'info') {
-        const newNotif = {
-          id: 'notif_' + Date.now(), 
-          title: title,
-          desc: desc,
-          timestamp: new Date().toISOString(),
-          type: type
-        };
-        
-        notifications.push(newNotif);
-        updateNotifBadgeUI();
-        renderNotifContent();
-      }
+function onYtPlayerReady(event) {
+  isYtReady = true;
+  if (ytPlayer) {
+    try {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume);
+    } catch (_) { }
+  }
+}
 
-      function updateNotifBadgeUI() {
-        const unreadCount = notifications.filter(n => !readNotifIds.includes(String(n.id))).length;
-        const badge = document.getElementById('notifBadge');
-        const btn = document.getElementById('notifBellBtn');
+function onYtPlayerStateChange(event) {
+  if (!event) return;
+  if (event.data === YT.PlayerState.ENDED) {
+    skipSong();
+  } else if (event.data === YT.PlayerState.PLAYING) {
+    isPlaying = true;
+    startTimer();
+    updatePlayerUI();
+    renderSongQueue();
+  } else if (event.data === YT.PlayerState.PAUSED) {
+    isPlaying = false;
+    stopTimer();
+    updatePlayerUI();
+    renderSongQueue();
+  }
+}
 
-        if (badge) {
-          badge.style.display = unreadCount > 0 ? 'flex' : 'none';
-          badge.innerText = unreadCount > 9 ? '9+' : unreadCount;
-        }
+function onYtPlayerError(event) {
+  console.warn('[YouTube Audio Engine] Video error, skipping song:', event ? event.data : '');
+  setTimeout(() => { skipSong(); }, 1500);
+}
 
-        if (btn) {
-          if (unreadCount > 0) {
-            btn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-            btn.style.color = '#EF4444';
-            btn.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.25)';
-          } else {
-            btn.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-            btn.style.color = 'var(--text-secondary)';
-            btn.style.boxShadow = 'none';
-          }
-        }
-      }
+function extractYouTubeId(urlOrText) {
+  if (!urlOrText) return null;
+  const match = urlOrText.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  return match && match[1] ? match[1] : null;
+}
 
-      function markAllNotifsAsRead() {
-        notifications.forEach(n => {
-          if (!readNotifIds.includes(n.id)) readNotifIds.push(n.id);
-        });
-        localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
+function startTimer() {
+  if (playbackInterval) clearInterval(playbackInterval);
+  playbackInterval = setInterval(() => {
+    const currentSong = localSongQueue[currentSongIndex];
+    if (!currentSong) {
+      stopTimer();
+      isPlaying = false;
+      updatePlayerUI();
+      return;
+    }
+    if (ytPlayer && ytPlayer.getCurrentTime && typeof ytPlayer.getCurrentTime === 'function') {
+      const curr = ytPlayer.getCurrentTime();
+      if (curr && !isNaN(curr)) currentTimeSeconds = Math.floor(curr);
+    } else {
+      currentTimeSeconds++;
+    }
+    updatePlayerUI();
+  }, 1000);
+}
 
-        updateNotifBadgeUI();
-        renderNotifContent();
-        if (typeof showToast === 'function') {
-          showToast('success', 'Sva obaveštenja su označena kao pročitana.', '✔');
-        }
-      }
+function stopTimer() {
+  if (playbackInterval) {
+    clearInterval(playbackInterval);
+    playbackInterval = null;
+  }
+}
 
-      // Zatvaranje popovera na klik sa strane ili na taster Esc
-      document.addEventListener('click', (e) => {
-        const popover = document.getElementById('notifPopover');
-        const btn = document.getElementById('notifBellBtn');
-        if (!popover || !btn) return;
+function formatDuration(secs) {
+  const m = Math.floor(secs / 60);
+  const s = String(secs % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
 
-        // Ako kliknuti element više nije u dokumentu (re-render), ignorišemo
-        if (!document.body.contains(e.target)) return;
+function renderSongQueue() {
+  const queueList = document.getElementById('songQueueList');
+  const queueCount = document.getElementById('queueCount');
+  if (!queueList) return;
 
-        if (popover.style.display === 'block') {
-          if (!popover.contains(e.target) && !btn.contains(e.target)) {
-            popover.style.display = 'none';
-          }
-        }
-      });
+  queueCount.textContent = `${localSongQueue.length} pesama`;
 
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') {
-          const popover = document.getElementById('notifPopover');
-          if (popover && popover.style.display === 'block') {
-            popover.style.display = 'none';
-          }
-        }
-      });
+  // Vizuelno ograničavanje Add dugmeta na osnovu plana
+  const sqLimits = getPlanLimits();
+  const addBtn = document.getElementById('songRequestAddBtn');
+  const addInput = document.getElementById('songRequestInput');
+  const isQueueFull = sqLimits.maxSongQueue !== Infinity && localSongQueue.length >= sqLimits.maxSongQueue;
 
-      function markNotifAsRead(id) {
-        const strId = String(id);
-        
-        if (!readNotifIds.includes(strId)) {
-          readNotifIds.push(strId);
-          localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
+  if (addBtn) {
+    addBtn.disabled = isQueueFull;
+    addBtn.style.opacity = isQueueFull ? '0.45' : '1';
+    addBtn.style.cursor = isQueueFull ? 'not-allowed' : 'pointer';
+    addBtn.title = isQueueFull ? `Queue limit dostignut (${localSongQueue.length}/${sqLimits.maxSongQueue}) — nadogradi paket` : '';
+  }
+  if (addInput) {
+    addInput.disabled = isQueueFull;
+    addInput.style.opacity = isQueueFull ? '0.5' : '1';
+    addInput.placeholder = isQueueFull
+      ? `Queue pun (${localSongQueue.length}/${sqLimits.maxSongQueue}) — nadogradi za veći queue`
+      : 'Unesi YouTube link ili naziv pesme...';
+  }
 
-          updateNotifBadgeUI();
-          renderNotifContent();
-        }
-      }
+  if (localSongQueue.length === 0) {
+    queueList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 24px; font-size: 0.82rem; font-style: italic;">Red za puštanje je prazan. Dodajte pesmu dole levo ili sačekajte muzičku želju iz četa.</div>';
+    return;
+  }
 
-      document.addEventListener('DOMContentLoaded', initNotificationCenter);
+  const defaultCover = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
 
-      function openFeedbackModal() {
-        const typeSelect = document.getElementById('feedbackType');
-        if (typeSelect) {
-          typeSelect.value = 'predlog';
-          onFeedbackTypeChange('predlog');
-        }
-        openModal('feedbackModal');
-      }
+  queueList.innerHTML = localSongQueue.map((song, index) => {
+    const isActive = index === currentSongIndex;
+    const activeBg = isActive ? 'rgba(255, 0, 51, 0.08)' : 'rgba(255,255,255,0.015)';
+    const activeBorder = isActive ? '1px solid rgba(255, 0, 51, 0.35)' : '1px solid var(--border-subtle)';
+    const activeText = isActive ? '#FF0033' : '#fff';
+    const cover = song.coverUrl || defaultCover;
 
-      function openHelpModal() {
-        openModal('helpModal');
-      }
-
-      function openDocsModal() {
-        openModal('docsModal');
-      }
-
-      function onFeedbackTypeChange(type) {
-        const titleLbl = document.getElementById('lblFeedbackTitle');
-        const titleInput = document.getElementById('feedbackTitle');
-        const usageGroup = document.getElementById('groupCmdUsage');
-        const textLbl = document.getElementById('lblFeedbackText');
-        const textInput = document.getElementById('feedbackText');
-
-        if (type === 'predlog') {
-          if (titleLbl) titleLbl.textContent = 'Naziv komande / opcije';
-          if (titleInput) titleInput.placeholder = '!kokice';
-          if (usageGroup) usageGroup.style.display = 'block';
-          if (textLbl) textLbl.textContent = 'Kako komanda funkcioniše?';
-          if (textInput) textInput.placeholder = 'Opis komande...';
-        } else if (type === 'utisak') {
-          if (titleLbl) titleLbl.textContent = 'Naslov utiska / Ocena';
-          if (titleInput) titleInput.placeholder = 'Odličan bot';
-          if (usageGroup) usageGroup.style.display = 'none';
-          if (textLbl) textLbl.textContent = 'Tvoji utisci i sugestije';
-          if (textInput) textInput.placeholder = 'Napiši utiske...';
-        } else if (type === 'prijavabuga') {
-          if (titleLbl) titleLbl.textContent = 'Gde se greška pojavila?';
-          if (titleInput) titleInput.placeholder = 'Komanda !top ne radi';
-          if (usageGroup) usageGroup.style.display = 'none';
-          if (textLbl) textLbl.textContent = 'Opis greške';
-          if (textInput) textInput.placeholder = 'Opis problema...';
-        }
-      }
-
-      function handleFeedbackFormSubmit(event) {
-        event.preventDefault();
-
-        const form = document.getElementById('feedbackForm');
-        const typeSelect = document.getElementById('feedbackType');
-        const typeText = typeSelect?.options[typeSelect.selectedIndex]?.text || 'Predlog';
-        const title = document.getElementById('feedbackTitle')?.value.trim();
-        const text = document.getElementById('feedbackText')?.value.trim();
-
-        if (!title || !text) {
-          showToast('error', 'Molimo popunite sva obavezna polja pre slanja.');
-          return false;
-        }
-
-        const channelInput = document.getElementById('feedbackFormChannel');
-        if (channelInput) {
-          channelInput.value = window.activeChannel || 'Nepoznat kanal';
-        }
-
-        const subjectInput = document.getElementById('feedbackFormSubject');
-        if (subjectInput) {
-          subjectInput.value = `[Kickot Bot - ${typeText}] ${title}`;
-        }
-
-        const btn = document.getElementById('feedbackSubmitBtn');
-        if (btn) {
-          btn.disabled = true;
-          btn.textContent = 'Slanje...';
-        }
-
-        // Submit form via background iframe
-        form.submit();
-
-        showToast('success', 'Hvala ti! Tvoj predlog je uspešno poslat Milanu.');
-
-        setTimeout(() => {
-          // Reset form fields
-          const titleInput = document.getElementById('feedbackTitle');
-          const usageInput = document.getElementById('feedbackCmdUsage');
-          const textInput = document.getElementById('feedbackText');
-          if (titleInput) titleInput.value = '';
-          if (usageInput) usageInput.value = '';
-          if (textInput) textInput.value = '';
-
-          if (btn) {
-            btn.disabled = false;
-            btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Pošalji`;
-          }
-
-          closeModal('feedbackModal');
-        }, 800);
-      }
-
-      // ── Song Request & YouTube Audio Player Logic ─────────────────────────────
-      let localSongQueue = [
-        {
-          id: 'yt_dQw4w9WgXcQ',
-          ytId: 'dQw4w9WgXcQ',
-          title: 'Never Gonna Give You Up',
-          artist: 'Rick Astley',
-          requester: 'Strimer (Milan_567)',
-          duration: 212,
-          source: 'youtube',
-          coverUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
-        }
-      ];
-
-      let currentSongIndex = 0;
-      let isPlaying = false;
-      let playbackInterval = null;
-      let currentTimeSeconds = 0;
-      let playerVolume = 80;
-
-      let ytPlayer = null;
-      let isYtReady = false;
-
-      // YouTube Iframe API callback
-      window.onYouTubeIframeAPIReady = function() {
-        try {
-          ytPlayer = new YT.Player('ytAudioPlayer', {
-            height: '100%',
-            width: '100%',
-            playerVars: {
-              autoplay: 1,
-              controls: 1,
-              disablekb: 0,
-              fs: 0,
-              rel: 0,
-              playsinline: 1,
-              origin: window.location.origin
-            },
-            events: {
-              'onReady': onYtPlayerReady,
-              'onStateChange': onYtPlayerStateChange,
-              'onError': onYtPlayerError
-            }
-          });
-        } catch (e) {
-          console.warn('[YouTube Audio Engine] API error:', e);
-        }
-      };
-
-      function onYtPlayerReady(event) {
-        isYtReady = true;
-        if (ytPlayer) {
-          try {
-            if (ytPlayer.unMute) ytPlayer.unMute();
-            if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume);
-          } catch (_) { }
-        }
-      }
-
-      function onYtPlayerStateChange(event) {
-        if (!event) return;
-        if (event.data === YT.PlayerState.ENDED) {
-          skipSong();
-        } else if (event.data === YT.PlayerState.PLAYING) {
-          isPlaying = true;
-          startTimer();
-          updatePlayerUI();
-          renderSongQueue();
-        } else if (event.data === YT.PlayerState.PAUSED) {
-          isPlaying = false;
-          stopTimer();
-          updatePlayerUI();
-          renderSongQueue();
-        }
-      }
-
-      function onYtPlayerError(event) {
-        console.warn('[YouTube Audio Engine] Video error, skipping song:', event ? event.data : '');
-        setTimeout(() => { skipSong(); }, 1500);
-      }
-
-      function extractYouTubeId(urlOrText) {
-        if (!urlOrText) return null;
-        const match = urlOrText.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
-        return match && match[1] ? match[1] : null;
-      }
-
-      function startTimer() {
-        if (playbackInterval) clearInterval(playbackInterval);
-        playbackInterval = setInterval(() => {
-          const currentSong = localSongQueue[currentSongIndex];
-          if (!currentSong) {
-            stopTimer();
-            isPlaying = false;
-            updatePlayerUI();
-            return;
-          }
-          if (ytPlayer && ytPlayer.getCurrentTime && typeof ytPlayer.getCurrentTime === 'function') {
-            const curr = ytPlayer.getCurrentTime();
-            if (curr && !isNaN(curr)) currentTimeSeconds = Math.floor(curr);
-          } else {
-            currentTimeSeconds++;
-          }
-          updatePlayerUI();
-        }, 1000);
-      }
-
-      function stopTimer() {
-        if (playbackInterval) {
-          clearInterval(playbackInterval);
-          playbackInterval = null;
-        }
-      }
-
-      function formatDuration(secs) {
-        const m = Math.floor(secs / 60);
-        const s = String(secs % 60).padStart(2, '0');
-        return `${m}:${s}`;
-      }
-
-      function renderSongQueue() {
-        const queueList = document.getElementById('songQueueList');
-        const queueCount = document.getElementById('queueCount');
-        if (!queueList) return;
-
-        queueCount.textContent = `${localSongQueue.length} pesama`;
-
-        // Vizuelno ograničavanje Add dugmeta na osnovu plana
-        const sqLimits = getPlanLimits();
-        const addBtn = document.getElementById('songRequestAddBtn');
-        const addInput = document.getElementById('songRequestInput');
-        const isQueueFull = sqLimits.maxSongQueue !== Infinity && localSongQueue.length >= sqLimits.maxSongQueue;
-
-        if (addBtn) {
-          addBtn.disabled = isQueueFull;
-          addBtn.style.opacity = isQueueFull ? '0.45' : '1';
-          addBtn.style.cursor = isQueueFull ? 'not-allowed' : 'pointer';
-          addBtn.title = isQueueFull ? `Queue limit dostignut (${localSongQueue.length}/${sqLimits.maxSongQueue}) — nadogradi paket` : '';
-        }
-        if (addInput) {
-          addInput.disabled = isQueueFull;
-          addInput.style.opacity = isQueueFull ? '0.5' : '1';
-          addInput.placeholder = isQueueFull
-            ? `Queue pun (${localSongQueue.length}/${sqLimits.maxSongQueue}) — nadogradi za veći queue`
-            : 'Unesi YouTube link ili naziv pesme...';
-        }
-
-        if (localSongQueue.length === 0) {
-          queueList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 24px; font-size: 0.82rem; font-style: italic;">Red za puštanje je prazan. Dodajte pesmu dole levo ili sačekajte muzičku želju iz četa.</div>';
-          return;
-        }
-
-        const defaultCover = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
-
-        queueList.innerHTML = localSongQueue.map((song, index) => {
-          const isActive = index === currentSongIndex;
-          const activeBg = isActive ? 'rgba(255, 0, 51, 0.08)' : 'rgba(255,255,255,0.015)';
-          const activeBorder = isActive ? '1px solid rgba(255, 0, 51, 0.35)' : '1px solid var(--border-subtle)';
-          const activeText = isActive ? '#FF0033' : '#fff';
-          const cover = song.coverUrl || defaultCover;
-
-          return `
+    return `
       <div style="background: ${activeBg}; border: ${activeBorder}; padding: 10px 14px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 12px; transition: all 0.2s ease;">
         <div style="display: flex; align-items: center; gap: 12px; flex-grow: 1; overflow: hidden;">
           <img src="${cover}" alt="Cover" style="width: 38px; height: 38px; border-radius: 6px; object-fit: cover; flex-shrink: 0; border: 1px solid rgba(255,255,255,0.1);" />
@@ -7369,849 +7372,849 @@ async function addNewChannel() {
         </div>
       </div>
     `;
-        }).join('');
+  }).join('');
+}
+
+function updatePlayerUI() {
+  const playerTitle = document.getElementById('playerTitle');
+  const playerRequester = document.getElementById('playerRequester');
+  const playerProgress = document.getElementById('playerProgress');
+  const playerCurrentTime = document.getElementById('playerCurrentTime');
+  const playerTotalTime = document.getElementById('playerTotalTime');
+  const playerDisk = document.getElementById('playerDisk');
+  const playerCoverImg = document.getElementById('playerCoverImg');
+  const playerSourceBadge = document.getElementById('playerSourceBadge');
+  const playIcon = document.getElementById('playIcon');
+
+  if (!playerTitle) return;
+
+  const currentSong = localSongQueue[currentSongIndex];
+  if (!currentSong) {
+    playerTitle.textContent = 'Nema pesama u redu';
+    playerRequester.textContent = 'Zatražite pesmu ispod ili u četu';
+    if (playerProgress) playerProgress.style.width = '0%';
+    if (playerCurrentTime) playerCurrentTime.textContent = '0:00';
+    if (playerTotalTime) playerTotalTime.textContent = '0:00';
+    if (playerCoverImg) { playerCoverImg.style.display = 'none'; playerCoverImg.src = ''; }
+    if (playerDisk) { playerDisk.style.display = 'flex'; playerDisk.style.animationPlayState = 'paused'; }
+    if (playerSourceBadge) playerSourceBadge.style.display = 'none';
+    if (playIcon) {
+      playIcon.setAttribute('viewBox', '0 0 24 24');
+      playIcon.style.marginLeft = '2px';
+      playIcon.innerHTML = '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" />';
+    }
+    return;
+  }
+
+  const titleText = currentSong.artist ? `${currentSong.artist} - ${currentSong.title}` : currentSong.title;
+  playerTitle.textContent = titleText;
+  playerRequester.textContent = `Zatražio: ${currentSong.requester}`;
+  if (playerTotalTime) playerTotalTime.textContent = formatDuration(currentSong.duration);
+  if (playerCurrentTime) playerCurrentTime.textContent = formatDuration(currentTimeSeconds);
+  if (playerProgress) {
+    const pct = currentSong.duration > 0 ? (currentTimeSeconds / currentSong.duration) * 100 : 0;
+    playerProgress.style.width = `${pct}%`;
+  }
+
+  if (currentSong.coverUrl && playerCoverImg) {
+    playerCoverImg.src = currentSong.coverUrl;
+    playerCoverImg.style.display = 'block';
+    if (playerDisk) playerDisk.style.display = 'none';
+  } else {
+    if (playerCoverImg) playerCoverImg.style.display = 'none';
+    if (playerDisk) playerDisk.style.display = 'flex';
+  }
+
+  if (playerSourceBadge) {
+    playerSourceBadge.style.display = 'inline-block';
+    playerSourceBadge.textContent = 'YouTube';
+    playerSourceBadge.style.background = 'rgba(255, 0, 51, 0.85)';
+  }
+
+  if (playIcon) {
+    playIcon.setAttribute('viewBox', '0 0 24 24');
+    if (isPlaying) {
+      playIcon.style.marginLeft = '0px';
+      playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" fill="currentColor" /><rect x="14" y="4" width="4" height="16" fill="currentColor" />';
+    } else {
+      playIcon.style.marginLeft = '2px';
+      playIcon.innerHTML = '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" />';
+    }
+  }
+}
+
+async function playCurrentAudio() {
+  const currentSong = localSongQueue[currentSongIndex];
+  if (!currentSong) return;
+
+  let ytId = currentSong.ytId || extractYouTubeId(currentSong.id) || extractYouTubeId(currentSong.title);
+
+  if (!ytId) {
+    const query = `${currentSong.artist && currentSong.artist !== 'YouTube' ? currentSong.artist + ' ' : ''}${currentSong.title}`;
+    ytId = await searchYouTubeVideoId(query);
+    if (ytId) {
+      currentSong.ytId = ytId;
+      currentSong.coverUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+    }
+  } else if (!currentSong.coverUrl) {
+    currentSong.coverUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
+  }
+
+  if (ytPlayer && ytId) {
+    try {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
+    } catch (_) { }
+
+    if (ytPlayer.loadVideoById) {
+      ytPlayer.loadVideoById({
+        videoId: ytId,
+        startSeconds: 0
+      });
+      if (ytPlayer.playVideo) ytPlayer.playVideo();
+    }
+    isPlaying = true;
+    startTimer();
+  } else {
+    isPlaying = true;
+    startTimer();
+  }
+  updatePlayerUI();
+  renderSongQueue();
+}
+
+async function togglePlayback() {
+  if (localSongQueue.length === 0) {
+    showToast('info', 'Dodajte najpre neku pesmu u red.', '🎵');
+    return;
+  }
+
+  if (isPlaying) {
+    isPlaying = false;
+    if (ytPlayer && ytPlayer.pauseVideo) {
+      ytPlayer.pauseVideo();
+    }
+    stopTimer();
+  } else {
+    isPlaying = true;
+    if (ytPlayer) {
+      try {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
+        if (ytPlayer.playVideo) ytPlayer.playVideo();
+      } catch (_) { }
+    } else {
+      playCurrentAudio();
+    }
+    startTimer();
+  }
+
+  updatePlayerUI();
+  renderSongQueue();
+}
+
+async function skipSong() {
+  stopTimer();
+  currentTimeSeconds = 0;
+
+  if (localSongQueue.length > 0) {
+    localSongQueue.splice(currentSongIndex, 1);
+    if (currentSongIndex >= localSongQueue.length) {
+      currentSongIndex = 0;
+    }
+  }
+
+  saveSongRequestConfig(true);
+
+  if (localSongQueue.length === 0) {
+    isPlaying = false;
+    if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+    showToast('info', 'Završeno puštanje svih pesama iz reda.', '🎵');
+  } else {
+    playCurrentAudio();
+  }
+
+  updatePlayerUI();
+  renderSongQueue();
+}
+
+async function previousSong() {
+  stopTimer();
+  currentTimeSeconds = 0;
+
+  if (currentSongIndex > 0) {
+    currentSongIndex--;
+  } else {
+    currentSongIndex = Math.max(0, localSongQueue.length - 1);
+  }
+
+  playCurrentAudio();
+}
+
+async function saveSongRequestConfig(silent) {
+  if (!activeChannel) return;
+
+  const masterToggle = document.getElementById('cfgFeatureSongRequestMaster');
+  const songToggle = document.getElementById('cfgSongRequestEnabled');
+  const rankSelect = document.getElementById('cfgSongRequestRank');
+  const costInput = document.getElementById('cfgSongRequestCost');
+  const maxDurationInput = document.getElementById('cfgSongRequestMaxDuration');
+
+  const isMasterEnabled = masterToggle ? masterToggle.checked : true;
+  const isEnabled = songToggle ? songToggle.checked : true;
+
+  const songrequestSettings = {
+    request_role: rankSelect ? rankSelect.value : 'everyone',
+    cost_points: costInput ? parseInt(costInput.value) || 0 : 0,
+    max_duration_seconds: maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360,
+    queue: localSongQueue
+  };
+
+  const { error } = await sb.from('bot_config')
+    .upsert({
+      user_id: getChannelOwnerId(),
+      channel_id: activeChannel.id,
+      channel_name: activeChannel.username,
+      feature_songrequest: isMasterEnabled && isEnabled,
+      songrequest_settings: songrequestSettings,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'channel_id' });
+
+  if (error) {
+    if (!silent) showToast('error', 'Greška pri čuvanju podešavanja song request-a', '❌');
+    return;
+  }
+
+  if (!silent) {
+    showToast('success', 'Song Request podešavanja uspešno sačuvana!', '✅');
+  }
+
+  notifyBotToReload();
+  updateOverviewModulesUI();
+}
+
+async function updateVolume(val) {
+  playerVolume = parseInt(val) || 0;
+  if (ytPlayer && ytPlayer.setVolume) {
+    ytPlayer.setVolume(playerVolume);
+  }
+}
+
+function seekPlayer(event) {
+  const currentSong = localSongQueue[currentSongIndex];
+  if (!currentSong) return;
+
+  const progressBar = event.currentTarget;
+  const rect = progressBar.getBoundingClientRect();
+  const clickX = event.clientX - rect.left;
+  const width = rect.width;
+  if (width <= 0) return;
+  const pct = Math.max(0, Math.min(1, clickX / width));
+
+  const targetSeconds = Math.floor(pct * (currentSong.duration || 0));
+  currentTimeSeconds = targetSeconds;
+
+  if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
+    try {
+      window.ytPlayer.seekTo(targetSeconds, true);
+    } catch (e) { }
+  }
+
+  updatePlayerUI();
+}
+
+async function searchYouTubeVideoId(query) {
+  if (!query) return null;
+  const directId = extractYouTubeId(query);
+  if (directId) return directId;
+
+  const cleanQuery = query.trim();
+
+  // 1. Zvanični KickALL Netlify Backend Search Endpoint
+  try {
+    const res = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.videoId) {
+        return data.videoId;
       }
+    }
+  } catch (e) { }
 
-      function updatePlayerUI() {
-        const playerTitle = document.getElementById('playerTitle');
-        const playerRequester = document.getElementById('playerRequester');
-        const playerProgress = document.getElementById('playerProgress');
-        const playerCurrentTime = document.getElementById('playerCurrentTime');
-        const playerTotalTime = document.getElementById('playerTotalTime');
-        const playerDisk = document.getElementById('playerDisk');
-        const playerCoverImg = document.getElementById('playerCoverImg');
-        const playerSourceBadge = document.getElementById('playerSourceBadge');
-        const playIcon = document.getElementById('playIcon');
-
-        if (!playerTitle) return;
-
-        const currentSong = localSongQueue[currentSongIndex];
-        if (!currentSong) {
-          playerTitle.textContent = 'Nema pesama u redu';
-          playerRequester.textContent = 'Zatražite pesmu ispod ili u četu';
-          if (playerProgress) playerProgress.style.width = '0%';
-          if (playerCurrentTime) playerCurrentTime.textContent = '0:00';
-          if (playerTotalTime) playerTotalTime.textContent = '0:00';
-          if (playerCoverImg) { playerCoverImg.style.display = 'none'; playerCoverImg.src = ''; }
-          if (playerDisk) { playerDisk.style.display = 'flex'; playerDisk.style.animationPlayState = 'paused'; }
-          if (playerSourceBadge) playerSourceBadge.style.display = 'none';
-          if (playIcon) {
-            playIcon.setAttribute('viewBox', '0 0 24 24');
-            playIcon.style.marginLeft = '2px';
-            playIcon.innerHTML = '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" />';
-          }
-          return;
-        }
-
-        const titleText = currentSong.artist ? `${currentSong.artist} - ${currentSong.title}` : currentSong.title;
-        playerTitle.textContent = titleText;
-        playerRequester.textContent = `Zatražio: ${currentSong.requester}`;
-        if (playerTotalTime) playerTotalTime.textContent = formatDuration(currentSong.duration);
-        if (playerCurrentTime) playerCurrentTime.textContent = formatDuration(currentTimeSeconds);
-        if (playerProgress) {
-          const pct = currentSong.duration > 0 ? (currentTimeSeconds / currentSong.duration) * 100 : 0;
-          playerProgress.style.width = `${pct}%`;
-        }
-
-        if (currentSong.coverUrl && playerCoverImg) {
-          playerCoverImg.src = currentSong.coverUrl;
-          playerCoverImg.style.display = 'block';
-          if (playerDisk) playerDisk.style.display = 'none';
-        } else {
-          if (playerCoverImg) playerCoverImg.style.display = 'none';
-          if (playerDisk) playerDisk.style.display = 'flex';
-        }
-
-        if (playerSourceBadge) {
-          playerSourceBadge.style.display = 'inline-block';
-          playerSourceBadge.textContent = 'YouTube';
-          playerSourceBadge.style.background = 'rgba(255, 0, 51, 0.85)';
-        }
-
-        if (playIcon) {
-          playIcon.setAttribute('viewBox', '0 0 24 24');
-          if (isPlaying) {
-            playIcon.style.marginLeft = '0px';
-            playIcon.innerHTML = '<rect x="6" y="4" width="4" height="16" fill="currentColor" /><rect x="14" y="4" width="4" height="16" fill="currentColor" />';
-          } else {
-            playIcon.style.marginLeft = '2px';
-            playIcon.innerHTML = '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" />';
-          }
-        }
+  // 2. Fallback: allorigins proxy
+  try {
+    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery))}`, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const html = await res.text();
+      const match = html.match(/"videoId":"([\w-]{11})"/);
+      if (match && match[1]) {
+        return match[1];
       }
+    }
+  } catch (e) { }
 
-      async function playCurrentAudio() {
-        const currentSong = localSongQueue[currentSongIndex];
-        if (!currentSong) return;
-
-        let ytId = currentSong.ytId || extractYouTubeId(currentSong.id) || extractYouTubeId(currentSong.title);
-
-        if (!ytId) {
-          const query = `${currentSong.artist && currentSong.artist !== 'YouTube' ? currentSong.artist + ' ' : ''}${currentSong.title}`;
-          ytId = await searchYouTubeVideoId(query);
-          if (ytId) {
-            currentSong.ytId = ytId;
-            currentSong.coverUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
-          }
-        } else if (!currentSong.coverUrl) {
-          currentSong.coverUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
-        }
-
-        if (ytPlayer && ytId) {
-          try {
-            if (ytPlayer.unMute) ytPlayer.unMute();
-            if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
-          } catch (_) { }
-
-          if (ytPlayer.loadVideoById) {
-            ytPlayer.loadVideoById({
-              videoId: ytId,
-              startSeconds: 0
-            });
-            if (ytPlayer.playVideo) ytPlayer.playVideo();
-          }
-          isPlaying = true;
-          startTimer();
-        } else {
-          isPlaying = true;
-          startTimer();
-        }
-        updatePlayerUI();
-        renderSongQueue();
+  // 3. Fallback: corsproxy
+  try {
+    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery))}`, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const html = await res.text();
+      const match = html.match(/"videoId":"([\w-]{11})"/);
+      if (match && match[1]) {
+        return match[1];
       }
+    }
+  } catch (e) { }
 
-      async function togglePlayback() {
-        if (localSongQueue.length === 0) {
-          showToast('info', 'Dodajte najpre neku pesmu u red.', '🎵');
-          return;
-        }
+  return null;
+}
 
-        if (isPlaying) {
-          isPlaying = false;
-          if (ytPlayer && ytPlayer.pauseVideo) {
-            ytPlayer.pauseVideo();
-          }
-          stopTimer();
-        } else {
-          isPlaying = true;
-          if (ytPlayer) {
-            try {
-              if (ytPlayer.unMute) ytPlayer.unMute();
-              if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
-              if (ytPlayer.playVideo) ytPlayer.playVideo();
-            } catch (_) { }
-          } else {
-            playCurrentAudio();
-          }
-          startTimer();
-        }
-
-        updatePlayerUI();
-        renderSongQueue();
+async function fetchExactYouTubeDuration(ytId) {
+  if (!ytId) return 0;
+  try {
+    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + ytId)}`, { signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const html = await res.text();
+      const match = html.match(/"approxDurationMs":"(\d+)"/);
+      if (match && match[1]) {
+        return Math.round(parseInt(match[1]) / 1000);
       }
+    }
+  } catch (e) { }
+  return 0;
+}
 
-      async function skipSong() {
-        stopTimer();
-        currentTimeSeconds = 0;
+async function resolveYouTubeSongSmart(query) {
+  if (!query) return null;
+  const cleanQuery = query.trim();
 
-        if (localSongQueue.length > 0) {
-          localSongQueue.splice(currentSongIndex, 1);
-          if (currentSongIndex >= localSongQueue.length) {
-            currentSongIndex = 0;
-          }
-        }
-
-        saveSongRequestConfig(true);
-
-        if (localSongQueue.length === 0) {
-          isPlaying = false;
-          if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
-          showToast('info', 'Završeno puštanje svih pesama iz reda.', '🎵');
-        } else {
-          playCurrentAudio();
-        }
-
-        updatePlayerUI();
-        renderSongQueue();
-      }
-
-      async function previousSong() {
-        stopTimer();
-        currentTimeSeconds = 0;
-
-        if (currentSongIndex > 0) {
-          currentSongIndex--;
-        } else {
-          currentSongIndex = Math.max(0, localSongQueue.length - 1);
-        }
-
-        playCurrentAudio();
-      }
-
-      async function saveSongRequestConfig(silent) {
-        if (!activeChannel) return;
-
-        const masterToggle = document.getElementById('cfgFeatureSongRequestMaster');
-        const songToggle = document.getElementById('cfgSongRequestEnabled');
-        const rankSelect = document.getElementById('cfgSongRequestRank');
-        const costInput = document.getElementById('cfgSongRequestCost');
-        const maxDurationInput = document.getElementById('cfgSongRequestMaxDuration');
-
-        const isMasterEnabled = masterToggle ? masterToggle.checked : true;
-        const isEnabled = songToggle ? songToggle.checked : true;
-
-        const songrequestSettings = {
-          request_role: rankSelect ? rankSelect.value : 'everyone',
-          cost_points: costInput ? parseInt(costInput.value) || 0 : 0,
-          max_duration_seconds: maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360,
-          queue: localSongQueue
-        };
-
-        const { error } = await sb.from('bot_config')
-          .upsert({
-            user_id: getChannelOwnerId(),
-            channel_id: activeChannel.id,
-            channel_name: activeChannel.username,
-            feature_songrequest: isMasterEnabled && isEnabled,
-            songrequest_settings: songrequestSettings,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'channel_id' });
-
-        if (error) {
-          if (!silent) showToast('error', 'Greška pri čuvanju podešavanja song request-a', '❌');
-          return;
-        }
-
-        if (!silent) {
-          showToast('success', 'Song Request podešavanja uspešno sačuvana!', '✅');
-        }
-
-        notifyBotToReload();
-        updateOverviewModulesUI();
-      }
-
-      async function updateVolume(val) {
-        playerVolume = parseInt(val) || 0;
-        if (ytPlayer && ytPlayer.setVolume) {
-          ytPlayer.setVolume(playerVolume);
-        }
-      }
-
-      function seekPlayer(event) {
-        const currentSong = localSongQueue[currentSongIndex];
-        if (!currentSong) return;
-
-        const progressBar = event.currentTarget;
-        const rect = progressBar.getBoundingClientRect();
-        const clickX = event.clientX - rect.left;
-        const width = rect.width;
-        if (width <= 0) return;
-        const pct = Math.max(0, Math.min(1, clickX / width));
-
-        const targetSeconds = Math.floor(pct * (currentSong.duration || 0));
-        currentTimeSeconds = targetSeconds;
-
-        if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
-          try {
-            window.ytPlayer.seekTo(targetSeconds, true);
-          } catch (e) { }
-        }
-
-        updatePlayerUI();
-      }
-
-      async function searchYouTubeVideoId(query) {
-        if (!query) return null;
-        const directId = extractYouTubeId(query);
-        if (directId) return directId;
-
-        const cleanQuery = query.trim();
-
-        // 1. Zvanični KickALL Netlify Backend Search Endpoint
-        try {
-          const res = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(4000) });
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.videoId) {
-              return data.videoId;
-            }
-          }
-        } catch (e) { }
-
-        // 2. Fallback: allorigins proxy
-        try {
-          const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery))}`, { signal: AbortSignal.timeout(4000) });
-          if (res.ok) {
-            const html = await res.text();
-            const match = html.match(/"videoId":"([\w-]{11})"/);
-            if (match && match[1]) {
-              return match[1];
-            }
-          }
-        } catch (e) { }
-
-        // 3. Fallback: corsproxy
-        try {
-          const res = await fetch(`https://corsproxy.io/?${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery))}`, { signal: AbortSignal.timeout(4000) });
-          if (res.ok) {
-            const html = await res.text();
-            const match = html.match(/"videoId":"([\w-]{11})"/);
-            if (match && match[1]) {
-              return match[1];
-            }
-          }
-        } catch (e) { }
-
-        return null;
-      }
-
-      async function fetchExactYouTubeDuration(ytId) {
-        if (!ytId) return 0;
-        try {
-          const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + ytId)}`, { signal: AbortSignal.timeout(3500) });
-          if (res.ok) {
-            const html = await res.text();
-            const match = html.match(/"approxDurationMs":"(\d+)"/);
-            if (match && match[1]) {
-              return Math.round(parseInt(match[1]) / 1000);
-            }
-          }
-        } catch (e) { }
-        return 0;
-      }
-
-      async function resolveYouTubeSongSmart(query) {
-        if (!query) return null;
-        const cleanQuery = query.trim();
-
-        // 1. Direktan YouTube link / ID
-        const ytIdMatch = extractYouTubeId(cleanQuery);
-        if (ytIdMatch) {
-          let exactDuration = await fetchExactYouTubeDuration(ytIdMatch);
-          try {
-            const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytIdMatch}&format=json`);
-            if (oembedRes.ok) {
-              const oembed = await oembedRes.json();
-              return {
-                ytId: ytIdMatch,
-                title: oembed.title || `YouTube Track (${ytIdMatch})`,
-                artist: oembed.author_name || 'YouTube',
-                coverUrl: `https://img.youtube.com/vi/${ytIdMatch}/hqdefault.jpg`,
-                duration: exactDuration > 0 ? exactDuration : 210
-              };
-            }
-          } catch (e) { }
-          return {
-            ytId: ytIdMatch,
-            title: `YouTube Track (${ytIdMatch})`,
-            artist: 'YouTube',
-            coverUrl: `https://img.youtube.com/vi/${ytIdMatch}/hqdefault.jpg`,
-            duration: exactDuration > 0 ? exactDuration : 210
-          };
-        }
-
-        // 2. Netlify Serverless YouTube Search
-        try {
-          const ytRes = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(5000) });
-          if (ytRes.ok) {
-            const data = await ytRes.json();
-            if (data && data.videoId) {
-              let artist = data.uploader || 'YouTube';
-              let title = data.title || cleanQuery;
-              if (title.includes(' - ')) {
-                const parts = title.split(' - ');
-                artist = parts[0].trim();
-                title = parts.slice(1).join(' - ').trim();
-              }
-              let exactDuration = data.duration ? Math.round(Number(data.duration)) : 0;
-              if (!exactDuration || exactDuration <= 0) {
-                exactDuration = await fetchExactYouTubeDuration(data.videoId);
-              }
-              return {
-                ytId: data.videoId,
-                title: title,
-                artist: artist,
-                coverUrl: data.coverUrl || `https://img.youtube.com/vi/${data.videoId}/hqdefault.jpg`,
-                duration: exactDuration > 0 ? exactDuration : 210
-              };
-            }
-          }
-        } catch (e) { }
-
-        // 3. Fallback: Pronađi Video ID preko klijentskog proxy-ja
-        const foundYtId = await searchYouTubeVideoId(cleanQuery);
-        let artist = '';
-        let title = cleanQuery;
-        if (cleanQuery.includes(' - ')) {
-          const parts = cleanQuery.split(' - ');
-          artist = parts[0].trim();
-          title = parts.slice(1).join(' - ').trim();
-        }
-
-        let exactDuration = await fetchExactYouTubeDuration(foundYtId);
-
+  // 1. Direktan YouTube link / ID
+  const ytIdMatch = extractYouTubeId(cleanQuery);
+  if (ytIdMatch) {
+    let exactDuration = await fetchExactYouTubeDuration(ytIdMatch);
+    try {
+      const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytIdMatch}&format=json`);
+      if (oembedRes.ok) {
+        const oembed = await oembedRes.json();
         return {
-          ytId: foundYtId,
-          title: title,
-          artist: artist,
-          coverUrl: foundYtId ? `https://img.youtube.com/vi/${foundYtId}/hqdefault.jpg` : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80',
+          ytId: ytIdMatch,
+          title: oembed.title || `YouTube Track (${ytIdMatch})`,
+          artist: oembed.author_name || 'YouTube',
+          coverUrl: `https://img.youtube.com/vi/${ytIdMatch}/hqdefault.jpg`,
           duration: exactDuration > 0 ? exactDuration : 210
         };
       }
+    } catch (e) { }
+    return {
+      ytId: ytIdMatch,
+      title: `YouTube Track (${ytIdMatch})`,
+      artist: 'YouTube',
+      coverUrl: `https://img.youtube.com/vi/${ytIdMatch}/hqdefault.jpg`,
+      duration: exactDuration > 0 ? exactDuration : 210
+    };
+  }
 
-      async function requestSong() {
-        const inputEl = document.getElementById('songRequestInput');
-        if (!inputEl) return;
-        const rawInput = inputEl.value ? inputEl.value.trim() : '';
-
-        if (!rawInput) {
-          showToast('info', 'Molimo unesite naziv pesme, izvođača ili YouTube link.', '🎵');
-          return;
+  // 2. Netlify Serverless YouTube Search
+  try {
+    const ytRes = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(5000) });
+    if (ytRes.ok) {
+      const data = await ytRes.json();
+      if (data && data.videoId) {
+        let artist = data.uploader || 'YouTube';
+        let title = data.title || cleanQuery;
+        if (title.includes(' - ')) {
+          const parts = title.split(' - ');
+          artist = parts[0].trim();
+          title = parts.slice(1).join(' - ').trim();
         }
-
-        const queueLimits = getPlanLimits();
-        if (queueLimits.maxSongQueue !== Infinity && localSongQueue.length >= queueLimits.maxSongQueue) {
-          showToast('warning', `Dostignut je limit od ${queueLimits.maxSongQueue} pesama u redu za ${queueLimits.name} paket! Nadogradi za veći queue.`);
-          openUpgradeModal('general');
-          return;
+        let exactDuration = data.duration ? Math.round(Number(data.duration)) : 0;
+        if (!exactDuration || exactDuration <= 0) {
+          exactDuration = await fetchExactYouTubeDuration(data.videoId);
         }
-
-        const addBtn = document.getElementById('songRequestAddBtn');
-        if (addBtn) {
-          addBtn.disabled = true;
-          addBtn.innerHTML = 'Tražim...';
-        }
-
-        showToast('info', `Tražim pesmu "${rawInput}" na YouTube-u...`, '🔍');
-
-        const resolved = await resolveYouTubeSongSmart(rawInput);
-
-        if (addBtn) {
-          addBtn.disabled = false;
-          addBtn.innerHTML = 'Dodaj';
-        }
-
-        if (!resolved) {
-          showToast('error', 'Nije bilo moguće pronaći pesmu.', '❌');
-          return;
-        }
-
-        const maxDurationInput = document.getElementById('cfgSongRequestMaxDuration');
-        const maxDuration = maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360;
-
-        const requesterName = (activeChannel && activeChannel.username) ? `Strimer (${activeChannel.username})` : 'Strimer';
-
-        const newSong = {
-          id: 'yt_' + (resolved.ytId || Date.now()),
-          ytId: resolved.ytId,
-          title: resolved.title,
-          artist: resolved.artist,
-          requester: requesterName,
-          duration: Math.min(resolved.duration || 210, maxDuration),
-          source: 'youtube',
-          coverUrl: resolved.coverUrl
+        return {
+          ytId: data.videoId,
+          title: title,
+          artist: artist,
+          coverUrl: data.coverUrl || `https://img.youtube.com/vi/${data.videoId}/hqdefault.jpg`,
+          duration: exactDuration > 0 ? exactDuration : 210
         };
-
-        localSongQueue.push(newSong);
-        inputEl.value = '';
-
-        renderSongQueue();
-        updatePlayerUI();
-        saveSongRequestConfig(true);
-
-        if (localSongQueue.length === 1 && !isPlaying) {
-          playCurrentAudio();
-        }
-
-        showToast('success', `Pronađena pesma: "${resolved.artist ? resolved.artist + ' - ' : ''}${resolved.title}"`, '🎵');
       }
+    }
+  } catch (e) { }
 
-      function removeSong(index) {
-        if (index < 0 || index >= localSongQueue.length) return;
+  // 3. Fallback: Pronađi Video ID preko klijentskog proxy-ja
+  const foundYtId = await searchYouTubeVideoId(cleanQuery);
+  let artist = '';
+  let title = cleanQuery;
+  if (cleanQuery.includes(' - ')) {
+    const parts = cleanQuery.split(' - ');
+    artist = parts[0].trim();
+    title = parts.slice(1).join(' - ').trim();
+  }
 
-        const removed = localSongQueue.splice(index, 1)[0];
+  let exactDuration = await fetchExactYouTubeDuration(foundYtId);
 
-        if (currentSongIndex >= localSongQueue.length) {
-          currentSongIndex = Math.max(0, localSongQueue.length - 1);
-        }
+  return {
+    ytId: foundYtId,
+    title: title,
+    artist: artist,
+    coverUrl: foundYtId ? `https://img.youtube.com/vi/${foundYtId}/hqdefault.jpg` : 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80',
+    duration: exactDuration > 0 ? exactDuration : 210
+  };
+}
 
-        if (localSongQueue.length === 0) {
-          isPlaying = false;
-          if (playbackInterval) clearInterval(playbackInterval);
-          currentTimeSeconds = 0;
-        }
+async function requestSong() {
+  const inputEl = document.getElementById('songRequestInput');
+  if (!inputEl) return;
+  const rawInput = inputEl.value ? inputEl.value.trim() : '';
 
-        renderSongQueue();
-        updatePlayerUI();
-        saveSongRequestConfig(true);
+  if (!rawInput) {
+    showToast('info', 'Molimo unesite naziv pesme, izvođača ili YouTube link.', '🎵');
+    return;
+  }
 
-        showToast('info', `Pesma "${removed ? removed.title : ''}" je uklonjena iz reda.`, '🗑️');
-      }
+  const queueLimits = getPlanLimits();
+  if (queueLimits.maxSongQueue !== Infinity && localSongQueue.length >= queueLimits.maxSongQueue) {
+    showToast('warning', `Dostignut je limit od ${queueLimits.maxSongQueue} pesama u redu za ${queueLimits.name} paket! Nadogradi za veći queue.`);
+    openUpgradeModal('general');
+    return;
+  }
 
-      function clearSongQueue() {
-        if (localSongQueue.length === 0) {
-          showToast('info', 'Red sa pesmama je već prazan.', 'ℹ️');
-          return;
-        }
+  const addBtn = document.getElementById('songRequestAddBtn');
+  if (addBtn) {
+    addBtn.disabled = true;
+    addBtn.innerHTML = 'Tražim...';
+  }
 
-        localSongQueue = [];
-        currentSongIndex = 0;
-        currentTimeSeconds = 0;
-        if (isPlaying) {
-          isPlaying = false;
-          if (playbackInterval) clearInterval(playbackInterval);
-        }
+  showToast('info', `Tražim pesmu "${rawInput}" na YouTube-u...`, '🔍');
 
-        renderSongQueue();
-        updatePlayerUI();
-        saveSongRequestConfig(true);
+  const resolved = await resolveYouTubeSongSmart(rawInput);
 
-        showToast('info', 'Red sa pesmama je uspešno očišćen.', '🧹');
-      }
+  if (addBtn) {
+    addBtn.disabled = false;
+    addBtn.innerHTML = 'Dodaj';
+  }
 
-      function playSongNow(index) {
-        if (index < 0 || index >= localSongQueue.length) return;
+  if (!resolved) {
+    showToast('error', 'Nije bilo moguće pronaći pesmu.', '❌');
+    return;
+  }
 
-        currentSongIndex = index;
-        currentTimeSeconds = 0;
-        isPlaying = true;
+  const maxDurationInput = document.getElementById('cfgSongRequestMaxDuration');
+  const maxDuration = maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360;
 
-        if (playbackInterval) clearInterval(playbackInterval);
-        playbackInterval = setInterval(() => {
-          const currentSong = localSongQueue[currentSongIndex];
-          if (!currentSong) {
-            clearInterval(playbackInterval);
-            isPlaying = false;
-            updatePlayerUI();
-            return;
+  const requesterName = (activeChannel && activeChannel.username) ? `Strimer (${activeChannel.username})` : 'Strimer';
+
+  const newSong = {
+    id: 'yt_' + (resolved.ytId || Date.now()),
+    ytId: resolved.ytId,
+    title: resolved.title,
+    artist: resolved.artist,
+    requester: requesterName,
+    duration: Math.min(resolved.duration || 210, maxDuration),
+    source: 'youtube',
+    coverUrl: resolved.coverUrl
+  };
+
+  localSongQueue.push(newSong);
+  inputEl.value = '';
+
+  renderSongQueue();
+  updatePlayerUI();
+  saveSongRequestConfig(true);
+
+  if (localSongQueue.length === 1 && !isPlaying) {
+    playCurrentAudio();
+  }
+
+  showToast('success', `Pronađena pesma: "${resolved.artist ? resolved.artist + ' - ' : ''}${resolved.title}"`, '🎵');
+}
+
+function removeSong(index) {
+  if (index < 0 || index >= localSongQueue.length) return;
+
+  const removed = localSongQueue.splice(index, 1)[0];
+
+  if (currentSongIndex >= localSongQueue.length) {
+    currentSongIndex = Math.max(0, localSongQueue.length - 1);
+  }
+
+  if (localSongQueue.length === 0) {
+    isPlaying = false;
+    if (playbackInterval) clearInterval(playbackInterval);
+    currentTimeSeconds = 0;
+  }
+
+  renderSongQueue();
+  updatePlayerUI();
+  saveSongRequestConfig(true);
+
+  showToast('info', `Pesma "${removed ? removed.title : ''}" je uklonjena iz reda.`, '🗑️');
+}
+
+function clearSongQueue() {
+  if (localSongQueue.length === 0) {
+    showToast('info', 'Red sa pesmama je već prazan.', 'ℹ️');
+    return;
+  }
+
+  localSongQueue = [];
+  currentSongIndex = 0;
+  currentTimeSeconds = 0;
+  if (isPlaying) {
+    isPlaying = false;
+    if (playbackInterval) clearInterval(playbackInterval);
+  }
+
+  renderSongQueue();
+  updatePlayerUI();
+  saveSongRequestConfig(true);
+
+  showToast('info', 'Red sa pesmama je uspešno očišćen.', '🧹');
+}
+
+function playSongNow(index) {
+  if (index < 0 || index >= localSongQueue.length) return;
+
+  currentSongIndex = index;
+  currentTimeSeconds = 0;
+  isPlaying = true;
+
+  if (playbackInterval) clearInterval(playbackInterval);
+  playbackInterval = setInterval(() => {
+    const currentSong = localSongQueue[currentSongIndex];
+    if (!currentSong) {
+      clearInterval(playbackInterval);
+      isPlaying = false;
+      updatePlayerUI();
+      return;
+    }
+
+    if (window.ytPlayer) {
+      try {
+        if (typeof window.ytPlayer.getDuration === 'function') {
+          const realDur = Math.round(window.ytPlayer.getDuration());
+          if (realDur && realDur > 0 && Math.abs((currentSong.duration || 0) - realDur) > 1) {
+            currentSong.duration = realDur;
           }
-
-          if (window.ytPlayer) {
-            try {
-              if (typeof window.ytPlayer.getDuration === 'function') {
-                const realDur = Math.round(window.ytPlayer.getDuration());
-                if (realDur && realDur > 0 && Math.abs((currentSong.duration || 0) - realDur) > 1) {
-                  currentSong.duration = realDur;
-                }
-              }
-              if (typeof window.ytPlayer.getCurrentTime === 'function') {
-                const realCur = Math.floor(window.ytPlayer.getCurrentTime());
-                if (typeof realCur === 'number' && !isNaN(realCur) && realCur >= 0) {
-                  currentTimeSeconds = realCur;
-                } else {
-                  currentTimeSeconds++;
-                }
-              } else {
-                currentTimeSeconds++;
-              }
-            } catch (_) {
-              currentTimeSeconds++;
-            }
+        }
+        if (typeof window.ytPlayer.getCurrentTime === 'function') {
+          const realCur = Math.floor(window.ytPlayer.getCurrentTime());
+          if (typeof realCur === 'number' && !isNaN(realCur) && realCur >= 0) {
+            currentTimeSeconds = realCur;
           } else {
             currentTimeSeconds++;
           }
-
-          if (currentSong.duration > 0 && currentTimeSeconds >= currentSong.duration) {
-            skipSong();
-          } else {
-            updatePlayerUI();
-          }
-        }, 1000);
-
-        updatePlayerUI();
-        renderSongQueue();
-        saveSongRequestConfig(true);
-      }
-
-      // Bind handlers globally to window for HTML event availability
-      window.requestSong = requestSong;
-      window.removeSong = removeSong;
-      window.clearSongQueue = clearSongQueue;
-      window.playSongNow = playSongNow;
-      window.togglePlayback = togglePlayback;
-      window.skipSong = skipSong;
-      window.previousSong = previousSong;
-      window.updateVolume = updateVolume;
-      window.seekPlayer = seekPlayer;
-      window.saveSongRequestConfig = saveSongRequestConfig;
-      window.switchEconomyTab = switchEconomyTab;
-      window.updateEconomyPreviews = updateEconomyPreviews;
-      window.saveEconomyConfig = saveEconomyConfig;
-      window.saveMinigamesConfig = saveMinigamesConfig;
-      window.runSimulatedGame = runSimulatedGame;
-      window.openCreateStoreItemModal = openCreateStoreItemModal;
-      window.saveStoreItem = saveStoreItem;
-      window.editStoreItem = editStoreItem;
-      window.deleteStoreItem = deleteStoreItem;
-      window.simulirajKupovinuArtikla = simulirajKupovinuArtikla;
-      window.approveRedemption = approveRedemption;
-      window.rejectRedemption = rejectRedemption;
-      window.renderEconomyLeaderboard = renderEconomyLeaderboard;
-      window.openEditUserPointsModal = openEditUserPointsModal;
-      window.divorceConfirm = divorceConfirm;
-      window.openFeedbackModal = openFeedbackModal;
-      window.openHelpModal = openHelpModal;
-      window.openDocsModal = openDocsModal;
-      window.onFeedbackTypeChange = onFeedbackTypeChange;
-      window.handleFeedbackFormSubmit = handleFeedbackFormSubmit;
-      window.syncLatestKickAvatar = syncLatestKickAvatar;
-      window.toggleModuleFromOverview = toggleModuleFromOverview;
-      window.handleCustomBotNameInput = handleCustomBotNameInput;
-      window.copyCustomBotModCmd = copyCustomBotModCmd;
-      window.promptCustomBotAuthModal = promptCustomBotAuthModal;
-      window.confirmCustomBotAuth = confirmCustomBotAuth;
-      window.disconnectCustomBot = disconnectCustomBot;
-      window.updateCustomBotStatusUI = updateCustomBotStatusUI;
-      window.getBotSenderIdentity = getBotSenderIdentity;
-
-      // Initial rendering of notification content on page load
-      window.addEventListener('DOMContentLoaded', () => {
-        // Hide notification badge if there are no unread notifications on start
-        const hasUnread = notifications.some(n => !n.read);
-        const badge = document.getElementById('notifBadge');
-        updateNotifBadgeUI();
-        renderNotifContent();
-        renderSongQueue();
-        updatePlayerUI();
-      });
-
-
-      // ── Economy & Ranking System Logic ──
-      function switchEconomyTab(tabName) {
-        currentEconomyTab = tabName;
-        localStorage.setItem('active-economy-tab', tabName);
-        const configTab = document.getElementById('ecoSubPanelConfig');
-        const storeTab = document.getElementById('ecoSubPanelStore');
-        const lbTab = document.getElementById('ecoSubPanelLeaderboard');
-
-        const btnConfig = document.getElementById('ecoTabBtnConfig');
-        const btnStore = document.getElementById('ecoTabBtnStore');
-        const btnLb = document.getElementById('ecoTabBtnLeaderboard');
-
-        if (configTab) configTab.style.display = tabName === 'config' ? 'block' : 'none';
-        if (storeTab) storeTab.style.display = tabName === 'store' ? 'block' : 'none';
-        if (lbTab) lbTab.style.display = tabName === 'leaderboard' ? 'block' : 'none';
-
-        if (btnConfig) btnConfig.className = 'btn btn-sm ' + (tabName === 'config' ? 'btn-primary' : 'btn-outline');
-        if (btnStore) btnStore.className = 'btn btn-sm ' + (tabName === 'store' ? 'btn-primary' : 'btn-outline');
-        if (btnLb) btnLb.className = 'btn btn-sm ' + (tabName === 'leaderboard' ? 'btn-primary' : 'btn-outline');
-
-        if (tabName === 'store') {
-          renderStoreItems();
-          renderStoreRedemptions();
-        } else if (tabName === 'leaderboard') {
-          renderEconomyLeaderboard();
-        }
-      }
-
-      function updateEconomyPreviews() {
-        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
-        const firstJoin = parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100;
-        const watchtime = parseInt(document.getElementById('cfgPointsPerWatchtime')?.value, 10) || 20;
-        const subMult = parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0;
-        const perSub = parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000;
-        const perGiftSub = parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000;
-        const perKicks = parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500;
-        const dailyStreak = parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150;
-
-        const pFirst = document.getElementById('previewFirstJoin');
-        const pWatch = document.getElementById('previewWatchtime');
-        const pSubMult = document.getElementById('previewSubMult');
-        const pSubBonus = document.getElementById('previewSubBonus');
-        const pKicks = document.getElementById('previewKicksBonus');
-        const pStreak = document.getElementById('previewDailyStreak');
-
-        if (pFirst) pFirst.textContent = `+${firstJoin.toLocaleString()} ${valuta}`;
-        if (pWatch) pWatch.textContent = `+${watchtime.toLocaleString()} ${valuta}`;
-        if (pSubMult) pSubMult.textContent = `${subMult.toFixed(1)}x Bonus`;
-        if (pSubBonus) pSubBonus.textContent = `+${perSub.toLocaleString()} / +${perGiftSub.toLocaleString()}`;
-        if (pKicks) pKicks.textContent = `+${perKicks.toLocaleString()} ${valuta}`;
-        if (pStreak) pStreak.textContent = `+${dailyStreak.toLocaleString()} ${valuta}/dan`;
-      }
-
-      async function saveEconomyConfig(silent = false) {
-        if (!activeChannel) return;
-
-        const ecoSettings = {
-          currency_name: document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins',
-          points_per_msg: parseInt(document.getElementById('cfgPointsPerMsg')?.value, 10) || 5,
-          smart_chat_validation: document.getElementById('cfgSmartChatValidation')?.checked ?? true,
-          first_interaction_bonus: parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100,
-          points_per_watchtime: parseInt(document.getElementById('cfgPointsPerWatchtime')?.value, 10) || 20,
-          level_up_announce: document.getElementById('cfgLevelUpAnnounce')?.checked ?? true,
-          sub_multiplier: parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0,
-          sub_bonus_per_msg: parseInt(document.getElementById('cfgSubBonusPerMsg')?.value, 10) || 10,
-          points_per_sub: parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000,
-          points_per_gift_sub: parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000,
-          points_per_100_kicks: parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500,
-          points_daily_streak: parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150,
-          points_per_raid: parseInt(document.getElementById('cfgPointsPerRaid')?.value, 10) || 300,
-          gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
-          max_gamble_amount: parseInt(document.getElementById('cfgMaxGambleAmount')?.value, 10) || 5000
-        };
-
-        if (!currentChannelConfig) currentChannelConfig = {};
-        currentChannelConfig.currency_name = ecoSettings.currency_name;
-        currentChannelConfig.economy_settings = ecoSettings;
-        Object.assign(currentChannelConfig, ecoSettings);
-
-        const fieldsToSave = {
-          currency_name: ecoSettings.currency_name,
-          points_per_msg: ecoSettings.points_per_msg,
-          smart_chat_validation: ecoSettings.smart_chat_validation,
-          first_interaction_bonus: ecoSettings.first_interaction_bonus,
-          points_per_watchtime: ecoSettings.points_per_watchtime,
-          level_up_announce: ecoSettings.level_up_announce,
-          sub_multiplier: ecoSettings.sub_multiplier,
-          sub_bonus_per_msg: ecoSettings.sub_bonus_per_msg,
-          points_per_sub: ecoSettings.points_per_sub,
-          points_per_gift_sub: ecoSettings.points_per_gift_sub,
-          points_per_100_kicks: ecoSettings.points_per_100_kicks,
-          points_daily_streak: ecoSettings.points_daily_streak,
-          points_per_raid: ecoSettings.points_per_raid,
-          gamble_enabled: ecoSettings.gamble_enabled,
-          max_gamble_amount: ecoSettings.max_gamble_amount,
-          economy_settings: ecoSettings
-        };
-
-        const { error } = await saveBotConfigFields(fieldsToSave);
-
-        if (error) {
-          if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ranking sistema!');
         } else {
-          if (!silent) showToast('success', 'Podešavanja ranking sistema su uspešno sačuvana!');
+          currentTimeSeconds++;
         }
-
-        updateEconomyPreviews();
+      } catch (_) {
+        currentTimeSeconds++;
       }
+    } else {
+      currentTimeSeconds++;
+    }
 
-      async function saveMinigamesConfig() {
-        if (!activeChannel) return;
+    if (currentSong.duration > 0 && currentTimeSeconds >= currentSong.duration) {
+      skipSong();
+    } else {
+      updatePlayerUI();
+    }
+  }, 1000);
 
-        const ecoSettings = {
-          gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
-          max_gamble_amount: parseInt(document.getElementById('cfgMinigamesMaxBet')?.value, 10) || 5000
-        };
+  updatePlayerUI();
+  renderSongQueue();
+  saveSongRequestConfig(true);
+}
 
-        if (!currentChannelConfig) currentChannelConfig = {};
-        currentChannelConfig.economy_settings = { ...currentChannelConfig.economy_settings, ...ecoSettings };
+// Bind handlers globally to window for HTML event availability
+window.requestSong = requestSong;
+window.removeSong = removeSong;
+window.clearSongQueue = clearSongQueue;
+window.playSongNow = playSongNow;
+window.togglePlayback = togglePlayback;
+window.skipSong = skipSong;
+window.previousSong = previousSong;
+window.updateVolume = updateVolume;
+window.seekPlayer = seekPlayer;
+window.saveSongRequestConfig = saveSongRequestConfig;
+window.switchEconomyTab = switchEconomyTab;
+window.updateEconomyPreviews = updateEconomyPreviews;
+window.saveEconomyConfig = saveEconomyConfig;
+window.saveMinigamesConfig = saveMinigamesConfig;
+window.runSimulatedGame = runSimulatedGame;
+window.openCreateStoreItemModal = openCreateStoreItemModal;
+window.saveStoreItem = saveStoreItem;
+window.editStoreItem = editStoreItem;
+window.deleteStoreItem = deleteStoreItem;
+window.simulirajKupovinuArtikla = simulirajKupovinuArtikla;
+window.approveRedemption = approveRedemption;
+window.rejectRedemption = rejectRedemption;
+window.renderEconomyLeaderboard = renderEconomyLeaderboard;
+window.openEditUserPointsModal = openEditUserPointsModal;
+window.divorceConfirm = divorceConfirm;
+window.openFeedbackModal = openFeedbackModal;
+window.openHelpModal = openHelpModal;
+window.openDocsModal = openDocsModal;
+window.onFeedbackTypeChange = onFeedbackTypeChange;
+window.handleFeedbackFormSubmit = handleFeedbackFormSubmit;
+window.syncLatestKickAvatar = syncLatestKickAvatar;
+window.toggleModuleFromOverview = toggleModuleFromOverview;
+window.handleCustomBotNameInput = handleCustomBotNameInput;
+window.copyCustomBotModCmd = copyCustomBotModCmd;
+window.promptCustomBotAuthModal = promptCustomBotAuthModal;
+window.confirmCustomBotAuth = confirmCustomBotAuth;
+window.disconnectCustomBot = disconnectCustomBot;
+window.updateCustomBotStatusUI = updateCustomBotStatusUI;
+window.getBotSenderIdentity = getBotSenderIdentity;
 
-        const { error } = await saveBotConfigFields({ economy_settings: currentChannelConfig.economy_settings });
+// Initial rendering of notification content on page load
+window.addEventListener('DOMContentLoaded', () => {
+  // Hide notification badge if there are no unread notifications on start
+  const hasUnread = notifications.some(n => !n.read);
+  const badge = document.getElementById('notifBadge');
+  updateNotifBadgeUI();
+  renderNotifContent();
+  renderSongQueue();
+  updatePlayerUI();
+});
 
-        if (error) {
-          showToast('error', 'Greška pri čuvanju podešavanja mini igara!');
-        } else {
-          showToast('success', 'Podešavanja mini igara su uspešno sačuvana!');
-        }
+
+// ── Economy & Ranking System Logic ──
+function switchEconomyTab(tabName) {
+  currentEconomyTab = tabName;
+  localStorage.setItem('active-economy-tab', tabName);
+  const configTab = document.getElementById('ecoSubPanelConfig');
+  const storeTab = document.getElementById('ecoSubPanelStore');
+  const lbTab = document.getElementById('ecoSubPanelLeaderboard');
+
+  const btnConfig = document.getElementById('ecoTabBtnConfig');
+  const btnStore = document.getElementById('ecoTabBtnStore');
+  const btnLb = document.getElementById('ecoTabBtnLeaderboard');
+
+  if (configTab) configTab.style.display = tabName === 'config' ? 'block' : 'none';
+  if (storeTab) storeTab.style.display = tabName === 'store' ? 'block' : 'none';
+  if (lbTab) lbTab.style.display = tabName === 'leaderboard' ? 'block' : 'none';
+
+  if (btnConfig) btnConfig.className = 'btn btn-sm ' + (tabName === 'config' ? 'btn-primary' : 'btn-outline');
+  if (btnStore) btnStore.className = 'btn btn-sm ' + (tabName === 'store' ? 'btn-primary' : 'btn-outline');
+  if (btnLb) btnLb.className = 'btn btn-sm ' + (tabName === 'leaderboard' ? 'btn-primary' : 'btn-outline');
+
+  if (tabName === 'store') {
+    renderStoreItems();
+    renderStoreRedemptions();
+  } else if (tabName === 'leaderboard') {
+    renderEconomyLeaderboard();
+  }
+}
+
+function updateEconomyPreviews() {
+  const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+  const firstJoin = parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100;
+  const watchtime = parseInt(document.getElementById('cfgPointsPerWatchtime')?.value, 10) || 20;
+  const subMult = parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0;
+  const perSub = parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000;
+  const perGiftSub = parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000;
+  const perKicks = parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500;
+  const dailyStreak = parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150;
+
+  const pFirst = document.getElementById('previewFirstJoin');
+  const pWatch = document.getElementById('previewWatchtime');
+  const pSubMult = document.getElementById('previewSubMult');
+  const pSubBonus = document.getElementById('previewSubBonus');
+  const pKicks = document.getElementById('previewKicksBonus');
+  const pStreak = document.getElementById('previewDailyStreak');
+
+  if (pFirst) pFirst.textContent = `+${firstJoin.toLocaleString()} ${valuta}`;
+  if (pWatch) pWatch.textContent = `+${watchtime.toLocaleString()} ${valuta}`;
+  if (pSubMult) pSubMult.textContent = `${subMult.toFixed(1)}x Bonus`;
+  if (pSubBonus) pSubBonus.textContent = `+${perSub.toLocaleString()} / +${perGiftSub.toLocaleString()}`;
+  if (pKicks) pKicks.textContent = `+${perKicks.toLocaleString()} ${valuta}`;
+  if (pStreak) pStreak.textContent = `+${dailyStreak.toLocaleString()} ${valuta}/dan`;
+}
+
+async function saveEconomyConfig(silent = false) {
+  if (!activeChannel) return;
+
+  const ecoSettings = {
+    currency_name: document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins',
+    points_per_msg: parseInt(document.getElementById('cfgPointsPerMsg')?.value, 10) || 5,
+    smart_chat_validation: document.getElementById('cfgSmartChatValidation')?.checked ?? true,
+    first_interaction_bonus: parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100,
+    points_per_watchtime: parseInt(document.getElementById('cfgPointsPerWatchtime')?.value, 10) || 20,
+    level_up_announce: document.getElementById('cfgLevelUpAnnounce')?.checked ?? true,
+    sub_multiplier: parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0,
+    sub_bonus_per_msg: parseInt(document.getElementById('cfgSubBonusPerMsg')?.value, 10) || 10,
+    points_per_sub: parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000,
+    points_per_gift_sub: parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000,
+    points_per_100_kicks: parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500,
+    points_daily_streak: parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150,
+    points_per_raid: parseInt(document.getElementById('cfgPointsPerRaid')?.value, 10) || 300,
+    gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
+    max_gamble_amount: parseInt(document.getElementById('cfgMaxGambleAmount')?.value, 10) || 5000
+  };
+
+  if (!currentChannelConfig) currentChannelConfig = {};
+  currentChannelConfig.currency_name = ecoSettings.currency_name;
+  currentChannelConfig.economy_settings = ecoSettings;
+  Object.assign(currentChannelConfig, ecoSettings);
+
+  const fieldsToSave = {
+    currency_name: ecoSettings.currency_name,
+    points_per_msg: ecoSettings.points_per_msg,
+    smart_chat_validation: ecoSettings.smart_chat_validation,
+    first_interaction_bonus: ecoSettings.first_interaction_bonus,
+    points_per_watchtime: ecoSettings.points_per_watchtime,
+    level_up_announce: ecoSettings.level_up_announce,
+    sub_multiplier: ecoSettings.sub_multiplier,
+    sub_bonus_per_msg: ecoSettings.sub_bonus_per_msg,
+    points_per_sub: ecoSettings.points_per_sub,
+    points_per_gift_sub: ecoSettings.points_per_gift_sub,
+    points_per_100_kicks: ecoSettings.points_per_100_kicks,
+    points_daily_streak: ecoSettings.points_daily_streak,
+    points_per_raid: ecoSettings.points_per_raid,
+    gamble_enabled: ecoSettings.gamble_enabled,
+    max_gamble_amount: ecoSettings.max_gamble_amount,
+    economy_settings: ecoSettings
+  };
+
+  const { error } = await saveBotConfigFields(fieldsToSave);
+
+  if (error) {
+    if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ranking sistema!');
+  } else {
+    if (!silent) showToast('success', 'Podešavanja ranking sistema su uspešno sačuvana!');
+  }
+
+  updateEconomyPreviews();
+}
+
+async function saveMinigamesConfig() {
+  if (!activeChannel) return;
+
+  const ecoSettings = {
+    gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
+    max_gamble_amount: parseInt(document.getElementById('cfgMinigamesMaxBet')?.value, 10) || 5000
+  };
+
+  if (!currentChannelConfig) currentChannelConfig = {};
+  currentChannelConfig.economy_settings = { ...currentChannelConfig.economy_settings, ...ecoSettings };
+
+  const { error } = await saveBotConfigFields({ economy_settings: currentChannelConfig.economy_settings });
+
+  if (error) {
+    showToast('error', 'Greška pri čuvanju podešavanja mini igara!');
+  } else {
+    showToast('success', 'Podešavanja mini igara su uspešno sačuvana!');
+  }
+}
+
+function runSimulatedGame() {
+  const type = document.getElementById('simGameType')?.value || 'slots';
+  const bet = parseInt(document.getElementById('simBetAmount')?.value, 10) || 100;
+  const resEl = document.getElementById('simGameResult');
+  const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Poena';
+
+  if (!resEl) return;
+
+  // Osiguravamo da container prikazuje tekst kao normalan blok
+  resEl.style.display = 'block';
+  resEl.style.textAlign = 'center';
+
+  if (type === 'slots') {
+    const simboli = ['🍒', '🍋', '🔔', '🍇', '💎', '🎰'];
+    const s1 = simboli[Math.floor(Math.random() * simboli.length)];
+    const s2 = simboli[Math.floor(Math.random() * simboli.length)];
+    const s3 = simboli[Math.floor(Math.random() * simboli.length)];
+
+    let resText = `<strong>@Strimer</strong> je zavrteo slot: [ ${s1} | ${s2} | ${s3} ] — `;
+    if (s1 === s2 && s2 === s3) {
+      if (s1 === '🎰' || s1 === '💎') {
+        resText += `<span style="color:#eab308; font-weight:700;">JACKPOT 50x! Osvojio si +${(bet * 50).toLocaleString()} ${valuta}!</span>`;
+      } else {
+        resText += `<span style="color:#53fc18; font-weight:700;">3 u nizu 10x! Osvojio si +${(bet * 10).toLocaleString()} ${valuta}!</span>`;
       }
+    } else if (s1 === s2 || s2 === s3 || s1 === s3) {
+      resText += `<span style="color:#eab308;">2 u nizu 2x! Vraćeno +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
+    } else {
+      resText += `<span style="color:#ef4444;">Nema pogotka! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
+    }
+    resEl.innerHTML = resText;
 
-      function runSimulatedGame() {
-        const type = document.getElementById('simGameType')?.value || 'slots';
-        const bet = parseInt(document.getElementById('simBetAmount')?.value, 10) || 100;
-        const resEl = document.getElementById('simGameResult');
-        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Poena';
+  } else if (type === 'roulette') {
+    const loptica = Math.floor(Math.random() * 37);
+    const crveniBrojevi = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+    const boja = loptica === 0 ? 'ZELENA' : (crveniBrojevi.includes(loptica) ? 'CRVENA' : 'CRNA');
 
-        if (!resEl) return;
+    resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo rulet! Loptica je pala na <strong>${loptica} (${boja})</strong>! <span style="color:#53fc18;">Isplata: +${(bet * 2).toLocaleString()} ${valuta} (Boja/Par) ili +${(bet * 36).toLocaleString()} ${valuta} (Tačan broj)!</span>`;
 
-        // Osiguravamo da container prikazuje tekst kao normalan blok
-        resEl.style.display = 'block';
-        resEl.style.textAlign = 'center';
+  } else if (type === 'coinflip') {
+    const ishod = Math.random() < 0.5 ? 'PISMO' : 'GLAVA';
+    const isWin = Math.random() < 0.5;
 
-        if (type === 'slots') {
-          const simboli = ['🍒', '🍋', '🔔', '🍇', '💎', '🎰'];
-          const s1 = simboli[Math.floor(Math.random() * simboli.length)];
-          const s2 = simboli[Math.floor(Math.random() * simboli.length)];
-          const s3 = simboli[Math.floor(Math.random() * simboli.length)];
+    if (isWin) {
+      resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#53fc18; font-weight:700;">Dupliranje 2x! Osvojio si +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
+    } else {
+      resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#ef4444;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
+    }
 
-          let resText = `<strong>@Strimer</strong> je zavrteo slot: [ ${s1} | ${s2} | ${s3} ] — `;
-          if (s1 === s2 && s2 === s3) {
-            if (s1 === '🎰' || s1 === '💎') {
-              resText += `<span style="color:#eab308; font-weight:700;">JACKPOT 50x! Osvojio si +${(bet * 50).toLocaleString()} ${valuta}!</span>`;
-            } else {
-              resText += `<span style="color:#53fc18; font-weight:700;">3 u nizu 10x! Osvojio si +${(bet * 10).toLocaleString()} ${valuta}!</span>`;
-            }
-          } else if (s1 === s2 || s2 === s3 || s1 === s3) {
-            resText += `<span style="color:#eab308;">2 u nizu 2x! Vraćeno +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
-          } else {
-            resText += `<span style="color:#ef4444;">Nema pogotka! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
-          }
-          resEl.innerHTML = resText;
+  } else if (type === 'wheel') {
+    const mults = [0, 0.5, 1, 2, 3, 5];
+    const m = mults[Math.floor(Math.random() * mults.length)];
+    const dobitak = Math.floor(bet * m);
 
-        } else if (type === 'roulette') {
-          const loptica = Math.floor(Math.random() * 37);
-          const crveniBrojevi = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
-          const boja = loptica === 0 ? 'ZELENA' : (crveniBrojevi.includes(loptica) ? 'CRVENA' : 'CRNA');
-          
-          resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo rulet! Loptica je pala na <strong>${loptica} (${boja})</strong>! <span style="color:#53fc18;">Isplata: +${(bet * 2).toLocaleString()} ${valuta} (Boja/Par) ili +${(bet * 36).toLocaleString()} ${valuta} (Tačan broj)!</span>`;
+    if (m > 1) {
+      resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#53fc18; font-weight:700;">Profit! Osvojio si +${dobitak.toLocaleString()} ${valuta}!</span>`;
+    } else if (m === 1 || m === 0.5) {
+      resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#eab308;">Vraćeno ${dobitak.toLocaleString()} ${valuta}.</span>`;
+    } else {
+      resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>0x</strong>! <span style="color:#ef4444;">Nula! Izgubio si ulog od ${bet.toLocaleString()} ${valuta}.</span>`;
+    }
+  }
+}
 
-        } else if (type === 'coinflip') {
-          const ishod = Math.random() < 0.5 ? 'PISMO' : 'GLAVA';
-          const isWin = Math.random() < 0.5;
+// ── Store Items & Purchase History CRUD ──
+let currentRedemptionsFilter = 'all';
 
-          if (isWin) {
-            resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#53fc18; font-weight:700;">Dupliranje 2x! Osvojio si +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
-          } else {
-            resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#ef4444;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
-          }
+function getIconSVG(iconStr) {
+  const str = (iconStr || '').toLowerCase();
+  if (str.includes('vip') || str.includes('⭐') || str.includes('star')) {
+    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+  }
+  if (str.includes('song') || str.includes('pesma') || str.includes('🎵') || str.includes('music')) {
+    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+  }
+  if (str.includes('voda') || str.includes('water') || str.includes('💧')) {
+    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
+  }
+  return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`;
+}
 
-        } else if (type === 'wheel') {
-          const mults = [0, 0.5, 1, 2, 3, 5];
-          const m = mults[Math.floor(Math.random() * mults.length)];
-          const dobitak = Math.floor(bet * m);
+function getStoreItems() {
+  return (currentChannelConfig && currentChannelConfig.store_items) ? currentChannelConfig.store_items : [];
+}
 
-          if (m > 1) {
-            resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#53fc18; font-weight:700;">Profit! Osvojio si +${dobitak.toLocaleString()} ${valuta}!</span>`;
-          } else if (m === 1 || m === 0.5) {
-            resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#eab308;">Vraćeno ${dobitak.toLocaleString()} ${valuta}.</span>`;
-          } else {
-            resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>0x</strong>! <span style="color:#ef4444;">Nula! Izgubio si ulog od ${bet.toLocaleString()} ${valuta}.</span>`;
-          }
-        }
-      }
+function renderStoreItems() {
+  const container = document.getElementById('storeItemsGrid');
+  const simSelect = document.getElementById('simStoreItemSelect');
+  const addBtn = document.getElementById('btnAddStoreItem');
+  if (!container) return;
 
-      // ── Store Items & Purchase History CRUD ──
-      let currentRedemptionsFilter = 'all';
+  const items = getStoreItems();
+  const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
+  const limits = getPlanLimits();
 
-      function getIconSVG(iconStr) {
-        const str = (iconStr || '').toLowerCase();
-        if (str.includes('vip') || str.includes('⭐') || str.includes('star')) {
-          return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
-        }
-        if (str.includes('song') || str.includes('pesma') || str.includes('🎵') || str.includes('music')) {
-          return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
-        }
-        if (str.includes('voda') || str.includes('water') || str.includes('💧')) {
-          return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
-        }
-        return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`;
-      }
+  if (simSelect) {
+    simSelect.innerHTML = items.map(i => `<option value="${i.id}">${i.name} (${i.cost} ${valuta})</option>`).join('');
+  }
 
-      function getStoreItems() {
-        return (currentChannelConfig && currentChannelConfig.store_items) ? currentChannelConfig.store_items : [];
-      }
-
-      function renderStoreItems() {
-        const container = document.getElementById('storeItemsGrid');
-        const simSelect = document.getElementById('simStoreItemSelect');
-        const addBtn = document.getElementById('btnAddStoreItem');
-        if (!container) return;
-
-        const items = getStoreItems();
-        const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
-        const limits = getPlanLimits();
-
-        if (simSelect) {
-          simSelect.innerHTML = items.map(i => `<option value="${i.id}">${i.name} (${i.cost} ${valuta})</option>`).join('');
-        }
-
-        // Show store items limit banner
-        const storeLimitBanner = document.getElementById('storeLimitBanner');
-        if (storeLimitBanner) {
-          if (limits.maxStoreItems === Infinity) {
-            storeLimitBanner.style.display = 'none';
-          } else {
-            storeLimitBanner.style.display = 'flex';
-            storeLimitBanner.innerHTML = `
+  // Show store items limit banner
+  const storeLimitBanner = document.getElementById('storeLimitBanner');
+  if (storeLimitBanner) {
+    if (limits.maxStoreItems === Infinity) {
+      storeLimitBanner.style.display = 'none';
+    } else {
+      storeLimitBanner.style.display = 'flex';
+      storeLimitBanner.innerHTML = `
               <div style="display:flex; align-items:center; gap:12px;">
                 <div style="background:rgba(139,92,246,0.18); border:1px solid rgba(139,92,246,0.3); color:#c084fc; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
                   ${limits.name} Paket
@@ -8227,34 +8230,34 @@ async function addNewChannel() {
               </div>
               <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('storeItems')">${upgradeSvgIcon}<span>Nadogradi za više artikala</span></button>
             `;
-          }
-        }
+    }
+  }
 
-        // Disable add button if limit reached
-        if (addBtn) {
-          if (limits.maxStoreItems !== Infinity && items.length >= limits.maxStoreItems) {
-            addBtn.disabled = true;
-            addBtn.style.opacity = '0.5';
-            addBtn.style.cursor = 'not-allowed';
-            addBtn.title = 'Dostignut je limit artikala za tvoj paket';
-          } else {
-            addBtn.disabled = false;
-            addBtn.style.opacity = '1';
-            addBtn.style.cursor = 'pointer';
-            addBtn.title = '';
-          }
-        }
+  // Disable add button if limit reached
+  if (addBtn) {
+    if (limits.maxStoreItems !== Infinity && items.length >= limits.maxStoreItems) {
+      addBtn.disabled = true;
+      addBtn.style.opacity = '0.5';
+      addBtn.style.cursor = 'not-allowed';
+      addBtn.title = 'Dostignut je limit artikala za tvoj paket';
+    } else {
+      addBtn.disabled = false;
+      addBtn.style.opacity = '1';
+      addBtn.style.cursor = 'pointer';
+      addBtn.title = '';
+    }
+  }
 
-        if (items.length === 0) {
-          container.innerHTML = `<div style="grid-column:1/-1; color:var(--text-muted); text-align:center; padding:20px;">Nema artikala u prodavnici. Klikni na "+ Dodaj novi artikal".</div>`;
-          return;
-        }
+  if (items.length === 0) {
+    container.innerHTML = `<div style="grid-column:1/-1; color:var(--text-muted); text-align:center; padding:20px;">Nema artikala u prodavnici. Klikni na "+ Dodaj novi artikal".</div>`;
+    return;
+  }
 
-        container.innerHTML = items.map(item => {
-          const stockStr = (item.stock === undefined || item.stock < 0) ? 'Neograničeno' : `${item.stock} kom.`;
-          const rankStr = (item.min_rank === 'subscriber') ? 'Samo Subs' : (item.min_rank === 'vip' ? 'VIP+' : (item.min_rank === 'moderator' ? 'Samo Mods' : 'Svi'));
+  container.innerHTML = items.map(item => {
+    const stockStr = (item.stock === undefined || item.stock < 0) ? 'Neograničeno' : `${item.stock} kom.`;
+    const rankStr = (item.min_rank === 'subscriber') ? 'Samo Subs' : (item.min_rank === 'vip' ? 'VIP+' : (item.min_rank === 'moderator' ? 'Samo Mods' : 'Svi'));
 
-          return `
+    return `
       <div style="background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:16px; display:flex; flex-direction:column; justify-content:space-between; position:relative;">
         <div>
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
@@ -8281,156 +8284,156 @@ async function addNewChannel() {
         </div>
       </div>
     `;
-        }).join('');
-      }
+  }).join('');
+}
 
-      function openCreateStoreItemModal() {
-        document.getElementById('storeItemModalTitle').innerText = 'Novi Artikal u Prodavnici';
-        document.getElementById('storeItemEditId').value = '';
-        document.getElementById('storeItemName').value = '';
-        document.getElementById('storeItemDesc').value = '';
-        document.getElementById('storeItemCost').value = '500';
-        document.getElementById('storeItemStock').value = '-1';
-        document.getElementById('storeItemRank').value = 'everyone';
-        document.getElementById('storeItemIcon').value = 'vip';
-        document.getElementById('storeItemAutoApprove').checked = false;
-        openModal('storeItemModal');
-      }
+function openCreateStoreItemModal() {
+  document.getElementById('storeItemModalTitle').innerText = 'Novi Artikal u Prodavnici';
+  document.getElementById('storeItemEditId').value = '';
+  document.getElementById('storeItemName').value = '';
+  document.getElementById('storeItemDesc').value = '';
+  document.getElementById('storeItemCost').value = '500';
+  document.getElementById('storeItemStock').value = '-1';
+  document.getElementById('storeItemRank').value = 'everyone';
+  document.getElementById('storeItemIcon').value = 'vip';
+  document.getElementById('storeItemAutoApprove').checked = false;
+  openModal('storeItemModal');
+}
 
-      function editStoreItem(id) {
-        const items = getStoreItems();
-        const item = items.find(i => i.id === id);
-        if (!item) return;
+function editStoreItem(id) {
+  const items = getStoreItems();
+  const item = items.find(i => i.id === id);
+  if (!item) return;
 
-        document.getElementById('storeItemModalTitle').innerText = 'Izmena Artikla Prodavnice';
-        document.getElementById('storeItemEditId').value = item.id;
-        document.getElementById('storeItemName').value = item.name;
-        document.getElementById('storeItemDesc').value = item.description || '';
-        document.getElementById('storeItemCost').value = item.cost || 500;
-        document.getElementById('storeItemStock').value = item.stock !== undefined ? item.stock : -1;
-        document.getElementById('storeItemRank').value = item.min_rank || 'everyone';
-        document.getElementById('storeItemIcon').value = item.icon || 'vip';
-        document.getElementById('storeItemAutoApprove').checked = item.auto_approve === true;
-        openModal('storeItemModal');
-      }
+  document.getElementById('storeItemModalTitle').innerText = 'Izmena Artikla Prodavnice';
+  document.getElementById('storeItemEditId').value = item.id;
+  document.getElementById('storeItemName').value = item.name;
+  document.getElementById('storeItemDesc').value = item.description || '';
+  document.getElementById('storeItemCost').value = item.cost || 500;
+  document.getElementById('storeItemStock').value = item.stock !== undefined ? item.stock : -1;
+  document.getElementById('storeItemRank').value = item.min_rank || 'everyone';
+  document.getElementById('storeItemIcon').value = item.icon || 'vip';
+  document.getElementById('storeItemAutoApprove').checked = item.auto_approve === true;
+  openModal('storeItemModal');
+}
 
-      async function saveStoreItem() {
-        const editId = document.getElementById('storeItemEditId').value;
-        const name = document.getElementById('storeItemName').value.trim();
-        const desc = document.getElementById('storeItemDesc').value.trim();
-        const cost = parseInt(document.getElementById('storeItemCost').value, 10) || 500;
-        const stock = parseInt(document.getElementById('storeItemStock').value, 10);
-        const min_rank = document.getElementById('storeItemRank').value;
-        const icon = document.getElementById('storeItemIcon').value;
-        const auto_approve = document.getElementById('storeItemAutoApprove').checked;
+async function saveStoreItem() {
+  const editId = document.getElementById('storeItemEditId').value;
+  const name = document.getElementById('storeItemName').value.trim();
+  const desc = document.getElementById('storeItemDesc').value.trim();
+  const cost = parseInt(document.getElementById('storeItemCost').value, 10) || 500;
+  const stock = parseInt(document.getElementById('storeItemStock').value, 10);
+  const min_rank = document.getElementById('storeItemRank').value;
+  const icon = document.getElementById('storeItemIcon').value;
+  const auto_approve = document.getElementById('storeItemAutoApprove').checked;
 
-        if (!name) {
-          showToast('Unesi naziv artikla!', 'warning');
-          return;
-        }
+  if (!name) {
+    showToast('Unesi naziv artikla!', 'warning');
+    return;
+  }
 
-        const limits = getPlanLimits();
-        let items = getStoreItems();
-        
-        // Check plan limits for new items (editing existing items doesn't count towards limit)
-        if (!editId && limits.maxStoreItems !== Infinity) {
-          if (items.length >= limits.maxStoreItems) {
-            openUpgradeModal('storeItems');
-            return;
-          }
-        }
+  const limits = getPlanLimits();
+  let items = getStoreItems();
 
-        if (editId) {
-          const idx = items.findIndex(i => i.id === editId);
-          if (idx !== -1) {
-            items[idx] = { ...items[idx], name, description: desc, cost, stock: isNaN(stock) ? -1 : stock, min_rank, icon, auto_approve };
-          }
-        } else {
-          items.push({
-            id: 'item_' + Date.now(),
-            name,
-            description: desc,
-            cost,
-            stock: isNaN(stock) ? -1 : stock,
-            min_rank,
-            icon,
-            auto_approve
-          });
-        }
+  // Check plan limits for new items (editing existing items doesn't count towards limit)
+  if (!editId && limits.maxStoreItems !== Infinity) {
+    if (items.length >= limits.maxStoreItems) {
+      openUpgradeModal('storeItems');
+      return;
+    }
+  }
 
-        if (!currentChannelConfig) currentChannelConfig = {};
-        currentChannelConfig.store_items = items;
+  if (editId) {
+    const idx = items.findIndex(i => i.id === editId);
+    if (idx !== -1) {
+      items[idx] = { ...items[idx], name, description: desc, cost, stock: isNaN(stock) ? -1 : stock, min_rank, icon, auto_approve };
+    }
+  } else {
+    items.push({
+      id: 'item_' + Date.now(),
+      name,
+      description: desc,
+      cost,
+      stock: isNaN(stock) ? -1 : stock,
+      min_rank,
+      icon,
+      auto_approve
+    });
+  }
 
-        const { error } = await saveBotConfigFields({ store_items: items });
+  if (!currentChannelConfig) currentChannelConfig = {};
+  currentChannelConfig.store_items = items;
 
-        if (error) {
-          showToast('error', 'Greška pri čuvanju artikla!');
-        } else {
-          showToast('success', editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!', '✅');
-          closeModal('storeItemModal');
-          renderStoreItems();
-        }
-      }
+  const { error } = await saveBotConfigFields({ store_items: items });
 
-      async function deleteStoreItem(id) {
-        let items = getStoreItems().filter(i => i.id !== id);
-        if (!currentChannelConfig) currentChannelConfig = {};
-        currentChannelConfig.store_items = items;
+  if (error) {
+    showToast('error', 'Greška pri čuvanju artikla!');
+  } else {
+    showToast('success', editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!', '✅');
+    closeModal('storeItemModal');
+    renderStoreItems();
+  }
+}
 
-        const { error } = await saveBotConfigFields({ store_items: items });
+async function deleteStoreItem(id) {
+  let items = getStoreItems().filter(i => i.id !== id);
+  if (!currentChannelConfig) currentChannelConfig = {};
+  currentChannelConfig.store_items = items;
 
-        if (error) {
-          showToast('error', 'Greška pri brisanju artikla!');
-        } else {
-          showToast('success', 'Artikal obrisan!', '✅');
-          renderStoreItems();
-        }
-      }
+  const { error } = await saveBotConfigFields({ store_items: items });
 
-      // ── Store Redemptions Queue & Purchase History ──
-      function getStoreRedemptions() {
-        return (currentChannelConfig && currentChannelConfig.store_redemptions) ? currentChannelConfig.store_redemptions : [];
-      }
+  if (error) {
+    showToast('error', 'Greška pri brisanju artikla!');
+  } else {
+    showToast('success', 'Artikal obrisan!', '✅');
+    renderStoreItems();
+  }
+}
 
-      function filterRedemptions(status) {
-        currentRedemptionsFilter = status;
-        ['redFilterAll', 'redFilterPending', 'redFilterCompleted', 'redFilterRejected'].forEach(id => {
-          const btn = document.getElementById(id);
-          if (btn) {
-            btn.className = 'btn btn-xs ' + (id.toLowerCase().includes(status) || (status === 'all' && id === 'redFilterAll') ? 'btn-primary' : 'btn-outline');
-          }
-        });
-        renderStoreRedemptions();
-      }
+// ── Store Redemptions Queue & Purchase History ──
+function getStoreRedemptions() {
+  return (currentChannelConfig && currentChannelConfig.store_redemptions) ? currentChannelConfig.store_redemptions : [];
+}
 
-      function renderStoreRedemptions() {
-        const tbody = document.getElementById('storeRedemptionsTbody');
-        if (!tbody) return;
+function filterRedemptions(status) {
+  currentRedemptionsFilter = status;
+  ['redFilterAll', 'redFilterPending', 'redFilterCompleted', 'redFilterRejected'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.className = 'btn btn-xs ' + (id.toLowerCase().includes(status) || (status === 'all' && id === 'redFilterAll') ? 'btn-primary' : 'btn-outline');
+    }
+  });
+  renderStoreRedemptions();
+}
 
-        let redemptions = getStoreRedemptions();
-        const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
+function renderStoreRedemptions() {
+  const tbody = document.getElementById('storeRedemptionsTbody');
+  if (!tbody) return;
 
-        if (currentRedemptionsFilter !== 'all') {
-          redemptions = redemptions.filter(r => r.status === currentRedemptionsFilter);
-        }
+  let redemptions = getStoreRedemptions();
+  const valuta = (currentChannelConfig && currentChannelConfig.currency_name) || 'KickCoins';
 
-        if (redemptions.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema zahteva za kupovinu za izabrani filter.</td></tr>`;
-          return;
-        }
+  if (currentRedemptionsFilter !== 'all') {
+    redemptions = redemptions.filter(r => r.status === currentRedemptionsFilter);
+  }
 
-        tbody.innerHTML = redemptions.map(r => {
-          let statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(234,179,8,0.15); color:#eab308; border:1px solid rgba(234,179,8,0.3);">Čeka odobrenje 🟡</span>`;
-          if (r.status === 'completed') {
-            statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">Odobreno 🟢</span>`;
-          } else if (r.status === 'rejected') {
-            statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">Odbijeno (Vraćeno) 🔴</span>`;
-          }
+  if (redemptions.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema zahteva za kupovinu za izabrani filter.</td></tr>`;
+    return;
+  }
 
-          const datum = r.requested_at ? new Date(r.requested_at).toLocaleString('sr-RS') : '—';
-          const isPending = (r.status === 'pending');
+  tbody.innerHTML = redemptions.map(r => {
+    let statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(234,179,8,0.15); color:#eab308; border:1px solid rgba(234,179,8,0.3);">Čeka odobrenje 🟡</span>`;
+    if (r.status === 'completed') {
+      statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">Odobreno 🟢</span>`;
+    } else if (r.status === 'rejected') {
+      statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">Odbijeno (Vraćeno) 🔴</span>`;
+    }
 
-          return `
+    const datum = r.requested_at ? new Date(r.requested_at).toLocaleString('sr-RS') : '—';
+    const isPending = (r.status === 'pending');
+
+    return `
       <tr>
         <td style="font-size:0.8rem; color:var(--text-muted);">${datum}</td>
         <td style="font-weight:600; color:#fff;">@${r.username}</td>
@@ -8445,134 +8448,134 @@ async function addNewChannel() {
         </td>
       </tr>
     `;
-        }).join('');
-      }
+  }).join('');
+}
 
-      async function simulirajKupovinuArtikla() {
-        const itemId = document.getElementById('simStoreItemSelect')?.value;
-        const username = (document.getElementById('simStoreUser')?.value || 'Korisnik').replace(/^@/, '').trim();
-        const items = getStoreItems();
-        const item = items.find(i => i.id === itemId);
+async function simulirajKupovinuArtikla() {
+  const itemId = document.getElementById('simStoreItemSelect')?.value;
+  const username = (document.getElementById('simStoreUser')?.value || 'Korisnik').replace(/^@/, '').trim();
+  const items = getStoreItems();
+  const item = items.find(i => i.id === itemId);
 
-        if (!item) {
-          showToast('Izaberi artikal iz prodavnice!', 'warning');
-          return;
-        }
+  if (!item) {
+    showToast('Izaberi artikal iz prodavnice!', 'warning');
+    return;
+  }
 
-        let redemptions = getStoreRedemptions();
-        const newRed = {
-          id: 'red_' + Date.now(),
-          username: username,
-          item_id: item.id,
-          item_name: item.name,
-          cost: item.cost,
-          status: item.auto_approve ? 'completed' : 'pending',
-          requested_at: new Date().toISOString()
-        };
+  let redemptions = getStoreRedemptions();
+  const newRed = {
+    id: 'red_' + Date.now(),
+    username: username,
+    item_id: item.id,
+    item_name: item.name,
+    cost: item.cost,
+    status: item.auto_approve ? 'completed' : 'pending',
+    requested_at: new Date().toISOString()
+  };
 
-        redemptions.unshift(newRed);
-        if (!currentChannelConfig) currentChannelConfig = {};
-        currentChannelConfig.store_redemptions = redemptions;
+  redemptions.unshift(newRed);
+  if (!currentChannelConfig) currentChannelConfig = {};
+  currentChannelConfig.store_redemptions = redemptions;
 
-        const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
+  const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
-        if (error) {
-          showToast('Greška pri simulaciji kupovine!', 'error');
-        } else {
-          showToast(`Simulirana kupovina za "${item.name}" od strane @${username}!`, 'success');
-          renderStoreRedemptions();
-        }
-      }
+  if (error) {
+    showToast('Greška pri simulaciji kupovine!', 'error');
+  } else {
+    showToast(`Simulirana kupovina za "${item.name}" od strane @${username}!`, 'success');
+    renderStoreRedemptions();
+  }
+}
 
-      async function approveRedemption(id) {
-        let redemptions = getStoreRedemptions();
-        const target = redemptions.find(r => r.id === id);
-        if (!target) return;
+async function approveRedemption(id) {
+  let redemptions = getStoreRedemptions();
+  const target = redemptions.find(r => r.id === id);
+  if (!target) return;
 
-        target.status = 'completed';
-        if (!currentChannelConfig) currentChannelConfig = {};
-        currentChannelConfig.store_redemptions = redemptions;
+  target.status = 'completed';
+  if (!currentChannelConfig) currentChannelConfig = {};
+  currentChannelConfig.store_redemptions = redemptions;
 
-        const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
+  const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
-        if (!error) {
-          showToast(`Kupovina za @${target.username} je uspešno odobrena!`, 'success');
-          renderStoreRedemptions();
-        }
-      }
+  if (!error) {
+    showToast(`Kupovina za @${target.username} je uspešno odobrena!`, 'success');
+    renderStoreRedemptions();
+  }
+}
 
-      async function rejectRedemption(id) {
-        let redemptions = getStoreRedemptions();
-        const target = redemptions.find(r => r.id === id);
-        if (!target) return;
+async function rejectRedemption(id) {
+  let redemptions = getStoreRedemptions();
+  const target = redemptions.find(r => r.id === id);
+  if (!target) return;
 
-        target.status = 'rejected';
-        if (!currentChannelConfig) currentChannelConfig = {};
-        currentChannelConfig.store_redemptions = redemptions;
+  target.status = 'rejected';
+  if (!currentChannelConfig) currentChannelConfig = {};
+  currentChannelConfig.store_redemptions = redemptions;
 
-        // Refund points to viewer if found on leaderboard
-        const userKey = target.username.toLowerCase();
-        const row = (allLeaderboard || []).find(x => (x.username || '').toLowerCase() === userKey);
-        if (row) {
-          row.points = (row.points || 0) + target.cost;
-          const { error: lbError } = await sb.from('leaderboard')
-            .upsert({ channel_id: String(activeChannel.id), username: userKey, points: row.points }, { onConflict: 'channel_id,username' });
-          if (!lbError) renderEconomyLeaderboard();
-        }
+  // Refund points to viewer if found on leaderboard
+  const userKey = target.username.toLowerCase();
+  const row = (allLeaderboard || []).find(x => (x.username || '').toLowerCase() === userKey);
+  if (row) {
+    row.points = (row.points || 0) + target.cost;
+    const { error: lbError } = await sb.from('leaderboard')
+      .upsert({ channel_id: String(activeChannel.id), username: userKey, points: row.points }, { onConflict: 'channel_id,username' });
+    if (!lbError) renderEconomyLeaderboard();
+  }
 
-        const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
+  const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
-        if (!error) {
-          showToast(`Kupovina za @${target.username} je odbijena i ${target.cost} poena je refundirano!`, 'info');
-          renderStoreRedemptions();
-        }
-      }
+  if (!error) {
+    showToast(`Kupovina za @${target.username} je odbijena i ${target.cost} poena je refundirano!`, 'info');
+    renderStoreRedemptions();
+  }
+}
 
-      // ── Economy Leaderboard Render ──
-      function renderEconomyLeaderboard() {
-        const tbody = document.getElementById('ecoLeaderboardTbody');
-        if (!tbody) return;
+// ── Economy Leaderboard Render ──
+function renderEconomyLeaderboard() {
+  const tbody = document.getElementById('ecoLeaderboardTbody');
+  if (!tbody) return;
 
-        const query = (document.getElementById('ecoLbSearchInput')?.value || '').toLowerCase().trim();
-        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || (currentChannelConfig && currentChannelConfig.currency_name) || 'Koins';
+  const query = (document.getElementById('ecoLbSearchInput')?.value || '').toLowerCase().trim();
+  const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || (currentChannelConfig && currentChannelConfig.currency_name) || 'Koins';
 
-        let list = (allLeaderboard || []).map(row => {
-          return {
-            username: row.display_name || row.username,
-            rawUsername: row.username,
-            points: row.points_currency || row.points || 0,
-            messages: row.points || 0,
-            updated_at: row.updated_at
-          };
-        });
+  let list = (allLeaderboard || []).map(row => {
+    return {
+      username: row.display_name || row.username,
+      rawUsername: row.username,
+      points: row.points_currency || row.points || 0,
+      messages: row.points || 0,
+      updated_at: row.updated_at
+    };
+  });
 
-        if (query) {
-          list = list.filter(item => item.username.toLowerCase().includes(query) || item.rawUsername.toLowerCase().includes(query));
-        }
+  if (query) {
+    list = list.filter(item => item.username.toLowerCase().includes(query) || item.rawUsername.toLowerCase().includes(query));
+  }
 
-        // Sortiraj prema izabranoj koloni i smeru
-        const sortKey = typeof ecoLbSortKey !== 'undefined' ? ecoLbSortKey : 'points';
-        const sortDir = typeof ecoLbSortDir !== 'undefined' ? ecoLbSortDir : 'desc';
-        list.sort((a, b) => {
-          let va, vb;
-          if (sortKey === 'activity') {
-            va = a.messages || 0;
-            vb = b.messages || 0;
-          } else {
-            va = a.points || 0;
-            vb = b.points || 0;
-          }
-          return sortDir === 'asc' ? va - vb : vb - va;
-        });
+  // Sortiraj prema izabranoj koloni i smeru
+  const sortKey = typeof ecoLbSortKey !== 'undefined' ? ecoLbSortKey : 'points';
+  const sortDir = typeof ecoLbSortDir !== 'undefined' ? ecoLbSortDir : 'desc';
+  list.sort((a, b) => {
+    let va, vb;
+    if (sortKey === 'activity') {
+      va = a.messages || 0;
+      vb = b.messages || 0;
+    } else {
+      va = a.points || 0;
+      vb = b.points || 0;
+    }
+    return sortDir === 'asc' ? va - vb : vb - va;
+  });
 
-        if (list.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema podataka na rang listi.</td></tr>`;
-          return;
-        }
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema podataka na rang listi.</td></tr>`;
+    return;
+  }
 
-        const coinIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" style="vertical-align:middle;"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>`;
+  const coinIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" style="vertical-align:middle;"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>`;
 
-        tbody.innerHTML = list.slice(0, 50).map((u, idx) => `
+  tbody.innerHTML = list.slice(0, 50).map((u, idx) => `
     <tr>
       <td style="font-weight:700; color:var(--text-muted);">${idx + 1}</td>
       <td style="font-weight:600; color:#fff;">@${escapeHtml(u.username)}</td>
@@ -8589,177 +8592,177 @@ async function addNewChannel() {
       </td>
     </tr>
   `).join('');
-      }
+}
 
-      function openEditUserPointsModal(username, currentPoints) {
-        const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
-        const newPoints = prompt(`Unesi novi broj poena (${valuta}) za @${username}:`, currentPoints);
-        if (newPoints === null) return;
-        const parsed = parseInt(newPoints, 10);
-        if (isNaN(parsed) || parsed < 0) return;
+function openEditUserPointsModal(username, currentPoints) {
+  const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+  const newPoints = prompt(`Unesi novi broj poena (${valuta}) za @${username}:`, currentPoints);
+  if (newPoints === null) return;
+  const parsed = parseInt(newPoints, 10);
+  if (isNaN(parsed) || parsed < 0) return;
 
-        const target = allLeaderboard.find(x => (x.username || '').toLowerCase() === username.toLowerCase());
-        if (target) {
-          target.points_currency = parsed;
-          target.points = parsed;
-          renderEconomyLeaderboard();
-          showToast('success', `Poeni za @${username} su ažurirani na ${parsed.toLocaleString()} ${valuta}!`);
-        }
-      }
-      // ─── Economy Leaderboard Sortiranje ────────────────────────
-      let ecoLbSortKey = 'points';  // 'points' | 'activity'
-      let ecoLbSortDir = 'desc';    // 'asc' | 'desc'
+  const target = allLeaderboard.find(x => (x.username || '').toLowerCase() === username.toLowerCase());
+  if (target) {
+    target.points_currency = parsed;
+    target.points = parsed;
+    renderEconomyLeaderboard();
+    showToast('success', `Poeni za @${username} su ažurirani na ${parsed.toLocaleString()} ${valuta}!`);
+  }
+}
+// ─── Economy Leaderboard Sortiranje ────────────────────────
+let ecoLbSortKey = 'points';  // 'points' | 'activity'
+let ecoLbSortDir = 'desc';    // 'asc' | 'desc'
 
-      function sortEconomyLeaderboard(key) {
-        if (ecoLbSortKey === key) {
-          ecoLbSortDir = ecoLbSortDir === 'desc' ? 'asc' : 'desc';
-        } else {
-          ecoLbSortKey = key;
-          ecoLbSortDir = 'desc';
-        }
+function sortEconomyLeaderboard(key) {
+  if (ecoLbSortKey === key) {
+    ecoLbSortDir = ecoLbSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    ecoLbSortKey = key;
+    ecoLbSortDir = 'desc';
+  }
 
-        // Osvezi vizuelno stanje headera
-        ['ecoLbThPoints', 'ecoLbThActivity'].forEach(id => {
-          const th = document.getElementById(id);
-          if (!th) return;
-          th.classList.remove('sort-asc', 'sort-desc');
-        });
-        const activeKey = key === 'points' ? 'ecoLbThPoints' : 'ecoLbThActivity';
-        const activeTh = document.getElementById(activeKey);
-        if (activeTh) activeTh.classList.add(ecoLbSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  // Osvezi vizuelno stanje headera
+  ['ecoLbThPoints', 'ecoLbThActivity'].forEach(id => {
+    const th = document.getElementById(id);
+    if (!th) return;
+    th.classList.remove('sort-asc', 'sort-desc');
+  });
+  const activeKey = key === 'points' ? 'ecoLbThPoints' : 'ecoLbThActivity';
+  const activeTh = document.getElementById(activeKey);
+  if (activeTh) activeTh.classList.add(ecoLbSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
 
-        renderEconomyLeaderboard();
-      }
+  renderEconomyLeaderboard();
+}
 
-      // Expose globally
-      window.sortEconomyLeaderboard = sortEconomyLeaderboard;
+// Expose globally
+window.sortEconomyLeaderboard = sortEconomyLeaderboard;
 
-      // ═══════════════════════════════════════════════════════════
-      // REFERRAL PROGRAM MODAL & LOGIC
-      // ═══════════════════════════════════════════════════════════
-      async function openReferralModal() {
-        const userMenuSm = document.getElementById('userMenuSm');
-        if (userMenuSm) userMenuSm.classList.remove('open');
+// ═══════════════════════════════════════════════════════════
+// REFERRAL PROGRAM MODAL & LOGIC
+// ═══════════════════════════════════════════════════════════
+async function openReferralModal() {
+  const userMenuSm = document.getElementById('userMenuSm');
+  if (userMenuSm) userMenuSm.classList.remove('open');
 
-        openModal('referralModal');
+  openModal('referralModal');
 
-        if (currentUser && currentUser.id) {
-          try {
-            await ensureUserHasReferralCode(currentUser.id);
-            await loadReferralData(currentUser.id);
-          } catch (err) {
-            // Referral load error
-          }
-        }
-      }
+  if (currentUser && currentUser.id) {
+    try {
+      await ensureUserHasReferralCode(currentUser.id);
+      await loadReferralData(currentUser.id);
+    } catch (err) {
+      // Referral load error
+    }
+  }
+}
 
-      async function ensureUserHasReferralCode(userId) {
-        try {
-          const { data: stats } = await sb.from('referral_stats').select('referral_code').eq('user_id', userId).single();
-          if (!stats || !stats.referral_code) {
-            await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: null });
-          }
-        } catch (err) {
-          // Referral code check error
-        }
-      }
+async function ensureUserHasReferralCode(userId) {
+  try {
+    const { data: stats } = await sb.from('referral_stats').select('referral_code').eq('user_id', userId).single();
+    if (!stats || !stats.referral_code) {
+      await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: null });
+    }
+  } catch (err) {
+    // Referral code check error
+  }
+}
 
-      async function loadReferralData(userId) {
-        try {
-          const { data: stats } = await sb.from('referral_stats').select('*').eq('user_id', userId).single();
-          if (stats) updateReferralStats(stats);
+async function loadReferralData(userId) {
+  try {
+    const { data: stats } = await sb.from('referral_stats').select('*').eq('user_id', userId).single();
+    if (stats) updateReferralStats(stats);
 
-          const { data: rewards } = await sb.from('referral_rewards').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-          updateRewardsList(rewards || []);
-        } catch (err) {
-          // Error loading referral data
-        }
-      }
+    const { data: rewards } = await sb.from('referral_rewards').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    updateRewardsList(rewards || []);
+  } catch (err) {
+    // Error loading referral data
+  }
+}
 
-      function generateReferralLink(referralCode) {
-        return `${window.KickotConfig.paths.indexUrl}?ref=${referralCode}`;
-      }
+function generateReferralLink(referralCode) {
+  return `${window.KickotConfig.paths.indexUrl}?ref=${referralCode}`;
+}
 
-      function updateReferralStats(stats) {
-        const totalReferrals = document.getElementById('totalReferrals');
-        const successfulReferrals = document.getElementById('successfulReferrals');
-        const totalEarned = document.getElementById('totalEarned');
-        const availableRewards = document.getElementById('availableRewards');
-        const referralCodeInput = document.getElementById('referralCodeInput');
-        const referralLinkText = document.getElementById('referralLinkText');
-        const withdrawalBtn = document.getElementById('withdrawalBtn');
+function updateReferralStats(stats) {
+  const totalReferrals = document.getElementById('totalReferrals');
+  const successfulReferrals = document.getElementById('successfulReferrals');
+  const totalEarned = document.getElementById('totalEarned');
+  const availableRewards = document.getElementById('availableRewards');
+  const referralCodeInput = document.getElementById('referralCodeInput');
+  const referralLinkText = document.getElementById('referralLinkText');
+  const withdrawalBtn = document.getElementById('withdrawalBtn');
 
-        if (totalReferrals) totalReferrals.textContent = stats.total_referrals || 0;
-        if (successfulReferrals) successfulReferrals.textContent = stats.successful_referrals || 0;
-        if (totalEarned) totalEarned.textContent = `€${(stats.total_earned || 0).toFixed(2)}`;
+  if (totalReferrals) totalReferrals.textContent = stats.total_referrals || 0;
+  if (successfulReferrals) successfulReferrals.textContent = stats.successful_referrals || 0;
+  if (totalEarned) totalEarned.textContent = `€${(stats.total_earned || 0).toFixed(2)}`;
 
-        const available = stats.available_balance || 0;
-        if (availableRewards) availableRewards.textContent = `€${available.toFixed(2)}`;
+  const available = stats.available_balance || 0;
+  if (availableRewards) availableRewards.textContent = `€${available.toFixed(2)}`;
 
-        if (withdrawalBtn) {
-          withdrawalBtn.disabled = available < 5;
-        }
+  if (withdrawalBtn) {
+    withdrawalBtn.disabled = available < 5;
+  }
 
-        if (stats.referral_code) {
-          if (referralCodeInput) referralCodeInput.value = stats.referral_code;
-          const refLink = generateReferralLink(stats.referral_code);
-          if (referralLinkText) referralLinkText.textContent = refLink;
+  if (stats.referral_code) {
+    if (referralCodeInput) referralCodeInput.value = stats.referral_code;
+    const refLink = generateReferralLink(stats.referral_code);
+    if (referralLinkText) referralLinkText.textContent = refLink;
 
-          setupReferralCopyBtn(stats.referral_code, refLink);
-        }
+    setupReferralCopyBtn(stats.referral_code, refLink);
+  }
 
-        window.currentAvailableBalance = available;
-      }
+  window.currentAvailableBalance = available;
+}
 
-      function setupReferralCopyBtn(code, link) {
-        const btn = document.getElementById('copyReferralBtn');
-        if (!btn) return;
+function setupReferralCopyBtn(code, link) {
+  const btn = document.getElementById('copyReferralBtn');
+  if (!btn) return;
 
-        btn.onclick = async () => {
-          try {
-            const textToCopy = `Moj referral kod: ${code}\nReferral link: ${link}`;
-            await navigator.clipboard.writeText(textToCopy);
-            btn.textContent = 'Kopirano!';
-            btn.style.background = '#10B981';
-            showToast('success', 'Referral link je uspešno kopiran!');
-            setTimeout(() => {
-              btn.textContent = 'Kopiraj Link';
-              btn.style.background = '';
-            }, 2000);
-          } catch (e) {
-            showToast('error', 'Greška pri kopiranju!');
-          }
-        };
-      }
+  btn.onclick = async () => {
+    try {
+      const textToCopy = `Moj referral kod: ${code}\nReferral link: ${link}`;
+      await navigator.clipboard.writeText(textToCopy);
+      btn.textContent = 'Kopirano!';
+      btn.style.background = '#10B981';
+      showToast('success', 'Referral link je uspešno kopiran!');
+      setTimeout(() => {
+        btn.textContent = 'Kopiraj Link';
+        btn.style.background = '';
+      }, 2000);
+    } catch (e) {
+      showToast('error', 'Greška pri kopiranju!');
+    }
+  };
+}
 
-      function copyCustomRefEmail(btn) {
-        const email = 'contact@milanwebportal.com';
-        navigator.clipboard.writeText(email).then(() => {
-          const origHTML = btn.innerHTML;
-          btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-          btn.style.color = '#53fc18';
-          btn.style.borderColor = '#53fc18';
-          showToast('success', 'Mejl adresa je uspešno kopirana!');
-          setTimeout(() => {
-            btn.innerHTML = origHTML;
-            btn.style.color = '';
-            btn.style.borderColor = '';
-          }, 2000);
-        }).catch(() => {
-          showToast('error', 'Greška pri kopiranju mejla.');
-        });
-      }
+function copyCustomRefEmail(btn) {
+  const email = 'contact@milanwebportal.com';
+  navigator.clipboard.writeText(email).then(() => {
+    const origHTML = btn.innerHTML;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    btn.style.color = '#53fc18';
+    btn.style.borderColor = '#53fc18';
+    showToast('success', 'Mejl adresa je uspešno kopirana!');
+    setTimeout(() => {
+      btn.innerHTML = origHTML;
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    }, 2000);
+  }).catch(() => {
+    showToast('error', 'Greška pri kopiranju mejla.');
+  });
+}
 
-      function updateRewardsList(rewards) {
-        const container = document.getElementById('rewardsList');
-        if (!container) return;
+function updateRewardsList(rewards) {
+  const container = document.getElementById('rewardsList');
+  if (!container) return;
 
-        if (!rewards || rewards.length === 0) {
-          container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 0.85rem;">Još uvek nemaš nagrade. Pozovi prijatelje da započneš!</div>`;
-          return;
-        }
+  if (!rewards || rewards.length === 0) {
+    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px; font-size: 0.85rem;">Još uvek nemaš nagrade. Pozovi prijatelje da započneš!</div>`;
+    return;
+  }
 
-        container.innerHTML = rewards.map(r => `
+  container.innerHTML = rewards.map(r => `
     <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); padding:10px 14px; border-radius:var(--radius-md);">
       <div>
         <div style="font-weight:600; color:#fff; font-size:0.85rem;">${r.reward_description || 'Provizija od kupovine'}</div>
@@ -8770,9 +8773,9 @@ async function addNewChannel() {
       </span>
     </div>
   `).join('');
-      }
+}
 
- function openWithdrawalModal() {
+function openWithdrawalModal() {
   closeModal('referralModal');
   const balEl = document.getElementById('modalAvailableBalance');
   if (balEl) balEl.textContent = `€${(window.currentAvailableBalance || 0).toFixed(2)}`;
@@ -8844,7 +8847,7 @@ async function handleWithdrawalSubmit(e) {
     }).catch(err => { /* FormSubmit mail error */ });
 
     showToast('Zahtev za isplatu je uspešno poslat! Bićete obavešteni o isplati.', 'success');
-    
+
     // Resetuj formu i zatvori modal
     document.getElementById('withdrawalForm')?.reset();
     closeModal('withdrawalModal');
@@ -8926,7 +8929,7 @@ function switchBotrixTab(tabName) {
   document.getElementById('botrixGuideText').innerHTML = guides[tabName] || guides.cmds;
   document.getElementById('botrixInputLabel').textContent = labels[tabName] || labels.cmds;
   document.getElementById('botrixInputText').placeholder = placeholders[tabName] || placeholders.cmds;
-  
+
   parseBotrixInput();
 }
 
@@ -9121,7 +9124,7 @@ function parseBotrixInput() {
     countEl.textContent = `Pronađeno: ${botrixParsedData.length} čiste automatske najave`;
     previewList.innerHTML = botrixParsedData.map((msg, i) => `
       <div style="background: rgba(255,255,255,0.04); padding: 6px 10px; border-radius: 6px; font-size: 0.78rem; color: var(--text-main);">
-        <strong>Najava #${i+1}:</strong> ${escapeHtml(msg)}
+        <strong>Najava #${i + 1}:</strong> ${escapeHtml(msg)}
       </div>
     `).join('');
 
@@ -9432,7 +9435,7 @@ async function executeBotrixImport() {
       const limits = getPlanLimits();
       const { data: configData } = await sb.from('bot_config').select('auto_announces').eq('channel_id', activeChannel.id).single();
       const currentAnnounces = Array.isArray(configData?.auto_announces) ? configData.auto_announces : [];
-      
+
       const availableSpace = limits.maxAutoAnnounces - currentAnnounces.length;
       if (availableSpace <= 0) {
         throw new Error(`Dostignut je limit od ${limits.maxAutoAnnounces} automatskih poruka za tvoj ${limits.name} paket! Nadogradi paket za više poruka.`);

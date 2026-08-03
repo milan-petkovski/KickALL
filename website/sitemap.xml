@@ -32,4 +32,20 @@
         <changefreq>monthly</changefreq>
         <priority>0.3</priority>
     </url>
+
+    <!-- Pricing -->
+    <url>
+        <loc>https://kickall.app/pricing.html</loc>
+        <lastmod>2026-08-03</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.4</priority>
+    </url>
+
+    <!-- Refund Policy -->
+    <url>
+        <loc>https://kickall.app/refund.html</loc>
+        <lastmod>2026-08-03</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.3</priority>
+    </url>
 </urlset>

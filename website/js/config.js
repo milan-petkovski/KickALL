@@ -24,11 +24,11 @@ window.CONFIG = {
     KICK_USERINFO: 'https://id.kick.com/oauth/userinfo',
     PROXY_ALLORIGINS: 'https://api.allorigins.win/get',
     PROXY_CORSPROXY: 'https://corsproxy.io/?',
-    
+
     // CORS-safe fetch wrapper
     async fetchWithCORS(url, options = {}) {
       const backendBase = window.CONFIG ? window.CONFIG.getBackendApiBase() : 'https://kickbot-ihzb.onrender.com';
-      
+
       try {
         const proxyUrl = `${backendBase}/api/proxy`;
         const proxyResponse = await fetch(proxyUrl, {
@@ -43,11 +43,11 @@ window.CONFIG = {
             body: options.body
           })
         });
-        
+
         if (proxyResponse.ok) {
           return proxyResponse;
         }
-        
+
         const errorData = await proxyResponse.json().catch(() => ({ error: 'Proxy request failed' }));
         throw new Error(errorData.error || 'Proxy request failed');
       } catch (error) {
@@ -56,6 +56,27 @@ window.CONFIG = {
         }
         throw error;
       }
+    }
+  },
+
+  // Paddle Billing Configuration
+  PADDLE: {
+    ENABLED: true,
+    ENVIRONMENT: 'production',
+    CLIENT_TOKEN: '',
+    BILLING_PORTAL_URL: '',
+    PRICE_IDS: {
+      pro: {
+        monthly: '',
+        yearly: ''
+      },
+      elite: {
+        monthly: '',
+        yearly: ''
+      }
+    },
+    PRICE_TIER_MAP: {
+      '': 'free'
     }
   },
 
@@ -141,7 +162,7 @@ window.CONFIG = {
   // Resilient Session Retriever for PC Reboots / Network Cold Starts
   getValidSessionWithRetry: async (sbClient, maxRetries = 3, retryDelayMs = 1500) => {
     if (!sbClient || !sbClient.auth) return null;
-    
+
     const storageKey = window.CONFIG?.SUPABASE?.STORAGE_KEY || 'kickbot-supabase-auth';
     let hasSavedSession = false;
     try {
@@ -149,7 +170,7 @@ window.CONFIG = {
       if (item && item.length > 10) {
         hasSavedSession = true;
       }
-    } catch (e) {}
+    } catch (e) { }
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -157,7 +178,7 @@ window.CONFIG = {
         if (data?.session?.user) {
           return data.session;
         }
-        
+
         if (!hasSavedSession && !error) {
           return null;
         }
@@ -187,7 +208,7 @@ window.CONFIG = {
 
         if (event.key === logoutKey) {
           if (sbClient && sbClient.auth) {
-            try { await sbClient.auth.signOut(); } catch (_) {}
+            try { await sbClient.auth.signOut(); } catch (_) { }
           }
           if (typeof onSessionChange === 'function') {
             onSessionChange(null, 'GLOBAL_LOGOUT');
@@ -202,13 +223,44 @@ window.CONFIG = {
     } catch (e) {
       console.warn('[KickAuth] Cross-tab listener error:', e);
     }
+  },
+
+  initPaddle: () => {
+    try {
+      const paddleConfig = window.CONFIG?.PADDLE || {};
+      const clientToken = String(paddleConfig.CLIENT_TOKEN || '').trim();
+      if (!clientToken || !window.Paddle) return false;
+      if (window.__PADDLE_INITIALIZED__) return true;
+
+      if (window.Paddle.Environment && typeof window.Paddle.Environment.set === 'function') {
+        window.Paddle.Environment.set(String(paddleConfig.ENVIRONMENT || 'production'));
+      }
+
+      if (typeof window.Paddle.Initialize === 'function') {
+        window.Paddle.Initialize({ token: clientToken });
+      } else if (typeof window.Paddle.Setup === 'function') {
+        window.Paddle.Setup({ token: clientToken });
+      }
+
+      window.__PADDLE_INITIALIZED__ = true;
+      return true;
+    } catch (error) {
+      console.warn('[Paddle] Initialization failed:', error);
+      return false;
+    }
   }
 };
+
+if (document.readyState === 'complete') {
+  window.CONFIG.initPaddle();
+} else {
+  window.addEventListener('load', () => window.CONFIG.initPaddle(), { once: true });
+}
 
 // Adaptive Keep-Alive Ping for Render free tier (only runs when tab is visible)
 if (window.CONFIG.KEEP_ALIVE.ENABLED) {
   let pingTimer = null;
-  
+
   const sendHealthPing = () => {
     if (document.visibilityState === 'visible') {
       fetch(`${window.CONFIG.getBackendApiBase()}${window.CONFIG.KEEP_ALIVE.HEALTH_ENDPOINT}`, {

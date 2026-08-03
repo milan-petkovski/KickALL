@@ -86,7 +86,9 @@
 
     if (!sb) {
       clearTimeout(safetyTimeout);
-      dismissAuthGate();
+      const gateMsg = document.getElementById('authGateMsg');
+      if (gateMsg) gateMsg.textContent = 'Preusmeravanje na prijavu...';
+      setTimeout(() => { window.location.href = '../index.html?login=1'; }, 1200);
       return;
     }
 
@@ -95,63 +97,72 @@
         ? await window.CONFIG.getValidSessionWithRetry(sb, 3, 1000)
         : (await sb.auth.getSession())?.data?.session;
 
-      if (session?.user) {
-        currentUser = session.user;
-        let username = currentUser.user_metadata?.kick_username
-                    || currentUser.user_metadata?.preferred_username
-                    || currentUser.user_metadata?.name
-                    || currentUser.user_metadata?.full_name
-                    || (currentUser.email ? currentUser.email : '');
-        let avatarUrl = currentUser.user_metadata?.avatar_url
-                     || currentUser.user_metadata?.picture
-                     || currentUser.user_metadata?.profile_picture;
+      if (!session?.user) {
+        clearTimeout(safetyTimeout);
+        const gateMsg = document.getElementById('authGateMsg');
+        if (gateMsg) gateMsg.textContent = 'Preusmeravanje na prijavu...';
+        setTimeout(() => { window.location.href = '../index.html?login=1'; }, 1200);
+        return;
+      }
 
-        // Query user_profiles in Supabase for exact fresh profile data
-        try {
-          const { data: profile } = await sb.from('user_profiles').select('*').eq('id', currentUser.id).maybeSingle();
-          if (profile) {
-            if (profile.kick_channels && Array.isArray(profile.kick_channels) && profile.kick_channels.length > 0) {
-              const primary = profile.kick_channels.find(c => c.is_primary) || profile.kick_channels[0];
-              if (primary.username) username = primary.username;
-              if (primary.avatar) avatarUrl = primary.avatar;
-              if (primary.chatroom_id) chatroomId = parseInt(primary.chatroom_id, 10);
-            }
-            if (!username && profile.display_name) username = profile.display_name;
+      currentUser = session.user;
+      let username = currentUser.user_metadata?.kick_username
+        || currentUser.user_metadata?.preferred_username
+        || currentUser.user_metadata?.name
+        || currentUser.user_metadata?.full_name
+        || (currentUser.email ? currentUser.email : '');
+      let avatarUrl = currentUser.user_metadata?.avatar_url
+        || currentUser.user_metadata?.picture
+        || currentUser.user_metadata?.profile_picture;
+
+      // Query user_profiles in Supabase for exact fresh profile data
+      try {
+        const { data: profile } = await sb.from('user_profiles').select('*').eq('id', currentUser.id).maybeSingle();
+        if (profile) {
+          if (profile.kick_channels && Array.isArray(profile.kick_channels) && profile.kick_channels.length > 0) {
+            const primary = profile.kick_channels.find(c => c.is_primary) || profile.kick_channels[0];
+            if (primary.username) username = primary.username;
+            if (primary.avatar) avatarUrl = primary.avatar;
+            if (primary.chatroom_id) chatroomId = parseInt(primary.chatroom_id, 10);
           }
-        } catch (e) {
-          console.warn('Supabase profile lookup info:', e.message);
+          if (!username && profile.display_name) username = profile.display_name;
         }
+      } catch (e) {
+        console.warn('Supabase profile lookup info:', e.message);
+      }
 
-        channelName = cleanUsername(username);
-        
-        // Update UI
-        const channelNameEl = document.getElementById('connectedChannelName');
-        if (channelNameEl) channelNameEl.textContent = channelName || 'DemoKanal';
+      channelName = cleanUsername(username);
 
-        const slugEl = document.getElementById('kickChannelSlug');
-        if (slugEl) slugEl.textContent = channelName || 'Nepovezan Kanal';
+      // Update UI
+      const channelNameEl = document.getElementById('connectedChannelName');
+      if (channelNameEl) channelNameEl.textContent = channelName || 'DemoKanal';
 
-        const btnVisit = document.getElementById('btnVisitKickChannel');
-        if (btnVisit && channelName) btnVisit.href = `https://kick.com/${channelName}`;
+      const slugEl = document.getElementById('kickChannelSlug');
+      if (slugEl) slugEl.textContent = channelName || 'Nepovezan Kanal';
 
-        updateHeaderProfileUI(channelName, avatarUrl);
+      const btnVisit = document.getElementById('btnVisitKickChannel');
+      if (btnVisit && channelName) btnVisit.href = `https://kick.com/${channelName}`;
 
-        if (channelName) {
-          loadSavedSessionStats(channelName);
-          await loadRealKickChannelData(channelName);
-          
-          // Connect to real Kick chat WebSocket automatically
-          connectToRealKickChat();
+      updateHeaderProfileUI(channelName, avatarUrl);
 
-          // Poll Kick API every 30 seconds for live viewer count updates
-          if (pollInterval) clearInterval(pollInterval);
-          pollInterval = setInterval(() => {
-            loadRealKickChannelData(channelName).catch(() => {});
-          }, 30000);
-        }
+      if (channelName) {
+        loadSavedSessionStats(channelName);
+        await loadRealKickChannelData(channelName);
+
+        // Connect to real Kick chat WebSocket automatically
+        connectToRealKickChat();
+
+        // Poll Kick API every 30 seconds for live viewer count updates
+        if (pollInterval) clearInterval(pollInterval);
+        pollInterval = setInterval(() => {
+          loadRealKickChannelData(channelName).catch(() => { });
+        }, 30000);
       }
     } catch (err) {
       console.warn('Auth check error:', err);
+      const gateMsg = document.getElementById('authGateMsg');
+      if (gateMsg) gateMsg.textContent = 'Preusmeravanje na prijavu...';
+      setTimeout(() => { window.location.href = '../index.html?login=1'; }, 1200);
     } finally {
       clearTimeout(safetyTimeout);
       dismissAuthGate();
@@ -165,8 +176,8 @@
     const gate = document.getElementById('authGate');
     if (gate) {
       gate.classList.add('fade-out');
-      setTimeout(() => { 
-        gate.style.display = 'none'; 
+      setTimeout(() => {
+        gate.style.display = 'none';
         gate.style.visibility = 'hidden';
         gate.style.opacity = '0';
         gate.style.pointerEvents = 'none';
@@ -210,7 +221,7 @@
           if (saved.totalEmotes) liveStats.totalEmotes = saved.totalEmotes;
           if (saved.totalBans) liveStats.totalBans = saved.totalBans;
           if (saved.totalHosts) liveStats.totalHosts = saved.totalHosts;
-          
+
           if (saved.uniqueChatters && Array.isArray(saved.uniqueChatters)) {
             liveStats.uniqueChattersMap = new Set(saved.uniqueChatters);
           }
@@ -262,7 +273,7 @@
       if (res.ok) {
         channelData = await res.json();
       }
-    } catch (_) {}
+    } catch (_) { }
 
     if (!channelData) {
       try {
@@ -272,14 +283,14 @@
           const json = await res.json();
           if (json.contents) channelData = JSON.parse(json.contents);
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (channelData) {
       if (channelData.chatroom && channelData.chatroom.id) {
         chatroomId = parseInt(channelData.chatroom.id, 10);
       }
-      
+
       if (channelData.livestream && channelData.livestream.is_live) {
         liveStats.avgViewers = channelData.livestream.viewer_count || 0;
       } else {
@@ -308,15 +319,15 @@
             if (w.username || w.user_id) liveStats.uniqueChattersMap.add(w.username || w.user_id);
           });
         }
-      } catch (_) {}
+      } catch (_) { }
     }
-    
+
     updateDashboardStatsUI();
   }
 
   async function connectToRealKickChat() {
     if (kickWebSocket) {
-      try { kickWebSocket.close(); } catch (e) {}
+      try { kickWebSocket.close(); } catch (e) { }
       kickWebSocket = null;
     }
 
@@ -332,7 +343,7 @@
     }
 
     const pusherUrl = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false';
-    
+
     try {
       kickWebSocket = new WebSocket(pusherUrl);
     } catch (err) {
@@ -342,12 +353,12 @@
 
     kickWebSocket.onopen = () => {
       console.log(`Kickan Realtime WebSocket Connected to chatroom: ${chatroomId}`);
-      
+
       kickWebSocket.send(JSON.stringify({
         event: 'pusher:subscribe',
         data: { auth: '', channel: `chatrooms.${chatroomId}.v2` }
       }));
-      
+
       kickWebSocket.send(JSON.stringify({
         event: 'pusher:subscribe',
         data: { auth: '', channel: `chatrooms.${chatroomId}` }
@@ -373,7 +384,7 @@
       try {
         const msgData = JSON.parse(event.data);
         const evName = msgData.event || '';
-        
+
         if (evName.includes('ChatMessageEvent') || evName.includes('ChatMessageSentEvent')) {
           const payload = typeof msgData.data === 'string' ? JSON.parse(msgData.data) : msgData.data;
           processChatMessageEvent(payload);
@@ -384,7 +395,7 @@
           liveStats.totalHosts++;
           throttledUpdateUI();
         }
-      } catch (err) {}
+      } catch (err) { }
     };
 
     return true;
@@ -397,7 +408,7 @@
 
     const senderName = payload.sender?.username || payload.sender?.slug || payload.username || 'Gledalac';
     const content = payload.content || payload.message || '';
-    
+
     let isSub = false;
     const badges = payload.sender?.identity?.badges || payload.sender?.badges || payload.badges || [];
     if (Array.isArray(badges)) {
@@ -422,7 +433,7 @@
     while ((match = emoteRegex.exec(content)) !== null) {
       emoteMatches.push(match[1]);
     }
-    
+
     // Fallback: If no kick emotes found, search for colon emotes or common text emotes
     if (emoteMatches.length === 0) {
       const colonMatches = content.match(/:[a-zA-Z0-9_]+:/g);
@@ -457,7 +468,7 @@
     const bannedUser = payload.user?.username || payload.banned_user?.username || 'Korisnik';
     const modName = payload.moderator?.username || 'Sistem / Moderator';
     const reason = payload.reason || 'Uklonjena poruka / Timeout';
-    
+
     liveStats.banLogs.unshift({
       user: bannedUser,
       mod: modName,
@@ -466,7 +477,7 @@
     });
 
     if (liveStats.banLogs.length > 15) liveStats.banLogs.pop();
-    
+
     throttledUpdateUI();
   }
 
@@ -497,7 +508,7 @@
     renderPopularEmotes();
     renderActiveViewersTable();
     renderBanHistoryTable();
-    
+
     if (channelName) saveSessionStats(channelName);
   }
 
@@ -603,8 +614,8 @@
       else if (rank === 2) badgeClass = 'rank-2';
       else if (rank === 3) badgeClass = 'rank-3';
 
-      const statusTag = data.isSub 
-        ? `<span style="color:#c084fc; font-weight:800; background:rgba(147, 51, 234, 0.15); padding:2px 8px; border-radius:6px; font-size:0.75rem;">SUB</span>` 
+      const statusTag = data.isSub
+        ? `<span style="color:#c084fc; font-weight:800; background:rgba(147, 51, 234, 0.15); padding:2px 8px; border-radius:6px; font-size:0.75rem;">SUB</span>`
         : `<span style="color:var(--kickan-text-muted); font-size:0.8rem;">Gledalac</span>`;
 
       html += `

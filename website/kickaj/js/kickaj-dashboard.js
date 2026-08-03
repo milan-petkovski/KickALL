@@ -212,13 +212,22 @@
 
   async function checkAuthSession() {
     if (!sb) {
-      dismissAuthGate();
+      const gateMsg = document.getElementById('authGateMsg');
+      if (gateMsg) gateMsg.textContent = 'Preusmeravanje na prijavu...';
+      setTimeout(() => { window.location.href = '../index.html?login=1'; }, 1200);
       return;
     }
     try {
       const session = window.CONFIG?.getValidSessionWithRetry
         ? await window.CONFIG.getValidSessionWithRetry(sb, 3, 1500)
         : (await sb.auth.getSession())?.data?.session;
+
+      if (!session?.user) {
+        const gateMsg = document.getElementById('authGateMsg');
+        if (gateMsg) gateMsg.textContent = 'Preusmeravanje na prijavu...';
+        setTimeout(() => { window.location.href = '../index.html?login=1'; }, 1200);
+        return;
+      }
 
       if (session?.user) {
         currentUser = session.user;
@@ -266,7 +275,9 @@
       }
       dismissAuthGate();
     } catch (err) {
-      dismissAuthGate();
+      const gateMsg = document.getElementById('authGateMsg');
+      if (gateMsg) gateMsg.textContent = 'Preusmeravanje na prijavu...';
+      setTimeout(() => { window.location.href = '../index.html?login=1'; }, 1200);
     }
   }
 
@@ -417,7 +428,7 @@
   async function resolveKickChatroom(slug) {
     if (!slug) return null;
     let cleanSlug = String(slug).trim().toLowerCase().replace(/^https?:\/\/(www\.)?kick\.com\//, '').replace(/\/$/, '');
-    
+
     // Check if numeric ID was provided directly
     if (/^\d+$/.test(cleanSlug)) {
       chatroomId = parseInt(cleanSlug, 10);
@@ -440,7 +451,7 @@
           try {
             data = JSON.parse(text);
             if (data?.contents) data = JSON.parse(data.contents);
-          } catch (e) {}
+          } catch (e) { }
 
           const foundId = data?.chatroom?.id || data?.chatroom_id;
           if (foundId) {
@@ -454,7 +465,7 @@
             return chatroomId;
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return chatroomId;
@@ -462,7 +473,7 @@
 
   async function connectToRealKickChat() {
     if (kickWebSocket) {
-      try { kickWebSocket.close(); } catch (e) {}
+      try { kickWebSocket.close(); } catch (e) { }
       kickWebSocket = null;
     }
 
@@ -490,7 +501,7 @@
         if (!isResolved) {
           isResolved = true;
           if (kickWebSocket) {
-            try { kickWebSocket.close(); } catch (e) {}
+            try { kickWebSocket.close(); } catch (e) { }
             kickWebSocket = null;
           }
           showToast('Konekcija sa Kick chatom je istekla (Timeout). Pokušajte ponovo.', 'error');
@@ -566,7 +577,7 @@
 
           if (evName.includes('ChatMessageEvent') || evName.includes('ChatMessageSentEvent')) {
             const payload = typeof msgData.data === 'string' ? JSON.parse(msgData.data) : msgData.data;
-            
+
             const senderName = payload?.sender?.username || payload?.sender?.slug || payload?.username;
             const text = payload?.content || payload?.message;
 
@@ -583,7 +594,7 @@
               processChatMessage({ username: senderName, isSub: isSub, message: text });
             }
           }
-        } catch (err) {}
+        } catch (err) { }
       };
     });
   }
@@ -607,7 +618,7 @@
         const randomUser = sampleUsers[Math.floor(Math.random() * sampleUsers.length)] + '_' + Math.floor(Math.random() * 90 + 10);
         const isSub = Math.random() > 0.4;
         const kw = settings.keyword ? settings.keyword : '';
-        
+
         processChatMessage({
           username: randomUser,
           isSub: isSub,
@@ -750,7 +761,7 @@
     } else {
       isRunning = false;
       if (kickWebSocket) {
-        try { kickWebSocket.close(); } catch (e) {}
+        try { kickWebSocket.close(); } catch (e) { }
         kickWebSocket = null;
       }
       updateStartButtonUI();
@@ -1013,7 +1024,7 @@
     isRunning = false;
     isSpinning = false;
     if (kickWebSocket) {
-      try { kickWebSocket.close(); } catch (e) {}
+      try { kickWebSocket.close(); } catch (e) { }
       kickWebSocket = null;
     }
     if (pingInterval) {

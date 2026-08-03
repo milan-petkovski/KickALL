@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html lang="sr">
-  <script>
-    // Load saved language before rendering
-    try {
-      const savedLang = localStorage.getItem('kickall_lang') || 'sr';
-      document.documentElement.lang = savedLang;
-    } catch (e) {
-      console.warn('LocalStorage not available:', e);
-    }
-  </script>
+<script>
+  // Load saved language before rendering
+  try {
+    const savedLang = localStorage.getItem('kickall_lang') || 'sr';
+    document.documentElement.lang = savedLang;
+  } catch (e) {
+    console.warn('LocalStorage not available:', e);
+  }
+</script>
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -21,7 +22,8 @@
   <meta name="msapplication-tap-highlight" content="no" />
   <meta name="color-scheme" content="dark" />
   <title>KICKALL - Centralni Dashboard</title>
-  <meta name="description" content="Centralni dashboard za KickAll ekosistem. Izaberi modul, prati referral nagrade i upravljaj svojim strimom." />
+  <meta name="description"
+    content="Centralni dashboard za KickAll ekosistem. Izaberi modul, prati referral nagrade i upravljaj svojim strimom." />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="canonical" href="https://kickall.app/dashboard.html" />
   <meta name="theme-color" content="#0B0816" />
@@ -30,7 +32,7 @@
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZNGNF6TEM"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
+    function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
 
     gtag('config', 'G-KZNGNF6TEM');
@@ -42,10 +44,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://rcukparptzzyssqdmydt.supabase.co" crossorigin />
-  
+
   <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.json" />
-  
+
   <!-- Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {
@@ -57,15 +59,17 @@
       });
     }
   </script>
-  
+
   <!-- Mobile Performance Optimizations -->
   <script src="js/mobile-optimization.js" defer></script>
-  
+
   <!-- Toast Notification System -->
   <script src="js/toast.js" defer></script>
 
   <!-- Fontovi -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet" />
 
   <!-- Lenis Smooth Scroll -->
   <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
@@ -91,7 +95,8 @@
   <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
     <div class="auth-gate-card">
       <div class="auth-gate-logo">
-        <img src="assets/kickall.webp" alt="KickALL Logo" class="logo-img" width="173" height="52" fetchpriority="high" />
+        <img src="assets/kickall.webp" alt="KickALL Logo" class="logo-img" width="173" height="52"
+          fetchpriority="high" />
       </div>
       <div class="auth-gate-spinner"></div>
       <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju...</p>
@@ -106,26 +111,32 @@
       </a>
       <nav class="nav-menu" id="navMenu">
         <button class="mobile-menu-close" id="mobileMenuClose" aria-label="Zatvori meni">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
         </button>
-        <a href="kickot/dashboard.html" class="nav-link nav-logo-link" title="Kickot">
+        <a href="kickot/dashboard.html" class="nav-link nav-logo-link" title="Kickot"
+          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); }">
           <img src="assets/kickot.webp" alt="Kickot" class="nav-module-img" height="28">
         </a>
-        <a href="kickaj/dashboard.html" class="nav-link nav-logo-link" title="Kickaj">
+        <a href="kickaj/dashboard.html" class="nav-link nav-logo-link" title="Kickaj"
+          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); }">
           <img src="assets/kickaj.webp" alt="Kickaj" class="nav-module-img" height="28">
         </a>
-        <a href="kickan/dashboard.html" class="nav-link nav-logo-link" title="Kickan">
+        <a href="kickan/dashboard.html" class="nav-link nav-logo-link" title="Kickan"
+          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); }">
           <img src="assets/kickan.webp" alt="Kickan" class="nav-module-img" height="28">
         </a>
-        <a href="kickov/dashboard.html" class="nav-link nav-logo-link" title="Kickov">
+        <a href="kickov/dashboard.html" class="nav-link nav-logo-link" title="Kickov"
+          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); }">
           <img src="assets/kickov.webp" alt="Kickov" class="nav-module-img" height="28">
         </a>
         <div class="mobile-menu-actions">
           <a href="index.html" class="btn btn-primary btn-large mobile-home-btn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
               <polyline points="9 22 9 12 15 12 15 22" />
             </svg>
@@ -145,20 +156,23 @@
           <button class="user-menu-trigger" id="userMenuTrigger">
             <div class="user-avatar" id="userAvatar">U</div>
             <span class="user-name" id="userName">Korisnik</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="chevron-icon">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round" class="chevron-icon">
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
           <div class="user-dropdown" id="userDropdown">
             <a href="index.html" class="dropdown-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
                 <polyline points="9 22 9 12 15 12 15 22" />
               </svg>
               <span data-i18n="dashboard.homePage">Početna stranica</span>
             </a>
             <button class="dropdown-item danger" id="btnLogout">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
@@ -179,28 +193,31 @@
   <!-- Main Content -->
   <main class="main-content">
     <div class="container dashboard-main-container">
-      
+
       <!-- Welcome Header -->
       <section class="welcome-section">
         <h1 class="welcome-title">
           <span data-i18n="dashboard.ecosystem">Ekosistem <span class="gradient-text">KickALL</span></span>
         </h1>
         <p class="welcome-subtitle">
-          <span data-i18n="dashboard.subtitle">Izaberi modul sa kojim želiš da upravljaš i podesi svoj stream za nekoliko trenutaka.</span>
+          <span data-i18n="dashboard.subtitle">Izaberi modul sa kojim želiš da upravljaš i podesi svoj stream za
+            nekoliko trenutaka.</span>
         </p>
       </section>
 
       <!-- Grid of Modules -->
       <section class="module-grid">
-        
+
         <!-- kickot Card -->
-        <div class="module-dashboard-card card-kickot" onclick="location.href='kickot/dashboard.html'">
+        <div class="module-dashboard-card card-kickot"
+          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } location.href='kickot/dashboard.html'">
           <div class="card-header-row">
             <span class="card-status-badge status-active">
               <span data-i18n="dashboard.active">Aktivan</span>
             </span>
             <div class="card-icon-wrap">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 8V4H8" />
                 <rect x="4" y="8" width="16" height="12" rx="2" />
                 <path d="M9 12v2" />
@@ -212,21 +229,26 @@
           </div>
           <h2 class="card-title">Kickot</h2>
           <p class="card-description">
-            <span data-i18n="dashboard.kickotDesc">Tvoj glavni chatbot asistent. Komande, moderacija četa, watchtime poeni, rangovi, leaderboard i zabavne mini-igre.</span>
+            <span data-i18n="dashboard.kickotDesc">Tvoj glavni chatbot asistent. Komande, moderacija četa, watchtime
+              poeni, rangovi, leaderboard i zabavne mini-igre.</span>
           </p>
-          <a href="#" class="card-btn btn-green-fill" onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); window.location.href = 'kickot/dashboard.html'; } catch(e) { console.error('Failed to set navigation flags:', e); } return false;">
+          <a href="#" class="card-btn btn-green-fill"
+            onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); window.location.href = 'kickot/dashboard.html'; } catch(e) { console.error('Failed to set navigation flags:', e); } return false;">
             <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
           </a>
         </div>
 
         <!-- kickaj Card -->
-        <div class="module-dashboard-card card-kickaj" onclick="location.href='kickaj/dashboard.html'">
+        <div class="module-dashboard-card card-kickaj"
+          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } location.href='kickaj/dashboard.html'">
           <div class="card-header-row">
-            <span class="card-status-badge status-active" style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border-color: rgba(6, 182, 212, 0.35);">
+            <span class="card-status-badge status-active"
+              style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border-color: rgba(6, 182, 212, 0.35);">
               <span style="font-weight: 800; letter-spacing: 0.5px;">BETA</span> • Aktivan
             </span>
             <div class="card-icon-wrap">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 12 20 22 4 22 4 12" />
                 <rect x="2" y="7" width="20" height="5" />
                 <line x1="12" y1="22" x2="12" y2="7" />
@@ -237,21 +259,26 @@
           </div>
           <h2 class="card-title">Kickaj</h2>
           <p class="card-description">
-            <span data-i18n="dashboard.kickajDesc">Sistem interaktivnih nagradnih igara (Giveaways). Izvlaci pobednike uživo na ekranu pomoću prelepog točka sreće.</span>
+            <span data-i18n="dashboard.kickajDesc">Sistem interaktivnih nagradnih igara (Giveaways). Izvlaci pobednike
+              uživo na ekranu pomoću prelepog točka sreće.</span>
           </p>
-          <a href="#" class="card-btn btn-green-fill" onclick="event.stopPropagation(); window.location.href='kickaj/dashboard.html'; return false;">
+          <a href="#" class="card-btn btn-green-fill"
+            onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } window.location.href='kickaj/dashboard.html'; return false;">
             <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
           </a>
         </div>
 
         <!-- kickan Card -->
-        <div class="module-dashboard-card card-kickan" onclick="location.href='kickan/dashboard.html'">
+        <div class="module-dashboard-card card-kickan"
+          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } location.href='kickan/dashboard.html'">
           <div class="card-header-row">
-            <span class="card-status-badge status-active" style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border-color: rgba(6, 182, 212, 0.35);">
+            <span class="card-status-badge status-active"
+              style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border-color: rgba(6, 182, 212, 0.35);">
               <span style="font-weight: 800; letter-spacing: 0.5px;">BETA</span> • Aktivan
             </span>
             <div class="card-icon-wrap">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="20" x2="18" y2="10" />
                 <line x1="12" y1="20" x2="12" y2="4" />
                 <line x1="6" y1="20" x2="6" y2="14" />
@@ -260,21 +287,26 @@
           </div>
           <h2 class="card-title">Kickan</h2>
           <p class="card-description">
-            <span data-i18n="dashboard.kickanDesc">Napredna statistika i grafici rasta tvog kanala. Prati broj gledalaca, pratioce i pretplatnike u realnom vremenu.</span>
+            <span data-i18n="dashboard.kickanDesc">Napredna statistika i grafici rasta tvog kanala. Prati broj
+              gledalaca, pratioce i pretplatnike u realnom vremenu.</span>
           </p>
-          <a href="#" class="card-btn btn-green-fill" onclick="event.stopPropagation(); window.location.href='kickan/dashboard.html'; return false;">
+          <a href="#" class="card-btn btn-green-fill"
+            onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } window.location.href='kickan/dashboard.html'; return false;">
             <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
           </a>
         </div>
 
         <!-- kickov Card -->
-        <div class="module-dashboard-card card-kickov" onclick="location.href='kickov/dashboard.html'">
+        <div class="module-dashboard-card card-kickov"
+          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } location.href='kickov/dashboard.html'">
           <div class="card-header-row">
-            <span class="card-status-badge status-active" style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border-color: rgba(6, 182, 212, 0.35);">
+            <span class="card-status-badge status-active"
+              style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border-color: rgba(6, 182, 212, 0.35);">
               <span style="font-weight: 800; letter-spacing: 0.5px;">BETA</span> • Aktivan
             </span>
             <div class="card-icon-wrap">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
                 <line x1="8" y1="21" x2="16" y2="21" />
                 <line x1="12" y1="17" x2="12" y2="21" />
@@ -283,9 +315,11 @@
           </div>
           <h2 class="card-title">Kickov</h2>
           <p class="card-description">
-            <span data-i18n="dashboard.kickovDesc">Prilagodljivi alerti i OBS vidžeti u realnom vremenu sa 0% provizije za PayPal donacije.</span>
+            <span data-i18n="dashboard.kickovDesc">Prilagodljivi alerti i OBS vidžeti u realnom vremenu sa 0% provizije
+              za PayPal donacije.</span>
           </p>
-          <a href="#" class="card-btn btn-green-fill" onclick="event.stopPropagation(); window.location.href='kickov/dashboard.html'; return false;">
+          <a href="#" class="card-btn btn-green-fill"
+            onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } window.location.href='kickov/dashboard.html'; return false;">
             <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
           </a>
         </div>
@@ -295,12 +329,13 @@
       <!-- Referral Program Link -->
       <section class="referral-link-section">
         <button class="referral-link-btn" onclick="openReferralModal()">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 12v10H4V12"/>
-            <path d="M2 7h20v5H2z"/>
-            <path d="M12 22V7"/>
-            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
-            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 12v10H4V12" />
+            <path d="M2 7h20v5H2z" />
+            <path d="M12 22V7" />
+            <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+            <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
           </svg>
           <span data-i18n="dashboard.referralProgram">Referral Program</span>
         </button>
@@ -309,17 +344,21 @@
   </main>
 
   <!-- Referral Modal -->
-  <div class="modal-backdrop" id="referralModal" onclick="handleModalBg(event, 'referralModal')" role="dialog" aria-labelledby="referralModalTitle" aria-modal="true">
+  <div class="modal-backdrop" id="referralModal" onclick="handleModalBg(event, 'referralModal')" role="dialog"
+    aria-labelledby="referralModalTitle" aria-modal="true">
     <div class="modal-box pm-modal" style="max-width: 660px;">
       <!-- Header with gradient bg -->
       <div class="pm-referral-header">
         <div class="pm-referral-header-glow"></div>
         <div class="pm-referral-header-inner">
           <div class="pm-modal-icon pm-icon-gold">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 12v10H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/>
-              <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
-              <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 12v10H4V12" />
+              <path d="M22 7H2v5h20V7z" />
+              <path d="M12 22V7" />
+              <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
+              <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
             </svg>
           </div>
           <div class="pm-modal-title-wrap">
@@ -327,8 +366,10 @@
             <p class="pm-modal-subtitle">Pozovi prijatelje i zaradi <span class="pm-ref-pct">20% provizije</span></p>
           </div>
           <button type="button" class="pm-modal-close" onclick="closeModal('referralModal')" aria-label="Zatvori modal">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -359,19 +400,22 @@
         <div class="pm-ref-link-box">
           <label class="pm-label">Tvoj jedinstveni Referral Kod &amp; Link</label>
           <div class="pm-ref-link-row">
-            <input type="text" id="referralCodeInput" class="form-input pm-ref-code-input" readonly value="UČITAVANJE...">
+            <input type="text" id="referralCodeInput" class="form-input pm-ref-code-input" readonly
+              value="UČITAVANJE...">
             <button type="button" class="btn btn-primary pm-ref-copy-btn" id="copyReferralBtn">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
               Kopiraj Link
             </button>
           </div>
           <div class="pm-ref-link-full" id="referralLinkFull">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
             </svg>
             <span id="referralLinkText">Učitavanje...</span>
           </div>
@@ -384,13 +428,15 @@
               Želiš sopstveni referral kod? (npr. <strong>MOJSTRIM</strong>)
             </div>
             <div class="pm-ref-custom-body">
-              Kontaktiraj nas na <a href="mailto:contact@milanwebportal.com?subject=Zahtev%20za%20Custom%20Referral%20Kod" class="pm-link">contact@milanwebportal.com</a>
+              Kontaktiraj nas na <a
+                href="mailto:contact@milanwebportal.com?subject=Zahtev%20za%20Custom%20Referral%20Kod"
+                class="pm-link">contact@milanwebportal.com</a>
             </div>
           </div>
           <button type="button" class="btn btn-outline pm-ref-email-btn" onclick="copyCustomRefEmail(this)">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
             </svg>
             Kopiraj Mejl
           </button>
@@ -399,11 +445,14 @@
         <!-- Rewards History -->
         <div class="pm-ref-rewards">
           <h4 class="pm-ref-rewards-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
-              <path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/>
-              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/>
-              <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2.3"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+              <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+              <path d="M4 22h16" />
+              <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+              <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+              <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
             </svg>
             Tvoje Nagrade &amp; Provizije
           </h4>
@@ -418,9 +467,12 @@
             <div class="pm-ref-withdraw-title">Minimalni iznos za isplatu je €5.00</div>
             <div class="pm-ref-withdraw-sub">Isplate se obrađuju na PayPal, Bankovni račun ili Crypto.</div>
           </div>
-          <button type="button" class="btn btn-primary pm-btn-submit" id="withdrawalBtn" onclick="openWithdrawalModal()" disabled>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+          <button type="button" class="btn btn-primary pm-btn-submit" id="withdrawalBtn" onclick="openWithdrawalModal()"
+            disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <polyline points="19 12 12 19 5 12" />
             </svg>
             Zatraži isplatu
           </button>
@@ -437,7 +489,8 @@
         <span data-i18n="dashboard.requestWithdrawal">💸 Zatraži isplatu</span>
       </h2>
       <p class="modal-subtitle">
-        <span data-i18n="dashboard.availableForWithdrawal">Dostupno za isplatu: <span id="modalAvailableBalance">€0.00</span></span>
+        <span data-i18n="dashboard.availableForWithdrawal">Dostupno za isplatu: <span
+            id="modalAvailableBalance">€0.00</span></span>
       </p>
 
       <form id="withdrawalForm" class="withdrawal-form">
@@ -452,7 +505,8 @@
             <button type="button" class="amount-preset-btn" data-amount="50">€50</button>
             <button type="button" class="amount-preset-btn" data-amount="100">€100</button>
           </div>
-          <input type="number" id="withdrawalAmount" class="form-input" placeholder="Unesi iznos..." min="5" step="0.01" required>
+          <input type="number" id="withdrawalAmount" class="form-input" placeholder="Unesi iznos..." min="5" step="0.01"
+            required>
         </div>
 
         <div class="form-group">
@@ -499,12 +553,13 @@
       <button class="modal-close-btn" onclick="closeSneakPeek('kickaj')">✕</button>
       <div class="modal-title">
         <span>🎁 kickaj</span>
-        <span style="font-size:0.8rem; background:rgba(83,252,24,0.15); color:#53FC18; padding:3px 8px; border-radius:50px; text-transform:uppercase;">Demo</span>
+        <span
+          style="font-size:0.8rem; background:rgba(83,252,24,0.15); color:#53FC18; padding:3px 8px; border-radius:50px; text-transform:uppercase;">Demo</span>
       </div>
       <div class="modal-subtitle">
         <span data-i18n="dashboard.kickajDemoDesc">Simulacija izvlačenja točka sreće u realnom vremenu.</span>
       </div>
-      
+
       <div class="wheel-simulator">
         <div class="wheel-pointer"></div>
         <div class="wheel-outer" id="wheelOuter">
@@ -524,42 +579,56 @@
       <button class="modal-close-btn" onclick="closeSneakPeek('kickov')">✕</button>
       <div class="modal-title">
         <span>🎬 kickov</span>
-        <span style="font-size:0.8rem; background:rgba(139,92,246,0.15); color:#C084FC; padding:3px 8px; border-radius:50px; text-transform:uppercase;">Demo</span>
+        <span
+          style="font-size:0.8rem; background:rgba(139,92,246,0.15); color:#C084FC; padding:3px 8px; border-radius:50px; text-transform:uppercase;">Demo</span>
       </div>
       <div class="modal-subtitle">
         <span data-i18n="dashboard.kickovDemoDesc">Simulacija kontrolera i testiranja OBS stream overlay-a.</span>
       </div>
-      
+
       <!-- Mock Screen representation of stream -->
-      <div style="position:relative; width:100%; height:200px; background:#18142c; border:2px solid #2e284c; border-radius:12px; overflow:hidden; margin:20px 0; box-shadow:inset 0 0 20px rgba(0,0,0,0.8);">
+      <div
+        style="position:relative; width:100%; height:200px; background:#18142c; border:2px solid #2e284c; border-radius:12px; overflow:hidden; margin:20px 0; box-shadow:inset 0 0 20px rgba(0,0,0,0.8);">
         <!-- Mock Video Feed background placeholder -->
-        <div style="position:absolute; inset:0; background:linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)), url('assets/kickall.webp') no-repeat center; opacity:0.1; background-size:contain;"></div>
-        
-        <!-- Live Badge -->
-        <div style="position:absolute; top:12px; left:12px; background:#EF4444; color:#fff; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px;">LIVE</div>
-        
-        <!-- Mock Alert Box -->
-        <div id="mockAlertBox" style="position:absolute; top:20px; left:50%; transform:translateX(-50%) translateY(-20px); background:rgba(14,10,29,0.95); border:1.5px solid var(--color-green); border-radius:10px; padding:10px 20px; font-family:'Space Grotesk',sans-serif; text-align:center; min-width:180px; opacity:0; transition:all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events:none; z-index:5;">
-          <div id="mockAlertText" style="font-size:0.8rem; font-weight:700; color:#fff; line-height:1.4;">Alert text</div>
+        <div
+          style="position:absolute; inset:0; background:linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.2)), url('assets/kickall.webp') no-repeat center; opacity:0.1; background-size:contain;">
         </div>
-        
+
+        <!-- Live Badge -->
+        <div
+          style="position:absolute; top:12px; left:12px; background:#EF4444; color:#fff; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px;">
+          LIVE</div>
+
+        <!-- Mock Alert Box -->
+        <div id="mockAlertBox"
+          style="position:absolute; top:20px; left:50%; transform:translateX(-50%) translateY(-20px); background:rgba(14,10,29,0.95); border:1.5px solid var(--color-green); border-radius:10px; padding:10px 20px; font-family:'Space Grotesk',sans-serif; text-align:center; min-width:180px; opacity:0; transition:all 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); pointer-events:none; z-index:5;">
+          <div id="mockAlertText" style="font-size:0.8rem; font-weight:700; color:#fff; line-height:1.4;">Alert text
+          </div>
+        </div>
+
         <!-- Mock Chat Overlay -->
-        <div style="position:absolute; bottom:12px; left:12px; width:200px; max-height:110px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; pointer-events:none; z-index:2;">
+        <div
+          style="position:absolute; bottom:12px; left:12px; width:200px; max-height:110px; overflow:hidden; display:flex; flex-direction:column; justify-content:flex-end; pointer-events:none; z-index:2;">
           <div id="mockChatList" style="display:flex; flex-direction:column; justify-content:flex-end;">
             <!-- chat messages appended dynamically -->
           </div>
         </div>
       </div>
-      
+
       <!-- Simulation Controls -->
       <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center;">
-        <button class="spin-btn" style="background:#53FC18; font-size:0.82rem; padding:8px 16px;" onclick="simulateAlert('sub')">
+        <button class="spin-btn" style="background:#53FC18; font-size:0.82rem; padding:8px 16px;"
+          onclick="simulateAlert('sub')">
           <span data-i18n="dashboard.simulateSub">Simuliraj Sub</span>
         </button>
-        <button class="spin-btn" style="background:#8B5CF6; color:#fff; font-size:0.82rem; padding:8px 16px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);" onclick="simulateAlert('follow')">
+        <button class="spin-btn"
+          style="background:#8B5CF6; color:#fff; font-size:0.82rem; padding:8px 16px; box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);"
+          onclick="simulateAlert('follow')">
           <span data-i18n="dashboard.simulateFollow">Simuliraj Follow</span>
         </button>
-        <button class="spin-btn" style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:0.82rem; padding:8px 16px; box-shadow:none;" onclick="simulateChatMessage()">
+        <button class="spin-btn"
+          style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:0.82rem; padding:8px 16px; box-shadow:none;"
+          onclick="simulateChatMessage()">
           <span data-i18n="dashboard.simulateMessage">Simuliraj Poruku</span>
         </button>
       </div>
@@ -568,24 +637,29 @@
 
   <!-- Interactive Modal for kickan (Analytics Preview) -->
   <div class="modal-backdrop" id="modalKickan">
-    <div class="modal-container" style="border-color: rgba(245, 158, 11, 0.3); box-shadow: 0 20px 60px rgba(245, 158, 11, 0.25);">
+    <div class="modal-container"
+      style="border-color: rgba(245, 158, 11, 0.3); box-shadow: 0 20px 60px rgba(245, 158, 11, 0.25);">
       <button class="modal-close-btn" onclick="closeSneakPeek('kickan')">✕</button>
       <div class="modal-title">
         <span>📊 kickan</span>
-        <span style="font-size:0.8rem; background:rgba(245,158,11,0.15); color:#FBBF24; padding:3px 8px; border-radius:50px; text-transform:uppercase;">Demo</span>
+        <span
+          style="font-size:0.8rem; background:rgba(245,158,11,0.15); color:#FBBF24; padding:3px 8px; border-radius:50px; text-transform:uppercase;">Demo</span>
       </div>
       <div class="modal-subtitle">
-        <span data-i18n="dashboard.kickanDemoDesc">Pregled metrika rasta i aktivnosti gledalaca u realnom vremenu.</span>
+        <span data-i18n="dashboard.kickanDemoDesc">Pregled metrika rasta i aktivnosti gledalaca u realnom
+          vremenu.</span>
       </div>
-      
+
       <div class="analytics-preview" style="border-color: rgba(245, 158, 11, 0.15);">
         <div class="analytics-stat-row">
           <span data-i18n="dashboard.averageViewers">Prosečan broj gledalaca:</span>
           <span>482</span>
         </div>
-        
-        <div class="analytics-chart-bar" style="background: rgba(245, 158, 11, 0.04); border-color: rgba(245, 158, 11, 0.15);">
-          <div class="analytics-chart-fill" id="fillViewers" style="width: 0%; background: linear-gradient(90deg, #F59E0B, #FBBF24)"></div>
+
+        <div class="analytics-chart-bar"
+          style="background: rgba(245, 158, 11, 0.04); border-color: rgba(245, 158, 11, 0.15);">
+          <div class="analytics-chart-fill" id="fillViewers"
+            style="width: 0%; background: linear-gradient(90deg, #F59E0B, #FBBF24)"></div>
           <div class="analytics-chart-text">
             <span data-i18n="dashboard.viewersGrowth">Rast gledanosti (ovaj mesec)</span>
             <span>+32%</span>
@@ -597,8 +671,10 @@
           <span>1,850</span>
         </div>
 
-        <div class="analytics-chart-bar" style="background: rgba(245, 158, 11, 0.04); border-color: rgba(245, 158, 11, 0.15);">
-          <div class="analytics-chart-fill" id="fillFollowers" style="width: 0%; background: linear-gradient(90deg, #10B981, #34D399)"></div>
+        <div class="analytics-chart-bar"
+          style="background: rgba(245, 158, 11, 0.04); border-color: rgba(245, 158, 11, 0.15);">
+          <div class="analytics-chart-fill" id="fillFollowers"
+            style="width: 0%; background: linear-gradient(90deg, #10B981, #34D399)"></div>
           <div class="analytics-chart-text">
             <span data-i18n="dashboard.goalFollowers">Cilj za ovaj mesec (pratioci)</span>
             <span>74%</span>
@@ -613,7 +689,7 @@
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/dashboard.js"></script>
-  
+
   <!-- KickALL Data Layer & Analytics -->
   <script src="js/data-layer.js"></script>
   <script src="js/route-tracking.js"></script>
