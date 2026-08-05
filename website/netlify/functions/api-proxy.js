@@ -1,34 +1,5 @@
-// In-memory rate limiter for serverless execution instance
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 30;  // Max 30 requests/min per IP
+const { isRateLimited } = require('./utils/rate-limiter');
 const MAX_BODY_BYTES = 50000;        // Max 50KB payload
-
-function isRateLimited(clientIp) {
-  if (clientIp === '127.0.0.1' || clientIp === 'localhost' || clientIp === '::1' || clientIp.includes('127.0.0.1')) {
-    return false;
-  }
-  const now = Date.now();
-  const userHistory = rateLimitMap.get(clientIp) || [];
-  const validHistory = userHistory.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW_MS);
-  
-  if (validHistory.length >= MAX_REQUESTS_PER_WINDOW) {
-    return true;
-  }
-  
-  validHistory.push(now);
-  rateLimitMap.set(clientIp, validHistory);
-  
-  // Periodic cleanup
-  if (rateLimitMap.size > 1000) {
-    for (const [ip, history] of rateLimitMap.entries()) {
-      if (history.length === 0 || now - history[history.length - 1] > RATE_LIMIT_WINDOW_MS) {
-        rateLimitMap.delete(ip);
-      }
-    }
-  }
-  return false;
-}
 
 exports.handler = async (event) => {
   const headers = {
@@ -60,7 +31,7 @@ exports.handler = async (event) => {
                    event.headers['client-ip'] || 
                    'unknown';
 
-  if (isRateLimited(clientIp)) {
+  if (await isRateLimited(clientIp, { windowMs: 60000, maxRequests: 30, endpoint: 'api-proxy' })) {
     return {
       statusCode: 429,
       headers: { ...headers, 'Retry-After': '60' },

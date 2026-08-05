@@ -214,7 +214,8 @@ async function checkAuth() {
 
       const tokenData = await res.json();
       if (tokenData.access_token) {
-        localStorage.setItem('kick_access_token', tokenData.access_token);
+        sessionStorage.setItem('kick_access_token', tokenData.access_token);
+        localStorage.removeItem('kick_access_token');
         sessionStorage.removeItem('kick_oauth_state');
         sessionStorage.removeItem('kick_code_verifier');
         localStorage.removeItem('kick_oauth_state');
@@ -242,7 +243,7 @@ async function checkAuth() {
   if (window.KickAuth) {
     kickAccessToken = KickAuth.getAccessToken();
   } else {
-    kickAccessToken = localStorage.getItem('kick_access_token');
+    kickAccessToken = sessionStorage.getItem('kick_access_token') || localStorage.getItem('kick_access_token');
   }
 
   if (isOAuthRedirect && kickAccessToken) {
@@ -823,10 +824,14 @@ function updateRewardsList(rewards) {
     return;
   }
 
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
   rewardsList.innerHTML = rewards.map(reward => `
     <div class="reward-item">
       <div class="reward-info">
-        <div class="reward-type">${reward.reward_description || getRewardTypeLabel(reward.reward_type)}</div>
+        <div class="reward-type">${escapeHtml(reward.reward_description || getRewardTypeLabel(reward.reward_type))}</div>
         <div class="reward-value">€${reward.reward_value.toFixed(2)}</div>
       </div>
       <div class="reward-status ${reward.status}">${getStatusLabel(reward.status)}</div>

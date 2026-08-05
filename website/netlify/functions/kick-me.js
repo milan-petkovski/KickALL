@@ -1,18 +1,4 @@
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW_MS = 60000;
-const MAX_REQUESTS_PER_WINDOW = 30;
-
-function isRateLimited(clientIp) {
-  if (clientIp === '127.0.0.1' || clientIp === 'localhost' || clientIp === '::1' || clientIp.includes('127.0.0.1')) {
-    return false;
-  }
-  const now = Date.now();
-  const history = (rateLimitMap.get(clientIp) || []).filter(t => now - t < RATE_LIMIT_WINDOW_MS);
-  if (history.length >= MAX_REQUESTS_PER_WINDOW) return true;
-  history.push(now);
-  rateLimitMap.set(clientIp, history);
-  return false;
-}
+const { isRateLimited } = require('./utils/rate-limiter');
 
 exports.handler = async (event) => {
   const headers = {
@@ -42,7 +28,7 @@ exports.handler = async (event) => {
                    (event.headers['x-forwarded-for'] ? event.headers['x-forwarded-for'].split(',')[0].trim() : null) || 
                    event.headers['client-ip'] || 
                    'unknown';
-  if (isRateLimited(clientIp)) {
+  if (await isRateLimited(clientIp, { windowMs: 60000, maxRequests: 30, endpoint: 'kick-me' })) {
     return {
       statusCode: 429,
       headers: { ...headers, 'Retry-After': '60' },

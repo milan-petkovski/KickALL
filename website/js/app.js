@@ -1680,9 +1680,9 @@ window.addEventListener('storage', (event) => {
                     return;
                 }
 
-                // Store tokens globally for all ecosystem services
+                // Store tokens in sessionStorage (secure against persistent XSS token theft)
                 sessionStorage.setItem('kick_access_token', tokenData.access_token);
-                localStorage.setItem('kick_access_token', tokenData.access_token);
+                localStorage.removeItem('kick_access_token');
                 localStorage.setItem('kick_token_type', tokenData.token_type || 'Bearer');
                 localStorage.setItem('kick_session_active', 'true');
 

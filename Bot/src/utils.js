@@ -21,23 +21,14 @@ function log(tip, poruka) {
 }
 
 /**
- * Sanitizuje unos tako što uklanja HTML/JS tagove i eskapuje specijalne karaktere
+ * Sanitizuje unos za Kick plain-text chat tako što uklanja HTML/JS tagove i neprikazive/kontrolne karaktere
+ * bez konvertovanja običnih karaktera (&, ', ", /) u HTML entitete (&amp;, &#x27;)
  */
 function sanitizeInput(str) {
     if (typeof str !== 'string') return '';
     return str
         .replace(/<[^>]*>/g, '') // Uklanja HTML tagove
-        .replace(/[&<>"'/]/g, (char) => { // Eskapuje specijalne karaktere
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#x27;',
-                '/': '&#x2F;'
-            };
-            return map[char];
-        })
+        .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200D\uFEFF]/g, '') // Uklanja nevidljive i kontrolne karaktere
         .trim();
 }
 

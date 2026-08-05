@@ -942,7 +942,8 @@ async function initAuth() {
           return;
         }
 
-        localStorage.setItem('kick_access_token', tokenData.access_token);
+        sessionStorage.setItem('kick_access_token', tokenData.access_token);
+        localStorage.removeItem('kick_access_token');
 
         const intent = sessionStorage.getItem('kick_oauth_intent') || 'login';
         const addChannelUid = sessionStorage.getItem('kick_add_channel_uid') || '';
@@ -1048,14 +1049,15 @@ async function initAuth() {
     }
 
     // ── Standardna provera tokena ──────────────────────────────────────
-    const kickAccessToken = localStorage.getItem('kick_access_token');
+    const kickAccessToken = sessionStorage.getItem('kick_access_token') || localStorage.getItem('kick_access_token');
     const urlParamsOAuth = urlParams.get('kick_oauth') === '1';
 
     // Check for hash fragment token from Netlify callback
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const hashToken = hashParams.get('kick_token');
     if (hashToken) {
-      localStorage.setItem('kick_access_token', hashToken);
+      sessionStorage.setItem('kick_access_token', hashToken);
+      localStorage.removeItem('kick_access_token');
       const tokenType = hashParams.get('token_type') || 'Bearer';
       localStorage.setItem('kick_token_type', tokenType);
       const expiresIn = hashParams.get('expires_in') || '3600';
@@ -5464,16 +5466,6 @@ function setLoading(btnId, loading) {
   }
 }
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 function fmtDate(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -8765,7 +8757,7 @@ function updateRewardsList(rewards) {
   container.innerHTML = rewards.map(r => `
     <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); border:1px solid var(--border-subtle); padding:10px 14px; border-radius:var(--radius-md);">
       <div>
-        <div style="font-weight:600; color:#fff; font-size:0.85rem;">${r.reward_description || 'Provizija od kupovine'}</div>
+        <div style="font-weight:600; color:#fff; font-size:0.85rem;">${escapeHtml(r.reward_description || 'Provizija od kupovine')}</div>
         <div style="color:#53fc18; font-weight:700; font-size:0.9rem;">€${(r.reward_value || 0).toFixed(2)}</div>
       </div>
       <span style="padding:2px 8px; border-radius:10px; font-size:0.72rem; font-weight:700; background:rgba(83,252,24,0.15); color:#53fc18; border:1px solid rgba(83,252,24,0.3);">

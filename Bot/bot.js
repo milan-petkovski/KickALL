@@ -1247,8 +1247,15 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // ─── GLOBAL CRASH PROTECTION ──────────────────────────────────────────────────
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', async (err) => {
     utils.log('ERR', `Neuhvaćena greška (uncaughtException): ${err.stack || err.message}`);
+    utils.log('WARN', 'Pokrećem gracefulShutdown radi bezbednog ponovnog pokretanja bota...');
+    try {
+        await gracefulShutdown('uncaughtException');
+    } catch (shutdownErr) {
+        console.error('Shutdown failed during uncaughtException:', shutdownErr);
+        process.exit(1);
+    }
 });
 
 process.on('unhandledRejection', (reason, promise) => {
