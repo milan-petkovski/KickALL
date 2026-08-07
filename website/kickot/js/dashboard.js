@@ -3,6 +3,29 @@
    Supabase CRUD + Real-time + UI
    ═══════════════════════════════════════════════════════════ */
 
+// ── Trenutno čišćenje URL fragmenta tokena radi bezbednosti ────
+(function sanitizeUrlHashToken() {
+  if (window.location.hash && window.location.hash.includes('kick_token=')) {
+    try {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const hashToken = hashParams.get('kick_token');
+      if (hashToken) {
+        sessionStorage.setItem('kick_access_token', hashToken);
+        localStorage.removeItem('kick_access_token');
+        const tokenType = hashParams.get('token_type') || 'Bearer';
+        localStorage.setItem('kick_token_type', tokenType);
+        localStorage.setItem('kick_session_active', Date.now().toString());
+      }
+      if (window.history && window.history.replaceState) {
+        const cleanUrl = window.location.pathname + window.location.search;
+        window.history.replaceState(null, '', cleanUrl);
+      }
+    } catch (e) {
+      console.warn('Error sanitizing hash token:', e);
+    }
+  }
+})();
+
 // ── Configuration Check ───────────────────────────────────────
 if (!window.KickotConfig) {
   throw new Error('KickotConfig not loaded. Please ensure config.js is loaded before dashboard.js');
@@ -987,7 +1010,7 @@ async function initAuth() {
           if (!kickUser || (!kickUser.id && !kickUser.chatroom_id)) {
             document.getElementById('authGateMsg').textContent = 'Greška: podaci kanala nedostupni...';
             showToast('error', 'Nije moguće preuzeti podatke kanala sa Kick platforme.', '❌');
-            setTimeout(() => { window.location.href = 'dashboard.html?settings=channels'; }, 3000);
+            setTimeout(() => { window.location.href = 'dashboard?settings=channels'; }, 3000);
             return;
           }
 
@@ -1027,7 +1050,7 @@ async function initAuth() {
           if (dbErr) {
             document.getElementById('authGateMsg').textContent = 'Greška pri čuvanju u bazu...';
             showToast('error', dbErr.message, '❌');
-            setTimeout(() => { window.location.href = 'dashboard.html?settings=channels'; }, 3000);
+            setTimeout(() => { window.location.href = 'dashboard?settings=channels'; }, 3000);
             return;
           }
 
@@ -1050,7 +1073,7 @@ async function initAuth() {
 
     // ── Standardna provera tokena ──────────────────────────────────────
     const kickAccessToken = sessionStorage.getItem('kick_access_token') || localStorage.getItem('kick_access_token');
-    const urlParamsOAuth = urlParams.get('kick_oauth') === '1';
+    const _urlParamsOAuth = urlParams.get('kick_oauth') === '1';
 
     // Check for hash fragment token from Netlify callback
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -1060,7 +1083,7 @@ async function initAuth() {
       localStorage.removeItem('kick_access_token');
       const tokenType = hashParams.get('token_type') || 'Bearer';
       localStorage.setItem('kick_token_type', tokenType);
-      const expiresIn = hashParams.get('expires_in') || '3600';
+      const _expiresIn = hashParams.get('expires_in') || '3600';
       localStorage.setItem('kick_session_active', Date.now().toString());
       // Clean URL
       window.history.replaceState({}, '', window.location.pathname);
@@ -1125,7 +1148,7 @@ async function handleKickOAuthSession(accessToken) {
   let kickUsername = '';
   let kickUserId = '';
   let kickAvatar = '';
-  let kickBio = '';
+  let _kickBio = '';
 
   if (kickUserRes.ok) {
     const kickData = await kickUserRes.json();
@@ -1133,7 +1156,7 @@ async function handleKickOAuthSession(accessToken) {
     kickUsername = kickUser?.username || kickUser?.name || '';
     kickUserId = kickUser?.user_id || kickUser?.id || '';
     kickAvatar = kickUser?.profile_picture || kickUser?.profile_pic || '';
-    kickBio = kickUser?.bio || '';
+    _kickBio = kickUser?.bio || '';
   } else {
     // Kick users API failed, trying alternative endpoint
     const altRes = await fetch('https://id.kick.com/oauth/userinfo', {
@@ -1299,7 +1322,7 @@ async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, a
   }
 }
 
-sb.auth.onAuthStateChange((event, session) => {
+sb.auth.onAuthStateChange((event, _session) => {
   if (event === 'SIGNED_OUT') {
     const hasSavedToken = !!localStorage.getItem(storageKey);
     if (!hasSavedToken) {
@@ -1414,7 +1437,7 @@ async function initApp() {
 
 // ── User Profile ──────────────────────────────────────────
 async function loadUserProfile() {
-  const { data, error } = await Promise.race([
+  const { data, error: _error } = await Promise.race([
     sb.from('user_profiles')
       .select('*')
       .eq('id', currentUser.id)
@@ -4918,7 +4941,7 @@ async function saveCommand() {
   await loadCommands();
 }
 
-async function toggleCommand(id, currentEnabled, isDefault) {
+async function toggleCommand(id, currentEnabled, _isDefault) {
   if (id.startsWith('builtin-')) {
     const cmdObj = allCommands.find(c => c.id === id);
     if (!cmdObj) return;
@@ -5335,7 +5358,7 @@ window.addEventListener('keydown', e => {
 // TOASTS (Old glassmorphism system)
 // ═══════════════════════════════════════════════════════════
 let toastId = 0;
-function showToast(type, msg, iconEmoji = '💬', duration = null) {
+function showToast(type, msg, _iconEmoji = '💬', duration = null) {
   let container = document.getElementById('toastContainer');
   // Ensure container is a direct child of body (fixes DOM nesting issues)
   if (!container || container.parentElement !== document.body) {
@@ -6010,7 +6033,7 @@ async function addNewManager() {
     }
 
     // 3. Proveri da li korisnik ima kreiran nalog na našem sajtu
-    const { data: profileUser, error: profileErr } = await sb.from('user_profiles')
+    const { data: profileUser, error: _profileErr } = await sb.from('user_profiles')
       .select('id, display_name')
       .ilike('display_name', kickUsernameLC)
       .maybeSingle();
@@ -6417,7 +6440,7 @@ async function toggleModuleFromOverview(toggleId) {
   if (!toggle) return;
 
   // Pronadji badge element za ovaj modul
-  const moduleToOvId = {
+  const _moduleToOvId = {
     cfgLeaderboard: 'ovStatusLeaderboard',
     cfgAnnounceTimeEnabled: 'ovStatusAnnouncements',
     cfgAutoresponse: 'ovStatusInteraction',
@@ -7234,7 +7257,7 @@ window.onYouTubeIframeAPIReady = function () {
   }
 };
 
-function onYtPlayerReady(event) {
+function onYtPlayerReady(_event) {
   isYtReady = true;
   if (ytPlayer) {
     try {
@@ -7962,8 +7985,8 @@ window.getBotSenderIdentity = getBotSenderIdentity;
 // Initial rendering of notification content on page load
 window.addEventListener('DOMContentLoaded', () => {
   // Hide notification badge if there are no unread notifications on start
-  const hasUnread = notifications.some(n => !n.read);
-  const badge = document.getElementById('notifBadge');
+  const _hasUnread = notifications.some(n => !n.read);
+  const _badge = document.getElementById('notifBadge');
   updateNotifBadgeUI();
   renderNotifContent();
   renderSongQueue();
@@ -8836,7 +8859,7 @@ async function handleWithdrawalSubmit(e) {
         Nacin_Isplate: method,
         Detalji_Isplate: details
       })
-    }).catch(err => { /* FormSubmit mail error */ });
+    }).catch(_err => { /* FormSubmit mail error */ });
 
     showToast('Zahtev za isplatu je uspešno poslat! Bićete obavešteni o isplati.', 'success');
 

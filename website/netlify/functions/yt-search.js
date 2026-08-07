@@ -5,7 +5,7 @@ const { isRateLimited } = require('./utils/rate-limiter');
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://kickall.app';
 
-exports.handler = async function (event, context) {
+exports.handler = async function (event, _context) {
   const corsHeaders = {
     'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
     'Content-Type': 'application/json'

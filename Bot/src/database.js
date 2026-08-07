@@ -625,7 +625,7 @@ async function ucitajBotConfig(chatroomId) {
         if (!KORISTI_SUPABASE) return;
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
-        const channelUsername = channelState.channelUsername || 'Nepoznat';
+        const _channelUsername = channelState.channelUsername || 'Nepoznat';
 
         const { data, error } = await supabase
             .from('bot_config')

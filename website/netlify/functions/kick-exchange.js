@@ -56,9 +56,16 @@ exports.handler = async (event) => {
   }
 
   try {
+    const upstreamHeaders = {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    };
+    if (process.env.INTERNAL_API_SECRET) {
+      upstreamHeaders['X-Internal-Token'] = process.env.INTERNAL_API_SECRET;
+    }
+
     const upstream = await fetch(`${base}/api/kick/exchange`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: upstreamHeaders,
       body: event.body || ''
     });
 

@@ -341,11 +341,11 @@
           (sessionStorage.getItem('from_kickall') === 'true' ? 'kickall' : 'kickot');
 
         const targets = {
-          kickot: 'kickot/dashboard.html',
-          kickall: 'dashboard.html'
+          kickot: 'kickot/dashboard',
+          kickall: 'dashboard'
         };
 
-        const targetPage = targets[originSite] || 'dashboard.html';
+        const targetPage = targets[originSite] || 'dashboard';
 
         // Use absolute path from root to avoid path concatenation issues
         window.location.replace(`/${targetPage}?kick_oauth=1`);

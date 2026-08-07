@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Reset loading state on pageshow event (handles back/forward navigation)
-    window.addEventListener('pageshow', (event) => {
+    window.addEventListener('pageshow', (_event) => {
         if (authKickLoginBtn) {
             authKickLoginBtn.classList.remove('loading');
             const btnText = authKickLoginBtn.querySelector('span');
@@ -276,7 +276,7 @@ async function setLanguage(lang) {
     // -----------------------------------------------------------------
     const simulateTriggers = document.querySelectorAll('.feature-simulate-trigger');
     const footerTabTriggers = document.querySelectorAll('.footer-tab-trigger');
-    const mainPlayground = document.getElementById('mainPlayground');
+    const _mainPlayground = document.getElementById('mainPlayground');
 
     function handleTabTrigger(trigger) {
         const targetTab = trigger.getAttribute('data-target-tab');
@@ -486,7 +486,7 @@ async function setLanguage(lang) {
         const cmd = parts[0].toLowerCase();
         const arg = parts.slice(1).join(' ').trim();
         const isEn = currentLang === 'en';
-        const lang = currentLang;
+        const _lang = currentLang;
         
         // Get translations from global translations object
         const t = window.translations || {};
@@ -1327,7 +1327,7 @@ window.addEventListener('storage', (event) => {
             }
 
             if (heroBtnPrimary) {
-                heroBtnPrimary.href = 'dashboard.html';
+                heroBtnPrimary.href = 'dashboard';
                 const heroBtnPrimaryText = document.getElementById('heroBtnPrimaryText');
                 if (heroBtnPrimaryText) {
                     const t = window.translations || {};
@@ -1361,7 +1361,7 @@ window.addEventListener('storage', (event) => {
                 const userProfile = t.userProfile || {};
                 const isEn = currentLang === 'en';
                 const goToDashboardText = userProfile.goToDashboard || (isEn ? 'Go to Dashboard' : 'Idi na Dashboard');
-                pricingFreeBtnEl.href = 'dashboard.html';
+                pricingFreeBtnEl.href = 'dashboard';
                 pricingFreeBtnEl.innerHTML = `
                     <span>${goToDashboardText}</span>
                 `;
@@ -1556,7 +1556,7 @@ window.addEventListener('storage', (event) => {
         return text;
     }
 
-    function getKickRedirectUri() {
+    function _getKickRedirectUri() {
         return window.CONFIG.OAUTH.getRedirectUri();
     }
 
@@ -1579,15 +1579,15 @@ window.addEventListener('storage', (event) => {
             sessionStorage.setItem('kick_origin_site', 'kickall');
             localStorage.setItem('kick_origin_site', 'kickall');
             sessionStorage.setItem('from_kickall', 'true');
-            sessionStorage.setItem('kick_redirect_page', '/dashboard.html');
-            localStorage.setItem('kick_redirect_page', '/dashboard.html');
+            sessionStorage.setItem('kick_redirect_page', '/dashboard');
+            localStorage.setItem('kick_redirect_page', '/dashboard');
         } catch (e) {
             console.warn('Storage not available:', e);
         }
 
         // 2. Ako koristiš globalni KickAuth
         if (window.KickAuth) {
-            KickAuth.initiateOAuth('/dashboard.html'); // Uklonjeno /Website/
+            KickAuth.initiateOAuth('/dashboard'); // Uklonjeno /Website/
             return;
         }
         
@@ -1622,7 +1622,7 @@ window.addEventListener('storage', (event) => {
         window.location.href = authUrl;
     }
 
-    async function handleOAuthCallback(code, state) {
+    async function _handleOAuthCallback(code, state) {
         try {
             const savedState = localStorage.getItem('kick_oauth_state') || sessionStorage.getItem('kick_oauth_state');
             const codeVerifier = localStorage.getItem('kick_code_verifier') || sessionStorage.getItem('kick_code_verifier');
@@ -1708,7 +1708,7 @@ window.addEventListener('storage', (event) => {
                     });
                 }
                 
-                window.location.href = 'dashboard.html';
+                window.location.href = 'dashboard';
                 
             } catch (fetchErr) {
                 if (window.toastSystem) {
@@ -1756,7 +1756,7 @@ window.addEventListener('storage', (event) => {
             // Add loading state
             authKickLoginBtn.classList.add('loading');
             const btnText = authKickLoginBtn.querySelector('span');
-            const originalText = btnText.textContent;
+            const _originalText = btnText.textContent;
             btnText.textContent = 'Preusmeravanje...';
             
             // Small delay to show loading state before redirect
@@ -1771,7 +1771,7 @@ window.addEventListener('storage', (event) => {
         ctaKickLoginBtn.addEventListener('click', async () => {
             const { data: { session } } = await sb.auth.getSession();
             if (session?.user) {
-                window.location.href = 'dashboard.html';
+                window.location.href = 'dashboard';
             } else {
                 openKickLogin();
             }

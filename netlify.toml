@@ -8,7 +8,7 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://cdn.jsdelivr.net https://cdn.paddle.com https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob: https://i.ytimg.com; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://checkout.paddle.com https://sandbox-checkout.paddle.com; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://rcukparptzzyssqdmydt.supabase.co https://kickbot-ihzb.onrender.com https://id.kick.com https://kick.com https://api.kick.com https://*.kick.com https://www.youtube.com https://*.youtube.com https://*.googlevideo.com https://api.paddle.com https://sandbox-api.paddle.com https://cdn.paddle.com wss:;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://cdn.jsdelivr.net https://cdn.paddle.com https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob: https://i.ytimg.com; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://checkout.paddle.com https://sandbox-checkout.paddle.com; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://rcukparptzzyssqdmydt.supabase.co https://kickbot-ihzb.onrender.com https://id.kick.com https://kick.com https://api.kick.com https://*.kick.com https://www.youtube.com https://*.youtube.com https://*.googlevideo.com https://api.paddle.com https://sandbox-api.paddle.com https://cdn.paddle.com https://api.allorigins.win https://corsproxy.io wss:;"
 
 # API i Auth preusmeravanja (najveći prioritet)
 [[redirects]]
@@ -24,50 +24,38 @@
   force = true
 
 [[redirects]]
-  from = "/api/kick/test-ping"
-  to = "https://kickbot-ihzb.onrender.com/api/kick/test-ping"
+  from = "/api/kick/*"
+  to = "/.netlify/functions/bot-proxy"
   status = 200
   force = true
 
 [[redirects]]
-  from = "/api/kick/channel"
-  to = "https://kickbot-ihzb.onrender.com/api/kick/channel"
+  from = "/api/channels"
+  to = "/.netlify/functions/bot-proxy"
   status = 200
   force = true
 
 [[redirects]]
-  from = "/api/kick/reload"
-  to = "https://kickbot-ihzb.onrender.com/api/kick/reload"
+  from = "/api/global-logout"
+  to = "/.netlify/functions/bot-proxy"
   status = 200
   force = true
 
 [[redirects]]
-  from = "/api/kick/logs"
-  to = "https://kickbot-ihzb.onrender.com/api/kick/logs"
+  from = "/api/check-logout"
+  to = "/.netlify/functions/bot-proxy"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/stats"
+  to = "/.netlify/functions/bot-proxy"
   status = 200
   force = true
 
 [[redirects]]
   from = "/api/avatar"
   to = "https://kickbot-ihzb.onrender.com/api/avatar"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/global-logout"
-  to = "https://kickbot-ihzb.onrender.com/api/global-logout"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/check-logout"
-  to = "https://kickbot-ihzb.onrender.com/api/check-logout"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/stats"
-  to = "https://kickbot-ihzb.onrender.com/api/stats"
   status = 200
   force = true
 

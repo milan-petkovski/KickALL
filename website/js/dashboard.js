@@ -1,3 +1,26 @@
+// ── Trenutno čišćenje URL fragmenta tokena radi bezbednosti ────
+(function sanitizeUrlHashToken() {
+  if (window.location.hash && window.location.hash.includes('kick_token=')) {
+    try {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const hashToken = hashParams.get('kick_token');
+      if (hashToken) {
+        sessionStorage.setItem('kick_access_token', hashToken);
+        localStorage.removeItem('kick_access_token');
+        const tokenType = hashParams.get('token_type') || 'Bearer';
+        localStorage.setItem('kick_token_type', tokenType);
+        localStorage.setItem('kick_session_active', Date.now().toString());
+      }
+      if (window.history && window.history.replaceState) {
+        const cleanUrl = window.location.pathname + window.location.search;
+        window.history.replaceState(null, '', cleanUrl);
+      }
+    } catch (e) {
+      console.warn('Error sanitizing hash token:', e);
+    }
+  }
+})();
+
 // ── Supabase Configuration ────────────────────────────────
 let sb;
 // Use Supabase client from app.js if available, otherwise create new one
@@ -170,7 +193,7 @@ async function checkAuth() {
   const code = urlParams.get('code');
   
   // Check if coming from kickot (for session sharing)
-  const fromKickot = sessionStorage.getItem('from_kickot') === 'true' ||
+  const _fromKickot = sessionStorage.getItem('from_kickot') === 'true' ||
                       localStorage.getItem('kick_origin_site') === 'kickot';
 
   if (code) {
@@ -1018,7 +1041,7 @@ function setupWithdrawalModal() {
       }
 
       // Create withdrawal request
-      const { data: requestId, error } = await sb.rpc('create_withdrawal_request', {
+      const { data: _requestId, error } = await sb.rpc('create_withdrawal_request', {
         p_user_id: user.id,
         p_amount: amount,
         p_payment_method: method,

@@ -67,7 +67,11 @@ exports.handler = async (event) => {
       'id.kick.com',
       'youtube.com',
       'www.youtube.com',
-      'i.ytimg.com'
+      'i.ytimg.com',
+      'api.allorigins.win',
+      'corsproxy.io',
+      'onrender.com',
+      'kickbot-ihzb.onrender.com'
     ];
 
     let url;
@@ -97,12 +101,26 @@ exports.handler = async (event) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
     
+    // Bela lista zaglavlja koja klijent sme da prosledi ka upstream servisu
+    const ALLOWED_CLIENT_HEADERS = ['content-type', 'authorization', 'accept', 'accept-language', 'user-agent'];
+    const sanitizedHeaders = { 'User-Agent': 'KickALL/1.0' };
+    
+    if (targetHeaders && typeof targetHeaders === 'object') {
+      for (const [key, val] of Object.entries(targetHeaders)) {
+        if (ALLOWED_CLIENT_HEADERS.includes(String(key).toLowerCase())) {
+          sanitizedHeaders[key] = val;
+        }
+      }
+    }
+
+    // Ako zahtev ide ka Render bot servisu, automatski priloži X-Internal-Token
+    if (url.hostname.includes('onrender.com') && process.env.INTERNAL_API_SECRET) {
+      sanitizedHeaders['X-Internal-Token'] = process.env.INTERNAL_API_SECRET;
+    }
+
     const proxyOptions = {
       method: method,
-      headers: {
-        'User-Agent': 'KickALL/1.0',
-        ...targetHeaders
-      },
+      headers: sanitizedHeaders,
       signal: controller.signal
     };
 

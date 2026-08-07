@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: KickALL Bot & Web HTTP API
+  description: OpenAPI 3.0 specifikacija za KickALL Bot HTTP server i Netlify proxy rute.
+  version: 1.0.0
+servers:
+  - url: https://kickbot-ihzb.onrender.com
+    description: Render Bot HTTP Server (Production)
+  - url: https://kickall.app
+    description: Netlify Website & Functions (Production)
+
+paths:
+  /api/kick/exchange:
+    post:
+      summary: Razmena Kick OAuth koda za access token
+      operationId: exchangeKickToken
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                code_verifier:
+                  type: string
+                redirect_uri:
+                  type: string
+              required:
+                - code
+      responses:
+        '200':
+          description: Token uspešno razmenjen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  token_type:
+                    type: string
+                  expires_in:
+                    type: integer
+        '400':
+          description: Nedostaje kod ili nevažeći parametar
+        '401':
+          description: Nevažeći klijentski token
+
+  /api/kick/me:
+    get:
+      summary: Preuzimanje informacija o prijavljenom Kick korisniku
+      operationId: getKickUserInfo
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer access_token sa Kick OAuth2
+      responses:
+        '200':
+          description: Uspešno preuzeti podaci o korisniku i profilu
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  username:
+                    type: string
+                  slug:
+                    type: string
+                  avatar:
+                    type: string
+                  chatroom_id:
+                    type: string
+        '401':
+          description: Nedostaje ili je nevažeći Authorization header
+
+  /api/kick/test-ping:
+    post:
+      summary: Slanje test poruke u chatroom kanala (zahteva X-Internal-Token)
+      operationId: testPingChannel
+      parameters:
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                chatroom_id:
+                  type: string
+              required:
+                - chatroom_id
+      responses:
+        '200':
+          description: Test poruka je uspešno poslata
+        '401':
+          description: Neautorizovan zahtev
+
+  /api/kick/reload:
+    get:
+      summary: Ponovno učitavanje konfiguracije i komandi kanala iz baze
+      operationId: reloadChannelConfig
+      parameters:
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: chatroom_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Konfiguracija uspešno osvežena
+        '401':
+          description: Neautorizovan zahtev
+
+  /api/kick/logs:
+    get:
+      summary: Preuzimanje internih logova bota za određeni kanal
+      operationId: getChannelLogs
+      parameters:
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: chatroom_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Filtrirani logovi kanala
+        '401':
+          description: Neautorizovan zahtev
+
+  /api/channels:
+    get:
+      summary: Pregled svih aktivnih kanala i statusa konekcije bota
+      operationId: getActiveChannels
+      parameters:
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Zbirni izveštaj o aktivnim kanalima
+        '401':
+          description: Neautorizovan zahtev
+
+  /api/global-logout:
+    post:
+      summary: Globalna odjava korisničke sesije (zahteva autentikaciju)
+      operationId: globalLogout
+      parameters:
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+              required:
+                - userId
+      responses:
+        '200':
+          description: Uspešno zabeležena odjava
+        '401':
+          description: Neautorizovan zahtev
+
+  /api/check-logout:
+    get:
+      summary: Provera da li je sesija korisnika odjavljena
+      operationId: checkLogout
+      parameters:
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Vraća boolean shouldLogout status

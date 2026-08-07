@@ -144,7 +144,7 @@ if (window.location.hostname !== 'localhost' && window.location.hostname !== '12
         }
 
         // 9. Debounce resize events
-        function debounce(func, wait) {
+        function _debounce(func, wait) {
             let timeout;
             return function executedFunction(...args) {
                 const later = () => {

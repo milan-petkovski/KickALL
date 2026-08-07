@@ -50,6 +50,14 @@ function timingSafeEqualHex(a, b) {
   }
 }
 
+function maskEmail(email) {
+  if (!email || typeof email !== 'string') return null;
+  const [user, domain] = email.split('@');
+  if (!domain) return '***';
+  const maskedUser = user.length > 2 ? `${user[0]}***${user[user.length - 1]}` : '***';
+  return `${maskedUser}@${domain}`;
+}
+
 function verifySignature(rawBody, signatureHeader, secret) {
   const { ts, h1 } = parsePaddleSignature(signatureHeader);
   if (!ts || !h1 || !secret) return false;
@@ -356,7 +364,7 @@ exports.handler = async (event) => {
   console.log('[Paddle Webhook] Event received', {
     eventType,
     subscriptionId: subscriptionId || null,
-    customerEmail: customerEmail || null,
+    customerEmail: maskEmail(customerEmail),
     customUserId: customUserId || null,
     priceId: priceId || null
   });
@@ -367,7 +375,7 @@ exports.handler = async (event) => {
     console.error('[Paddle Webhook] User not found for event', {
       eventType,
       subscriptionId: subscriptionId || null,
-      customerEmail: customerEmail || null,
+      customerEmail: maskEmail(customerEmail),
       customUserId: customUserId || null
     });
 
@@ -472,3 +480,10 @@ exports.handler = async (event) => {
     body: JSON.stringify({ received: true, handled: true, userId: user.id })
   };
 };
+
+// Eksport za unit testove
+exports.verifySignature = verifySignature;
+exports.parsePaddleSignature = parsePaddleSignature;
+exports.maskEmail = maskEmail;
+exports.safeJsonParse = safeJsonParse;
+exports.normalizeEventType = normalizeEventType;

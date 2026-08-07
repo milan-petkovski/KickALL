@@ -82,7 +82,13 @@ window.CONFIG = {
 
   // Backend API Configuration
   getBackendApiBase: () => {
-    return 'https://kickbot-ihzb.onrender.com';
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1' || 
+                        window.location.hostname === '0.0.0.0';
+    if (isLocalhost) {
+      return 'http://localhost:3000';
+    }
+    return window.location.origin;
   },
 
   // OAuth Configuration
@@ -259,7 +265,7 @@ if (document.readyState === 'complete') {
 
 // Adaptive Keep-Alive Ping for Render free tier (only runs when tab is visible)
 if (window.CONFIG.KEEP_ALIVE.ENABLED) {
-  let pingTimer = null;
+  let _pingTimer = null;
 
   const sendHealthPing = () => {
     if (document.visibilityState === 'visible') {
@@ -276,7 +282,7 @@ if (window.CONFIG.KEEP_ALIVE.ENABLED) {
   sendHealthPing();
 
   // Set periodic ping
-  pingTimer = setInterval(sendHealthPing, window.CONFIG.KEEP_ALIVE.PING_INTERVAL);
+  _pingTimer = setInterval(sendHealthPing, window.CONFIG.KEEP_ALIVE.PING_INTERVAL);
 
   // Restart ping on tab re-focus
   document.addEventListener('visibilitychange', () => {

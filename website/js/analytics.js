@@ -23,9 +23,9 @@ class KickALLAnalytics {
 
   detectPageType() {
     const path = window.location.pathname;
-    if (path.includes('/kickot/dashboard.html')) return 'kickot_dashboard';
+    if (path.includes('/kickot/dashboard')) return 'kickot_dashboard';
     if (path.includes('/kickot/')) return 'kickot_landing';
-    if (path.includes('/dashboard.html')) return 'main_dashboard';
+    if (path.includes('/dashboard')) return 'main_dashboard';
     if (path.includes('/auth/')) return 'auth_page';
     if (path.includes('/privacy') || path.includes('/terms')) return 'legal_page';
     return 'main_landing';

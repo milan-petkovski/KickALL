@@ -31,6 +31,10 @@ Disallow: /auth/
 Disallow: /dashboard/
 Disallow: /api/
 Disallow: /admin/
+Disallow: /kickaj/
+Disallow: /kickan/
+Disallow: /kickov/
+Disallow: /kickot/dashboard.html
 
 # Sitemap
 Sitemap: https://kickall.app/sitemap.xml

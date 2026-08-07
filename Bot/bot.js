@@ -1011,7 +1011,7 @@ async function proveriDaLiJeLive(chatroomId) {
             const liveState = !!data.livestream;
 
             // Moderator check - uklonjeno da bi bot radio i bez moderator statusa
-            const isModOrOwner = (data.role === 'moderator' || data.role === 'creator' || data.role === 'broadcaster' || channelUsername.toLowerCase() === botUsernameResolved.toLowerCase());
+            const _isModOrOwner = (data.role === 'moderator' || data.role === 'creator' || data.role === 'broadcaster' || channelUsername.toLowerCase() === botUsernameResolved.toLowerCase());
             channelState.isModerator = true; // Uvek dozvoli bota da radi
 
             if (database.KORISTI_SUPABASE && database.supabase) {
@@ -1258,7 +1258,7 @@ process.on('uncaughtException', async (err) => {
     }
 });
 
-process.on('unhandledRejection', (reason, promise) => {
+process.on('unhandledRejection', (reason, _promise) => {
     const msg = reason instanceof Error ? reason.stack : String(reason);
     utils.log('ERR', `Neobrađeno obećanje (unhandledRejection): ${msg}`);
 });
@@ -1317,12 +1317,40 @@ function resolveKickRedirectUri(candidate) {
     return 'https://kickall.app/auth/kick/callback/';
 }
 
-// ─── HTTP SERVER (Uptime / Render Service fallback) ───────────────────────────
-const PORT = process.env.PORT || 3000;
-http.createServer(async (req, res) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+function verifyInternalToken(req) {
+    const secret = process.env.INTERNAL_API_SECRET || process.env.INTERNAL_SECRET;
+    if (!secret) {
+        utils.log('ERR', 'KRITIČNO: INTERNAL_API_SECRET nije podešen u okruženju! Zahtev je odbijen.');
+        return false;
+    }
+    const tokenHeader = req.headers['x-internal-token'];
+    const authHeader = req.headers['authorization'];
+    if (tokenHeader && tokenHeader === secret) return true;
+    if (authHeader && (authHeader === `Bearer ${secret}` || authHeader === secret)) return true;
+    return false;
+}
+
+async function handleHttpRequest(req, res) {
+    const origin = req.headers['origin'];
+    const allowedOrigins = [
+        process.env.ALLOWED_ORIGIN,
+        'https://kickall.app',
+        'https://www.kickall.app',
+        'http://localhost:8888',
+        'http://127.0.0.1:8888',
+        'http://localhost:5500',
+        'http://127.0.0.1:5500',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+    ].filter(Boolean);
+
+    if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.netlify.app'))) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+        res.setHeader('Access-Control-Allow-Origin', 'https://kickall.app');
+    }
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Internal-Token');
 
     if (req.method === 'OPTIONS') {
         res.writeHead(200);
@@ -1553,8 +1581,13 @@ http.createServer(async (req, res) => {
             return;
         }
 
-        // Global logout endpoint
+        // Global logout endpoint (zahteva autentikaciju)
         if (parsedUrl.pathname === '/api/global-logout' && req.method === 'POST') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized', detail: 'Missing or invalid authentication token' }));
+                return;
+            }
             try {
                 const body = await new Promise((resolve) => {
                     let data = '';
@@ -1563,8 +1596,6 @@ http.createServer(async (req, res) => {
                 });
                 const { userId } = JSON.parse(body || '{}');
 
-                // Store logout timestamp in a simple in-memory cache
-                // In production, this should use Redis or a database
                 if (!global.logoutCache) {
                     global.logoutCache = new Map();
                 }
@@ -1604,6 +1635,11 @@ http.createServer(async (req, res) => {
         }
 
         if (parsedUrl.pathname === '/api/kick/channel') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized access to channel endpoint' }));
+                return;
+            }
             const username = parsedUrl.searchParams.get('username');
             if (!username) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1629,6 +1665,11 @@ http.createServer(async (req, res) => {
         }
 
         if (parsedUrl.pathname === '/api/kick/logs' && req.method === 'GET') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized access to bot logs' }));
+                return;
+            }
             const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
             const channelState = chatroomId ? state.getChannelState(chatroomId) : null;
             const channelUsername = channelState ? channelState.channelUsername : null;
@@ -1648,6 +1689,11 @@ http.createServer(async (req, res) => {
         }
 
         if (parsedUrl.pathname === '/api/kick/test-ping' && req.method === 'POST') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized access to test-ping' }));
+                return;
+            }
             let body = '';
             req.on('data', chunk => { body += chunk.toString(); });
             req.on('end', async () => {
@@ -1674,6 +1720,11 @@ http.createServer(async (req, res) => {
         }
 
         if (parsedUrl.pathname === '/api/kick/reload') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized access to reload endpoint' }));
+                return;
+            }
             const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
             if (!chatroomId) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1696,6 +1747,11 @@ http.createServer(async (req, res) => {
         }
 
         if (parsedUrl.pathname === '/api/kick/check-moderator') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized access to check-moderator endpoint' }));
+                return;
+            }
             const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
             if (!chatroomId) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -1720,6 +1776,11 @@ http.createServer(async (req, res) => {
         }
 
         if (parsedUrl.pathname === '/api/channels' && req.method === 'GET') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized access to channels summary' }));
+                return;
+            }
             try {
                 const channelsSummary = Object.keys(state.channels).map(id => {
                     const c = state.channels[id];
@@ -1749,15 +1810,56 @@ http.createServer(async (req, res) => {
             }
             return;
         }
+
+        if (parsedUrl.pathname === '/api/global-logout' && req.method === 'POST') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized', detail: 'Missing or invalid authentication token' }));
+                return;
+            }
+            state.loggedOutUsers = state.loggedOutUsers || new Set();
+            let bodyStr = '';
+            req.on('data', chunk => { bodyStr += chunk; });
+            req.on('end', () => {
+                try {
+                    const payload = JSON.parse(bodyStr || '{}');
+                    if (payload.userId) {
+                        state.loggedOutUsers.add(String(payload.userId));
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
+                } catch (_e) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
+                }
+            });
+            return;
+        }
+
+        if (parsedUrl.pathname === '/api/check-logout' && req.method === 'GET') {
+            const userId = parsedUrl.searchParams.get('userId');
+            state.loggedOutUsers = state.loggedOutUsers || new Set();
+            const shouldLogout = userId ? state.loggedOutUsers.has(String(userId)) : false;
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ shouldLogout, userId }));
+            return;
+        }
     } catch (err) {
         console.error('Error handling HTTP request in bot.js:', err);
     }
 
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end(`🤖 Multi-channel Kick Bot je aktivan!\nKanali na kojima radi: ${Object.values(state.channels).map(c => '@' + c.channelUsername).join(', ') || 'nijedan'}\n`);
-}).listen(PORT, () => {
-    utils.log('INFO', `Lokalni HTTP server pokrenut na portu: ${PORT}`);
-});
+}
+
+const PORT = process.env.PORT || 3000;
+const server = http.createServer(handleHttpRequest);
+
+function pokreniServer() {
+    server.listen(PORT, () => {
+        utils.log('INFO', `Lokalni HTTP server pokrenut na portu: ${PORT}`);
+    });
+}
 
 // ─── MEMORY CLEANUP ───────────────────────────────────────────────────────────
 setInterval(() => {
@@ -1777,7 +1879,7 @@ setInterval(() => {
             }
         }
     }
-}, 10 * 60 * 1000); // Svakih 10 minuta
+}, 10 * 60 * 1000).unref(); // Svakih 10 minuta
 
 // ─── START ────────────────────────────────────────────────────────────────────
 async function start() {
@@ -1902,10 +2004,15 @@ async function start() {
             .subscribe();
 
 
-    } else {
-        utils.log('ERR', 'Kritična greška: Supabase nije konfigurisan! Multi-channel bot zahteva bazu podataka.');
-        process.exit(1);
     }
 }
 
-start();
+if (require.main === module) {
+    pokreniServer();
+    start();
+}
+
+module.exports = {
+    verifyInternalToken,
+    handleHttpRequest
+};

@@ -2,10 +2,10 @@ const config = require('./config');
 const state = require('./state');
 const { log, isValidUsername, sanitizeInput, proveraKulauna, prevediVreme, dobijTrenutniMesec, fetchKickAPI } = require('./utils');
 const { supabase, KORISTI_SUPABASE, osigurajCuvanjeLjubavi, sacuvajLeaderboard } = require('./database');
-const { posaljiPoruku, posaljiIPinujPoruku, odpinujPoruku } = require('./messenger');
+const { posaljiPoruku } = require('./messenger');
 
 // Pomoćna funkcija za podrazumevanu ljubav
-function getDefaultLove(u1, u2) {
+function getDefaultLove(_u1, _u2) {
     return 0; // Svi parovi po defaultu kreću sa 0%
 }
 

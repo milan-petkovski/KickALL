@@ -37,10 +37,10 @@
             return BASE_URL + this.parentPath;
         },
         get dashboardUrl() {
-            return `${this.parentUrl}/dashboard.html`;
+            return `${this.parentUrl}/dashboard`;
         },
         get indexUrl() {
-            return `${this.parentUrl}/index.html`;
+            return `${this.parentUrl}/`;
         }
     };
 
@@ -71,7 +71,7 @@
         // API Configuration
         api: {
             get baseUrl() {
-                return window.CONFIG ? window.CONFIG.getBackendApiBase() : 'https://kickbot-ihzb.onrender.com';
+                return window.CONFIG ? window.CONFIG.getBackendApiBase() : (isLocalhost ? 'http://localhost:3000' : window.location.origin);
             },
             get kickOAuthRedirect() {
                 // Always use kickall.app for callback in production
@@ -128,7 +128,7 @@
 
         // Helper functions - Kickot-specific
         getApiUrl(endpoint) {
-            const baseUrl = window.CONFIG ? window.CONFIG.getBackendApiBase() : 'https://kickbot-ihzb.onrender.com';
+            const baseUrl = window.CONFIG ? window.CONFIG.getBackendApiBase() : (isLocalhost ? 'http://localhost:3000' : window.location.origin);
             return `${baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
         },
 

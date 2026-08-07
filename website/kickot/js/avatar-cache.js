@@ -55,7 +55,7 @@ async function getAvatarFromCache(username) {
   try {
     await initAvatarCache();
     
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
       const transaction = db.transaction([STORE_NAME], 'readonly');
       const objectStore = transaction.objectStore(STORE_NAME);
       const request = objectStore.get(username.toLowerCase());

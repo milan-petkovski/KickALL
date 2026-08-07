@@ -46,11 +46,16 @@ exports.handler = async (event) => {
   }
 
   try {
+    const upstreamHeaders = {
+      Authorization: event.headers.authorization || event.headers.Authorization || ''
+    };
+    if (process.env.INTERNAL_API_SECRET) {
+      upstreamHeaders['X-Internal-Token'] = process.env.INTERNAL_API_SECRET;
+    }
+
     const upstream = await fetch(`${base}/api/kick/me`, {
       method: 'GET',
-      headers: {
-        Authorization: event.headers.authorization || event.headers.Authorization || ''
-      }
+      headers: upstreamHeaders
     });
 
     const text = await upstream.text();

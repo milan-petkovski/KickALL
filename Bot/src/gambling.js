@@ -1,5 +1,5 @@
 const state = require('./state');
-const { log, sanitizeInput, isValidUsername } = require('./utils');
+const { sanitizeInput, isValidUsername } = require('./utils');
 const { posaljiPoruku } = require('./messenger');
 const { dobijNazivValute } = require('./economy');
 
@@ -332,6 +332,7 @@ function handleWheel(chatroomId, sender, amountRaw) {
 }
 
 module.exports = {
+    proveriUlog,
     handleSlots,
     handleRoulette,
     handleCoinflip,

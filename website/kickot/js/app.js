@@ -535,7 +535,7 @@ function setLoading(type, loading) {
 }
 
 // ── Modal ─────────────────────────────────────────────────
-function openModal(tab = 'login') {
+function openModal(_tab = 'login') {
   const modal = document.getElementById('authModal');
   if (modal) {
     modal.classList.add('open');
@@ -606,7 +606,7 @@ async function generateCodeChallenge(v) {
 async function openKickLogin() {
   // Use global auth system if available
   if (window.KickAuth) {
-    KickAuth.initiateOAuth('kickot/dashboard.html');
+    KickAuth.initiateOAuth('kickot/dashboard');
     return;
   }
   
@@ -672,7 +672,7 @@ async function handleLogin() {
       setTimeout(() => {
         const fromKickAllKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.FROM_KICKALL : 'from_kickall';
         const fromKickAll = sessionStorage.getItem(fromKickAllKey) === 'true';
-        window.location.href = fromKickAll ? '../dashboard.html' : 'dashboard.html';
+        window.location.href = fromKickAll ? '/dashboard' : '/kickot/dashboard';
       }, 800);
     }
   } catch (err) {
@@ -738,7 +738,7 @@ async function handleSignup() {
       setTimeout(() => {
         const fromKickAllKey = CONFIG.STORAGE_KEYS ? CONFIG.STORAGE_KEYS.FROM_KICKALL : 'from_kickall';
         const fromKickAll = sessionStorage.getItem(fromKickAllKey) === 'true';
-        window.location.href = fromKickAll ? '../dashboard.html' : 'dashboard.html';
+        window.location.href = fromKickAll ? '/dashboard' : '/kickot/dashboard';
       }, 800);
     } else {
       showFormAlert('signupSuccess', t('auth.signup.success'), 'success');
@@ -864,7 +864,7 @@ function onUserChange(user) {
     const heroPrimaryBtn = document.getElementById('heroPrimaryBtn');
     const heroPrimaryBtnText = document.getElementById('heroPrimaryBtnText');
     if (heroPrimaryBtn && heroPrimaryBtnText) {
-      heroPrimaryBtn.onclick = () => { window.location.href = 'dashboard.html'; };
+      heroPrimaryBtn.onclick = () => { window.location.href = '/kickot/dashboard'; };
       heroPrimaryBtnText.textContent = t('nav.goToDashboard');
       heroPrimaryBtnText.removeAttribute('data-i18n');
     }
@@ -894,7 +894,7 @@ function onUserChange(user) {
     const ctaPrimaryBtnText = document.getElementById('ctaPrimaryBtnText');
     if (ctaPrimaryBtn && ctaPrimaryBtnText) {
       if (user) {
-        ctaPrimaryBtn.onclick = () => { window.location.href = 'dashboard.html'; };
+        ctaPrimaryBtn.onclick = () => { window.location.href = '/kickot/dashboard'; };
         ctaPrimaryBtnText.textContent = t('nav.goToDashboard');
         ctaPrimaryBtnText.removeAttribute('data-i18n');
       } else {
@@ -907,7 +907,7 @@ function onUserChange(user) {
 
 // ── Toast Notifications ────────────────────────────────────
 let toastId = 0;
-function showToast(type, msg, iconEmoji = '💬', duration = null) {
+function showToast(type, msg, _iconEmoji = '💬', duration = null) {
   let container = document.getElementById('toastContainer');
   // Ensure container is a direct child of body (fixes DOM nesting issues)
   if (!container || container.parentElement !== document.body) {
@@ -1050,7 +1050,7 @@ if (authKickLoginBtn) {
     authKickLoginBtn.classList.add('loading');
     authKickLoginBtn.disabled = true;
     const btnText = authKickLoginBtn.querySelector('span');
-    const originalText = btnText.textContent;
+    const _originalText = btnText.textContent;
     btnText.textContent = 'Preusmeravanje...';
 
     // Small delay to show loading state before redirect
@@ -1162,7 +1162,7 @@ if (window.location.search.includes('reset=true')) {
 
 async function handleLogout() {
   try {
-    let userId = null;
+    let _userId = null;
     if (typeof sb !== 'undefined' && sb && sb.auth) {
       const { data } = await sb.auth.getSession();
       userId = data?.session?.user?.id;

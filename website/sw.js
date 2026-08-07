@@ -3,10 +3,15 @@ const CACHE_NAME = 'kickall-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  '/dashboard',
   '/dashboard.html',
+  '/pricing',
   '/pricing.html',
+  '/refund',
   '/refund.html',
+  '/privacy',
   '/privacy.html',
+  '/terms',
   '/terms.html',
   '/css/base.css',
   '/css/style.css',
@@ -104,13 +109,13 @@ self.addEventListener('fetch', (event) => {
               .then((cache) => {
                 cache.put(event.request, responseToCache);
               })
-              .catch(err => {
+              .catch(_err => {
                 // Silently fail cache errors
               });
           }
           return response;
         })
-        .catch((error) => {
+        .catch((_error) => {
           // Fallback to cache if network fails
           return caches.match(event.request)
             .then((cachedResponse) => {
@@ -137,7 +142,7 @@ self.addEventListener('fetch', (event) => {
                     .then((cache) => {
                       cache.put(event.request, responseToCache);
                     })
-                    .catch(err => {
+                    .catch(_err => {
                       // Silently fail cache errors
                     });
                 }
@@ -162,13 +167,13 @@ self.addEventListener('fetch', (event) => {
                 .then((cache) => {
                   cache.put(event.request, responseToCache);
                 })
-                .catch(err => {
+                .catch(_err => {
                   // Silently fail cache errors
                 });
 
               return response;
             })
-            .catch((error) => {
+            .catch((_error) => {
               // Return offline fallback for CSS/JS
               if (event.request.url.endsWith('.css') ||
                 event.request.url.endsWith('.js')) {
@@ -179,7 +184,7 @@ self.addEventListener('fetch', (event) => {
               }
             });
         })
-        .catch((error) => {
+        .catch((_error) => {
           return fetch(event.request);
         })
     );

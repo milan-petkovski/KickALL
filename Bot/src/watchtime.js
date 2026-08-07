@@ -1,4 +1,3 @@
-const config = require('./config');
 const state = require('./state');
 const { log, sanitizeInput, isValidUsername } = require('./utils');
 const { supabase, KORISTI_SUPABASE } = require('./database');

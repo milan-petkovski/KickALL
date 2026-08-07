@@ -1,5 +1,5 @@
 const state = require('./state');
-const { log, sanitizeInput, isValidUsername } = require('./utils');
+const { sanitizeInput, isValidUsername } = require('./utils');
 const { posaljiPoruku } = require('./messenger');
 
 // ─── MATEMATIKA NIPOA I XP-A ─────────────────────────────────────────
