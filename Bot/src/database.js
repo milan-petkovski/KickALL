@@ -317,6 +317,9 @@ function evidentirajPoruku(chatroomId, username, poruka) {
             sacuvajLeaderboard(chatroomId);
             channelState.leaderboardSaveTimer = null;
         }, config.LEADERBOARD_SAVE_INTERVAL_MS);
+        if (channelState.leaderboardSaveTimer && typeof channelState.leaderboardSaveTimer.unref === 'function') {
+            channelState.leaderboardSaveTimer.unref();
+        }
     }
 }
 
@@ -338,6 +341,9 @@ function smanjiPoruku(chatroomId, username, iznos) {
                 sacuvajLeaderboard(chatroomId);
                 channelState.leaderboardSaveTimer = null;
             }, config.LEADERBOARD_SAVE_INTERVAL_MS);
+            if (channelState.leaderboardSaveTimer && typeof channelState.leaderboardSaveTimer.unref === 'function') {
+                channelState.leaderboardSaveTimer.unref();
+            }
         }
     }
 }
@@ -500,6 +506,9 @@ function osigurajCuvanjeLjubavi(chatroomId) {
             sacuvajLjubav(chatroomId);
             channelState.loveSaveTimer = null;
         }, config.LOVE_SAVE_INTERVAL_MS);
+        if (channelState.loveSaveTimer && typeof channelState.loveSaveTimer.unref === 'function') {
+            channelState.loveSaveTimer.unref();
+        }
     }
 }
 

@@ -1,18 +1,202 @@
 openapi: 3.0.3
 info:
   title: KickALL Bot & Web HTTP API
-  description: OpenAPI 3.0 specifikacija za KickALL Bot HTTP server i Netlify proxy rute.
+  description: OpenAPI 3.0 specifikacija za KickALL Bot HTTP server i Netlify Serverless proxy rute.
   version: 1.0.0
 servers:
-  - url: https://kickbot-ihzb.onrender.com
-    description: Render Bot HTTP Server (Production)
+  - url: https://kickall.app/.netlify/functions
+    description: Netlify Functions Public API (Production Base)
   - url: https://kickall.app
-    description: Netlify Website & Functions (Production)
+    description: Netlify Website & Functions Root (Production)
+  - url: https://kickbot-ihzb.onrender.com
+    description: Render Bot HTTP Server (Internal Production)
 
 paths:
+  # ─── NETLIFY PUBLIC SERVERLESS FUNCTIONS ─────────────────────────────────────
+
+  /.netlify/functions/bot-proxy:
+    get:
+      summary: Proksiranje zahteva ka unutrašnjem Bot servisu sa tajnim tokenom
+      operationId: netlifyBotProxyGet
+      parameters:
+        - in: path
+          name: pathSuffix
+          required: false
+          schema:
+            type: string
+          description: Putanja do bot rute (npr. /api/channels, /api/kick/logs)
+      responses:
+        '200':
+          description: Uspešno prosleđen odgovor sa bot servisa
+        '404':
+          description: Putanja nije na listi dozvoljenih ruta (ALLOWED_PATHS)
+        '429':
+          description: Prekoračen rate limit
+        '500':
+          description: Server miskonfiguracija (nedostaje INTERNAL_API_SECRET)
+    post:
+      summary: Proksiranje POST zahteva ka unutrašnjem Bot servisu
+      operationId: netlifyBotProxyPost
+      responses:
+        '200':
+          description: Uspešan rezultat sa bot servisa
+        '404':
+          description: Putanja nije dozvoljena
+
+  /.netlify/functions/api-proxy:
+    post:
+      summary: Siguran API proxy sa SSRF zaštitom i allowlist provere domena
+      operationId: netlifyApiProxy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                targetUrl:
+                  type: string
+                  example: https://kick.com/api/v2/channels/test
+                method:
+                  type: string
+                  default: GET
+                headers:
+                  type: object
+                body:
+                  type: string
+              required:
+                - targetUrl
+      responses:
+        '200':
+          description: Uspešno prosleđen upstream odgovor
+        '400':
+          description: Nedostaje targetUrl ili je URL neispravan
+        '403':
+          description: Ciljni domen nije na SSRF listi dozvoljenih domena
+        '413':
+          description: Telo zahteva prelazi 50KB limit
+        '429':
+          description: Prekoračen rate limit
+
+  /.netlify/functions/kick-exchange:
+    post:
+      summary: Javni Netlify proxy za razmenu Kick OAuth2 koda za token
+      operationId: netlifyKickExchange
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                code_verifier:
+                  type: string
+                redirect_uri:
+                  type: string
+              required:
+                - code
+      responses:
+        '200':
+          description: Token uspešno razmenjen i vraćen klijentu
+        '400':
+          description: Nevažeći kôd ili parametri
+        '413':
+          description: Telo zahteva prelazi 10KB limit
+        '429':
+          description: Prekoračen rate limit
+
+  /.netlify/functions/kick-me:
+    get:
+      summary: Javni Netlify proxy za dohvatanje podataka o autenfitikovanom Kick korisniku
+      operationId: netlifyKickMe
+      parameters:
+        - in: header
+          name: Authorization
+          required: true
+          schema:
+            type: string
+          description: Bearer access_token sa Kick OAuth2
+      responses:
+        '200':
+          description: Podaci o profilu uspešno preuzeti
+        '401':
+          description: Neautorizovan zahtev ili istekao token
+        '429':
+          description: Prekoračen rate limit
+
+  /.netlify/functions/yt-search:
+    get:
+      summary: Pretraga YouTube videa za Song Request funkcionalnost bez API ključa
+      operationId: netlifyYtSearch
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema:
+            type: string
+          description: Naziv pesme ili autor za pretragu
+      responses:
+        '200':
+          description: Pronađen prvi najbliži YouTube video
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  videoId:
+                    type: string
+                  title:
+                    type: string
+                  uploader:
+                    type: string
+                  coverUrl:
+                    type: string
+                  duration:
+                    type: integer
+        '400':
+          description: Nedostaje parametar pretrage q
+        '429':
+          description: Prekoračen rate limit
+        '444':
+          description: Nije pronađen video zapis za dati upit
+
+  /.netlify/functions/paddle-webhook:
+    post:
+      summary: Prijem i obrada Paddle billing webhook događaja sa provere HMAC potpisa
+      operationId: netlifyPaddleWebhook
+      parameters:
+        - in: header
+          name: Paddle-Signature
+          required: true
+          schema:
+            type: string
+          description: Paddle HMAC sha256 potpis zahteva (ts=...;h1=...)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event_type:
+                  type: string
+                data:
+                  type: object
+      responses:
+        '200':
+          description: Webhook uspešno primljen i obrađen
+        '401':
+          description: Neispravan Paddle potpis
+        '500':
+          description: Nedostaje Paddle ili Supabase konfiguracija
+
+  # ─── BOT DIRECT / INTERNAL ENDPOINTS ─────────────────────────────────────────
+
   /api/kick/exchange:
     post:
-      summary: Razmena Kick OAuth koda za access token
+      summary: Razmena Kick OAuth koda za access token (Bot Direct)
       operationId: exchangeKickToken
       requestBody:
         required: true
@@ -32,17 +216,6 @@ paths:
       responses:
         '200':
           description: Token uspešno razmenjen
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  access_token:
-                    type: string
-                  token_type:
-                    type: string
-                  expires_in:
-                    type: integer
         '400':
           description: Nedostaje kod ili nevažeći parametar
         '401':
@@ -50,7 +223,7 @@ paths:
 
   /api/kick/me:
     get:
-      summary: Preuzimanje informacija o prijavljenom Kick korisniku
+      summary: Preuzimanje informacija o prijavljenom Kick korisniku (Bot Direct)
       operationId: getKickUserInfo
       parameters:
         - in: header
@@ -62,21 +235,6 @@ paths:
       responses:
         '200':
           description: Uspešno preuzeti podaci o korisniku i profilu
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  id:
-                    type: string
-                  username:
-                    type: string
-                  slug:
-                    type: string
-                  avatar:
-                    type: string
-                  chatroom_id:
-                    type: string
         '401':
           description: Nedostaje ili je nevažeći Authorization header
 
@@ -189,6 +347,48 @@ paths:
       responses:
         '200':
           description: Uspešno zabeležena odjava
+        '401':
+          description: Neautorizovan zahtev
+
+  /api/kick/check-moderator:
+    get:
+      summary: Provera da li bot ima moderatorska prava na datom kanalu
+      operationId: checkModeratorStatus
+      parameters:
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: channel
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status moderatora uspešno vraćen
+        '401':
+          description: Neautorizovan zahtev
+
+  /api/kick/channel:
+    get:
+      summary: Dohvatanje detaljnih informacija o specificiranom Kick kanalu
+      operationId: getKickChannelInfo
+      parameters:
+        - in: header
+          name: X-Internal-Token
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Podaci o kanalu uspešno vraćeni
         '401':
           description: Neautorizovan zahtev
 

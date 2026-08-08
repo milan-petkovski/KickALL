@@ -25,6 +25,10 @@ jobs:
         working-directory: ./Bot
         run: npm ci
 
+      - name: Install Website Dependencies
+        working-directory: ./Website
+        run: npm install
+
       - name: Install Root Dependencies
         run: npm install
 

@@ -27,6 +27,14 @@ exports.handler = async (event) => {
   const botBase = (process.env.RENDER_BOT_API_BASE || process.env.BOT_API_URL || 'https://kickbot-ihzb.onrender.com').replace(/\/+$/, '');
   const secret = process.env.INTERNAL_API_SECRET;
 
+  if (!secret) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Server misconfiguration: missing INTERNAL_API_SECRET' })
+    };
+  }
+
   // Odredi ciljnu putanju prema unutrašnjem API-ju bota
   let pathSuffix = event.path;
   if (pathSuffix.startsWith('/.netlify/functions/bot-proxy')) {
@@ -34,6 +42,15 @@ exports.handler = async (event) => {
   }
   if (!pathSuffix || pathSuffix === '/') {
     pathSuffix = '/api/channels';
+  }
+
+  const ALLOWED_PATHS = ['/api/channels', '/api/kick/logs', '/api/kick/reload', '/api/kick/test-ping', '/api/kick/check-moderator', '/api/kick/channel', '/api/global-logout'];
+  if (!ALLOWED_PATHS.includes(pathSuffix)) {
+    return {
+      statusCode: 404,
+      headers,
+      body: JSON.stringify({ error: 'Not found' })
+    };
   }
 
   const queryString = event.rawQuery ? `?${event.rawQuery}` : '';

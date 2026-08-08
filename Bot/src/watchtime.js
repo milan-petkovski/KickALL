@@ -140,7 +140,9 @@ async function watchtimeTick(chatroomId) {
                 const xpBonus = channelState.xp_per_watchtime || 50;
                 const pointsBonus = channelState.points_per_watchtime || 20;
                 economy.dodajXP(chatroomId, channelState.watchtime[key].display_name || username, xpBonus, pointsBonus);
-            } catch (e) {}
+            } catch (e) {
+                log('ERR', `Greška u watchtime praćenju za ${username}: ${e.message}`);
+            }
 
             dodatiKorisnici.push(channelState.watchtime[key].display_name);
             nesto = true;
