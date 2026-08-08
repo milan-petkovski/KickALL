@@ -44,12 +44,12 @@ test('Economy - dodajXP dodeljuje poene i XP novom korisniku', () => {
 
     dodajXP(chatroomId, 'TestUser', 15, 5, false, 'Dobar strim brate!');
 
-    const user = channelState.leaderboard['testuser'];
+    const user = channelState.economy['testuser'];
     assert.ok(user);
     assert.equal(user.username, 'TestUser');
     assert.equal(user.xp, 15);
     // 5 poena za poruku + 100 bonus za prvu interakciju = 105
-    assert.equal(user.points, 105);
+    assert.equal(user.coins, 105);
 });
 
 test('Economy - smart chat validation odbacuje prekratke poruke i spam', () => {

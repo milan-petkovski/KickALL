@@ -52,15 +52,21 @@ async function izvrsiSlanje(chatroomId, tekst) {
         throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
 
-    log('BOT', `[${(channelState && channelState.channelUsername) || chatroomId}] ${tekst}`);
-
+    let msgId = null;
     try {
         const json = await response.json();
-        const msgId = (json.data && json.data.id) || (json.data && json.data.message && json.data.message.id) || json.id || null;
-        return msgId;
+        msgId = (json.data && json.data.id) || (json.data && json.data.message && json.data.message.id) || json.id || null;
     } catch {
-        return null;
+        // JSON parse greška — tretiramo kao tihi neuspeh
     }
+
+    if (msgId) {
+        log('BOT', `[${(channelState && channelState.channelUsername) || chatroomId}] ${tekst}`);
+    } else {
+        log('WARN', `[${(channelState && channelState.channelUsername) || chatroomId}] Poruka tiho odbijena od Kick API-ja (nema msg ID). Bot verovatno nema moderatorska prava u ovom kanalu. Poruka: "${tekst}"`);
+    }
+
+    return msgId;
 }
 
 async function posaljiIPinujPoruku(chatroomId, tekst) {

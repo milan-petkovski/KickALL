@@ -14,9 +14,9 @@ test('Gambling Edge Cases - proveriUlog napredna pravila i granice', () => {
     channelState.gamble_enabled = true;
     channelState.planLimits = { priority: 2 };
     channelState.max_gamble_amount = 5000;
-    channelState.leaderboard['hazarder'] = {
+    channelState.economy['hazarder'] = {
         username: 'Hazarder',
-        points: 10000
+        coins: 10000
     };
 
     // 1. Negativan ulog -> mora pasti
@@ -42,16 +42,16 @@ test('Gambling Edge Cases - handleRoulette izvršava igru i ažurira poene', () 
     const channelState = state.getChannelState(chatroomId);
     channelState.gamble_enabled = true;
     channelState.planLimits = { priority: 2 };
-    channelState.leaderboard['ruletar'] = {
+    channelState.economy['ruletar'] = {
         username: 'Ruletar',
-        points: 1000
+        coins: 1000
     };
 
     const origRandom = Math.random;
     Math.random = () => 0.0; // Pogođen broj / gubitak
     try {
         handleRoulette(chatroomId, 'Ruletar', 'crna', '200');
-        const noviPoeni = channelState.leaderboard['ruletar'].points;
+        const noviPoeni = channelState.economy['ruletar'].coins;
         assert.ok(typeof noviPoeni === 'number');
         assert.notEqual(noviPoeni, 1000);
     } finally {
@@ -64,19 +64,19 @@ test('Gambling Edge Cases - handleCoinflip i handleWheel izvršavanje', () => {
     const channelState = state.getChannelState(chatroomId);
     channelState.gamble_enabled = true;
     channelState.planLimits = { priority: 2 };
-    channelState.leaderboard['kockar2'] = {
+    channelState.economy['kockar2'] = {
         username: 'Kockar2',
-        points: 2000
+        coins: 2000
     };
 
     const origRandom = Math.random;
     Math.random = () => 0.1;
     try {
-        handleCoinflip(chatroomId, 'Kockar2', 'glava 500');
-        assert.ok(channelState.leaderboard['kockar2'].points >= 1500);
+        handleCoinflip(chatroomId, 'Kockar2', 'glava', '500');
+        assert.ok(channelState.economy['kockar2'].coins >= 1500);
 
         handleWheel(chatroomId, 'Kockar2', '500');
-        assert.ok(typeof channelState.leaderboard['kockar2'].points === 'number');
+        assert.ok(typeof channelState.economy['kockar2'].coins === 'number');
     } finally {
         Math.random = origRandom;
     }

@@ -564,9 +564,11 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!roulette ') || porukaNormalized.startsWith('!rulet ')) {
+            if (porukaNormalized.startsWith('!roulette') || (porukaNormalized.startsWith('!rulet') && !porukaNormalized.startsWith('!ruskirulet'))) {
                 if (channelState.feature_games === false) return;
-                const rest = porukaNormalized.startsWith('!roulette ') ? porukaSredjena.slice(10).trim() : porukaSredjena.slice(7).trim();
+                let rest = '';
+                if (porukaNormalized.startsWith('!roulette')) rest = porukaSredjena.slice(9).trim();
+                else rest = porukaSredjena.slice(6).trim();
                 const parts = rest.split(/\s+/);
                 const opt = parts[0] || '';
                 const amount = parts[1] || '';
@@ -658,7 +660,7 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!ruskirulet') || porukaNormalized === '!rulet') {
+            if (porukaNormalized.startsWith('!ruskirulet') || porukaNormalized.startsWith('!rr')) {
                 if (channelState.feature_games === false) return;
                 if (utils.proveraKulauna(chatroomId, '!ruskirulet', username)) return;
                 commands.handleRulet(chatroomId, username);
@@ -670,6 +672,20 @@ function povezi() {
                 const target = porukaSredjena.slice(9).trim();
                 if (utils.proveraKulauna(chatroomId, '!alkotest', username)) return;
                 commands.handleAlkotest(chatroomId, username, target);
+                return;
+            }
+
+            if (porukaNormalized.startsWith('!cinjenica') || porukaNormalized.startsWith('!fact')) {
+                if (channelState.feature_games === false) return;
+                if (utils.proveraKulauna(chatroomId, '!cinjenica', username)) return;
+                commands.handleCinjenica(chatroomId);
+                return;
+            }
+
+            if (porukaNormalized.startsWith('!followage')) {
+                const target = porukaSredjena.slice(10).trim();
+                if (utils.proveraKulauna(chatroomId, '!followage', username)) return;
+                commands.handleFollowage(chatroomId, username, target);
                 return;
             }
 
@@ -853,10 +869,14 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!aktivnost' || porukaNormalized === '!stats' || porukaNormalized === '!points' || porukaNormalized === '!poeni') {
+            if (porukaNormalized.startsWith('!me') || porukaNormalized.startsWith('!stats') || porukaNormalized.startsWith('!aktivnost')) {
                 if (channelState.feature_leaderboard === false) return;
-                if (utils.proveraKulauna(chatroomId, '!aktivnost', username)) return;
-                commands.handleAktivnost(chatroomId, username);
+                let target = '';
+                if (porukaNormalized.startsWith('!me')) target = porukaSredjena.slice(3).trim();
+                else if (porukaNormalized.startsWith('!stats')) target = porukaSredjena.slice(6).trim();
+                else target = porukaSredjena.slice(10).trim();
+                if (utils.proveraKulauna(chatroomId, '!me', username)) return;
+                commands.handleMe(chatroomId, username, target);
                 return;
             }
 
@@ -1122,6 +1142,7 @@ async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
 
     // Učitavamo in-memory podatke za ovaj kanal
     await database.ucitajLeaderboard(chatroomId);
+    await database.ucitajEkonomiju(chatroomId);
     await database.ucitajLjubav(chatroomId);
     await database.ucitajCustomKomande(chatroomId);
     await watchtime.ucitajWatchtime(chatroomId);
@@ -1157,6 +1178,9 @@ async function zaustaviKanal(chatroomId) {
     if (channelState.watchtimeDirty) {
         await watchtime.sacuvajWatchtime(chatroomId);
     }
+    if (channelState.economyDirty) {
+        await database.sacuvajEkonomiju(chatroomId);
+    }
 
     // Otkazivanje pretplate sa četa
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
@@ -1170,6 +1194,10 @@ async function zaustaviKanal(chatroomId) {
     // Čišćenje tajmera
     if (channelState.autoAnnounceTimer) {
         clearInterval(channelState.autoAnnounceTimer);
+    }
+    if (channelState.economySaveTimer) {
+        clearTimeout(channelState.economySaveTimer);
+        channelState.economySaveTimer = null;
     }
 
     delete state.channels[chatroomId];

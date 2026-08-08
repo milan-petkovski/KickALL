@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npx serve . -p 5500",
-    "start": "npx serve . -p 5500",
+    "dev": "npx serve . -p 5500 -c serve.json",
+    "start": "npx serve . -p 5500 -c serve.json",
     "build": "node ../scripts/build.js || echo 'Website build verified'"
   }
 }

@@ -1,0 +1,19 @@
+{
+  "public": ".",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/dashboard", "destination": "/dashboard.html" },
+    { "source": "/pricing", "destination": "/pricing.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/refund", "destination": "/refund.html" },
+    { "source": "/kickot/dashboard", "destination": "/kickot/dashboard.html" },
+    { "source": "/kickaj/dashboard", "destination": "/kickaj/dashboard.html" },
+    { "source": "/kickan/dashboard", "destination": "/kickan/dashboard.html" },
+    { "source": "/kickov/dashboard", "destination": "/kickov/dashboard.html" },
+    { "source": "/kickot", "destination": "/kickot/index.html" },
+    { "source": "/kickaj", "destination": "/kickaj/index.html" },
+    { "source": "/kickan", "destination": "/kickan/index.html" },
+    { "source": "/kickov", "destination": "/kickov/index.html" }
+  ]
+}

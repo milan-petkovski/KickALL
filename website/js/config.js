@@ -85,8 +85,11 @@ window.CONFIG = {
     const isLocalhost = window.location.hostname === 'localhost' || 
                         window.location.hostname === '127.0.0.1' || 
                         window.location.hostname === '0.0.0.0';
-    if (isLocalhost) {
+    if (isLocalhost && localStorage.getItem('use_local_bot') === 'true') {
       return 'http://localhost:3000';
+    }
+    if (isLocalhost) {
+      return 'https://kickall.app';
     }
     return window.location.origin;
   },

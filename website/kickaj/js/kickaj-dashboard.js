@@ -249,7 +249,10 @@
 
           if (profile) {
             if (profile.kick_channels && Array.isArray(profile.kick_channels) && profile.kick_channels.length > 0) {
-              const primary = profile.kick_channels.find(c => c.is_primary) || profile.kick_channels[0];
+              const savedId = localStorage.getItem('kickbot_selected_channel_id');
+              const savedName = localStorage.getItem('kickbot_selected_channel_name');
+              const selectedCh = profile.kick_channels.find(c => String(c.id) === String(savedId) || c.username?.toLowerCase() === savedName?.toLowerCase());
+              const primary = selectedCh || profile.kick_channels.find(c => c.is_primary) || profile.kick_channels[0];
               if (primary.username) username = primary.username;
               if (primary.avatar) avatarUrl = primary.avatar;
               if (primary.chatroom_id) chatroomId = primary.chatroom_id;

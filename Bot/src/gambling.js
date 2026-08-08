@@ -1,63 +1,84 @@
 const state = require('./state');
-const { sanitizeInput, isValidUsername } = require('./utils');
+const config = require('./config');
 const { posaljiPoruku } = require('./messenger');
 const { dobijNazivValute } = require('./economy');
+const { sanitizeInput, isValidUsername } = require('./utils');
 
-// Pomoćna provera za poene i dozvole ulog-a
+// ─── HELPER: Dohvati economy korisnika ───────────────────────────────────────
+function dohvatiEkonomiju(channelState, key, displayName) {
+    if (!channelState.economy[key]) {
+        channelState.economy[key] = {
+            username: displayName || key,
+            xp: 0, level: 0, coins: 0,
+            daily_claimed_at: 0, daily_streak: 0
+        };
+    }
+    return channelState.economy[key];
+}
+
+// ─── HELPER: Oznaci korisnike kao dirty i zaplanuj save ──────────────────────
+function markirajDirtyIZaplanujSave(channelState, chatroomId, ...keys) {
+    channelState.economyDirty = true;
+    for (const k of keys) channelState.economyDeltas.add(k);
+
+    if (!channelState.economySaveTimer) {
+        channelState.economySaveTimer = setTimeout(async () => {
+            try {
+                const { sacuvajEkonomiju } = require('./database');
+                await sacuvajEkonomiju(chatroomId);
+            } catch (e) { /* greska pri cuvanju */ }
+            channelState.economySaveTimer = null;
+        }, config.ECONOMY_SAVE_INTERVAL_MS);
+        if (channelState.economySaveTimer && typeof channelState.economySaveTimer.unref === 'function') {
+            channelState.economySaveTimer.unref();
+        }
+    }
+}
+
+// ─── HELPER: Provera uloga ───────────────────────────────────────────────────
 function proveriUlog(chatroomId, sender, amountRaw) {
+    if (!isValidUsername(sender)) return { valid: false };
+
+    const clean = sanitizeInput(sender);
+    const key   = clean.toLowerCase();
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return { valid: false };
 
-    if (channelState.gamble_enabled === false) {
-        posaljiPoruku(chatroomId, `🎰 Kockanje je trenutno onemogućeno na ovom kanalu.`);
+    const user          = dohvatiEkonomiju(channelState, key, clean);
+    const trenutniCoins = user.coins || 0;
+    const valuta        = dobijNazivValute(channelState);
+
+    if (!amountRaw) {
+        posaljiPoruku(chatroomId, `❌ @${clean}, navedi iznos uloga!`);
         return { valid: false };
     }
-
-    if (channelState.planLimits && channelState.planLimits.priority < 2) {
-        posaljiPoruku(chatroomId, `🎰 Kazino igre sa ulogom poena (!slots, !rulet, !coinflip, !tocak) su otključane u PRO i ELITE paketima. Nadogradi paket na Kickot Dashboard-u!`);
-        return { valid: false };
-    }
-
-    if (!isValidUsername(sender)) return { valid: false };
-    const clean = sanitizeInput(sender);
-    const key = clean.toLowerCase();
-
-    const valuta = dobijNazivValute(channelState);
-    const user = channelState.leaderboard[key];
-    const trenutniPoeni = user ? (user.points || 0) : 0;
 
     let iznos = 0;
-    if (!amountRaw) {
-        posaljiPoruku(chatroomId, `❌ Unesi iznos uloga! Primjer: !slots 100 ili !slots all`);
-        return { valid: false };
-    }
-
-    if (amountRaw.toLowerCase() === 'all' || amountRaw.toLowerCase() === 'sve') {
-        iznos = trenutniPoeni;
-    } else {
-        iznos = parseInt(amountRaw, 10);
-    }
+    const arg = amountRaw.toLowerCase().trim();
+    if (arg === 'all' || arg === 'sve')        iznos = trenutniCoins;
+    else if (arg === 'half' || arg === 'pola') iznos = Math.floor(trenutniCoins / 2);
+    else                                        iznos = parseInt(arg, 10);
 
     if (isNaN(iznos) || iznos <= 0) {
         posaljiPoruku(chatroomId, `❌ Iznos uloga mora biti pozitivan broj!`);
         return { valid: false };
     }
 
-    if (iznos > trenutniPoeni) {
-        posaljiPoruku(chatroomId, `❌ @${clean}, nemaš dovoljno poena! Tvoj balans: **${trenutniPoeni.toLocaleString()} ${valuta}**.`);
+    if (iznos > trenutniCoins) {
+        posaljiPoruku(chatroomId, `❌ @${clean}, nemaš dovoljno poena! Tvoj balans: ${trenutniCoins.toLocaleString()} ${valuta}.`);
         return { valid: false };
     }
 
     const maxGamble = channelState.max_gamble_amount || 5000;
     if (iznos > maxGamble) {
-        posaljiPoruku(chatroomId, `⚠️ Maksimalni ulog po igri na ovom kanalu je **${maxGamble.toLocaleString()} ${valuta}**!`);
+        posaljiPoruku(chatroomId, `⚠️ Maksimalni ulog po igri na ovom kanalu je ${maxGamble.toLocaleString()} ${valuta}!`);
         return { valid: false };
     }
 
-    return { valid: true, cleanSender: clean, userKey: key, iznos, valuta, user };
+    return { valid: true, cleanSender: clean, userKey: key, iznos, valuta, user, channelState };
 }
 
-// ─── KOMANDA: !slots [iznos] ─────────────────────────────────────────
+// ─── KOMANDA: !slots [iznos] ─────────────────────────────────────────────────
 function handleSlots(chatroomId, sender, amountRaw) {
     const p = proveriUlog(chatroomId, sender, amountRaw);
     if (!p.valid) return;
@@ -67,96 +88,75 @@ function handleSlots(chatroomId, sender, amountRaw) {
     const s2 = simboli[Math.floor(Math.random() * simboli.length)];
     const s3 = simboli[Math.floor(Math.random() * simboli.length)];
 
-    const channelState = state.getChannelState(chatroomId);
-
-    // Ishodi
     let dobitak = 0;
     let porukaDobitka = '';
 
     if (s1 === s2 && s2 === s3) {
         if (s1 === '7️⃣' || s1 === '💎') {
-            dobitak = p.iznos * 10; // JACKPOT
-            porukaDobitka = `💎🔥 **JACKPOT 10x!** Osvojio si **+${dobitak.toLocaleString()} ${p.valuta}**! 🔥💎`;
+            dobitak = p.iznos * 10;
+            porukaDobitka = `💎🔥 JACKPOT 10x! Osvojio si +${dobitak.toLocaleString()} ${p.valuta}! 🔥💎`;
         } else {
             dobitak = p.iznos * 5;
-            porukaDobitka = `🎉 **3 u nizu 5x!** Osvojio si **+${dobitak.toLocaleString()} ${p.valuta}**! 🎉`;
+            porukaDobitka = `🎉 3 u nizu 5x! Osvojio si +${dobitak.toLocaleString()} ${p.valuta}! 🎉`;
         }
     } else if (s1 === s2 || s2 === s3 || s1 === s3) {
         dobitak = Math.floor(p.iznos * 1.5);
-        porukaDobitka = `✨ **2 u nizu!** Dobio si nazad **+${dobitak.toLocaleString()} ${p.valuta}**! ✨`;
+        porukaDobitka = `✨ 2 u nizu! Dobio si nazad +${dobitak.toLocaleString()} ${p.valuta}! ✨`;
     } else {
         dobitak = 0;
-        porukaDobitka = `❌ Izgubio si **${p.iznos.toLocaleString()} ${p.valuta}**! Više sreće drugi put! 💸`;
+        porukaDobitka = `❌ Izgubio si ${p.iznos.toLocaleString()} ${p.valuta}! Više sreće drugi put! 💸`;
     }
 
-    // Ažuriraj poene
-    p.user.points = p.user.points - p.iznos + dobitak;
-    channelState.leaderboardDeltas[p.userKey] = (channelState.leaderboardDeltas[p.userKey] || 0) + (dobitak - p.iznos);
-    channelState.leaderboardDirty = true;
+    p.user.coins = (p.user.coins || 0) - p.iznos + dobitak;
+    markirajDirtyIZaplanujSave(p.channelState, chatroomId, p.userKey);
 
     posaljiPoruku(chatroomId, `🎰 @${p.cleanSender} je zavrteo slot: [ ${s1} | ${s2} | ${s3} ] — ${porukaDobitka}`);
 }
 
-// ─── KOMANDA: !roulette / !rulet [opcija] [iznos] ────────────────────
+// ─── KOMANDA: !roulette / !rulet [opcija] [iznos] ────────────────────────────
 function handleRoulette(chatroomId, sender, optionRaw, amountRaw) {
     if (!optionRaw || !amountRaw) {
-        posaljiPoruku(chatroomId, `🎲 Upotreba: !roulette <crvena/crna/zelena/par/nepar/0-36> <iznos> — npr. !roulette crvena 100`);
+        posaljiPoruku(chatroomId, `🎡 Upotreba: !roulette <crvena/crna/par/nepar/broj 0-36> <iznos>`);
         return;
     }
 
     const p = proveriUlog(chatroomId, sender, amountRaw);
     if (!p.valid) return;
 
-    const opcija = optionRaw.toLowerCase().trim();
-    const loptica = Math.floor(Math.random() * 37); // 0 do 36
-
-    // Boja broja
-    const crveniBrojevi = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
-    let bojaLoptice = 'zelena 💚'; // 0
-    if (loptica !== 0) {
-        bojaLoptice = crveniBrojevi.includes(loptica) ? 'crvena ❤️' : 'crna 🖤';
-    }
+    const opcija  = optionRaw.toLowerCase().trim();
+    const loptica = Math.floor(Math.random() * 37);
+    const jeCrvena = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(loptica);
+    const bojaLoptice = loptica === 0 ? 'Zelena' : (jeCrvena ? 'Crvena' : 'Crna');
 
     let pobeda = false;
     let mnozilac = 0;
 
-    if (opcija === 'crvena' || opcija === 'red') {
-        if (loptica !== 0 && crveniBrojevi.includes(loptica)) { pobeda = true; mnozilac = 2; }
-    } else if (opcija === 'crna' || opcija === 'black') {
-        if (loptica !== 0 && !crveniBrojevi.includes(loptica)) { pobeda = true; mnozilac = 2; }
-    } else if (opcija === 'zelena' || opcija === 'green') {
-        if (loptica === 0) { pobeda = true; mnozilac = 14; }
-    } else if (opcija === 'par' || opcija === 'even') {
-        if (loptica !== 0 && loptica % 2 === 0) { pobeda = true; mnozilac = 2; }
-    } else if (opcija === 'nepar' || opcija === 'odd') {
-        if (loptica !== 0 && loptica % 2 !== 0) { pobeda = true; mnozilac = 2; }
-    } else {
-        const izabraniBroj = parseInt(opcija, 10);
-        if (!isNaN(izabraniBroj) && izabraniBroj >= 0 && izabraniBroj <= 36) {
-            if (loptica === izabraniBroj) { pobeda = true; mnozilac = 36; }
+    if (opcija === 'crvena' || opcija === 'red')        { if (jeCrvena && loptica !== 0) { pobeda = true; mnozilac = 2; } }
+    else if (opcija === 'crna' || opcija === 'black')   { if (!jeCrvena && loptica !== 0) { pobeda = true; mnozilac = 2; } }
+    else if (opcija === 'par' || opcija === 'even')     { if (loptica !== 0 && loptica % 2 === 0) { pobeda = true; mnozilac = 2; } }
+    else if (opcija === 'nepar' || opcija === 'odd')    { if (loptica !== 0 && loptica % 2 !== 0) { pobeda = true; mnozilac = 2; } }
+    else {
+        const ciljniBroj = parseInt(opcija, 10);
+        if (!isNaN(ciljniBroj) && ciljniBroj >= 0 && ciljniBroj <= 36) {
+            if (loptica === ciljniBroj) { pobeda = true; mnozilac = 36; }
         } else {
-            posaljiPoruku(chatroomId, `❌ Nevaljana opcija u ruletu! Izaberi: crvena, crna, zelena, par, nepar ili broj od 0 do 36.`);
+            posaljiPoruku(chatroomId, `❌ Neispravna opcija! Izaberi crvena/crna/par/nepar ili broj 0-36.`);
             return;
         }
     }
 
-    const channelState = state.getChannelState(chatroomId);
-    let dobitak = 0;
     if (pobeda) {
-        dobitak = p.iznos * mnozilac;
-        p.user.points = p.user.points - p.iznos + dobitak;
-        channelState.leaderboardDeltas[p.userKey] = (channelState.leaderboardDeltas[p.userKey] || 0) + (dobitak - p.iznos);
-        channelState.leaderboardDirty = true;
-        posaljiPoruku(chatroomId, `🎡 Loptica je pala na **${loptica} (${bojaLoptice})**! @${p.cleanSender} je POBEDIO i osvojio **+${dobitak.toLocaleString()} ${p.valuta}**! 🎉`);
+        const dobitak = p.iznos * mnozilac;
+        p.user.coins = (p.user.coins || 0) - p.iznos + dobitak;
+        posaljiPoruku(chatroomId, `🎡 Loptica je pala na ${loptica} (${bojaLoptice})! @${p.cleanSender} je POBEDIO i osvojio +${dobitak.toLocaleString()} ${p.valuta}! 🎉`);
     } else {
-        p.user.points -= p.iznos;
-        channelState.leaderboardDeltas[p.userKey] = (channelState.leaderboardDeltas[p.userKey] || 0) - p.iznos;
-        channelState.leaderboardDirty = true;
-        posaljiPoruku(chatroomId, `🎡 Loptica je pala na **${loptica} (${bojaLoptice})**! @${p.cleanSender} je izgubio **${p.iznos.toLocaleString()} ${p.valuta}**! 💸`);
+        p.user.coins = (p.user.coins || 0) - p.iznos;
+        posaljiPoruku(chatroomId, `🎡 Loptica je pala na ${loptica} (${bojaLoptice})! @${p.cleanSender} je izgubio ${p.iznos.toLocaleString()} ${p.valuta}! 💸`);
     }
+    markirajDirtyIZaplanujSave(p.channelState, chatroomId, p.userKey);
 }
 
-// ─── KOMANDA: !coinflip / !piskoglava [pismo/glava] [iznos] ──────────
+// ─── KOMANDA: !coinflip / !piskoglava [pismo/glava] [iznos] ──────────────────
 function handleCoinflip(chatroomId, sender, sideRaw, amountRaw) {
     if (!sideRaw || !amountRaw) {
         posaljiPoruku(chatroomId, `🪙 Upotreba: !coinflip <pismo/glava> <iznos> — npr. !coinflip pismo 100`);
@@ -168,32 +168,27 @@ function handleCoinflip(chatroomId, sender, sideRaw, amountRaw) {
 
     const stranaInput = sideRaw.toLowerCase().trim();
     let izabranaStrana = '';
-    if (stranaInput === 'pismo' || stranaInput === 'p') izabranaStrana = 'pismo';
-    else if (stranaInput === 'glava' || stranaInput === 'g') izabranaStrana = 'glava';
+    if (stranaInput === 'pismo' || stranaInput === 'p')       izabranaStrana = 'pismo';
+    else if (stranaInput === 'glava' || stranaInput === 'g')  izabranaStrana = 'glava';
     else {
         posaljiPoruku(chatroomId, `❌ Izaberi 'pismo' ili 'glava'!`);
         return;
     }
 
-    const ishod = Math.random() < 0.5 ? 'pismo' : 'glava';
+    const ishod  = Math.random() < 0.5 ? 'pismo' : 'glava';
     const pobeda = (izabranaStrana === ishod);
 
-    const channelState = state.getChannelState(chatroomId);
     if (pobeda) {
-        const dobitak = p.iznos * 2;
-        p.user.points = p.user.points - p.iznos + dobitak;
-        channelState.leaderboardDeltas[p.userKey] = (channelState.leaderboardDeltas[p.userKey] || 0) + p.iznos;
-        channelState.leaderboardDirty = true;
-        posaljiPoruku(chatroomId, `🪙 Novčić je pao na **${ishod.toUpperCase()}**! @${p.cleanSender} je pogodio i osvojio **+${p.iznos.toLocaleString()} ${p.valuta}**! 💥`);
+        p.user.coins = (p.user.coins || 0) + p.iznos;
+        posaljiPoruku(chatroomId, `🪙 Novčić je pao na ${ishod.toUpperCase()}! @${p.cleanSender} je pogodio i osvojio +${p.iznos.toLocaleString()} ${p.valuta}! 💥`);
     } else {
-        p.user.points -= p.iznos;
-        channelState.leaderboardDeltas[p.userKey] = (channelState.leaderboardDeltas[p.userKey] || 0) - p.iznos;
-        channelState.leaderboardDirty = true;
-        posaljiPoruku(chatroomId, `🪙 Novčić je pao na **${ishod.toUpperCase()}**! @${p.cleanSender} je promašio i izgubio **${p.iznos.toLocaleString()} ${p.valuta}**! 💸`);
+        p.user.coins = (p.user.coins || 0) - p.iznos;
+        posaljiPoruku(chatroomId, `🪙 Novčić je pao na ${ishod.toUpperCase()}! @${p.cleanSender} je promašio i izgubio ${p.iznos.toLocaleString()} ${p.valuta}! 💸`);
     }
+    markirajDirtyIZaplanujSave(p.channelState, chatroomId, p.userKey);
 }
 
-// ─── KOMANDA: !duel @user [iznos] ────────────────────────────────────
+// ─── KOMANDA: !duel @user [iznos] ────────────────────────────────────────────
 function handleDuel(chatroomId, sender, targetRaw, amountRaw) {
     const target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : '';
     if (!target || !isValidUsername(target)) {
@@ -205,34 +200,32 @@ function handleDuel(chatroomId, sender, targetRaw, amountRaw) {
     if (!p.valid) return;
 
     const cleanTarget = sanitizeInput(target);
-    const targetKey = cleanTarget.toLowerCase();
+    const targetKey   = cleanTarget.toLowerCase();
 
     if (p.userKey === targetKey) {
         posaljiPoruku(chatroomId, `😂 Ne možeš izazvati samog sebe na dvoboj!`);
         return;
     }
 
-    const channelState = state.getChannelState(chatroomId);
-    const targetUserData = channelState.leaderboard[targetKey];
-    const targetPoeni = targetUserData ? (targetUserData.points || 0) : 0;
+    const targetEconomy = p.channelState.economy[targetKey];
+    const targetCoins   = targetEconomy ? (targetEconomy.coins || 0) : 0;
 
-    if (targetPoeni < p.iznos) {
-        posaljiPoruku(chatroomId, `❌ @${cleanTarget} nema dovoljno poena za ovaj dvoboj! (Ima: ${targetPoeni} ${p.valuta}).`);
+    if (targetCoins < p.iznos) {
+        posaljiPoruku(chatroomId, `❌ @${cleanTarget} nema dovoljno poena za ovaj dvoboj! (Ima: ${targetCoins} ${p.valuta}).`);
         return;
     }
 
-    // Sačuvaj dvoboj na 30 sekundi
-    if (!channelState.pendingDuels) channelState.pendingDuels = {};
-    channelState.pendingDuels[targetKey] = {
-        challenger: p.cleanSender,
+    if (!p.channelState.pendingDuels) p.channelState.pendingDuels = {};
+    p.channelState.pendingDuels[targetKey] = {
+        challenger:    p.cleanSender,
         challengerKey: p.userKey,
-        target: cleanTarget,
+        target:        cleanTarget,
         targetKey,
-        iznos: p.iznos,
-        createdTs: Date.now()
+        iznos:         p.iznos,
+        createdTs:     Date.now()
     };
 
-    posaljiPoruku(chatroomId, `⚔️ @${p.cleanSender} je izazvao korisnika @${cleanTarget} na DVOBOJ u **${p.iznos.toLocaleString()} ${p.valuta}**! Ukucaj **!accept** za prihvatanje ili **!odbij** (imaš 30 sekundi)! 💥`);
+    posaljiPoruku(chatroomId, `⚔️ @${p.cleanSender} je izazvao korisnika @${cleanTarget} na DVOBOJ u ${p.iznos.toLocaleString()} ${p.valuta}! Ukucaj !accept za prihvatanje ili !odbij (imaš 30 sekundi)! 💥`);
 }
 
 function handleAcceptDuel(chatroomId, sender) {
@@ -240,7 +233,7 @@ function handleAcceptDuel(chatroomId, sender) {
     if (!channelState || !channelState.pendingDuels) return;
 
     if (!isValidUsername(sender)) return;
-    const clean = sanitizeInput(sender);
+    const clean     = sanitizeInput(sender);
     const targetKey = clean.toLowerCase();
 
     const duel = channelState.pendingDuels[targetKey];
@@ -257,32 +250,27 @@ function handleAcceptDuel(chatroomId, sender) {
 
     delete channelState.pendingDuels[targetKey];
 
-    const cUser = channelState.leaderboard[duel.challengerKey];
-    const tUser = channelState.leaderboard[duel.targetKey];
+    const cEcon  = dohvatiEkonomiju(channelState, duel.challengerKey, duel.challenger);
+    const tEcon  = dohvatiEkonomiju(channelState, duel.targetKey,     duel.target);
     const valuta = dobijNazivValute(channelState);
 
-    if (!cUser || (cUser.points || 0) < duel.iznos || !tUser || (tUser.points || 0) < duel.iznos) {
+    if ((cEcon.coins || 0) < duel.iznos || (tEcon.coins || 0) < duel.iznos) {
         posaljiPoruku(chatroomId, `❌ Dvoboj poništen jer jedan od igrača više nema dovoljno poena.`);
         return;
     }
 
-    // Ishod dvoboja 50/50
     const pobednikChallenger = Math.random() < 0.5;
     if (pobednikChallenger) {
-        cUser.points += duel.iznos;
-        tUser.points -= duel.iznos;
-        channelState.leaderboardDeltas[duel.challengerKey] = (channelState.leaderboardDeltas[duel.challengerKey] || 0) + duel.iznos;
-        channelState.leaderboardDeltas[duel.targetKey] = (channelState.leaderboardDeltas[duel.targetKey] || 0) - duel.iznos;
-        channelState.leaderboardDirty = true;
-        posaljiPoruku(chatroomId, `⚔️💥 @${duel.challenger} je POBEDIO u dvoboju protiv @${duel.target} i osvojio **+${duel.iznos.toLocaleString()} ${valuta}**! 🏆`);
+        cEcon.coins = (cEcon.coins || 0) + duel.iznos;
+        tEcon.coins = (tEcon.coins || 0) - duel.iznos;
+        posaljiPoruku(chatroomId, `⚔️💥 @${duel.challenger} je POBEDIO u dvoboju protiv @${duel.target} i osvojio +${duel.iznos.toLocaleString()} ${valuta}! 🏆`);
     } else {
-        cUser.points -= duel.iznos;
-        tUser.points += duel.iznos;
-        channelState.leaderboardDeltas[duel.challengerKey] = (channelState.leaderboardDeltas[duel.challengerKey] || 0) - duel.iznos;
-        channelState.leaderboardDeltas[duel.targetKey] = (channelState.leaderboardDeltas[duel.targetKey] || 0) + duel.iznos;
-        channelState.leaderboardDirty = true;
-        posaljiPoruku(chatroomId, `⚔️💥 @${duel.target} je POBEDIO u dvoboju protiv @${duel.challenger} i osvojio **+${duel.iznos.toLocaleString()} ${valuta}**! 🏆`);
+        cEcon.coins = (cEcon.coins || 0) - duel.iznos;
+        tEcon.coins = (tEcon.coins || 0) + duel.iznos;
+        posaljiPoruku(chatroomId, `⚔️💥 @${duel.target} je POBEDIO u dvoboju protiv @${duel.challenger} i osvojio +${duel.iznos.toLocaleString()} ${valuta}! 🏆`);
     }
+
+    markirajDirtyIZaplanujSave(channelState, chatroomId, duel.challengerKey, duel.targetKey);
 }
 
 function handleDeclineDuel(chatroomId, sender) {
@@ -290,7 +278,7 @@ function handleDeclineDuel(chatroomId, sender) {
     if (!channelState || !channelState.pendingDuels) return;
 
     if (!isValidUsername(sender)) return;
-    const clean = sanitizeInput(sender);
+    const clean     = sanitizeInput(sender);
     const targetKey = clean.toLowerCase();
 
     if (channelState.pendingDuels[targetKey]) {
@@ -300,6 +288,7 @@ function handleDeclineDuel(chatroomId, sender) {
     }
 }
 
+// ─── KOMANDA: !wheel / !tocak [iznos] ────────────────────────────────────────
 function handleWheel(chatroomId, sender, amountRaw) {
     const p = proveriUlog(chatroomId, sender, amountRaw);
     if (!p.valid) return;
@@ -313,21 +302,19 @@ function handleWheel(chatroomId, sender, amountRaw) {
         { label: '5x 👑', mult: 5.0 }
     ];
 
-    const pick = opcije[Math.floor(Math.random() * opcije.length)];
+    const pick   = opcije[Math.floor(Math.random() * opcije.length)];
     const dobitak = Math.floor(p.iznos * pick.mult);
     const razlika = dobitak - p.iznos;
 
-    const channelState = state.getChannelState(chatroomId);
-    p.user.points = p.user.points + razlika;
-    channelState.leaderboardDeltas[p.userKey] = (channelState.leaderboardDeltas[p.userKey] || 0) + razlika;
-    channelState.leaderboardDirty = true;
+    p.user.coins = (p.user.coins || 0) + razlika;
+    markirajDirtyIZaplanujSave(p.channelState, chatroomId, p.userKey);
 
     if (razlika > 0) {
-        posaljiPoruku(chatroomId, `🎯 @${p.cleanSender} je zavrteo točak sreće: **[ ${pick.label} ]** — Osvojio si **+${dobitak.toLocaleString()} ${p.valuta}**! 🎉`);
+        posaljiPoruku(chatroomId, `🎯 @${p.cleanSender} je zavrteo točak sreće: [ ${pick.label} ] — Osvojio si +${dobitak.toLocaleString()} ${p.valuta}! 🎉`);
     } else if (razlika === 0) {
-        posaljiPoruku(chatroomId, `🎯 @${p.cleanSender} je zavrteo točak: **[ ${pick.label} ]** — Vraćeno **${dobitak.toLocaleString()} ${p.valuta}**.`);
+        posaljiPoruku(chatroomId, `🎯 @${p.cleanSender} je zavrteo točak: [ ${pick.label} ] — Vraćeno ${dobitak.toLocaleString()} ${p.valuta}.`);
     } else {
-        posaljiPoruku(chatroomId, `🎯 @${p.cleanSender} je zavrteo točak: **[ ${pick.label} ]** — Izgubio si **${Math.abs(razlika).toLocaleString()} ${p.valuta}**! 💸`);
+        posaljiPoruku(chatroomId, `🎯 @${p.cleanSender} je zavrteo točak: [ ${pick.label} ] — Izgubio si ${Math.abs(razlika).toLocaleString()} ${p.valuta}! 💸`);
     }
 }
 

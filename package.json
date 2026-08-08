@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "npx serve Website -p 5500",
+    "dev": "npx serve Website -p 5500 -c serve.json",
+    "dev:netlify": "npx netlify dev",
     "test": "node --test Bot/tests/*.test.js Website/tests/*.test.js",
     "test:coverage": "node --test --experimental-test-coverage Bot/tests/*.test.js Website/tests/*.test.js",
     "test:bot": "node --test Bot/tests/*.test.js",

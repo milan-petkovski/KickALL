@@ -13,9 +13,9 @@ test('Gambling - proveriUlog validira opcije uloga', () => {
     channelState.planLimits = { priority: 2 }; // PRO plan
     channelState.currency_name = 'KickCoins';
     channelState.max_gamble_amount = 5000;
-    channelState.leaderboard['kockar'] = {
+    channelState.economy['kockar'] = {
         username: 'Kockar',
-        points: 1000
+        coins: 1000
     };
 
     // Nevažeći iznos
@@ -51,16 +51,16 @@ test('Gambling - handleSlots izvršava igru i ažurira balans', () => {
     const channelState = state.getChannelState(chatroomId);
     channelState.gamble_enabled = true;
     channelState.planLimits = { priority: 2 };
-    channelState.leaderboard['igrac'] = {
+    channelState.economy['igrac'] = {
         username: 'Igrac',
-        points: 500
+        coins: 500
     };
 
     const origRandom = Math.random;
     Math.random = () => 0.1; // Fiksirani nasumični broj
     try {
         handleSlots(chatroomId, 'Igrac', '100');
-        const noviPoeni = channelState.leaderboard['igrac'].points;
+        const noviPoeni = channelState.economy['igrac'].coins;
         assert.ok(typeof noviPoeni === 'number');
         assert.notEqual(noviPoeni, 500);
     } finally {

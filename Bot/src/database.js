@@ -772,11 +772,102 @@ async function posaljiKickovAlert(userId, alertType, payloadData) {
     }
 }
 
+// ─── EKONOMIJA (XP, LEVEL, COINS) ────────────────────────────────────────────
+
+async function ucitajEkonomiju(chatroomId) {
+    try {
+        if (!KORISTI_SUPABASE) return;
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+        const channelUsername = channelState.channelUsername || chatroomId;
+
+        log('INFO', `[${channelUsername}] Učitavam ekonomiju (XP/level/coins) iz baze...`);
+
+        const { data, error } = await supabase
+            .from('user_economy')
+            .select('username, display_name, xp, level, coins, daily_claimed_at, daily_streak')
+            .eq('channel_id', chatroomId);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            data.forEach(row => {
+                const key = row.username.toLowerCase();
+                channelState.economy[key] = {
+                    username: row.display_name || row.username,
+                    xp:               row.xp || 0,
+                    level:            row.level || 0,
+                    coins:            row.coins || 0,
+                    daily_claimed_at: row.daily_claimed_at || 0,
+                    daily_streak:     row.daily_streak || 0
+                };
+            });
+            log('INFO', `[${channelUsername}] Učitana ekonomija za ${data.length} korisnika.`);
+        } else {
+            log('INFO', `[${channelUsername}] Nema ekonomskih podataka u bazi, počinjemo od nule.`);
+        }
+    } catch (err) {
+        log('ERR', `Greška pri učitavanju ekonomije za ${chatroomId}: ${err.message}`);
+    }
+}
+
+async function sacuvajEkonomiju(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || !channelState.economyDirty) return;
+
+    try {
+        if (!KORISTI_SUPABASE) return;
+
+        const dirtyUsers = channelState.economyDeltas;
+        if (!dirtyUsers || dirtyUsers.size === 0) {
+            channelState.economyDirty = false;
+            return;
+        }
+
+        const rows = [];
+        for (const key of dirtyUsers) {
+            const user = channelState.economy[key];
+            if (!user) continue;
+            rows.push({
+                channel_id:       chatroomId,
+                username:         key,
+                display_name:     user.username || key,
+                xp:               user.xp || 0,
+                level:            user.level || 0,
+                coins:            user.coins || 0,
+                daily_claimed_at: user.daily_claimed_at || 0,
+                daily_streak:     user.daily_streak || 0,
+                updated_at:       new Date().toISOString()
+            });
+        }
+
+        if (rows.length === 0) {
+            channelState.economyDirty = false;
+            return;
+        }
+
+        const { error } = await supabase
+            .from('user_economy')
+            .upsert(rows, { onConflict: 'channel_id,username' });
+
+        if (error) throw error;
+
+        channelState.economyDeltas.clear();
+        channelState.economyDirty = false;
+
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Ekonomija sačuvana za ${rows.length} korisnika.`);
+    } catch (err) {
+        log('ERR', `Greška pri čuvanju ekonomije za ${chatroomId}: ${err.message}`);
+    }
+}
+
 module.exports = {
     supabase,
     KORISTI_SUPABASE,
     sacuvajSongQueue,
     ucitajLeaderboard,
+    ucitajEkonomiju,
+    sacuvajEkonomiju,
     ucitajLjubav,
     sacuvajLjubav,
     osigurajCuvanjeLjubavi,

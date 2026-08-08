@@ -184,7 +184,7 @@ function openUpgradeModal(feature) {
 }
 
 function updatePlanButtons() {
-  const currentPlan = (currentUserPlan || 'free').toLowerCase();
+  let currentPlan = (currentUserPlan || 'free').toLowerCase();
   if (currentPlan === 'business') currentPlan = 'elite';
 
   // Monthly pricing buttons
@@ -1543,13 +1543,24 @@ async function loadUserProfile() {
     // Managed channels load failed - non-critical
   }
 
-  if (currentChannels.length > 0) {
-    const primary = currentChannels.find(c => c.is_primary) || currentChannels[0];
-    setActiveChannel(primary);
-  } else if (managedChannels.length > 0) {
-    setActiveChannel(managedChannels[0]);
+  const allAvailable = [...currentChannels, ...managedChannels];
+  const savedChannelId = localStorage.getItem('kickbot_selected_channel_id');
+  const savedChannelName = localStorage.getItem('kickbot_selected_channel_name');
+
+  let defaultChannel = null;
+  if (savedChannelId || savedChannelName) {
+    defaultChannel = allAvailable.find(c => String(c.id) === String(savedChannelId) || c.username?.toLowerCase() === String(savedChannelName).toLowerCase());
+  }
+
+  if (!defaultChannel && currentChannels.length > 0) {
+    defaultChannel = currentChannels.find(c => c.is_primary) || currentChannels[0];
+  } else if (!defaultChannel && managedChannels.length > 0) {
+    defaultChannel = managedChannels[0];
+  }
+
+  if (defaultChannel) {
+    setActiveChannel(defaultChannel);
   } else {
-    // No channel configured — prompt
     showNoChannelState();
   }
 
@@ -1628,6 +1639,12 @@ async function fetchKickAvatar(username) {
 
 function setActiveChannel(ch) {
   activeChannel = ch;
+  if (ch && (ch.id || ch.username)) {
+    try {
+      localStorage.setItem('kickbot_selected_channel_id', String(ch.id || ''));
+      localStorage.setItem('kickbot_selected_channel_name', String(ch.username || ''));
+    } catch (_) {}
+  }
   document.getElementById('channelNameDisplay').textContent = ch.username;
   updateLiveStatusUI(false); // Resetuj na offline po defaultu kako ne bi flešovalo prethodno stanje
 
@@ -2248,8 +2265,7 @@ const defaultBuiltinCommands = [
   { id: 'builtin-iq', command: 'iq, iq @user', response: 'Prikazuje inteligenciju (IQ) korisnika ili ciljanog člana četa.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'iq', category: 'Zabava' },
   { id: 'builtin-samar', command: 'samar @user', response: 'Šalje zabavan šamar odabranom korisniku sa nasumičnim predmetom u četu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'samar', category: 'Zabava' },
   { id: 'builtin-roll', command: 'roll @user', response: 'Pokreće roll dvoboj (kockice 1-100) protiv drugog člana četa.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'roll', category: 'Zabava' },
-  { id: 'builtin-duelfun', command: 'duel @user', response: 'Izazovi drugog člana na zabavni dvoboj u četu (bez uloga poena).', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'duel', category: 'Zabava' },
-  { id: 'builtin-rulet', command: 'rulet, ruskirulet', response: 'Igraj ruski rulet sa botom — 1 u 6 šansa za privremeni timeout.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'rulet', category: 'Zabava' },
+  { id: 'builtin-rulet', command: 'ruskirulet, rr', response: 'Igraj ruski rulet sa botom — 1 u 6 šansa za privremeni timeout.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'ruskirulet', category: 'Zabava' },
   { id: 'builtin-alkotest', command: 'alkotest [@user]', response: 'Izračunava količinu promila u krvi i opisuje stanje korisnika.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'alkotest', category: 'Zabava' },
   { id: 'builtin-cinjenica', command: 'cinjenica', response: 'Ispisuje nasumičnu zanimljivu činjenicu u četu.', cooldown_ms: 5000, min_rank: 'everyone', enabled: true, is_default: true, uses_count: 0, db_match_key: 'cinjenica', category: 'Zabava' },
 

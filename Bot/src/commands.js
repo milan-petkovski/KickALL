@@ -210,16 +210,16 @@ function handleRulet(chatroomId, sender) {
     const metak = komore[Math.floor(Math.random() * komore.length)];
     if (metak) {
         const porazi = [
-            `💀 *KLIK*... BUM! @${cleanSender} je popio metak u ruskom ruletu! Bolje sreće u sledećem životu. 🪦`,
-            `💀 *KLIK*... ŠKLJOC... BUM! @${cleanSender} je izvukao kraći kraj. Počivaj u miru! 🥀`,
-            `💀 *KLIK*... BUM! @${cleanSender} je eliminisan iz četa (simulirano)! Kakav hrabar, ali tragičan pokušaj! 🔫`
+            `💀 KLIK... BUM! @${cleanSender} je popio metak u ruskom ruletu! Bolje sreće u sledećem životu. 🪦`,
+            `💀 KLIK... ŠKLJOC... BUM! @${cleanSender} je izvukao kraći kraj. Počivaj u miru! 🥀`,
+            `💀 KLIK... BUM! @${cleanSender} je eliminisan iz četa (simulirano)! Kakav hrabar, ali tragičan pokušaj! 🔫`
         ];
         posaljiPoruku(chatroomId, porazi[Math.floor(Math.random() * porazi.length)]);
     } else {
         const prezivljavanja = [
-            `🔫 *KLIK*... Prazno! @${cleanSender} je preživeo ovu rundu ruskog ruleta. Znoj se cedi sa čela... 😰`,
-            `🔫 *KLIK*... Tišina. Srce kuca ubrzano, ali @${cleanSender} je još uvek živ! Sreća te prati danas! 🍀`,
-            `🔫 *KLIK*... Ništa! @${cleanSender} se samo nasmejao sudbini u lice. Sledeći! 😎`
+            `🔫 KLIK... Prazno! @${cleanSender} je preživeo ovu rundu ruskog ruleta. Znoj se cedi sa čela... 😰`,
+            `🔫 KLIK... Tišina. Srce kuca ubrzano, ali @${cleanSender} je još uvek živ! Sreća te prati danas! 🍀`,
+            `🔫 KLIK... Ništa! @${cleanSender} se samo nasmejao sudbini u lice. Sledeći! 😎`
         ];
         posaljiPoruku(chatroomId, prezivljavanja[Math.floor(Math.random() * prezivljavanja.length)]);
     }
@@ -246,7 +246,68 @@ function handleAlkotest(chatroomId, sender, targetRaw) {
     else if (promili < 2.5) status = 'Vidi dva strimera i tri chata! 😵';
     else status = 'Kritično! Spava pod stolom uz kafanski reprizni hit! 🚑🍺';
 
-    posaljiPoruku(chatroomId, `🍺 Alkotest za @${user}: izmereno je **${promili}‰** alkohola u krvi! Status: ${status}`);
+    posaljiPoruku(chatroomId, `🍺 Alkotest za @${user}: izmereno je ${promili}‰ alkohola u krvi! Status: ${status}`);
+}
+
+// ─── ČINJENICA ────────────────────────────────────────────────────────────────
+function handleCinjenica(chatroomId) {
+    const cinjenice = [
+        "Banane su prirodno blago radioaktivne zbog kalijuma koji sadrže. 🍌",
+        "Hobotnice imaju tri srca i plavu krv. 🐙",
+        "Med se nikada ne kvari — pronađen je jestiv med u egipatskim piramidama star preko 3000 godina! 🍯",
+        "Otisci jezika su potpuno jedinstveni za svakog čoveka, baš kao i otisci prstiju. 👅",
+        "Srce plavog kita je veličine malog automobila. 🐋",
+        "Voda u zamrzivaču se brže smrzava ako je bila vruća nego ako je bila hladna (Mpemba efekat). ❄️",
+        "Krave imaju najbolje prijatelje i doživljavaju stres kada se razdvoje od njih. 🐄",
+        "Kenguri ne mogu da hodaju unazad zbog strukture svojih nogu i repa. 🦘",
+        "Ajkule postoje na Zemlji duže nego drveće — preko 400 miliona godina! 🦈",
+        "Prva poslata SMS poruka u istoriji glasila je 'Merry Christmas' (1992. godine). 📱",
+        "Prosečan čovek tokom života provede oko 6 meseci čekajući crveno svetlo na semaforu. 🚦",
+        "Venera je jedina planeta u našem sunčevom sistemu koja se rotira u smeru kazaljke na satu. 🪐"
+    ];
+    const izabrana = cinjenice[Math.floor(Math.random() * cinjenice.length)];
+    posaljiPoruku(chatroomId, `💡 Činjenica: ${izabrana}`);
+}
+
+// ─── FOLLOWAGE ────────────────────────────────────────────────────────────────
+async function handleFollowage(chatroomId, sender, targetRaw) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : sender;
+    if (!isValidUsername(target)) {
+        posaljiPoruku(chatroomId, `@${sender} Nevalidno korisničko ime.`);
+        return;
+    }
+
+    const cleanTarget = sanitizeInput(target);
+    const channelUsername = channelState.channelUsername || chatroomId;
+
+    try {
+        const utils = require('./utils');
+        const res = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}/users/${cleanTarget}/follow-date`);
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.created_at) {
+                const followDate = new Date(data.created_at);
+                const diffTime = Math.abs(Date.now() - followDate.getTime());
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                const meseci = Math.floor(diffDays / 30);
+                const preostaliDani = diffDays % 30;
+
+                let vremeStr = `${diffDays} dana`;
+                if (meseci > 0) {
+                    vremeStr = `${meseci} meseca i ${preostaliDani} dana (${diffDays} dana ukupno)`;
+                }
+
+                posaljiPoruku(chatroomId, `❤️ @${cleanTarget} prati kanal @${channelUsername} već ${vremeStr}! (od ${followDate.toLocaleDateString('sr-RS')})`);
+                return;
+            }
+        }
+        posaljiPoruku(chatroomId, `ℹ️ @${cleanTarget} ne prati kanal @${channelUsername} ili podaci nisu javno dostupni.`);
+    } catch (e) {
+        posaljiPoruku(chatroomId, `ℹ️ Nemoguće dohvatiti podatke o praćenju za @${cleanTarget}.`);
+    }
 }
 
 // ─── LJUBAVNI KALKULATOR ──────────────────────────────────────────────────────
@@ -618,24 +679,46 @@ function handleTop(chatroomId, numRaw) {
     posaljiPoruku(chatroomId, `🏆 Aktivnost (${trenutniMesec}) - Top ${limit}: ${topList}`);
 }
 
-function handleAktivnost(chatroomId, user) {
+function handleMe(chatroomId, sender, targetRaw) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
-    const userKey = user.toLowerCase();
-    const sortirani = Object.values(channelState.leaderboard)
-        .sort((a, b) => b.count - a.count);
-
-    const rank = sortirani.findIndex(x => x.username.toLowerCase() === userKey) + 1;
-    const podaci = channelState.leaderboard[userKey];
-
-    if (!podaci || rank === 0) {
-        posaljiPoruku(chatroomId, `📊 @${user}, još uvek nemaš upisanih poruka za ovaj mesec.`);
-        return;
+    const target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : '';
+    let user = sender;
+    if (target && isValidUsername(target)) {
+        user = sanitizeInput(target);
     }
 
-    const trenutniMesec = dobijTrenutniMesec();
-    posaljiPoruku(chatroomId, `📊 @${user}, tvoja aktivnost (${trenutniMesec}): ${podaci.count} poruka (Rank #${rank})`);
+    const key = user.toLowerCase();
+
+    // 1. Poruke i Rang u aktivnosti
+    const sortiraniPoruke = Object.values(channelState.leaderboard || {})
+        .sort((a, b) => (b.count || 0) - (a.count || 0));
+    const rankPorukeIdx = sortiraniPoruke.findIndex(x => (x.username || '').toLowerCase() === key);
+    const rankPoruke = rankPorukeIdx !== -1 ? `#${rankPorukeIdx + 1}` : 'N/A';
+    const msgCount = channelState.leaderboard[key] ? (channelState.leaderboard[key].count || 0) : 0;
+
+    // 2. Ekonomija (XP, Level, Coins)
+    const economyMod = require('./economy');
+    const ecoUser = channelState.economy ? channelState.economy[key] : null;
+    const xp = ecoUser ? (ecoUser.xp || 0) : 0;
+    const nivo = ecoUser ? (ecoUser.level || economyMod.izracunajNivo(xp)) : 0;
+    const coins = ecoUser ? (ecoUser.coins || 0) : 0;
+    const titula = economyMod.dobijTitulu(nivo);
+    const valuta = economyMod.dobijNazivValute(channelState);
+
+    // 3. Watchtime
+    const wtUser = channelState.watchtime ? channelState.watchtime[key] : null;
+    const minutes = wtUser ? (wtUser.minutes || 0) : 0;
+    const sati = Math.floor(minutes / 60);
+    const preostaliMin = minutes % 60;
+    const wtStr = sati > 0 ? `${sati}h ${preostaliMin}m` : `${minutes}m`;
+
+    posaljiPoruku(chatroomId, `📊 @${user} | Lvl ${nivo} (${titula}) | 🪙 ${coins.toLocaleString()} ${valuta} | 💬 ${msgCount.toLocaleString()} poruka (Rang ${rankPoruke}) | ⏱️ ${wtStr}`);
+}
+
+function handleAktivnost(chatroomId, user, targetRaw) {
+    handleMe(chatroomId, user, targetRaw);
 }
 
 async function handleResetLeaderboard(chatroomId, user, isAuthorized) {
@@ -1179,17 +1262,17 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
     if (cenaPoena > 0) {
         const economy = require('./economy');
         const valuta = economy.dobijNazivValute(channelState);
-        const user = channelState.leaderboard[userKey];
-        const trenutniPoeni = user ? (user.points || 0) : 0;
+        const userEcon = channelState.economy[userKey];
+        const trenutniPoeni = userEcon ? (userEcon.coins || 0) : 0;
 
         if (trenutniPoeni < cenaPoena) {
-            posaljiPoruku(chatroomId, `❌ @${sender}, nemaš dovoljno poena za muzičku želju! Potrebno: ${cenaPoena} ${valuta}, a ti imaš: ${trenutniPoeni} ${valuta}.`);
+            posaljiPoruku(chatroomId, `@${sender}, nemas dovoljno poena za muzicku zelju! Potrebno: ${cenaPoena} ${valuta}, a ti imas: ${trenutniPoeni} ${valuta}.`);
             return;
         }
 
-        user.points -= cenaPoena;
-        channelState.leaderboardDeltas[userKey] = (channelState.leaderboardDeltas[userKey] || 0) - cenaPoena;
-        channelState.leaderboardDirty = true;
+        userEcon.coins -= cenaPoena;
+        channelState.economyDirty = true;
+        channelState.economyDeltas.add(userKey);
     }
 
     // Provera da li je pesma već u redu
@@ -1320,7 +1403,7 @@ function handleStoreList(chatroomId) {
 
     const valuta = (channelState.currency_name || 'KickCoins');
     const lista = items.slice(0, 5).map(item => `[${item.name} - ${item.cost} ${valuta}]`).join(' | ');
-    posaljiPoruku(chatroomId, `🛍️ **Prodavnica Kanala**: ${lista} — Ukucaj !kupi <naziv nagrade> za kupovinu!`);
+    posaljiPoruku(chatroomId, `🛍️ Prodavnica Kanala: ${lista} — Ukucaj !kupi <naziv nagrade> za kupovinu!`);
 }
 
 function handleRedeemStore(chatroomId, sender, itemQueryRaw) {
@@ -1357,18 +1440,18 @@ function handleRedeemStore(chatroomId, sender, itemQueryRaw) {
     }
 
     const valuta = (channelState.currency_name || 'KickCoins');
-    const user = channelState.leaderboard[key];
-    const trenutniPoeni = user ? (user.points || 0) : 0;
+    const userEcon = channelState.economy[key];
+    const trenutniPoeni = userEcon ? (userEcon.coins || 0) : 0;
 
     if (trenutniPoeni < item.cost) {
-        posaljiPoruku(chatroomId, `❌ @${cleanSender}, nemaš dovoljno poena za "${item.name}"! Potrebno: ${item.cost} ${valuta}, a imaš: ${trenutniPoeni} ${valuta}.`);
+        posaljiPoruku(chatroomId, `@${cleanSender}, nemas dovoljno poena za "${item.name}"! Potrebno: ${item.cost} ${valuta}, a imas: ${trenutniPoeni} ${valuta}.`);
         return;
     }
 
     // Oduzmi poene
-    user.points -= item.cost;
-    channelState.leaderboardDeltas[key] = (channelState.leaderboardDeltas[key] || 0) - item.cost;
-    channelState.leaderboardDirty = true;
+    userEcon.coins -= item.cost;
+    channelState.economyDirty = true;
+    channelState.economyDeltas.add(key);
 
     // Zabeleži redemption za Dashboard
     if (!channelState.store_redemptions) channelState.store_redemptions = [];
@@ -1383,7 +1466,7 @@ function handleRedeemStore(chatroomId, sender, itemQueryRaw) {
     };
     channelState.store_redemptions.unshift(redemption);
 
-    posaljiPoruku(chatroomId, `🎉 @${cleanSender} je kupio **"${item.name}"** za **${item.cost} ${valuta}**! Vaš zahtev je poslat streamer-u na odobrenje! 🚀`);
+    posaljiPoruku(chatroomId, `🎉 @${cleanSender} je kupio "${item.name}" za ${item.cost} ${valuta}! Vaš zahtev je poslat streamer-u na odobrenje! 🚀`);
 }
 
 async function handleAddCommand(chatroomId, sender, textRaw, senderObj) {
@@ -1428,19 +1511,42 @@ async function handleAddCommand(chatroomId, sender, textRaw, senderObj) {
     if (database.KORISTI_SUPABASE && database.supabase) {
         try {
             const cleanCmdName = cmdName.slice(1);
-            const { error } = await database.supabase
-                .from('custom_commands')
-                .upsert({
-                    channel_id: chatroomId,
-                    command: cleanCmdName,
-                    response: responseText,
-                    cooldown_ms: channelState.planLimits?.minCooldownMs || 3000,
-                    enabled: true,
-                    min_rank: 'everyone',
-                    is_default: false
-                }, { onConflict: 'channel_id,command' });
 
-            if (error) throw error;
+            // Proveravamo da li komanda već postoji za ovaj kanal u bazi
+            const { data: existing } = await database.supabase
+                .from('custom_commands')
+                .select('id')
+                .eq('channel_id', chatroomId)
+                .eq('command', cleanCmdName)
+                .maybeSingle();
+
+            if (existing && existing.id) {
+                const { error: updateErr } = await database.supabase
+                    .from('custom_commands')
+                    .update({
+                        response: responseText,
+                        cooldown_ms: channelState.planLimits?.minCooldownMs || 3000,
+                        enabled: true,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id);
+
+                if (updateErr) throw updateErr;
+            } else {
+                const { error: insertErr } = await database.supabase
+                    .from('custom_commands')
+                    .insert({
+                        channel_id: chatroomId,
+                        command: cleanCmdName,
+                        response: responseText,
+                        cooldown_ms: channelState.planLimits?.minCooldownMs || 3000,
+                        enabled: true,
+                        min_rank: 'everyone',
+                        is_default: false
+                    });
+
+                if (insertErr) throw insertErr;
+            }
 
             await database.ucitajCustomKomande(chatroomId);
             posaljiPoruku(chatroomId, `✅ Custom komanda ${cmdName} je uspešno dodata!`);
@@ -1546,6 +1652,8 @@ module.exports = {
     handleDuel,
     handleRulet,
     handleAlkotest,
+    handleCinjenica,
+    handleFollowage,
     handleLove,
     handleModifyLove,
     handleVencaj,
@@ -1555,6 +1663,7 @@ module.exports = {
     handleBrakovi,
     handleTop,
     handleAktivnost,
+    handleMe,
     handleResetLeaderboard,
     handleUptime,
     handleIgra,
