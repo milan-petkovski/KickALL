@@ -75,6 +75,42 @@ async function posaljiPrekoZvanicnogApija(chatroomId, tekst, channelUsername, ch
 
         if (!response.ok) {
             const errorText = await response.text();
+
+            // Auto-fallback za NO_LINKS_ERROR (Kada kanal zabranjuje linkove, a bot nije Moderator)
+            if (errorText.includes('NO_LINKS_ERROR') && !channelState._retryNoLink) {
+                channelState._retryNoLink = true;
+                log('WARN', `[${channelUsername}] Kick odbio link (NO_LINKS_ERROR). Sanitizujem link (razdvajam domen sa razmakom) i pokušavam ponovo...`);
+                const sanitizedText = tekst
+                    .replace(/https?:\/\//gi, '')
+                    .replace(/discord\.gg\//gi, 'discord . gg/')
+                    .replace(/\.(com|rs|org|net|me|gg)\b/gi, ' . $1');
+                try {
+                    const result = await posaljiPrekoZvanicnogApija(chatroomId, sanitizedText, channelUsername, channelState);
+                    channelState._retryNoLink = false;
+                    return result;
+                } catch (retryErr) {
+                    channelState._retryNoLink = false;
+                    throw retryErr;
+                }
+            }
+
+            // Auto-fallback za MAX_SPECIAL_CHARS_ERROR (Previše specijalnih znakova/emoji-ja)
+            if (errorText.includes('MAX_SPECIAL_CHARS_ERROR') && !channelState._retryNoSpecial) {
+                channelState._retryNoSpecial = true;
+                log('WARN', `[${channelUsername}] Kick odbio poruku (MAX_SPECIAL_CHARS_ERROR). Uklanjam specijalne karaktere i pokušavam ponovo...`);
+                const cleanText = tekst
+                    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+                    .replace(/[^\w\s\d,.:;!?'"@#$%\-*+()\/\[\]=_čćšđžČĆŠĐŽ]/g, '');
+                try {
+                    const result = await posaljiPrekoZvanicnogApija(chatroomId, cleanText, channelUsername, channelState);
+                    channelState._retryNoSpecial = false;
+                    return result;
+                } catch (retryErr) {
+                    channelState._retryNoSpecial = false;
+                    throw retryErr;
+                }
+            }
+
             throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
 

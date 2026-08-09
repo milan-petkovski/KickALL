@@ -210,7 +210,7 @@ function ocistiAktivneGledaoce(chatroomId) {
 // ─── POKRETANJE I ZAUSTAVLJANJE TIMERA ─────────────────────────────────────────
 function pokreniWatchtimeTick() {
     if (state.watchtimeTickTimer) return;
-    state.watchtimeTickTimer = setInterval(watchtimeTickSve, UPDATE_INTERVAL_MS);
+    state.watchtimeTickTimer = setInterval(watchtimeTickSve, UPDATE_INTERVAL_MS).unref();
     log('INFO', 'Globalni watchtime tick pokrenut (svakih 10 minuta).');
 }
 

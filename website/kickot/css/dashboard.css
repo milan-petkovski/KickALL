@@ -1429,6 +1429,45 @@ body {
   flex-shrink: 0;
 }
 
+.mini-avatar-wrap {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  min-height: 26px !important;
+  max-width: 26px !important;
+  max-height: 26px !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-sizing: border-box !important;
+  clip-path: circle(50% at 50% 50%) !important;
+}
+
+.mini-avatar-wrap.fallback {
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9) !important;
+}
+
+.mini-avatar-wrap img, .mini-avatar-img {
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 100% !important;
+  min-height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  display: block !important;
+  flex-shrink: 0 !important;
+}
+
 .podium-1 .podium-avatar {
   background: linear-gradient(135deg, #FBBF24, #F59E0B);
   border-color: #FBBF24;

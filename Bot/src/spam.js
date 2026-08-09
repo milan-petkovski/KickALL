@@ -12,9 +12,10 @@ function spamFilter(chatroomId, username, poruka) {
     const userKey = username.toLowerCase();
     
     // ── 1. Provera identičnih poruka ──────────────────────────────────────────
-    const kljucIdenticna = `${username}::${poruka.toLowerCase()}`;
+    const kljucIdenticna = `${userKey}::${poruka.trim().toLowerCase()}`;
     if (!channelState.spamTracker[kljucIdenticna]) channelState.spamTracker[kljucIdenticna] = [];
-    channelState.spamTracker[kljucIdenticna] = channelState.spamTracker[kljucIdenticna].filter(t => sada - t < (channelState.SPAM_WINDOW_MS || config.SPAM_WINDOW_MS));
+    const windowIdenticnaTime = channelState.SPAM_WINDOW_MS !== undefined ? channelState.SPAM_WINDOW_MS : config.SPAM_WINDOW_MS;
+    channelState.spamTracker[kljucIdenticna] = channelState.spamTracker[kljucIdenticna].filter(t => sada - t < windowIdenticnaTime);
     channelState.spamTracker[kljucIdenticna].push(sada);
     const countIdenticna = channelState.spamTracker[kljucIdenticna].length;
 

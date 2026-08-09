@@ -662,13 +662,13 @@ async function ucitajBotConfig(chatroomId) {
             channelState.COOLDOWN_MS = Math.max(data.cooldown_ms ?? 3000, limits.minCooldownMs || 3000);
             channelState.SPAM_THRESHOLD = data.spam_threshold ?? 3;
             channelState.SPAM_WINDOW_MS = data.spam_window_ms ?? 15000;
-            
+
             if (data.stream_pin_msg) {
                 channelState.STREAM_START_PIN_MESSAGE = data.stream_pin_msg;
             } else {
                 channelState.STREAM_START_PIN_MESSAGE = '';
             }
-            
+
             channelState.feature_leaderboard = limits.allowLeaderboard && (data.feature_leaderboard ?? true);
             channelState.feature_watchtime = limits.allowWatchtime && (data.feature_watchtime ?? true);
             channelState.feature_games = limits.allowGambling && (data.feature_games ?? true);
@@ -678,12 +678,12 @@ async function ucitajBotConfig(chatroomId) {
             channelState.feature_songrequest = limits.allowSongRequest && (data.feature_songrequest ?? false);
             channelState.songrequest_settings = data.songrequest_settings || {};
             channelState.welcome_message = data.welcome_message || '';
-            
+
             channelState.botActive = data.bot_active || false;
 
             const rawAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
             channelState.autoAnnounces = rawAnnounces.slice(0, limits.maxAutoAnnounces || 2);
-            
+
             channelState.announce_interval_mins = data.announce_interval_mins ?? 15;
             channelState.announce_message_threshold = data.announce_message_threshold ?? 30;
             channelState.announce_time_enabled = data.announce_time_enabled ?? true;
@@ -708,7 +708,7 @@ async function ucitajBotConfig(chatroomId) {
             if (data.channel_name && data.channel_name !== channelState.channelUsername) {
                 channelState.channelUsername = data.channel_name;
             }
-            
+
             log('INFO', `⚙️ Bot konfiguracija sinhronizovana za @${channelState.channelUsername} (${limits.name} Plan). Prefix: '${channelState.PREFIX}', Aktivan: ${channelState.botActive}`);
         } else {
             channelState.botActive = false;
@@ -740,7 +740,7 @@ async function sacuvajSongQueue(chatroomId, queue) {
     try {
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
-        
+
         if (!channelState.songrequest_settings) channelState.songrequest_settings = {};
         channelState.songrequest_settings.queue = queue;
 
@@ -805,11 +805,11 @@ async function ucitajEkonomiju(chatroomId) {
                 const key = row.username.toLowerCase();
                 channelState.economy[key] = {
                     username: row.display_name || row.username,
-                    xp:               row.xp || 0,
-                    level:            row.level || 0,
-                    coins:            row.coins || 0,
+                    xp: row.xp || 0,
+                    level: row.level || 0,
+                    coins: row.coins || 0,
                     daily_claimed_at: row.daily_claimed_at || 0,
-                    daily_streak:     row.daily_streak || 0
+                    daily_streak: row.daily_streak || 0
                 };
             });
             log('INFO', `[${channelUsername}] Učitana ekonomija iz leaderboard tabele za ${data.length} korisnika.`);
@@ -843,17 +843,17 @@ async function sacuvajEkonomiju(chatroomId) {
             const user = channelState.economy[key];
             if (!user) continue;
             rows.push({
-                channel_id:       chatroomId,
-                username:         key,
-                display_name:     user.username || key,
-                xp:               user.xp || 0,
-                level:            user.level || 0,
-                coins:            user.coins || 0,
+                channel_id: chatroomId,
+                username: key,
+                display_name: user.username || key,
+                xp: user.xp || 0,
+                level: user.level || 0,
+                coins: user.coins || 0,
                 daily_claimed_at: user.daily_claimed_at || 0,
-                daily_streak:     user.daily_streak || 0,
-                month:            trenutniMesec,
-                year:             godinaStr,
-                updated_at:       new Date().toISOString()
+                daily_streak: user.daily_streak || 0,
+                month: trenutniMesec,
+                year: godinaStr,
+                updated_at: new Date().toISOString()
             });
         }
 
@@ -877,6 +877,17 @@ async function sacuvajEkonomiju(chatroomId) {
     }
 }
 
+async function syncChatroomId(oldId, newChatroomId, channelName) {
+    try {
+        await supabase
+            .from('channels')
+            .update({ chatroom_id: String(newChatroomId) })
+            .eq('username', channelName);
+    } catch (err) {
+        console.error('Greska u syncChatroomId:', err);
+    }
+}
+
 module.exports = {
     supabase,
     KORISTI_SUPABASE,
@@ -895,6 +906,7 @@ module.exports = {
     ucitajBotConfig,
     ucitajUserPlan,
     ucitajSveAktivneKanale,
-    posaljiKickovAlert
+    posaljiKickovAlert,
+    syncChatroomId
 };
 

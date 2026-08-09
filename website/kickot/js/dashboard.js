@@ -814,18 +814,37 @@ function updateAvatarUI(elementId, avatarUrl) {
 
 function formatPorukeCount(count) {
   const val = Number(count) || 0;
+  const formattedVal = val.toLocaleString('en-US');
   const n = Math.abs(val) % 100;
   const n1 = n % 10;
   if (n > 10 && n < 20) {
-    return `${val} poruka`;
+    return `${formattedVal} poruka`;
   }
   if (n1 === 1) {
-    return `${val} poruka`;
+    return `${formattedVal} poruka`;
   }
   if (n1 >= 2 && n1 <= 4) {
-    return `${val} poruke`;
+    return `${formattedVal} poruke`;
   }
-  return `${val} poruka`;
+  return `${formattedVal} poruka`;
+}
+
+function formatWatchtime(totalMinutes) {
+  const mins = Number(totalMinutes) || 0;
+  const days = Math.floor(mins / 1440);
+  const hours = Math.floor((mins % 1440) / 60);
+  const m = mins % 60;
+
+  if (days > 0) {
+    if (hours > 0 && m > 0) return `${days}d ${hours}h ${m}min`;
+    if (hours > 0) return `${days}d ${hours}h`;
+    if (m > 0) return `${days}d ${m}min`;
+    return `${days}d`;
+  }
+  if (hours > 0) {
+    return m > 0 ? `${hours}h ${m}min` : `${hours}h`;
+  }
+  return `${m}min`;
 }
 
 let editingCmdId = null; // null = new, UUID = edit
@@ -1569,11 +1588,16 @@ async function loadUserProfile() {
 }
 
 async function fetchKickAvatar(username) {
-  // Neki Kick nalozi imaju slug sa "_" (npr. milan_567), a neki sa "-" (npr. lamba-tutz-gang).
-  // Probamo prvo originalni username, pa ako ne uspe, probamo verziju sa crticom.
+  const raw = String(username || '').trim();
+  if (!raw) return null;
+
   const candidates = [...new Set([
-    String(username || ''),
-    String(username || '').toLowerCase().replace(/_/g, '-')
+    raw,
+    raw.toLowerCase(),
+    raw.toUpperCase(),
+    raw.replace(/_/g, '-'),
+    raw.toLowerCase().replace(/_/g, '-'),
+    raw.toUpperCase().replace(/_/g, '-')
   ])];
 
   for (const slug of candidates) {
@@ -1586,7 +1610,7 @@ async function fetchKickAvatar(username) {
 async function tryFetchKickAvatarForSlug(username) {
   // 1. Pokušaj preko lokalnog bot API servera (koristi got-scraping, radi 100% bez Cloudflare blokade)
   try {
-    const localRes = await fetch(`${getBotApiBase()}/api/avatar?username=${username}`);
+    const localRes = await fetch(`${getBotApiBase()}/api/avatar?username=${username}`, { signal: AbortSignal.timeout(1500) });
     if (localRes.ok) {
       const localData = await localRes.json();
       if (localData?.avatar) {
@@ -1598,7 +1622,14 @@ async function tryFetchKickAvatarForSlug(username) {
   const apiUrl = `https://kick.com/api/v2/channels/${username}`;
 
   const proxies = [
-    // 1. Allorigins (usually very reliable, has cached copies)
+    {
+      name: 'corsproxy',
+      url: `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
+      parse: async (res) => {
+        const data = await res.json();
+        return data?.user?.profile_pic || null;
+      }
+    },
     {
       name: 'allorigins',
       url: `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`,
@@ -1608,7 +1639,6 @@ async function tryFetchKickAvatarForSlug(username) {
         return data?.user?.profile_pic || null;
       }
     },
-    // 2. Codetabs
     {
       name: 'codetabs',
       url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(apiUrl)}`,
@@ -1624,7 +1654,7 @@ async function tryFetchKickAvatarForSlug(username) {
     let resolved = false;
 
     proxies.forEach(proxy => {
-      fetch(proxy.url)
+      fetch(proxy.url, { signal: AbortSignal.timeout(2500) })
         .then(async (res) => {
           if (res.ok && !resolved) {
             const pic = await proxy.parse(res);
@@ -1643,13 +1673,13 @@ async function tryFetchKickAvatarForSlug(username) {
         });
     });
 
-    // Safeguard timeout
+    // Safeguard fast timeout
     setTimeout(() => {
       if (!resolved) {
         resolved = true;
         resolve(null);
       }
-    }, 6000);
+    }, 2500);
   });
 }
 
@@ -1659,7 +1689,7 @@ function setActiveChannel(ch) {
     try {
       localStorage.setItem('kickbot_selected_channel_id', String(ch.id || ''));
       localStorage.setItem('kickbot_selected_channel_name', String(ch.username || ''));
-    } catch (_) {}
+    } catch (_) { }
   }
   document.getElementById('channelNameDisplay').textContent = ch.username;
   updateLiveStatusUI(false); // Resetuj na offline po defaultu kako ne bi flešovalo prethodno stanje
@@ -2825,19 +2855,48 @@ function onLeaderboardPeriodChange() {
   loadLeaderboard();
 }
 
+function sortLeaderboardRows(rows, type = activeLeaderboardType) {
+  const list = [...(rows || [])];
+
+  if (type === 'watchtime') {
+    return list.sort((a, b) => (b.watchtime_minutes || b.minutes || 0) - (a.watchtime_minutes || a.minutes || 0));
+  }
+
+  if (type === 'ranking') {
+    return list.sort((a, b) => ((b.coins || b.xp || 0) - (a.coins || a.xp || 0)));
+  }
+
+  if (type === 'combined') {
+    return list.sort((a, b) => {
+      const scoreA = (a.chat || a.points || 0) + Math.floor((a.minutes || a.watchtime_minutes || 0) / 6);
+      const scoreB = (b.chat || b.points || 0) + Math.floor((b.minutes || b.watchtime_minutes || 0) / 6);
+      return scoreB - scoreA;
+    });
+  }
+
+  return list.sort((a, b) => (b.chat !== undefined ? b.chat : (b.points || 0)) - (a.chat !== undefined ? a.chat : (a.points || 0)));
+}
+
 async function loadWatchtime() {
   if (!activeChannel) return;
 
   const totalMins = allLeaderboard.reduce((s, r) => s + (r.watchtime_minutes || r.minutes || 0), 0);
-  const hours = Math.floor(totalMins / 60);
-  const mins = totalMins % 60;
-  let watchtimeText = hours > 0 ? `${hours}h ${mins}min` : `${mins} minuta`;
+  let watchtimeText = formatWatchtime(totalMins);
   const statEl = document.getElementById('statTotalWatchtime');
   if (statEl) statEl.textContent = watchtimeText;
 
   if (activeLeaderboardType === 'watchtime' || activeLeaderboardType === 'combined') {
     renderUnifiedLeaderboard();
   }
+}
+
+function refreshMiniPanels(rows) {
+  // Avatar cache is shared between mini panels (chatters + watchtime).
+  // When one panel resolves an avatar fetch for a user who also appears
+  // in the other panel, both need to re-render or the other panel gets
+  // stuck showing the fallback initial forever.
+  if (document.getElementById('miniLeaderboard')) renderMiniLeaderboard(rows);
+  if (document.getElementById('miniWatchtime')) renderMiniWatchtime(rows);
 }
 
 function renderMiniLeaderboard(rows) {
@@ -2856,16 +2915,30 @@ function renderMiniLeaderboard(rows) {
     const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
     const initial = (item.username || 'U').charAt(0).toUpperCase();
 
-    const avatarHtml = safeAvatarUrl
-      ? `<img src="${safeAvatarUrl}" class="mini-avatar-img" alt="${escapeHtml(item.username)}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">`
-      : `<div class="user-cell__avatar" style="width:24px; height:24px; font-size:0.7rem;">${initial}</div>`;
+    const avatarInner = safeAvatarUrl
+      ? `<img src="${safeAvatarUrl}" class="mini-avatar-img" alt="${escapeHtml(item.username)}">`
+      : `<span style="font-size:0.7rem; font-weight:800; color:#fff;">${initial}</span>`;
+    const avatarHtml = `<div class="mini-avatar-wrap ${safeAvatarUrl ? '' : 'fallback'}">${avatarInner}</div>`;
 
-    if (!cachedUrl && avatarKey) {
+    if (!safeAvatarUrl && avatarCache[avatarKey] !== 'loading') {
       avatarCache[avatarKey] = 'loading';
-      fetchKickAvatar(item.username).then(url => {
-        avatarCache[avatarKey] = url || 'none';
-        if (url) saveAvatarToCache(avatarKey, url);
-        renderMiniLeaderboard(rows);
+      getAvatarFromCache(item.username).then(cachedDB => {
+        if (cachedDB && cachedDB !== 'none') {
+          avatarCache[avatarKey] = cachedDB;
+          refreshMiniPanels(rows);
+        } else {
+          fetchKickAvatar(item.username).then(url => {
+            avatarCache[avatarKey] = url || 'none';
+            setAvatarInCache(avatarKey, url || 'none').catch(() => { });
+            refreshMiniPanels(rows);
+          });
+        }
+      }).catch(() => {
+        fetchKickAvatar(item.username).then(url => {
+          avatarCache[avatarKey] = url || 'none';
+          setAvatarInCache(avatarKey, url || 'none').catch(() => { });
+          refreshMiniPanels(rows);
+        });
       });
     }
 
@@ -2903,23 +2976,35 @@ function renderMiniWatchtime(rows) {
     const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
     const initial = (item.username || 'U').charAt(0).toUpperCase();
 
-    const avatarHtml = safeAvatarUrl
-      ? `<img src="${safeAvatarUrl}" class="mini-avatar-img" alt="${escapeHtml(item.username)}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">`
-      : `<div class="user-cell__avatar" style="width:24px; height:24px; font-size:0.7rem;">${initial}</div>`;
+    const avatarInner = safeAvatarUrl
+      ? `<img src="${safeAvatarUrl}" class="mini-avatar-img" alt="${escapeHtml(item.username)}">`
+      : `<span style="font-size:0.7rem; font-weight:800; color:#fff;">${initial}</span>`;
+    const avatarHtml = `<div class="mini-avatar-wrap ${safeAvatarUrl ? '' : 'fallback'}">${avatarInner}</div>`;
 
-    if (!cachedUrl && avatarKey) {
+    if (!safeAvatarUrl && avatarCache[avatarKey] !== 'loading') {
       avatarCache[avatarKey] = 'loading';
-      fetchKickAvatar(item.username).then(url => {
-        avatarCache[avatarKey] = url || 'none';
-        if (url) saveAvatarToCache(avatarKey, url);
-        renderMiniWatchtime(rows);
+      getAvatarFromCache(item.username).then(cachedDB => {
+        if (cachedDB && cachedDB !== 'none') {
+          avatarCache[avatarKey] = cachedDB;
+          refreshMiniPanels(rows);
+        } else {
+          fetchKickAvatar(item.username).then(url => {
+            avatarCache[avatarKey] = url || 'none';
+            setAvatarInCache(avatarKey, url || 'none').catch(() => { });
+            refreshMiniPanels(rows);
+          });
+        }
+      }).catch(() => {
+        fetchKickAvatar(item.username).then(url => {
+          avatarCache[avatarKey] = url || 'none';
+          setAvatarInCache(avatarKey, url || 'none').catch(() => { });
+          refreshMiniPanels(rows);
+        });
       });
     }
 
     const mins = Number(item.watchtime_minutes !== undefined && item.watchtime_minutes !== null ? item.watchtime_minutes : (item.minutes || 0));
-    const hours = Math.floor(mins / 60);
-    const m = mins % 60;
-    const watchStr = hours > 0 ? `${hours}h ${m}min` : `${m}min`;
+    const watchStr = formatWatchtime(mins);
 
     return `
       <div class="mini-item" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
@@ -2984,7 +3069,7 @@ async function loadLeaderboard() {
       if (lastDigit === 1) suffix = 'poruka';
       else if (lastDigit >= 2 && lastDigit <= 4) suffix = 'poruke';
     }
-    chatStatEl.textContent = `${totalChat} ${suffix}`;
+    chatStatEl.textContent = `${totalChat.toLocaleString('en-US')} ${suffix}`;
   }
 
   // Calculate total watchtime for header stat
@@ -3044,7 +3129,7 @@ function setLeaderboardType(type) {
         <th style="width:60px">#</th>
         <th>Korisnik</th>
         <th>Ukupno minuta</th>
-        <th>Sati gledanja</th>
+        <th>Vreme gledanja</th>
         <th>Ažurirano</th>
       `;
     } else if (type === 'ranking') {
@@ -3059,7 +3144,7 @@ function setLeaderboardType(type) {
       header.innerHTML = `
         <th style="width:60px">#</th>
         <th>Korisnik</th>
-        <th>Sati gledanja</th>
+        <th>Vreme gledanja</th>
         <th>Poruke</th>
         <th>Poeni & Nivo</th>
         <th>Ažurirano</th>
@@ -3122,15 +3207,15 @@ function renderUnifiedLeaderboard(customRows = null) {
 
   let rows;
   if (customRows) {
-    rows = customRows;
+    rows = sortLeaderboardRows(customRows);
   } else if (isCombined) {
     rows = buildCombinedRows();
   } else if (isChatters) {
-    rows = [...allLeaderboard].sort((a, b) => (b.chat !== undefined ? b.chat : (b.points || 0)) - (a.chat !== undefined ? a.chat : (a.points || 0)));
+    rows = sortLeaderboardRows(allLeaderboard, 'chatters');
   } else if (isWatchtime) {
-    rows = [...allLeaderboard].sort((a, b) => (b.watchtime_minutes || b.minutes || 0) - (a.watchtime_minutes || a.minutes || 0));
+    rows = sortLeaderboardRows(allLeaderboard, 'watchtime');
   } else if (isRanking) {
-    rows = [...allLeaderboard].sort((a, b) => ((b.coins || b.xp || 0) - (a.coins || a.xp || 0)));
+    rows = sortLeaderboardRows(allLeaderboard, 'ranking');
   } else {
     rows = buildCombinedRows();
   }
@@ -3227,12 +3312,10 @@ function renderUnifiedLeaderboard(customRows = null) {
       : `<strong style="color:${rankColor(globalIndex)}">${globalIndex + 1}.</strong>`;
 
     const totalMinutes = row.minutes || row.watchtime_minutes || 0;
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    const watchtimeStr = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+    const watchtimeStr = formatWatchtime(totalMinutes);
     const porukeStr = formatPorukeCount(row.chat !== undefined ? row.chat : (row.points || 0));
     const coinsVal = row.coins || 0;
-    const levelStr = `Nivo ${row.level || 1} (${row.xp || 0} XP)`;
+    const levelStr = `Nivo ${row.level || 1} (${(row.xp || 0).toLocaleString('en-US')} XP)`;
 
     if (isChatters) {
       return `
@@ -3320,9 +3403,7 @@ function renderPodium(top3) {
     const num = top3.length > 1 ? nums[i] : crownSvg;
 
     const totalMins = row.minutes || row.watchtime_minutes || 0;
-    const hours = Math.floor(totalMins / 60);
-    const mins = totalMins % 60;
-    const watchtimeFullStr = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+    const watchtimeFullStr = formatWatchtime(totalMins);
     const porukeCount = row.chat !== undefined ? row.chat : (row.points || 0);
     const coinsVal = row.coins || 0;
 
@@ -3332,10 +3413,10 @@ function renderPodium(top3) {
     } else if (isWatchtime) {
       valStr = watchtimeFullStr;
     } else if (isRanking) {
-      valStr = `Lvl ${row.level || 1} / ${coinsVal.toLocaleString()} p.`;
+      valStr = `Lvl ${row.level || 1} / ${coinsVal.toLocaleString('en-US')} p.`;
     } else {
       // Zajedno (Watchtime / Poruke / Nivo)
-      valStr = `${hours}h / ${formatPorukeCount(porukeCount)} / Lvl ${row.level || 1}`;
+      valStr = `${watchtimeFullStr} / ${formatPorukeCount(porukeCount)} / Lvl ${row.level || 1}`;
     }
 
     const avatarKey = (row.username || '').toLowerCase();
@@ -3379,15 +3460,33 @@ function renderMiniLeaderboard(rows) {
     const cachedUrl = avatarCache[avatarKey];
     const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
     const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
-    const avatarStyle = safeAvatarUrl
-      ? `background-image:url('${safeAvatarUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
-      : '';
-    const avatarContent = safeAvatarUrl ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
+    const initial = (row.display_name || row.username || 'U').charAt(0).toUpperCase();
 
-    if (!safeAvatarUrl && row.username) {
-      setTimeout(() => {
-        getOrFetchAvatar(row.username, `mini-lead-avatar-${i}`);
-      }, 60 * i);
+    const avatarInner = safeAvatarUrl
+      ? `<img src="${safeAvatarUrl}" class="mini-avatar-img" alt="${escapeHtml(row.username)}">`
+      : `<span style="font-size:0.7rem; font-weight:800; color:#fff;">${initial}</span>`;
+    const avatarHtml = `<div class="mini-avatar-wrap ${safeAvatarUrl ? '' : 'fallback'}">${avatarInner}</div>`;
+
+    if (!safeAvatarUrl && avatarCache[avatarKey] !== 'loading') {
+      avatarCache[avatarKey] = 'loading';
+      getAvatarFromCache(row.username).then(cachedDB => {
+        if (cachedDB && cachedDB !== 'none') {
+          avatarCache[avatarKey] = cachedDB;
+          refreshMiniPanels(rows);
+        } else {
+          fetchKickAvatar(row.username).then(url => {
+            avatarCache[avatarKey] = url || 'none';
+            setAvatarInCache(avatarKey, url || 'none').catch(() => { });
+            refreshMiniPanels(rows);
+          });
+        }
+      }).catch(() => {
+        fetchKickAvatar(row.username).then(url => {
+          avatarCache[avatarKey] = url || 'none';
+          setAvatarInCache(avatarKey, url || 'none').catch(() => { });
+          refreshMiniPanels(rows);
+        });
+      });
     }
 
     const countVal = getChatVal(row);
@@ -3395,7 +3494,7 @@ function renderMiniLeaderboard(rows) {
       <div class="mini-item" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-weight:700; font-size:0.8rem; color:${rankColor(i)}; min-width:16px;">${i + 1}.</span>
-          <div id="mini-lead-avatar-${i}" class="user-cell__avatar" style="width:24px; height:24px; font-size:0.7rem; ${avatarStyle}">${avatarContent}</div>
+          ${avatarHtml}
           <span style="font-weight:600; font-size:0.85rem; color:#fff;">@${escapeHtml(row.display_name || row.username)}</span>
         </div>
         <span style="font-size:0.82rem; font-weight:700; color:#3B82F6;">${formatPorukeCount(countVal)}</span>
@@ -3406,20 +3505,18 @@ function renderMiniLeaderboard(rows) {
 
 function filterLeaderboard(q) {
   leaderboardPage = 1;
-  const isChatters = activeLeaderboardType === 'chatters';
   const isCombined = activeLeaderboardType === 'combined';
   let source;
+
   if (isCombined) {
     source = buildCombinedRows();
-  } else if (isChatters) {
-    source = allLeaderboard;
   } else {
-    source = allWatchtime;
+    source = allLeaderboard;
   }
   const filtered = source.filter(r =>
     (r.display_name || r.username || r.username || '').toLowerCase().includes(q.toLowerCase())
   );
-  renderUnifiedLeaderboard(filtered);
+  renderUnifiedLeaderboard(sortLeaderboardRows(filtered));
 }
 
 function changeLeaderboardPage(dir) {

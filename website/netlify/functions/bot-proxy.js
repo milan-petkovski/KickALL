@@ -12,9 +12,9 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers, body: '' };
   }
 
-  const clientIp = event.headers['x-nf-client-connection-ip'] || 
-                   (event.headers['x-forwarded-for'] ? event.headers['x-forwarded-for'].split(',')[0].trim() : null) || 
-                   'unknown';
+  const clientIp = event.headers['x-nf-client-connection-ip'] ||
+    (event.headers['x-forwarded-for'] ? event.headers['x-forwarded-for'].split(',')[0].trim() : null) ||
+    'unknown';
 
   if (await isRateLimited(clientIp, { windowMs: 60000, maxRequests: 60, endpoint: 'bot-proxy' })) {
     return {
@@ -44,7 +44,7 @@ exports.handler = async (event) => {
     pathSuffix = '/api/channels';
   }
 
-  const ALLOWED_PATHS = ['/api/channels', '/api/kick/logs', '/api/kick/reload', '/api/kick/test-ping', '/api/kick/check-moderator', '/api/kick/channel', '/api/global-logout'];
+  const ALLOWED_PATHS = ['/api/channels', '/api/kick/logs', '/api/kick/reload', '/api/kick/test-ping', '/api/kick/check-moderator', '/api/kick/channel', '/api/global-logout', '/api/check-logout'];
   if (!ALLOWED_PATHS.includes(pathSuffix)) {
     return {
       statusCode: 404,

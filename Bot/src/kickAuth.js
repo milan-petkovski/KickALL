@@ -140,7 +140,7 @@ function zakaziAutoOsvezavanje() {
         } catch (err) {
             log('ERR', `[AUTH] Automatsko osvežavanje Kick tokena nije uspelo: ${err.message}`);
         }
-    }, 15 * 60 * 1000); // proverava na svakih 15 minuta, osvežava kad je blizu isteka
+    }, 15 * 60 * 1000).unref(); // proverava na svakih 15 minuta, osvežava kad je blizu isteka
 }
 
 /**

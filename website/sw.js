@@ -61,6 +61,13 @@ self.addEventListener('activate', (event) => {
       .then(() => {
         return self.clients.claim();
       })
+      .then(() => {
+        // Enable navigation preload if supported to reduce latency for navigations
+        if (self.registration && self.registration.navigationPreload) {
+          return self.registration.navigationPreload.enable();
+        }
+        return Promise.resolve();
+      })
   );
 });
 
@@ -99,34 +106,38 @@ self.addEventListener('fetch', (event) => {
 
   if (isHtmlRequest) {
     // Network-first strategy for HTML files
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // Cache the fresh response
-          if (response && response.status === 200) {
+    event.respondWith((async () => {
+      // If navigation preload provided a response, use it
+      try {
+        const preloadResponse = await event.preloadResponse;
+        if (preloadResponse) {
+          return preloadResponse;
+        }
+      } catch (e) {
+        // ignore preload errors and continue to fetch
+      }
+
+      try {
+        const response = await fetch(event.request);
+        // Cache the fresh response
+        if (response && response.status === 200) {
+          try {
             const responseToCache = response.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              })
-              .catch(_err => {
-                // Silently fail cache errors
-              });
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(event.request, responseToCache);
+          } catch (_err) {
+            // Silently fail cache errors
           }
-          return response;
-        })
-        .catch((_error) => {
-          // Fallback to cache if network fails
-          return caches.match(event.request)
-            .then((cachedResponse) => {
-              if (cachedResponse) {
-                return cachedResponse;
-              }
-              // Ultimate fallback to index.html
-              return caches.match('/index.html');
-            });
-        })
-    );
+        }
+        return response;
+      } catch (_error) {
+        // Fallback to cache if network fails
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) return cachedResponse;
+        // Ultimate fallback to index.html
+        return caches.match('/index.html');
+      }
+    })());
   } else {
     // Cache-first strategy for static assets (CSS, JS, images)
     event.respondWith(
