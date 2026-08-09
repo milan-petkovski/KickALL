@@ -310,11 +310,11 @@
       }
     }
 
-    // Query Supabase Watchtime for real logged stats
+    // Query Supabase Leaderboard for real logged stats
     if (sb && currentUser) {
       try {
         const { data: watchLogs } = await sb
-          .from('watchtime')
+          .from('leaderboard')
           .select('*')
           .limit(500);
         if (watchLogs && watchLogs.length > 0) {

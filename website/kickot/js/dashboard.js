@@ -679,11 +679,11 @@ function renderPlanLimitBanners() {
         overlay.style.pointerEvents = 'auto';
         overlay.innerHTML = `
           <div class="locked-feature-overlay__icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           </div>
-          <h4 class="locked-feature-overlay__title">Custom Bot Ime je zaključano na Free paketu</h4>
-          <p class="locked-feature-overlay__desc">Povezivanje sopstvenog bot naloga (npr. @MojKanalBot) umesto sistemskog bota je dostupno u PRO i ELITE paketima.</p>
-          <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('customBot')" style="padding: 10px 22px; font-size: 0.85rem;">${upgradeSvgIcon}<span>Nadogradi i Otključaj Custom Bot</span></button>
+          <h4 class="locked-feature-overlay__title"><span style="text-decoration: line-through; opacity: 0.7;">Custom Bot Ime</span> — DOLAZI USKORO ⏳</h4>
+          <p class="locked-feature-overlay__desc">Povezivanje sopstvenog bot naloga (npr. @MojKanalBot) je trenutno u fazi razvoja i biće dostupno uskoro. Svi kanali koriste zvanični @KickotBot nalog.</p>
+          <button type="button" class="btn btn-secondary" disabled style="padding: 10px 22px; font-size: 0.85rem; opacity: 0.75; cursor: default; border-color: rgba(245, 158, 11, 0.4); color: #F59E0B;"><span>Dolazi Uskoro</span></button>
         `;
       }
     }
@@ -1568,6 +1568,21 @@ async function loadUserProfile() {
 }
 
 async function fetchKickAvatar(username) {
+  // Neki Kick nalozi imaju slug sa "_" (npr. milan_567), a neki sa "-" (npr. lamba-tutz-gang).
+  // Probamo prvo originalni username, pa ako ne uspe, probamo verziju sa crticom.
+  const candidates = [...new Set([
+    String(username || ''),
+    String(username || '').toLowerCase().replace(/_/g, '-')
+  ])];
+
+  for (const slug of candidates) {
+    const pic = await tryFetchKickAvatarForSlug(slug);
+    if (pic) return pic;
+  }
+  return null;
+}
+
+async function tryFetchKickAvatarForSlug(username) {
   // 1. Pokušaj preko lokalnog bot API servera (koristi got-scraping, radi 100% bez Cloudflare blokade)
   try {
     const localRes = await fetch(`${getBotApiBase()}/api/avatar?username=${username}`);
@@ -2771,22 +2786,149 @@ function downloadCsv(csvContent, fileName) {
 }
 
 // ── Leaderboard ───────────────────────────────────────────
+// ── Leaderboard ───────────────────────────────────────────
 function populateMonthSelector() {
+  const periodSel = document.getElementById('lbPeriodSelect');
   const sel = document.getElementById('lbMonthSelect');
   if (!sel) return;
 
+  const periodMode = periodSel?.value || 'monthly';
   const now = new Date();
-  const months = [];
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const y = d.getFullYear();
-    months.push({ value: `${m}-${y}`, label: `${m}/${y}` });
-  }
 
-  sel.innerHTML = months.map(m =>
-    `<option value="${m.value}">${m.label}</option>`
-  ).join('');
+  if (periodMode === 'alltime') {
+    sel.style.display = 'none';
+    sel.innerHTML = `<option value="all">Sve vreme</option>`;
+  } else if (periodMode === 'yearly') {
+    sel.style.display = 'inline-block';
+    const years = [];
+    const currentYear = now.getFullYear();
+    for (let y = currentYear; y >= currentYear - 3; y--) {
+      years.push({ value: String(y), label: `${y}` });
+    }
+    sel.innerHTML = years.map(y => `<option value="${y.value}">${y.label}</option>`).join('');
+  } else {
+    sel.style.display = 'inline-block';
+    const months = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const y = d.getFullYear();
+      months.push({ value: `${m}-${y}`, label: `${m}/${y}` });
+    }
+    sel.innerHTML = months.map(m => `<option value="${m.value}">${m.label}</option>`).join('');
+  }
+}
+
+function onLeaderboardPeriodChange() {
+  populateMonthSelector();
+  loadLeaderboard();
+}
+
+async function loadWatchtime() {
+  if (!activeChannel) return;
+
+  const totalMins = allLeaderboard.reduce((s, r) => s + (r.watchtime_minutes || r.minutes || 0), 0);
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  let watchtimeText = hours > 0 ? `${hours}h ${mins}min` : `${mins} minuta`;
+  const statEl = document.getElementById('statTotalWatchtime');
+  if (statEl) statEl.textContent = watchtimeText;
+
+  if (activeLeaderboardType === 'watchtime' || activeLeaderboardType === 'combined') {
+    renderUnifiedLeaderboard();
+  }
+}
+
+function renderMiniLeaderboard(rows) {
+  const el = document.getElementById('miniLeaderboard');
+  if (!el) return;
+  if (!rows || rows.length === 0) {
+    el.innerHTML = '<div class="mini-empty" style="color:var(--text-muted); font-size:0.85rem; padding:12px 0;">Nema podataka za chatters.</div>';
+    return;
+  }
+  const topChatters = [...rows].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 5);
+  el.innerHTML = topChatters.map((item, idx) => {
+    const avatarKey = (item.username || '').toLowerCase();
+    const cachedUrl = avatarCache[avatarKey];
+    const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
+    const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
+    const initial = (item.username || 'U').charAt(0).toUpperCase();
+
+    const avatarHtml = safeAvatarUrl
+      ? `<img src="${safeAvatarUrl}" class="mini-avatar-img" alt="${escapeHtml(item.username)}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">`
+      : `<div class="user-cell__avatar" style="width:24px; height:24px; font-size:0.7rem;">${initial}</div>`;
+
+    if (!cachedUrl && avatarKey) {
+      avatarCache[avatarKey] = 'loading';
+      fetchKickAvatar(item.username).then(url => {
+        avatarCache[avatarKey] = url || 'none';
+        if (url) saveAvatarToCache(avatarKey, url);
+        renderMiniLeaderboard(rows);
+      });
+    }
+
+    return `
+      <div class="mini-item" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-weight:700; font-size:0.8rem; color:${rankColor(idx)}; min-width:16px;">${idx + 1}.</span>
+          ${avatarHtml}
+          <span style="font-weight:600; font-size:0.85rem; color:#fff;">@${escapeHtml(item.username)}</span>
+        </div>
+        <span style="font-size:0.82rem; font-weight:700; color:#3B82F6;">${formatPorukeCount(item.points || 0)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderMiniWatchtime(rows) {
+  const el = document.getElementById('miniWatchtime');
+  if (!el) return;
+  if (!rows || rows.length === 0) {
+    el.innerHTML = '<div class="mini-empty" style="color:var(--text-muted); font-size:0.85rem; padding:12px 0;">Nema podataka za watchtime.</div>';
+    return;
+  }
+  const topWatchtime = [...rows].sort((a, b) => {
+    const valA = Number(a.watchtime_minutes !== undefined && a.watchtime_minutes !== null ? a.watchtime_minutes : (a.minutes || 0));
+    const valB = Number(b.watchtime_minutes !== undefined && b.watchtime_minutes !== null ? b.watchtime_minutes : (b.minutes || 0));
+    return valB - valA;
+  }).slice(0, 5);
+
+  el.innerHTML = topWatchtime.map((item, idx) => {
+    const avatarKey = (item.username || '').toLowerCase();
+    const cachedUrl = avatarCache[avatarKey];
+    const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
+    const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
+    const initial = (item.username || 'U').charAt(0).toUpperCase();
+
+    const avatarHtml = safeAvatarUrl
+      ? `<img src="${safeAvatarUrl}" class="mini-avatar-img" alt="${escapeHtml(item.username)}" style="width:24px; height:24px; border-radius:50%; object-fit:cover;">`
+      : `<div class="user-cell__avatar" style="width:24px; height:24px; font-size:0.7rem;">${initial}</div>`;
+
+    if (!cachedUrl && avatarKey) {
+      avatarCache[avatarKey] = 'loading';
+      fetchKickAvatar(item.username).then(url => {
+        avatarCache[avatarKey] = url || 'none';
+        if (url) saveAvatarToCache(avatarKey, url);
+        renderMiniWatchtime(rows);
+      });
+    }
+
+    const mins = Number(item.watchtime_minutes !== undefined && item.watchtime_minutes !== null ? item.watchtime_minutes : (item.minutes || 0));
+    const hours = Math.floor(mins / 60);
+    const m = mins % 60;
+    const watchStr = hours > 0 ? `${hours}h ${m}min` : `${m}min`;
+
+    return `
+      <div class="mini-item" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-weight:700; font-size:0.8rem; color:${rankColor(idx)}; min-width:16px;">${idx + 1}.</span>
+          ${avatarHtml}
+          <span style="font-weight:600; font-size:0.85rem; color:#fff;">@${escapeHtml(item.username)}</span>
+        </div>
+        <span style="font-size:0.82rem; font-weight:700; color:var(--kick-green);">${watchStr}</span>
+      </div>
+    `;
+  }).join('');
 }
 
 async function loadLeaderboard() {
@@ -2797,32 +2939,29 @@ async function loadLeaderboard() {
   const searchInput = document.getElementById('leaderboardSearchInput');
   if (searchInput) searchInput.value = '';
 
+  const periodSel = document.getElementById('lbPeriodSelect');
   const sel = document.getElementById('lbMonthSelect');
-  const month = sel?.value || getCurrentMonth();
+  const periodMode = periodSel?.value || 'monthly';
+  const selectedVal = sel?.value || (periodMode === 'yearly' ? String(new Date().getFullYear()) : getCurrentMonth());
 
-  let { data, error } = await sb.from('leaderboard')
+  let query = sb.from('leaderboard')
     .select('*')
-    .eq('channel_id', String(activeChannel.id))
-    .eq('month', month)
-    .order('points', { ascending: false })
-    .limit(200);
+    .eq('channel_id', String(activeChannel.id));
 
-  if ((!data || data.length === 0) && !error) {
-    const fallbackRes = await sb.from('leaderboard')
-      .select('*')
-      .eq('channel_id', String(activeChannel.id))
-      .order('points', { ascending: false })
-      .limit(200);
-    if (!fallbackRes.error && fallbackRes.data) {
-      data = fallbackRes.data;
-    }
+  if (periodMode === 'alltime') {
+    // Svo vreme - bez filtera
+  } else if (periodMode === 'yearly') {
+    query = query.or(`year.eq.${selectedVal},month.ilike.%-${selectedVal}`);
+  } else {
+    query = query.eq('month', selectedVal);
   }
 
-  if (error) { return; }
-  if (data && data.length > 0) {
-    allLeaderboard = data;
-  }
-  renderMiniLeaderboard(allLeaderboard.slice(0, 5));
+  let { data, error } = await query.order('points', { ascending: false }).limit(500);
+
+  if (error) { data = []; }
+  allLeaderboard = data || [];
+  renderMiniLeaderboard(allLeaderboard);
+  renderMiniWatchtime(allLeaderboard);
 
   // Calculate and display total chat messages with Serbian grammar formatting
   const totalChat = allLeaderboard.reduce((s, r) => s + (r.points || 0), 0);
@@ -2838,77 +2977,18 @@ async function loadLeaderboard() {
     chatStatEl.textContent = `${totalChat} ${suffix}`;
   }
 
-  // "Najaktivniji korisnik" = zbir poruka + watchtime skor, prikazujemo ime korisnika
-  if (allLeaderboard.length > 0 || allWatchtime.length > 0) {
-    const combined = buildCombinedRows();
-    if (combined.length > 0) {
-      document.getElementById('statTopPoints').textContent = combined[0].username;
-    } else if (allLeaderboard.length > 0) {
-      document.getElementById('statTopPoints').textContent = allLeaderboard[0]?.display_name || allLeaderboard[0]?.username || '—';
-    }
+  // Calculate total watchtime for header stat
+  loadWatchtime();
+
+  // "Najaktivniji korisnik" = zbir poruka + watchtime skor
+  const combined = buildCombinedRows();
+  const topStatEl = document.getElementById('statTopPoints');
+  if (topStatEl) {
+    topStatEl.textContent = combined.length > 0 ? combined[0].username : '—';
   }
 
-  // Nakon učitavanja leaderboarda, uvek osvežavamo prikaz tabele
   renderUnifiedLeaderboard();
 }
-
-async function loadWatchtime() {
-  if (!activeChannel) return;
-
-  const { data, error } = await sb.from('watchtime')
-    .select('*')
-    .eq('channel_id', String(activeChannel.id))
-    .order('minutes', { ascending: false })
-    .limit(200);
-
-  if (error) { return; }
-  if (data && data.length > 0) {
-    allWatchtime = data;
-  }
-  renderMiniWatchtime(allWatchtime.slice(0, 5));
-
-  const totalMins = allWatchtime.reduce((s, r) => s + (r.minutes || 0), 0);
-  const hours = Math.floor(totalMins / 60);
-  const mins = totalMins % 60;
-  let watchtimeText = '';
-  if (hours > 0) {
-    watchtimeText = `${hours}h ${mins}min`;
-  } else {
-    watchtimeText = `${mins} minuta`;
-  }
-  document.getElementById('statTotalWatchtime').textContent = watchtimeText;
-
-  // Nakon učitavanja watchtime-a, ako je aktivni tab 'watchtime' ili 'combined', renderujemo leaderboard
-  if (activeLeaderboardType === 'watchtime' || activeLeaderboardType === 'combined') {
-    renderUnifiedLeaderboard();
-  }
-}
-
-// ── UI Helperi za skeleton i empty state ──────────────────
-function renderTableSkeleton(tbodyId, colCount = 5, rowCount = 5) {
-
-  const tbody = document.getElementById(tbodyId);
-  if (!tbody) return;
-  tbody.innerHTML = Array.from({ length: rowCount }, () => `
-    <tr class="skeleton-row">
-      <td><div class="skeleton skeleton-cell skeleton-cell--sm"></div></td>
-      <td><div style="display:flex;align-items:center;gap:8px">
-        <div class="skeleton skeleton-avatar"></div>
-        <div class="skeleton skeleton-cell skeleton-cell--md"></div>
-      </div></td>
-      ${Array.from({ length: colCount - 2 }, () =>
-    `<td><div class="skeleton skeleton-cell skeleton-cell--sm"></div></td>`
-  ).join('')}
-    </tr>
-  `).join('');
-}
-
-function renderEmptyState(tbodyId, colCount, message = 'Nema podataka za prikaz.') {
-  const tbody = document.getElementById(tbodyId);
-  if (!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="${colCount}" class="table-empty">${message}</td></tr>`;
-}
-
 
 function setLeaderboardType(type) {
   activeLeaderboardType = type;
@@ -2919,12 +2999,14 @@ function setLeaderboardType(type) {
   const tabChatters = document.getElementById('lbTabChatters');
   const tabWatchtime = document.getElementById('lbTabWatchtime');
   const tabCombined = document.getElementById('lbTabCombined');
+  const tabRanking = document.getElementById('lbTabRanking');
 
-  [tabChatters, tabWatchtime, tabCombined].forEach(btn => {
+  [tabChatters, tabWatchtime, tabCombined, tabRanking].forEach(btn => {
     if (btn) btn.classList.remove('active');
   });
   if (type === 'chatters' && tabChatters) tabChatters.classList.add('active');
   if (type === 'watchtime' && tabWatchtime) tabWatchtime.classList.add('active');
+  if (type === 'ranking' && tabRanking) tabRanking.classList.add('active');
   if (type === 'combined' && tabCombined) tabCombined.classList.add('active');
 
   // Izmeni klase u sidebar navigaciji samo ako je trenutno na leaderboard panelu
@@ -2936,16 +3018,16 @@ function setLeaderboardType(type) {
     updateBreadcrumbs('leaderboard');
   }
 
-  // Izmeni zaglavlje tabele
+  // Izmeni zaglavlje tabele usklađeno sa redovima
   const header = document.getElementById('leaderboardTableHeader');
   if (header) {
     if (type === 'chatters') {
       header.innerHTML = `
         <th style="width:60px">#</th>
         <th>Korisnik</th>
-        <th>Poruke</th>
-        <th>Mesec</th>
-        <th>Azurirano</th>
+        <th>Broj Poruka</th>
+        <th>Period</th>
+        <th>Ažurirano</th>
       `;
     } else if (type === 'watchtime') {
       header.innerHTML = `
@@ -2953,16 +3035,24 @@ function setLeaderboardType(type) {
         <th>Korisnik</th>
         <th>Ukupno minuta</th>
         <th>Sati gledanja</th>
-        <th>Azurirano</th>
+        <th>Ažurirano</th>
+      `;
+    } else if (type === 'ranking') {
+      header.innerHTML = `
+        <th style="width:60px">#</th>
+        <th>Korisnik</th>
+        <th>Nivo & XP</th>
+        <th>Poeni / Koins</th>
+        <th>Ažurirano</th>
       `;
     } else {
       header.innerHTML = `
         <th style="width:60px">#</th>
         <th>Korisnik</th>
-        <th>Watchtime</th>
+        <th>Sati gledanja</th>
         <th>Poruke</th>
-        <th>Mesec</th>
-        <th>Azurirano</th>
+        <th>Poeni & Nivo</th>
+        <th>Ažurirano</th>
       `;
     }
   }
@@ -2974,18 +3064,15 @@ function setLeaderboardType(type) {
   renderUnifiedLeaderboard();
 }
 
-
-
 function buildCombinedRows() {
   const map = {};
-
+  const periodSel = document.getElementById('lbPeriodSelect');
   const sel = document.getElementById('lbMonthSelect');
-  const selectedMonth = sel?.value || getCurrentMonth();
+  const periodMode = periodSel?.value || 'monthly';
+  const selectedVal = sel?.value || (periodMode === 'yearly' ? String(new Date().getFullYear()) : getCurrentMonth());
+  const periodLabel = periodMode === 'alltime' ? 'Sve vreme' : selectedVal;
 
   allLeaderboard.forEach(r => {
-    // Filtriraj leaderboard po izabranom mesecu koristeći month polje
-    if (r.month && r.month !== selectedMonth) return;
-
     const key = (r.username || '').toLowerCase();
     if (!map[key]) {
       map[key] = {
@@ -2993,39 +3080,20 @@ function buildCombinedRows() {
         display_name: r.display_name || r.username,
         points: 0,
         minutes: 0,
-        month: r.month || selectedMonth,
+        coins: r.coins || 0,
+        xp: r.xp || 0,
+        level: r.level || 1,
+        month: periodLabel,
         updated_at: r.updated_at
       };
     }
-    map[key].points += r.points || 0;
-    if (!map[key].month) map[key].month = r.month || selectedMonth;
+    map[key].points += (r.points || 0);
+    map[key].minutes += (r.watchtime_minutes || r.minutes || 0);
+    map[key].coins = Math.max(map[key].coins, r.coins || 0);
+    map[key].xp = Math.max(map[key].xp, r.xp || 0);
+    map[key].level = Math.max(map[key].level, r.level || 1);
   });
 
-  allWatchtime.forEach(r => {
-    const date = r.updated_at ? new Date(r.updated_at) : new Date();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const y = date.getFullYear();
-    const rowMonth = `${m}-${y}`;
-    if (rowMonth !== selectedMonth) return;
-
-    const key = (r.username || '').toLowerCase();
-    if (!map[key]) {
-      map[key] = {
-        username: r.username,
-        display_name: r.display_name || r.username,
-        points: 0,
-        minutes: 0,
-        month: selectedMonth,
-        updated_at: r.updated_at || new Date().toISOString()
-      };
-    }
-    map[key].minutes += r.minutes || 0;
-    if (!map[key].updated_at || (r.updated_at && r.updated_at > map[key].updated_at)) {
-      map[key].updated_at = r.updated_at;
-    }
-  });
-
-  // score = messages + (minutes / 6) — normalizacija watchtime-a na uporedivu skalu (1h watchtime = 10 poruka)
   return Object.values(map).sort((a, b) => {
     const scoreA = (a.points || 0) + Math.floor((a.minutes || 0) / 6);
     const scoreB = (b.points || 0) + Math.floor((b.minutes || 0) / 6);
@@ -3036,6 +3104,7 @@ function buildCombinedRows() {
 function renderUnifiedLeaderboard(customRows = null) {
   const isChatters = activeLeaderboardType === 'chatters';
   const isWatchtime = activeLeaderboardType === 'watchtime';
+  const isRanking = activeLeaderboardType === 'ranking';
   const isCombined = activeLeaderboardType === 'combined';
 
   let rows;
@@ -3045,8 +3114,12 @@ function renderUnifiedLeaderboard(customRows = null) {
     rows = buildCombinedRows();
   } else if (isChatters) {
     rows = [...allLeaderboard].sort((a, b) => (b.points || 0) - (a.points || 0));
+  } else if (isWatchtime) {
+    rows = [...allLeaderboard].sort((a, b) => (b.watchtime_minutes || b.minutes || 0) - (a.watchtime_minutes || a.minutes || 0));
+  } else if (isRanking) {
+    rows = [...allLeaderboard].sort((a, b) => ((b.coins || b.points || 0) - (a.coins || a.points || 0)));
   } else {
-    rows = [...allWatchtime].sort((a, b) => (b.minutes || 0) - (a.minutes || 0));
+    rows = buildCombinedRows();
   }
 
   // Renderovanje podijuma (top 3)
@@ -3061,7 +3134,6 @@ function renderUnifiedLeaderboard(customRows = null) {
     tbody.innerHTML = `<tr><td colspan="${colCount}" class="table-empty">Nema podataka za prikaz.</td></tr>`;
     document.getElementById('lbTableMeta').textContent = '0 korisnika';
 
-
     const prevBtn = document.getElementById('lbPrevPageBtn');
     const nextBtn = document.getElementById('lbNextPageBtn');
     const pageInfo = document.getElementById('lbPageInfo');
@@ -3069,7 +3141,6 @@ function renderUnifiedLeaderboard(customRows = null) {
     if (nextBtn) nextBtn.disabled = true;
     if (pageInfo) pageInfo.textContent = 'Stranica 1 od 1';
     return;
-
   }
 
   document.getElementById('lbTableMeta').textContent = `${rows.length} korisnika`;
@@ -3114,14 +3185,12 @@ function renderUnifiedLeaderboard(customRows = null) {
       const avatarKey = (row.username || '').toLowerCase();
       const cachedUrl = avatarCache[avatarKey];
       const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
-      // Sanitizacija URL-a: prihvati samo https:// radi zastite od CSS injection-a
       const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
       avatarStyle = safeAvatarUrl
         ? `background-image:url('${safeAvatarUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
         : '';
       avatarContent = safeAvatarUrl ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
 
-      // Pokreni fetch ako nije keširano i ako imamo username
       if (!hasAvatar && row.username) {
         setTimeout(() => {
           getOrFetchAvatar(row.username, `lbRowAv_${row.username}_${globalIndex}`);
@@ -3144,39 +3213,53 @@ function renderUnifiedLeaderboard(customRows = null) {
       ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="color: #FBBF24; filter: drop-shadow(0 1px 4px rgba(251, 191, 36, 0.4)); display: inline-block; vertical-align: middle; margin-right: 4px;"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"/></svg>`
       : `<strong style="color:${rankColor(globalIndex)}">${globalIndex + 1}.</strong>`;
 
+    const totalMinutes = row.minutes || row.watchtime_minutes || 0;
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const watchtimeStr = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+    const porukeStr = formatPorukeCount(row.points || 0);
+    const coinsVal = row.coins || row.points || 0;
+    const levelStr = `Nivo ${row.level || 1} (${row.xp || 0} XP)`;
+
     if (isChatters) {
       return `
         <tr>
           <td>${rankDisplay}</td>
           <td>${userCol}</td>
-          <td class="td-num" style="color:${rankColor(globalIndex)}">${formatPorukeCount(row.points)}</td>
-          <td style="color:var(--text-muted)">${escapeHtml(row.month || '')}</td>
+          <td class="td-num" style="color:var(--app-primary); font-weight:600;">${porukeStr}</td>
+          <td style="color:var(--text-muted)">${escapeHtml(row.month || '—')}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
     } else if (isWatchtime) {
-      const hours = Math.floor((row.minutes || 0) / 60);
-      const mins = (row.minutes || 0) % 60;
       return `
         <tr>
           <td>${rankDisplay}</td>
           <td>${userCol}</td>
-          <td class="td-num">${row.minutes} min</td>
-          <td class="td-num" style="color:var(--kick-green); font-weight: 600;">${hours}h ${mins}min</td>
+          <td class="td-num">${totalMinutes} min</td>
+          <td class="td-num" style="color:var(--kick-green); font-weight:600;">${watchtimeStr}</td>
+          <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
+        </tr>
+      `;
+    } else if (isRanking) {
+      return `
+        <tr>
+          <td>${rankDisplay}</td>
+          <td>${userCol}</td>
+          <td class="td-num" style="color:var(--app-primary); font-weight:600;">${levelStr}</td>
+          <td class="td-num" style="color:#eab308; font-weight:600;">${coinsVal.toLocaleString()} p.</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
     } else {
-      // Combined
-      const hours = Math.floor((row.minutes || 0) / 60);
-      const mins = (row.minutes || 0) % 60;
+      // Combined (6 columns: Watchtime, Chatters, Ekonomija)
       return `
         <tr>
           <td>${rankDisplay}</td>
           <td>${userCol}</td>
-          <td class="td-num" style="color:var(--kick-green); font-weight: 600;">${hours}h ${mins}min</td>
-          <td class="td-num" style="color:var(--app-primary)">${formatPorukeCount(row.points)}</td>
-          <td style="color:var(--text-muted)">${escapeHtml(row.month || '—')}</td>
+          <td class="td-num" style="color:var(--kick-green); font-weight:600;">${watchtimeStr}</td>
+          <td class="td-num" style="color:var(--app-primary); font-weight:600;">${porukeStr}</td>
+          <td class="td-num" style="color:#eab308; font-weight:600;">Lvl ${row.level || 1} • ${coinsVal.toLocaleString()} p.</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
@@ -3217,19 +3300,29 @@ function renderPodium(top3) {
   const nums = ['2.', crownSvg, '3.'];
   const isChatters = activeLeaderboardType === 'chatters';
   const isWatchtime = activeLeaderboardType === 'watchtime';
+  const isRanking = activeLeaderboardType === 'ranking';
 
   el.innerHTML = order.map((row, i) => {
     const cls = top3.length > 1 ? classes[i] : 'podium-1';
     const num = top3.length > 1 ? nums[i] : crownSvg;
+
+    const totalMins = row.minutes || row.watchtime_minutes || 0;
+    const hours = Math.floor(totalMins / 60);
+    const mins = totalMins % 60;
+    const watchtimeFullStr = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+    const porukeCount = row.points || 0;
+    const coinsVal = row.coins || row.points || 0;
+
     let valStr = '';
     if (isChatters) {
-      valStr = formatPorukeCount(row.points);
+      valStr = formatPorukeCount(porukeCount);
     } else if (isWatchtime) {
-      const h = Math.floor((row.minutes || 0) / 60);
-      valStr = `${h}h`;
+      valStr = watchtimeFullStr;
+    } else if (isRanking) {
+      valStr = `Lvl ${row.level || 1} / ${coinsVal.toLocaleString()} p.`;
     } else {
-      const h = Math.floor((row.minutes || 0) / 60);
-      valStr = `${row.points}p / ${h}h`;
+      // Zajedno (Watchtime samo sati / Poruke / Nivo)
+      valStr = `${hours}h / ${porukeCount}p / Lvl ${row.level || 1}`;
     }
 
     const avatarKey = (row.username || '').toLowerCase();
@@ -3265,7 +3358,9 @@ function renderMiniLeaderboard(rows) {
   if (!el) return;
   if (!rows || rows.length === 0) { el.innerHTML = '<div class="mini-empty">Nema podataka</div>'; return; }
 
-  el.innerHTML = rows.map((row, i) => {
+  const topRows = [...rows].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 5);
+
+  el.innerHTML = topRows.map((row, i) => {
     const avatarKey = (row.username || '').toLowerCase();
     const cachedUrl = avatarCache[avatarKey];
     const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
@@ -3332,9 +3427,10 @@ function exportLeaderboard() {
       .join('\n');
     downloadCsv(csv, `leaderboard_chatters_${activeChannel?.username}_${getCurrentMonth()}.csv`);
   } else if (type === 'watchtime') {
-    if (allWatchtime.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
+    const rows = [...allLeaderboard].sort((a, b) => (b.watchtime_minutes || 0) - (a.watchtime_minutes || 0));
+    if (rows.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
     const csv = ['Rank,Username,Minutes,Hours,Updated']
-      .concat(allWatchtime.map((r, i) => `${i + 1},${r.display_name || r.username},${r.minutes},${Math.floor(r.minutes / 60)},${r.updated_at}`))
+      .concat(rows.map((r, i) => `${i + 1},${r.display_name || r.username},${r.watchtime_minutes || 0},${Math.floor((r.watchtime_minutes || 0) / 60)},${r.updated_at}`))
       .join('\n');
     downloadCsv(csv, `leaderboard_watchtime_${activeChannel?.username}.csv`);
   } else {
@@ -3347,42 +3443,7 @@ function exportLeaderboard() {
   }
 }
 
-function renderMiniWatchtime(rows) {
-  const el = document.getElementById('miniWatchtime');
-  if (!el) return;
-  if (rows.length === 0) { el.innerHTML = '<div class="mini-empty">Nema podataka</div>'; return; }
 
-  el.innerHTML = rows.map((row, i) => {
-    const h = Math.floor((row.minutes || 0) / 60);
-    const m = (row.minutes || 0) % 60;
-    const valStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
-
-    const avatarKey = (row.username || '').toLowerCase();
-    const cachedUrl = avatarCache[avatarKey];
-    const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
-    // Sanitizacija URL-a: prihvati samo https://
-    const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
-    const avatarStyle = safeAvatarUrl
-      ? `background-image:url('${safeAvatarUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
-      : '';
-    const avatarContent = safeAvatarUrl ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
-
-    if (!safeAvatarUrl && row.username) {
-      setTimeout(() => {
-        getOrFetchAvatar(row.username, `mini-watch-avatar-${i}`);
-      }, 60 * i);
-    }
-
-    return `
-      <div class="mini-item">
-        <div class="mini-rank rank-${i < 3 ? i + 1 : 'n'}">${i + 1}</div>
-        <div id="mini-watch-avatar-${i}" class="mini-avatar" style="${avatarStyle}">${avatarContent}</div>
-        <span class="mini-username">${escapeHtml(row.display_name || row.username)}</span>
-        <span class="mini-value" style="color: var(--kick-green); font-weight: 600;">${valStr}</span>
-      </div>
-    `;
-  }).join('');
-}
 
 // ── Marriages ─────────────────────────────────────────────
 async function loadMarriages() {
@@ -4062,24 +4123,7 @@ function copyCustomBotModCmd() {
 }
 
 function promptCustomBotAuthModal() {
-  const limits = getPlanLimits();
-  if (!limits.customBotAllowed) {
-    showToast('warning', `Sopstveno bot ime je dostupan samo za korisnike PRO i ELITE paketa! Nadogradi svoj nalog.`);
-    openUpgradeModal('customBot');
-    return;
-  }
-
-  const val = document.getElementById('cfgCustomBotName')?.value || '';
-  const rawName = val.trim().replace(/^@+/, '');
-
-  if (!rawName) {
-    showToast('warning', 'Molimo unesite željeno ime bot naloga u Koraku 2!');
-    document.getElementById('cfgCustomBotName')?.focus();
-    return;
-  }
-
-  handleCustomBotNameInput(val);
-  openModal('customBotAuthModal');
+  showToast('info', 'Funkcija sopstvenog bot naloga (Custom Bot Ime) dolazi uskoro!');
 }
 
 async function confirmCustomBotAuth() {
@@ -9540,31 +9584,37 @@ async function executeBotrixImport() {
 
         // 2. Upis u bazu (proveri postojanje po id pa uradi insert ili update)
         try {
-          const { data: existing } = await sb.from('watchtime')
-            .select('id, minutes')
+          const currentMonthStr = getCurrentMonth();
+          const currentYearStr = currentMonthStr.split('-')[1] || String(new Date().getFullYear());
+
+          const { data: existing } = await sb.from('leaderboard')
+            .select('id, watchtime_minutes')
             .eq('channel_id', channelIdStr)
             .eq('username', u)
+            .eq('month', currentMonthStr)
             .maybeSingle();
 
           if (existing && existing.id) {
-            const { error: errUpd } = await sb.from('watchtime').update({
-              minutes: Math.max(existing.minutes || 0, mins),
+            const { error: errUpd } = await sb.from('leaderboard').update({
+              watchtime_minutes: Math.max(existing.watchtime_minutes || 0, mins),
               display_name: u,
               updated_at: new Date().toISOString()
             }).eq('id', existing.id);
-            if (errUpd) console.error('Watchtime update error:', errUpd);
+            if (errUpd) console.error('Leaderboard watchtime update error:', errUpd);
           } else {
-            const { error: errIns } = await sb.from('watchtime').insert({
+            const { error: errIns } = await sb.from('leaderboard').insert({
               channel_id: channelIdStr,
               username: u,
               display_name: u,
-              minutes: mins,
+              watchtime_minutes: mins,
+              month: currentMonthStr,
+              year: currentYearStr,
               updated_at: new Date().toISOString()
             });
-            if (errIns) console.error('Watchtime insert error:', errIns);
+            if (errIns) console.error('Leaderboard watchtime insert error:', errIns);
           }
         } catch (e) {
-          console.error('Watchtime DB error:', e);
+          console.error('Leaderboard DB error:', e);
         }
 
         successCount++;

@@ -683,7 +683,7 @@
 
         <!-- ══ OVERVIEW ══ -->
         <section id="panel-overview" class="panel">
-          <div class="panel-header" style="margin-bottom: 1.5rem;">
+          <div class="panel-header" style="margin-bottom: 0.5rem;">
             <div>
               <h1 class="panel-title" style="display: flex; align-items: center; gap: 12px;">
                 <div
@@ -702,7 +702,7 @@
 
           <!-- Red 1: 4 Stat Kartice -->
           <div class="stats-grid"
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem; align-items: stretch;">
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1rem; align-items: stretch;">
             <div class="stat-card">
               <div class="stat-icon stat-purple" style="color: var(--app-primary);">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -762,7 +762,7 @@
 
           <!-- Red 2: 2 Kartice (Top 5 Watchtime & Top 5 Chatters) -->
           <div
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem; align-items: stretch;">
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; margin-bottom: 1rem; align-items: stretch;">
             <!-- Top 5 Watchtime -->
             <div class="ov-card"
               style="display: flex; flex-direction: column; justify-content: space-between; height: 100%;">
@@ -914,7 +914,7 @@
 
               <!-- Action buttons row -->
               <div
-                style="display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 14px; margin-top: 10px; flex-wrap: wrap;">
+                style="display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 14px; flex-wrap: wrap;">
                 <button class="btn btn-primary btn-sm" id="ctrlBotToggleBtn" onclick="toggleBotActiveFromCtrl()"
                   style="flex: 1; justify-content: center; min-width: 110px;">Pokreni bota</button>
                 <button class="btn btn-outline btn-sm" onclick="switchPanel('config')"
@@ -976,8 +976,7 @@
                 </div>
                 <span>Leaderboard</span>
               </h1>
-              <p class="panel-desc">Kompletan pregled aktivnosti, vremena gledanja i broja poslatih poruka za gledaoce
-                na jednom mestu.</p>
+              <p class="panel-desc">Kompletan pregled aktivnosti, vremena gledanja, broja poslatih poruka i ekonomije na jednom mestu.</p>
             </div>
             <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
               <div class="panel-header-toggle">
@@ -989,6 +988,11 @@
                 </label>
               </div>
               <div class="panel-actions" style="display: flex; align-items: center; gap: 8px;">
+                <select class="select-input" id="lbPeriodSelect" onchange="onLeaderboardPeriodChange()" style="font-weight: 600;">
+                  <option value="monthly">Mesečno</option>
+                  <option value="yearly">Godišnje</option>
+                  <option value="alltime">Sve vreme</option>
+                </select>
                 <select class="select-input" id="lbMonthSelect" onchange="loadLeaderboard()"></select>
                 <button class="btn btn-outline btn-sm btn-botrix" onclick="openBotrixImportModal('watchtime')"
                   style="display: flex; align-items: center; gap: 6px;">
@@ -1043,6 +1047,13 @@
               </svg>
               Chatters
             </button>
+            <button class="lb-tab-btn" id="lbTabRanking" onclick="setLeaderboardType('ranking')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              Ranking
+            </button>
           </div>
 
           <div class="lb-podium" id="lbPodium"></div>
@@ -1057,9 +1068,7 @@
               <line x1="12" y1="8" x2="12.01" y2="8"></line>
             </svg>
             <span style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
-              Leaderboard se vodi na <strong>mesečnom nivou</strong> i automatski se arhivira na kraju svakog meseca.
-              Strimeri mogu ručno resetovati tabelu u bilo kom trenutku kucanjem komande
-              <strong>!resetleaderboard</strong> direktno u četu.
+              Leaderboard se vodi na <strong>mesečnom nivou</strong> i automatski se arhivira na kraju svakog meseca. Strimeri mogu ručno resetovati rang listu u bilo kom trenutku kucanjem komande <code style="background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px; color:var(--kick-green);">!resetleaderboard</code> direktno u četu.
             </span>
           </div>
 
@@ -1083,13 +1092,14 @@
                   <th style="width:60px">#</th>
                   <th>Korisnik</th>
                   <th>Poruke</th>
-                  <th>Mesec</th>
-                  <th>Ažurirano</th>
+                  <th>Sati gledanja</th>
+                  <th>Poeni & Nivo</th>
+                  <th>Period</th>
                 </tr>
               </thead>
               <tbody id="leaderboardBody">
                 <tr>
-                  <td colspan="5" class="table-empty">Nema podataka za prikaz.</td>
+                  <td colspan="6" class="table-empty">Nema podataka za prikaz.</td>
                 </tr>
               </tbody>
             </table>
@@ -3744,28 +3754,29 @@
                       <circle cx="12" cy="7" r="4" />
                     </svg>
                   </div>
-                  <span>Custom nalog za bota (Sopstveno ime bota)</span>
+                  <span style="display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="text-decoration: line-through; opacity: 0.65;">Custom nalog za bota (Sopstveno ime bota)</span>
+                    <span style="font-size: 0.72rem; font-weight: 800; padding: 3px 8px; border-radius: 4px; background: rgba(245, 158, 11, 0.2); color: #F59E0B; text-transform: uppercase; border: 1px solid rgba(245, 158, 11, 0.4); letter-spacing: 0.5px;">USKORO</span>
+                  </span>
                 </h3>
 
                 <!-- Connection Status Badge -->
                 <div id="customBotStatusBadge" style="display: inline-flex; align-items: center; gap: 8px;">
                   <span
-                    style="font-size: 0.8rem; font-weight: 600; padding: 5px 12px; border-radius: 20px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-subtle); color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
-                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #9CA3AF;"></span>
-                    Koristi se podrazumevani @KickotBot
+                    style="font-size: 0.8rem; font-weight: 600; padding: 5px 12px; border-radius: 20px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.3); color: #F59E0B; display: flex; align-items: center; gap: 6px;">
+                    <span style="width: 8px; height: 8px; border-radius: 50%; background: #F59E0B;"></span>
+                    DOLAZI USKORO — Koristi se podrazumevani @KickotBot
                   </span>
                 </div>
               </div>
 
-              <p style="font-size: 0.86rem; color: var(--text-muted); margin: 0 0 20px 0; line-height: 1.6;">
-                Povežite vaš lični Kick nalog bota kako bi sve komande, obaveštenja i automatske poruke na vašem kanalu
-                stizale sa vašim ujednačenim brendom (npr. <code style="color: var(--kick-green);">@MojKanalBot</code>
-                umesto sistemskog bota).
+              <p style="font-size: 0.86rem; color: var(--text-muted); margin: 0; line-height: 1.6;">
+                <span style="text-decoration: line-through; opacity: 0.6;">Povežite vaš lični Kick nalog bota kako bi sve komande, obaveštenja i automatske poruke na vašem kanalu stizale sa vašim ujednačenim brendom (npr. @MojKanalBot umesto sistemskog bota).</span>
+                <span style="display: block; margin-top: 6px; color: #F59E0B; font-weight: 600; font-size: 0.84rem;">⏳ Funkcija sopstvenog bota je u izradi i biće dostupna uskoro. Trenutno svi kanali primaju poruke sa zvaničnog bot naloga @KickotBot.</span>
               </p>
 
-              <!-- 3-STEP WIZARD GRID -->
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-
+              <!-- 3-STEP WIZARD GRID (Skriveno - Funkcija dolazi uskoro) -->
+              <div id="customBotWizardGrid" style="display: none;">
                 <!-- STEP 1 CARD -->
                 <div class="wizard-step-card"
                   style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: var(--radius-md); padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px;">
@@ -3886,7 +3897,6 @@
                     <span>Obavezno ukucajte komandu u četu kao strimer.</span>
                   </div>
                 </div>
-
               </div>
             </div>
           </div>
@@ -6422,7 +6432,7 @@
 
   <!-- YouTube Iframe API for Audio Player -->
   <script src="https://www.youtube.com/iframe_api"></script>
-  <script src="js/dist/dashboard.min.js?v=yt_music_v3"></script>
+  <script src="js/dist/dashboard.min.js?v=2.0.0_top5_fix"></script>
 
   <!-- KickALL Data Layer & Analytics -->
   <script src="../js/dist/data-layer.min.js"></script>

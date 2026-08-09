@@ -400,11 +400,7 @@ function povezi() {
             // Welcome message: pošalji pozdravnu poruku ako je definisana i korisnik se prvi put javlja u ovoj sesiji
             if (channelState.welcome_message && !channelState.welcomedUsers.has(userKey)) {
                 channelState.welcomedUsers.add(userKey);
-                let welcomeMsg = channelState.welcome_message;
-                welcomeMsg = welcomeMsg.replace(/{user}/g, `@${username}`).replace(/{username}/g, username);
-                if (!welcomeMsg.includes(`@${username}`) && !welcomeMsg.includes(username)) {
-                    welcomeMsg = `@${username}, ${welcomeMsg}`;
-                }
+                const welcomeMsg = utils.formatTemplateMessage(channelState.welcome_message, username);
                 messenger.posaljiPoruku(chatroomId, welcomeMsg);
             }
 
@@ -985,7 +981,8 @@ function povezi() {
         stopHeartbeat();
         const opis = razlog ? ` (${razlog})` : '';
         utils.log('WARN', `Veza prekinuta (kod: ${kod})${opis}`);
-        scheduleReconnect();
+        const isImmediate = kod === 4200 || kod === 4201 || kod === 4202;
+        scheduleReconnect(isImmediate);
     });
 
     state.ws.on('error', (greska) => {
@@ -1009,7 +1006,13 @@ function startHeartbeat() {
     }, config.HEARTBEAT_MS || 25000);
 }
 
-function scheduleReconnect() {
+function scheduleReconnect(immediate = false) {
+    if (immediate) {
+        state.reconnectAttempt = 0;
+        utils.log('INFO', 'Hitna rekonekcija na WebSocket (kod 4200/4201) za 0.5s...');
+        setTimeout(povezi, 500);
+        return;
+    }
     const baseCekanje = Math.min((config.RECONNECT_BASE_MS || 3000) * Math.pow(2, state.reconnectAttempt), config.RECONNECT_MAX_MS || 60000);
     const jitter = Math.floor(Math.random() * 1000);
     const cekanje = baseCekanje + jitter;

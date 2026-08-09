@@ -35,6 +35,11 @@ async function processQueue(chatroomId) {
 async function izvrsiSlanje(chatroomId, tekst) {
     const channelState = state.getChannelState(chatroomId);
     const sendRoomId = (channelState && channelState.realChatroomId) ? channelState.realChatroomId : chatroomId;
+
+    if (state.isBotAuthenticated === false && (Date.now() - (state.lastAuthErrorTs || 0) < 30000)) {
+        throw new Error('Bot token unauthenticated. Skiping send attempt.');
+    }
+
     const response = await fetch(`https://kick.com/api/v2/messages/send/${sendRoomId}`, {
         method: 'POST',
         headers: {
@@ -49,8 +54,19 @@ async function izvrsiSlanje(chatroomId, tekst) {
 
     if (!response.ok) {
         const errorText = await response.text();
+        if (response.status === 403 && (errorText.includes('User is not authenticated') || errorText.includes('security policy'))) {
+            state.isBotAuthenticated = false;
+            state.lastAuthErrorTs = Date.now();
+            state.authErrorCount = (state.authErrorCount || 0) + 1;
+            log('ERR', `[AUTH] Bot autentifikacija neuspešna (HTTP 403). BEARER_TOKEN ili BOT_COOKIE je nevažeći ili istekao! (${errorText})`);
+        } else if (response.status === 400 && errorText.includes('NO_LINKS_ERROR')) {
+            log('WARN', `[${(channelState && channelState.channelUsername) || chatroomId}] Poruka sa linkom odbijena od Kick-a (NO_LINKS_ERROR). Proverite da li bot ima Moderator ulogu u kanalu ili da li su linkovi dozvoljeni.`);
+        }
         throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
+
+    // Uspešan poziv resetuje auth flag
+    state.isBotAuthenticated = true;
 
     let msgId = null;
     try {
@@ -151,31 +167,36 @@ async function odpinujPoruku(chatroomId) {
 }
 
 async function obrisiPoruku(chatroomId, messageId) {
-    if (!chatroomId || !messageId) return;
+    if (!chatroomId || !messageId) return false;
     const channelState = state.getChannelState(chatroomId);
     const channelName = channelState ? channelState.channelUsername : chatroomId;
     const sendRoomId = (channelState && channelState.realChatroomId) ? channelState.realChatroomId : chatroomId;
     
     try {
-        const response = await fetch(`https://kick.com/api/v2/chatrooms/${sendRoomId}/messages/${messageId}`, {
+        const { gotScraping } = await import('got-scraping');
+        const url = `https://kick.com/api/v2/chatrooms/${sendRoomId}/messages/${messageId}`;
+        const res = await gotScraping({
+            url: url,
             method: 'DELETE',
             headers: {
                 'accept':        'application/json',
                 'authorization': config.BEARER_TOKEN,
-                'content-type':  'application/json',
-                'cookie':        config.BOT_COOKIE,
-                'user-agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36'
-            }
+                'cookie':        config.BOT_COOKIE
+            },
+            retry: { limit: 0 }
         });
         
-        if (!response.ok) {
-            const errorText = await response.text();
-            log('ERR', `[${channelName}] Neuspešno brisanje poruke ${messageId}: HTTP ${response.status} - ${errorText}`);
-        } else {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
             log('INFO', `[${channelName}] Poruka ${messageId} uspešno obrisana sa lajva.`);
+            return true;
+        } else {
+            const bodyText = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+            log('ERR', `[${channelName}] Neuspešno brisanje poruke ${messageId}: HTTP ${res.statusCode} - ${bodyText}`);
+            return false;
         }
     } catch (err) {
         log('ERR', `[${channelName}] Greška pri brisanju poruke ${messageId}: ${err.message}`);
+        return false;
     }
 }
 

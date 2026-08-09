@@ -218,21 +218,18 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
 function kazniKorisnika(chatroomId, username, messageId, reason, actionType, timeoutDuration) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
-    
-    // Delete the offending message
-    if (messageId) {
-        obrisiPoruku(chatroomId, messageId);
-    }
-    
+
     const act = actionType || 'delete';
     const duration = timeoutDuration !== undefined ? timeoutDuration : 600;
     const userKey = username.toLowerCase();
-    
+
     if (act === 'timeout') {
+        if (messageId) obrisiPoruku(chatroomId, messageId);
         posaljiPoruku(chatroomId, `/timeout ${username} ${duration} Automatska moderacija: ${reason}`);
         posaljiPoruku(chatroomId, `@${username} je privremeno udaljen iz čata (Kazna: ${reason}).`);
         log('MOD', `[${channelState.channelUsername || chatroomId}] Timeout ${username} for ${duration}s. Reason: ${reason}`);
     } else if (act === 'warn') {
+        if (messageId) obrisiPoruku(chatroomId, messageId);
         if (!channelState.warningsCount) {
             channelState.warningsCount = new Map();
         }
@@ -249,9 +246,22 @@ function kazniKorisnika(chatroomId, username, messageId, reason, actionType, tim
             log('MOD', `[${channelState.channelUsername || chatroomId}] Warned ${username} (${warnCount}/3). Reason: ${reason}`);
         }
     } else {
-        // Just delete
-        posaljiPoruku(chatroomId, `@${username} tvoja poruka je obrisana (Razlog: ${reason}).`);
-        log('MOD', `[${channelState.channelUsername || chatroomId}] Deleted message from ${username}. Reason: ${reason}`);
+        // Just delete: obrisiPoruku vrati true samo ako je poruka stvarno obrisana na Kick-u
+        if (messageId) {
+            obrisiPoruku(chatroomId, messageId).then((isDeleted) => {
+                if (isDeleted) {
+                    posaljiPoruku(chatroomId, `@${username} tvoja poruka je obrisana (Razlog: ${reason}).`);
+                    log('MOD', `[${channelState.channelUsername || chatroomId}] Deleted message from ${username}. Reason: ${reason}`);
+                } else {
+                    log('WARN', `[${channelState.channelUsername || chatroomId}] Brisanje poruke korisnika ${username} nije uspelo na Kick-u (Security policy ili API greška). Poruka o brisanju nije poslata.`);
+                }
+            }).catch((err) => {
+                log('ERR', `[${channelState.channelUsername || chatroomId}] Neočekivana greška pri brisanju: ${err.message}`);
+            });
+        } else {
+            posaljiPoruku(chatroomId, `@${username} tvoja poruka je obrisana (Razlog: ${reason}).`);
+            log('MOD', `[${channelState.channelUsername || chatroomId}] Deleted message from ${username}. Reason: ${reason}`);
+        }
     }
 }
 

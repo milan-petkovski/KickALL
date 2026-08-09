@@ -131,7 +131,7 @@ async function sacuvajLeaderboard(chatroomId) {
 
             const { data, error: fetchError } = await supabase
                 .from('leaderboard')
-                .select('username, display_name, points')
+                .select('username, points, watchtime_minutes')
                 .eq('channel_id', chatroomId)
                 .eq('month', channelState.tekuciMesecLeaderboarda)
                 .in('username', dirtyKeys);
@@ -141,21 +141,27 @@ async function sacuvajLeaderboard(chatroomId) {
             const dbMap = {};
             if (data) {
                 data.forEach(row => {
-                    dbMap[row.username.toLowerCase()] = row.points;
+                    dbMap[row.username.toLowerCase()] = row;
                 });
             }
 
             const rowsToUpsert = dirtyKeys.map(key => {
-                const dbPoints = dbMap[key] !== undefined ? dbMap[key] : 0;
+                const existing = dbMap[key];
+                const dbPoints = existing && existing.points !== undefined ? existing.points : 0;
+                const dbWatchtime = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : ((channelState.watchtime && channelState.watchtime[key]) ? channelState.watchtime[key].minutes : 0);
                 const delta = channelState.leaderboardDeltas[key];
                 const newPoints = Math.max(0, dbPoints + delta);
+                const mesecStr = channelState.tekuciMesecLeaderboarda || trenutniMesec;
+                const godinaStr = mesecStr.includes('-') ? mesecStr.split('-')[1] : String(new Date().getFullYear());
 
                 return {
                     channel_id: chatroomId,
                     username: key,
                     display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
                     points: newPoints,
-                    month: channelState.tekuciMesecLeaderboarda,
+                    watchtime_minutes: dbWatchtime,
+                    month: mesecStr,
+                    year: godinaStr,
                     updated_at: new Date().toISOString(),
                     _newPoints: newPoints
                 };
@@ -781,12 +787,16 @@ async function ucitajEkonomiju(chatroomId) {
         if (!channelState) return;
         const channelUsername = channelState.channelUsername || chatroomId;
 
-        log('INFO', `[${channelUsername}] Učitavam ekonomiju (XP/level/coins) iz baze...`);
+        const { dobijTrenutniMesec } = require('./utils');
+        const trenutniMesec = dobijTrenutniMesec();
+
+        log('INFO', `[${channelUsername}] Učitavam ekonomiju (XP/level/coins) iz leaderboard tabele...`);
 
         const { data, error } = await supabase
-            .from('user_economy')
+            .from('leaderboard')
             .select('username, display_name, xp, level, coins, daily_claimed_at, daily_streak')
-            .eq('channel_id', chatroomId);
+            .eq('channel_id', chatroomId)
+            .eq('month', trenutniMesec);
 
         if (error) throw error;
 
@@ -802,9 +812,9 @@ async function ucitajEkonomiju(chatroomId) {
                     daily_streak:     row.daily_streak || 0
                 };
             });
-            log('INFO', `[${channelUsername}] Učitana ekonomija za ${data.length} korisnika.`);
+            log('INFO', `[${channelUsername}] Učitana ekonomija iz leaderboard tabele za ${data.length} korisnika.`);
         } else {
-            log('INFO', `[${channelUsername}] Nema ekonomskih podataka u bazi, počinjemo od nule.`);
+            log('INFO', `[${channelUsername}] Nema ekonomskih podataka u leaderboard tabeli za ovaj mesec, počinjemo od nule.`);
         }
     } catch (err) {
         log('ERR', `Greška pri učitavanju ekonomije za ${chatroomId}: ${err.message}`);
@@ -824,6 +834,10 @@ async function sacuvajEkonomiju(chatroomId) {
             return;
         }
 
+        const { dobijTrenutniMesec } = require('./utils');
+        const trenutniMesec = dobijTrenutniMesec();
+        const godinaStr = trenutniMesec.split('-')[1] || String(new Date().getFullYear());
+
         const rows = [];
         for (const key of dirtyUsers) {
             const user = channelState.economy[key];
@@ -837,6 +851,8 @@ async function sacuvajEkonomiju(chatroomId) {
                 coins:            user.coins || 0,
                 daily_claimed_at: user.daily_claimed_at || 0,
                 daily_streak:     user.daily_streak || 0,
+                month:            trenutniMesec,
+                year:             godinaStr,
                 updated_at:       new Date().toISOString()
             });
         }
@@ -847,15 +863,15 @@ async function sacuvajEkonomiju(chatroomId) {
         }
 
         const { error } = await supabase
-            .from('user_economy')
-            .upsert(rows, { onConflict: 'channel_id,username' });
+            .from('leaderboard')
+            .upsert(rows, { onConflict: 'channel_id,username,month' });
 
         if (error) throw error;
 
         channelState.economyDeltas.clear();
         channelState.economyDirty = false;
 
-        log('INFO', `[${channelState.channelUsername || chatroomId}] Ekonomija sačuvana za ${rows.length} korisnika.`);
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Ekonomija sačuvana u leaderboard tabelu za ${rows.length} korisnika.`);
     } catch (err) {
         log('ERR', `Greška pri čuvanju ekonomije za ${chatroomId}: ${err.message}`);
     }

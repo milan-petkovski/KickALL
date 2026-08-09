@@ -41,3 +41,32 @@ test('Sanitization & Utils - proveraKulauna sprečava brzinske komande', () => {
     const res2 = proveraKulauna(chatroomId, key, 'TestUser', 5000);
     assert.equal(res2, true);
 });
+
+test('Sanitization & Utils - formatTemplateMessage zamenjuje sve varijante template varijabli', () => {
+    const { formatTemplateMessage } = require('../src/utils');
+
+    assert.equal(
+        formatTemplateMessage('Dobrodošao/la @$(name)! u strim', 'Karliicaa'),
+        'Dobrodošao/la @Karliicaa! u strim'
+    );
+    assert.equal(
+        formatTemplateMessage('Pozdrav $(user) na kanalu', 'Karliicaa'),
+        'Pozdrav Karliicaa na kanalu'
+    );
+    assert.equal(
+        formatTemplateMessage('Dobrodošao {name}!', 'Karliicaa'),
+        'Dobrodošao Karliicaa!'
+    );
+    assert.equal(
+        formatTemplateMessage('Dobrodošao {username}!', 'Karliicaa'),
+        'Dobrodošao Karliicaa!'
+    );
+    assert.equal(
+        formatTemplateMessage('Welcome @%user% to stream', 'Karliicaa'),
+        'Welcome @Karliicaa to stream'
+    );
+    assert.equal(
+        formatTemplateMessage('Dobrodošao u strim', 'Karliicaa'),
+        '@Karliicaa, Dobrodošao u strim'
+    );
+});

@@ -1413,6 +1413,22 @@ body {
   border: 3px solid transparent;
 }
 
+.user-cell__avatar {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #8B5CF6, #6D28D9);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+}
+
 .podium-1 .podium-avatar {
   background: linear-gradient(135deg, #FBBF24, #F59E0B);
   border-color: #FBBF24;

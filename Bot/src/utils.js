@@ -176,6 +176,27 @@ function prevediVreme(opis) {
     return mapa[opis.toLowerCase().trim()] || opis;
 }
 
+/**
+ * Parsira i formatira predložak poruke (npr. welcome poruku) zamenom varijabli kao što su:
+ * $(name), $(user), {name}, {username}, {user}, $name, $user, %name%, %user%
+ */
+function formatTemplateMessage(template, username) {
+    if (typeof template !== 'string' || !template) return '';
+    if (!username) return template;
+
+    let res = template;
+
+    res = res
+        .replace(/@(?:\$\(name\)|\$\(user\)|\{name\}|\{username\}|\{user\}|\$name|\$user|%name%|%user%)/gi, `@${username}`)
+        .replace(/(?:\$\(name\)|\$\(user\)|\{name\}|\{username\}|\{user\}|\$name|\$user|%name%|%user%)/gi, username);
+
+    if (!res.includes(`@${username}`) && !res.includes(username)) {
+        res = `@${username}, ${res}`;
+    }
+
+    return res;
+}
+
 module.exports = {
     log,
     sanitizeInput,
@@ -183,5 +204,6 @@ module.exports = {
     fetchKickAPI,
     dobijTrenutniMesec,
     proveraKulauna,
-    prevediVreme
+    prevediVreme,
+    formatTemplateMessage
 };

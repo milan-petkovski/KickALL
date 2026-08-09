@@ -127,7 +127,12 @@ module.exports = {
     isConnected: false,
     reconnectAttempt: 0,
     heartbeatTimer: null,
-    watchtimeTickTimer: null
+    watchtimeTickTimer: null,
+
+    // Globalni status autentifikacije bota
+    isBotAuthenticated: true,
+    lastAuthErrorTs: 0,
+    authErrorCount: 0
 };
 
 
