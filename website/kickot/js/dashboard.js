@@ -5316,7 +5316,7 @@ function notifyGlobalLogout(userId) {
   localStorage.setItem('kickbot_global_logout', Date.now().toString());
 
   if (userId) {
-    fetch('https://kickbot-ihzb.onrender.com/api/global-logout', {
+    fetch(`${getBotApiBase()}/api/global-logout`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: userId })
