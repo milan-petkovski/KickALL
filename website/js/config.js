@@ -89,7 +89,7 @@ window.CONFIG = {
       return 'http://localhost:3000';
     }
     if (isLocalhost) {
-      return 'https://kickall.app';
+      return 'https://kickbot-ihzb.onrender.com';
     }
     return window.location.origin;
   },

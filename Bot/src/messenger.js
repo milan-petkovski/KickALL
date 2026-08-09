@@ -1,6 +1,8 @@
 const config = require('./config');
 const state = require('./state');
 const { log } = require('./utils');
+const kickAuth = require('./kickAuth');
+
 
 function posaljiPoruku(chatroomId, tekst) {
     if (!chatroomId) return;
@@ -34,6 +36,65 @@ async function processQueue(chatroomId) {
 
 async function izvrsiSlanje(chatroomId, tekst) {
     const channelState = state.getChannelState(chatroomId);
+    const channelUsername = channelState && channelState.channelUsername;
+
+    if (channelUsername) {
+        try {
+            return await posaljiPrekoZvanicnogApija(chatroomId, tekst, channelUsername, channelState);
+        } catch (error) {
+            if (error.message && error.message.includes('Nema sačuvanih Kick bot tokena')) {
+                // OAuth nije podešen, tiho pređi na stari metod
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    // Fallback: stari neoficijalni endpoint sa statičnim BEARER_TOKEN/BOT_COOKIE.
+    return await posaljiPrekoStarogEndpointa(chatroomId, tekst, channelState);
+}
+
+async function posaljiPrekoZvanicnogApija(chatroomId, tekst, channelUsername, channelState) {
+    try {
+        const accessToken = await kickAuth.getAccessToken();
+        const broadcasterUserId = await kickAuth.getBroadcasterUserId(channelUsername);
+
+        const response = await fetch('https://api.kick.com/public/v1/chat', {
+            method: 'POST',
+            headers: {
+                'accept':        'application/json',
+                'authorization': `Bearer ${accessToken}`,
+                'content-type':  'application/json'
+            },
+            body: JSON.stringify({
+                type: 'user',
+                content: tekst,
+                broadcaster_user_id: broadcasterUserId
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+        }
+
+        const json = await response.json();
+        const msgId = json && json.data && json.data.message_id;
+        state.isBotAuthenticated = true;
+
+        if (msgId) {
+            log('BOT', `[${channelUsername}] ${tekst}`);
+        } else {
+            log('WARN', `[${channelUsername}] Poruka poslata ali API nije vratio message_id. Poruka: "${tekst}"`);
+        }
+        return msgId;
+    } catch (error) {
+        log('ERR', `[${channelUsername || chatroomId}] Greška pri slanju preko zvaničnog Kick API-ja: ${error.message}`);
+        throw error;
+    }
+}
+
+async function posaljiPrekoStarogEndpointa(chatroomId, tekst, channelState) {
     const sendRoomId = (channelState && channelState.realChatroomId) ? channelState.realChatroomId : chatroomId;
 
     if (state.isBotAuthenticated === false && (Date.now() - (state.lastAuthErrorTs || 0) < 30000)) {

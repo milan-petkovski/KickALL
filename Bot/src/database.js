@@ -23,7 +23,7 @@ async function ucitajLeaderboard(chatroomId) {
             log('INFO', `[${channelUsername}] Učitavam leaderboard sa Supabase baze...`);
             const { data, error } = await supabase
                 .from('leaderboard')
-                .select('username, display_name, points')
+                .select('username, display_name, chat')
                 .eq('channel_id', chatroomId)
                 .eq('month', trenutniMesec);
 
@@ -34,7 +34,7 @@ async function ucitajLeaderboard(chatroomId) {
                 data.forEach(row => {
                     podaci[row.username.toLowerCase()] = {
                         username: row.display_name,
-                        count: row.points
+                        count: row.chat || 0
                     };
                 });
                 json = {
@@ -131,7 +131,7 @@ async function sacuvajLeaderboard(chatroomId) {
 
             const { data, error: fetchError } = await supabase
                 .from('leaderboard')
-                .select('username, points, watchtime_minutes')
+                .select('username, chat, watchtime_minutes')
                 .eq('channel_id', chatroomId)
                 .eq('month', channelState.tekuciMesecLeaderboarda)
                 .in('username', dirtyKeys);
@@ -147,10 +147,10 @@ async function sacuvajLeaderboard(chatroomId) {
 
             const rowsToUpsert = dirtyKeys.map(key => {
                 const existing = dbMap[key];
-                const dbPoints = existing && existing.points !== undefined ? existing.points : 0;
+                const dbChat = existing && existing.chat !== undefined ? existing.chat : 0;
                 const dbWatchtime = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : ((channelState.watchtime && channelState.watchtime[key]) ? channelState.watchtime[key].minutes : 0);
                 const delta = channelState.leaderboardDeltas[key];
-                const newPoints = Math.max(0, dbPoints + delta);
+                const newChat = Math.max(0, dbChat + delta);
                 const mesecStr = channelState.tekuciMesecLeaderboarda || trenutniMesec;
                 const godinaStr = mesecStr.includes('-') ? mesecStr.split('-')[1] : String(new Date().getFullYear());
 
@@ -158,16 +158,16 @@ async function sacuvajLeaderboard(chatroomId) {
                     channel_id: chatroomId,
                     username: key,
                     display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
-                    points: newPoints,
+                    chat: newChat,
                     watchtime_minutes: dbWatchtime,
                     month: mesecStr,
                     year: godinaStr,
                     updated_at: new Date().toISOString(),
-                    _newPoints: newPoints
+                    _newChat: newChat
                 };
             });
 
-            const rowsClean = rowsToUpsert.map(({ _newPoints, ...r }) => r);
+            const rowsClean = rowsToUpsert.map(({ _newChat, ...r }) => r);
             const { error: upsertError } = await supabase
                 .from('leaderboard')
                 .upsert(rowsClean, { onConflict: 'channel_id,username,month' });
@@ -177,11 +177,11 @@ async function sacuvajLeaderboard(chatroomId) {
             rowsToUpsert.forEach(row => {
                 const key = row.username;
                 if (channelState.leaderboard[key]) {
-                    channelState.leaderboard[key].count = row._newPoints;
+                    channelState.leaderboard[key].count = row._newChat;
                 } else {
                     channelState.leaderboard[key] = {
                         username: row.display_name,
-                        count: row._newPoints
+                        count: row._newChat
                     };
                 }
                 delete channelState.leaderboardDeltas[key];

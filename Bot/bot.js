@@ -14,6 +14,21 @@ const watchtime = require('./src/watchtime');
 const moderation = require('./src/moderation');
 const economy = require('./src/economy');
 const gambling = require('./src/gambling');
+const kickAuth = require('./src/kickAuth');
+
+(async () => {
+    try {
+        const konfigurisano = await kickAuth.proveriKonfiguraciju();
+        if (konfigurisano) {
+            kickAuth.zakaziAutoOsvezavanje();
+            utils.log('INFO', '[AUTH] Kick OAuth tokeni pronađeni (Supabase/lokalno), automatsko osvežavanje je aktivno. Bot koristi zvanični Public API za slanje poruka.');
+        } else {
+            utils.log('WARN', '[AUTH] Kick OAuth tokeni nisu podešeni. Bot koristi stari BEARER_TOKEN/BOT_COOKIE metod, koji Kick može bilo kada da poništi. Pokreni: node scripts/kick-login.js');
+        }
+    } catch (err) {
+        utils.log('ERR', `[AUTH] Provera Kick OAuth tokena pri startu nije uspela (${err.message}). Bot nastavlja da radi sa starim BEARER_TOKEN/BOT_COOKIE metodom.`);
+    }
+})();
 
 let botUsernameResolved = config.BOT_USERNAME;
 

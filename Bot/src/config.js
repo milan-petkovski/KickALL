@@ -3,6 +3,8 @@ require('dotenv').config();
 const BEARER_TOKEN     = process.env.BEARER_TOKEN;
 const BOT_COOKIE       = process.env.BOT_COOKIE;
 const BOT_USERNAME     = process.env.BOT_USERNAME || "kickot_bot";
+const KICK_CLIENT_ID     = process.env.KICK_CLIENT_ID;
+const KICK_CLIENT_SECRET = process.env.KICK_CLIENT_SECRET;
 const SUPABASE_URL     = process.env.SUPABASE_URL;
 const SUPABASE_KEY     = process.env.SUPABASE_KEY;
 
@@ -16,6 +18,8 @@ module.exports = {
     BEARER_TOKEN,
     BOT_COOKIE,
     BOT_USERNAME,
+    KICK_CLIENT_ID,
+    KICK_CLIENT_SECRET,
     SUPABASE_URL,
     SUPABASE_KEY,
     GIST_ID,

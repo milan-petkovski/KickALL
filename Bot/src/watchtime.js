@@ -69,7 +69,7 @@ async function sacuvajWatchtime(chatroomId) {
 
         const { data, error: fetchError } = await supabase
             .from('leaderboard')
-            .select('username, points, watchtime_minutes')
+            .select('username, chat, watchtime_minutes')
             .eq('channel_id', chatroomId)
             .eq('month', trenutniMesec)
             .in('username', dirtyKeys);
@@ -86,7 +86,7 @@ async function sacuvajWatchtime(chatroomId) {
         const lbRows = dirtyKeys.map(key => {
             const existing = dbMap[key];
             const dbMinutes = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : 0;
-            const dbPoints = existing && existing.points !== undefined ? existing.points : ((channelState.leaderboard && channelState.leaderboard[key]) ? channelState.leaderboard[key].count : 0);
+            const dbChat = existing && existing.chat !== undefined ? existing.chat : ((channelState.leaderboard && channelState.leaderboard[key]) ? channelState.leaderboard[key].count : 0);
             const delta = channelState.watchtimeDeltas[key];
             const newMinutes = Math.max(0, dbMinutes + delta);
 
@@ -94,7 +94,7 @@ async function sacuvajWatchtime(chatroomId) {
                 channel_id: chatroomId,
                 username: key,
                 display_name: (channelState.watchtime[key] && channelState.watchtime[key].display_name) || key,
-                points: dbPoints,
+                chat: dbChat,
                 watchtime_minutes: newMinutes,
                 month: trenutniMesec,
                 year: godinaStr,

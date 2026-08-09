@@ -2,10 +2,21 @@ const { isRateLimited } = require('./utils/rate-limiter');
 const MAX_BODY_BYTES = 10000;       // Max 10KB payload za OAuth exchange
 
 exports.handler = async (event) => {
+  const requestOrigin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
+  const allowedOrigins = [
+    'https://kickall.app',
+    'https://kickall.netlify.app',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+  ];
+  const allowOrigin = allowedOrigins.includes(requestOrigin) ? requestOrigin : (process.env.ALLOWED_ORIGIN || 'https://kickall.app');
+
   const headers = {
-    'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://kickall.app',
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Internal-Token',
     'Content-Type': 'application/json'
   };
 

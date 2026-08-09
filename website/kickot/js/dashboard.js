@@ -813,18 +813,19 @@ function updateAvatarUI(elementId, avatarUrl) {
 }
 
 function formatPorukeCount(count) {
-  const n = Math.abs(count || 0) % 100;
+  const val = Number(count) || 0;
+  const n = Math.abs(val) % 100;
   const n1 = n % 10;
   if (n > 10 && n < 20) {
-    return `${count} poruka`;
+    return `${val} poruka`;
   }
   if (n1 === 1) {
-    return `${count} poruka`;
+    return `${val} poruka`;
   }
   if (n1 >= 2 && n1 <= 4) {
-    return `${count} poruke`;
+    return `${val} poruke`;
   }
-  return `${count} poruka`;
+  return `${val} poruka`;
 }
 
 let editingCmdId = null; // null = new, UUID = edit
@@ -2846,7 +2847,8 @@ function renderMiniLeaderboard(rows) {
     el.innerHTML = '<div class="mini-empty" style="color:var(--text-muted); font-size:0.85rem; padding:12px 0;">Nema podataka za chatters.</div>';
     return;
   }
-  const topChatters = [...rows].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 5);
+  const getChatVal = item => Number(item.chat !== undefined ? item.chat : (item.points || 0));
+  const topChatters = [...rows].sort((a, b) => getChatVal(b) - getChatVal(a)).slice(0, 5);
   el.innerHTML = topChatters.map((item, idx) => {
     const avatarKey = (item.username || '').toLowerCase();
     const cachedUrl = avatarCache[avatarKey];
@@ -2867,6 +2869,7 @@ function renderMiniLeaderboard(rows) {
       });
     }
 
+    const countVal = getChatVal(item);
     return `
       <div class="mini-item" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -2874,7 +2877,7 @@ function renderMiniLeaderboard(rows) {
           ${avatarHtml}
           <span style="font-weight:600; font-size:0.85rem; color:#fff;">@${escapeHtml(item.username)}</span>
         </div>
-        <span style="font-size:0.82rem; font-weight:700; color:#3B82F6;">${formatPorukeCount(item.points || 0)}</span>
+        <span style="font-size:0.82rem; font-weight:700; color:#3B82F6;">${formatPorukeCount(countVal)}</span>
       </div>
     `;
   }).join('');
@@ -2956,15 +2959,22 @@ async function loadLeaderboard() {
     query = query.eq('month', selectedVal);
   }
 
-  let { data, error } = await query.order('points', { ascending: false }).limit(500);
+  let { data, error } = await query.order('chat', { ascending: false }).limit(500);
 
-  if (error) { data = []; }
+  if (error) {
+    console.warn('Leaderboard query with chat ordering returned error, attempting fallback:', error);
+    const fallbackRes = await sb.from('leaderboard')
+      .select('*')
+      .eq('channel_id', String(activeChannel.id))
+      .limit(500);
+    data = fallbackRes.data || [];
+  }
   allLeaderboard = data || [];
   renderMiniLeaderboard(allLeaderboard);
   renderMiniWatchtime(allLeaderboard);
 
   // Calculate and display total chat messages with Serbian grammar formatting
-  const totalChat = allLeaderboard.reduce((s, r) => s + (r.points || 0), 0);
+  const totalChat = allLeaderboard.reduce((s, r) => s + (r.chat !== undefined ? r.chat : (r.points || 0)), 0);
   const chatStatEl = document.getElementById('statTotalChat');
   if (chatStatEl) {
     const lastDigit = totalChat % 10;
@@ -3074,10 +3084,12 @@ function buildCombinedRows() {
 
   allLeaderboard.forEach(r => {
     const key = (r.username || '').toLowerCase();
+    const chatCount = r.chat !== undefined ? r.chat : (r.points || 0);
     if (!map[key]) {
       map[key] = {
         username: r.username,
         display_name: r.display_name || r.username,
+        chat: 0,
         points: 0,
         minutes: 0,
         coins: r.coins || 0,
@@ -3087,7 +3099,8 @@ function buildCombinedRows() {
         updated_at: r.updated_at
       };
     }
-    map[key].points += (r.points || 0);
+    map[key].chat += chatCount;
+    map[key].points += chatCount;
     map[key].minutes += (r.watchtime_minutes || r.minutes || 0);
     map[key].coins = Math.max(map[key].coins, r.coins || 0);
     map[key].xp = Math.max(map[key].xp, r.xp || 0);
@@ -3095,8 +3108,8 @@ function buildCombinedRows() {
   });
 
   return Object.values(map).sort((a, b) => {
-    const scoreA = (a.points || 0) + Math.floor((a.minutes || 0) / 6);
-    const scoreB = (b.points || 0) + Math.floor((b.minutes || 0) / 6);
+    const scoreA = (a.chat || a.points || 0) + Math.floor((a.minutes || 0) / 6);
+    const scoreB = (b.chat || b.points || 0) + Math.floor((b.minutes || 0) / 6);
     return scoreB - scoreA;
   });
 }
@@ -3113,11 +3126,11 @@ function renderUnifiedLeaderboard(customRows = null) {
   } else if (isCombined) {
     rows = buildCombinedRows();
   } else if (isChatters) {
-    rows = [...allLeaderboard].sort((a, b) => (b.points || 0) - (a.points || 0));
+    rows = [...allLeaderboard].sort((a, b) => (b.chat !== undefined ? b.chat : (b.points || 0)) - (a.chat !== undefined ? a.chat : (a.points || 0)));
   } else if (isWatchtime) {
     rows = [...allLeaderboard].sort((a, b) => (b.watchtime_minutes || b.minutes || 0) - (a.watchtime_minutes || a.minutes || 0));
   } else if (isRanking) {
-    rows = [...allLeaderboard].sort((a, b) => ((b.coins || b.points || 0) - (a.coins || a.points || 0)));
+    rows = [...allLeaderboard].sort((a, b) => ((b.coins || b.xp || 0) - (a.coins || a.xp || 0)));
   } else {
     rows = buildCombinedRows();
   }
@@ -3217,8 +3230,8 @@ function renderUnifiedLeaderboard(customRows = null) {
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
     const watchtimeStr = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
-    const porukeStr = formatPorukeCount(row.points || 0);
-    const coinsVal = row.coins || row.points || 0;
+    const porukeStr = formatPorukeCount(row.chat !== undefined ? row.chat : (row.points || 0));
+    const coinsVal = row.coins || 0;
     const levelStr = `Nivo ${row.level || 1} (${row.xp || 0} XP)`;
 
     if (isChatters) {
@@ -3310,8 +3323,8 @@ function renderPodium(top3) {
     const hours = Math.floor(totalMins / 60);
     const mins = totalMins % 60;
     const watchtimeFullStr = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
-    const porukeCount = row.points || 0;
-    const coinsVal = row.coins || row.points || 0;
+    const porukeCount = row.chat !== undefined ? row.chat : (row.points || 0);
+    const coinsVal = row.coins || 0;
 
     let valStr = '';
     if (isChatters) {
@@ -3321,8 +3334,8 @@ function renderPodium(top3) {
     } else if (isRanking) {
       valStr = `Lvl ${row.level || 1} / ${coinsVal.toLocaleString()} p.`;
     } else {
-      // Zajedno (Watchtime samo sati / Poruke / Nivo)
-      valStr = `${hours}h / ${porukeCount}p / Lvl ${row.level || 1}`;
+      // Zajedno (Watchtime / Poruke / Nivo)
+      valStr = `${hours}h / ${formatPorukeCount(porukeCount)} / Lvl ${row.level || 1}`;
     }
 
     const avatarKey = (row.username || '').toLowerCase();
@@ -3356,15 +3369,15 @@ function renderPodium(top3) {
 function renderMiniLeaderboard(rows) {
   const el = document.getElementById('miniLeaderboard');
   if (!el) return;
-  if (!rows || rows.length === 0) { el.innerHTML = '<div class="mini-empty">Nema podataka</div>'; return; }
+  if (!rows || rows.length === 0) { el.innerHTML = '<div class="mini-empty" style="color:var(--text-muted); font-size:0.85rem; padding:12px 0;">Nema podataka za chatters.</div>'; return; }
 
-  const topRows = [...rows].sort((a, b) => (b.points || 0) - (a.points || 0)).slice(0, 5);
+  const getChatVal = item => Number(item.chat !== undefined ? item.chat : (item.points || 0));
+  const topRows = [...rows].sort((a, b) => getChatVal(b) - getChatVal(a)).slice(0, 5);
 
   el.innerHTML = topRows.map((row, i) => {
     const avatarKey = (row.username || '').toLowerCase();
     const cachedUrl = avatarCache[avatarKey];
     const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
-    // Sanitizacija URL-a: prihvati samo https://
     const safeAvatarUrl = hasAvatar && /^https:\/\//.test(cachedUrl) ? cachedUrl : null;
     const avatarStyle = safeAvatarUrl
       ? `background-image:url('${safeAvatarUrl}'); background-size:cover; background-position:center; border:1px solid rgba(255,255,255,0.15);`
@@ -3377,12 +3390,15 @@ function renderMiniLeaderboard(rows) {
       }, 60 * i);
     }
 
+    const countVal = getChatVal(row);
     return `
-      <div class="mini-item">
-        <div class="mini-rank rank-${i < 3 ? i + 1 : 'n'}">${i + 1}</div>
-        <div id="mini-lead-avatar-${i}" class="mini-avatar" style="${avatarStyle}">${avatarContent}</div>
-        <span class="mini-username">${escapeHtml(row.display_name || row.username)}</span>
-        <span class="mini-value">${formatPorukeCount(row.points)}</span>
+      <div class="mini-item" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-weight:700; font-size:0.8rem; color:${rankColor(i)}; min-width:16px;">${i + 1}.</span>
+          <div id="mini-lead-avatar-${i}" class="user-cell__avatar" style="width:24px; height:24px; font-size:0.7rem; ${avatarStyle}">${avatarContent}</div>
+          <span style="font-weight:600; font-size:0.85rem; color:#fff;">@${escapeHtml(row.display_name || row.username)}</span>
+        </div>
+        <span style="font-size:0.82rem; font-weight:700; color:#3B82F6;">${formatPorukeCount(countVal)}</span>
       </div>
     `;
   }).join('');
@@ -8588,13 +8604,13 @@ async function rejectRedemption(id) {
   if (!currentChannelConfig) currentChannelConfig = {};
   currentChannelConfig.store_redemptions = redemptions;
 
-  // Refund points to viewer if found on leaderboard
+  // Refund coins to viewer if found on leaderboard
   const userKey = target.username.toLowerCase();
   const row = (allLeaderboard || []).find(x => (x.username || '').toLowerCase() === userKey);
   if (row) {
-    row.points = (row.points || 0) + target.cost;
+    row.coins = (row.coins || 0) + target.cost;
     const { error: lbError } = await sb.from('leaderboard')
-      .upsert({ channel_id: String(activeChannel.id), username: userKey, points: row.points }, { onConflict: 'channel_id,username' });
+      .upsert({ channel_id: String(activeChannel.id), username: userKey, coins: row.coins }, { onConflict: 'channel_id,username' });
     if (!lbError) renderEconomyLeaderboard();
   }
 
