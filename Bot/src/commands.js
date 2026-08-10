@@ -1525,7 +1525,7 @@ async function handleAddCommand(chatroomId, sender, textRaw, senderObj) {
                     .from('custom_commands')
                     .update({
                         response: responseText,
-                        cooldown_ms: channelState.planLimits?.minCooldownMs || 3000,
+                        cooldown: channelState.planLimits?.minCooldownMs || 3000,
                         enabled: true,
                         updated_at: new Date().toISOString()
                     })
@@ -1536,13 +1536,15 @@ async function handleAddCommand(chatroomId, sender, textRaw, senderObj) {
                 const { error: insertErr } = await database.supabase
                     .from('custom_commands')
                     .insert({
+                        user_id: channelState.userId,
                         channel_id: chatroomId,
                         command: cleanCmdName,
                         response: responseText,
-                        cooldown_ms: channelState.planLimits?.minCooldownMs || 3000,
+                        cooldown: channelState.planLimits?.minCooldownMs || 3000,
                         enabled: true,
                         min_rank: 'everyone',
-                        is_default: false
+                        is_default: false,
+                        created_at: new Date().toISOString()
                     });
 
                 if (insertErr) throw insertErr;
@@ -1584,13 +1586,19 @@ async function handleDelCommand(chatroomId, sender, cmdRaw, senderObj) {
     const database = require('./database');
     if (database.KORISTI_SUPABASE && database.supabase) {
         try {
-            const { error } = await database.supabase
+            const { data: deleted, error } = await database.supabase
                 .from('custom_commands')
                 .delete()
                 .eq('channel_id', chatroomId)
-                .eq('command', cmdName);
+                .eq('command', cmdName)
+                .select('id');
 
             if (error) throw error;
+
+            if (!deleted || deleted.length === 0) {
+                posaljiPoruku(chatroomId, `⚠️ Komanda !${cmdName} nije pronađena.`);
+                return;
+            }
 
             await database.ucitajCustomKomande(chatroomId);
             posaljiPoruku(chatroomId, `✅ Custom komanda !${cmdName} je uspešno obrisana.`);

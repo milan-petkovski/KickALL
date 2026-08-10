@@ -346,6 +346,38 @@ function povezi() {
             return;
         }
 
+        // Ostali događaji sa kanala (Subscription, Gifted Subscription, Follower)
+        if (
+            response.event === 'App\\Events\\SubscriptionEvent' ||
+            response.event === 'App\\Events\\GiftedSubscriptionsEvent' ||
+            response.event === 'App\\Events\\FollowersUpdateEvent'
+        ) {
+            let evtData;
+            try {
+                evtData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+            } catch {
+                evtData = null;
+            }
+
+            const match = response.channel ? response.channel.match(/^chatrooms\.(\d+)\.v2$/) : null;
+            if (match && evtData) {
+                const pusherChatroomId = match[1];
+                let chatroomId = Object.keys(state.channels).find(k => {
+                    const cs = state.channels[k];
+                    return cs.realChatroomId === pusherChatroomId || k === pusherChatroomId;
+                }) || pusherChatroomId;
+
+                const channelState = state.getChannelState(chatroomId);
+                if (channelState && channelState.isStreamLive) {
+                    const activeUser = evtData.username || evtData.follower?.username || evtData.subscriber?.username || evtData.user?.username;
+                    if (activeUser && activeUser.toLowerCase() !== channelState.channelUsername.toLowerCase()) {
+                        watchtime.registrujAktivnogGledaoca(chatroomId, activeUser);
+                    }
+                }
+            }
+            return;
+        }
+
         // Nova chat poruka
         if (response.event === 'App\\Events\\ChatMessageEvent') {
             let chatData;

@@ -97,7 +97,7 @@ function proveraKulauna(chatroomId, kljuc, username, customCooldownMs) {
     if (limit === undefined) {
         const cmdIme = kljuc.startsWith('!') ? kljuc.slice(1).toLowerCase() : kljuc.toLowerCase();
         if (channelState.customCommands && channelState.customCommands[cmdIme]) {
-            limit = channelState.customCommands[cmdIme].cooldown_ms;
+            limit = channelState.customCommands[cmdIme].cooldown;
         }
     }
     if (limit === undefined) {

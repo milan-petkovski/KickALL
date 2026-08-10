@@ -605,7 +605,7 @@ async function ucitajCustomKomande(chatroomId) {
 
         const { data, error } = await supabase
             .from('custom_commands')
-            .select('command, response, cooldown_ms, enabled, min_rank, is_default')
+            .select('command, response, cooldown, enabled, min_rank, is_default')
             .eq('channel_id', chatroomId)
             .eq('enabled', true);
 
@@ -622,7 +622,7 @@ async function ucitajCustomKomande(chatroomId) {
                         const minCd = channelState.planLimits?.minCooldownMs || 1000;
                         channelState.customCommands[alias] = {
                             response: row.response,
-                            cooldown_ms: Math.max(row.cooldown_ms || 5000, minCd),
+                            cooldown: Math.max(row.cooldown || 5000, minCd),
                             min_rank: row.min_rank || 'everyone',
                             is_default: row.is_default || false
                         };
