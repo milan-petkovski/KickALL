@@ -877,11 +877,11 @@ async function sacuvajEkonomiju(chatroomId) {
     }
 }
 
-async function syncChatroomId(oldId, newChatroomId, channelName) {
+async function syncChatroomId(channelName, realChatroomId) {
     try {
         await supabase
             .from('channels')
-            .update({ chatroom_id: String(newChatroomId) })
+            .update({ chatroom_id: String(realChatroomId) })
             .eq('username', channelName);
     } catch (err) {
         console.error('Greska u syncChatroomId:', err);

@@ -2373,7 +2373,7 @@ const defaultBuiltinCommands = [
   { id: 'builtin-setgame', command: 'setgame [naziv]', response: 'Ručno postavlja naziv igre koja se prikazuje u informacijama strima.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'setgame', category: 'Moderacija' },
 
   // Statistika
-  { id: 'builtin-topwatchtime', command: 'top watchtime [broj], topwatch [broj]', response: 'Prikazuje top listu gledalaca sa najviše provedenih sati na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'top watchtime', category: 'Statistika' },
+  { id: 'builtin-topwatchtime', command: 'topwatchtime [broj], topwatch [broj]', response: 'Prikazuje top listu gledalaca sa najviše provedenih sati na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'topwatchtime', category: 'Statistika' },
   { id: 'builtin-topchat', command: 'top chat [broj], top [broj], leaderboard [broj]', response: 'Prikazuje rang listu najaktivnijih korisnika po broju poruka u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'top', category: 'Statistika' },
   { id: 'builtin-watchtime', command: 'watchtime [@user]', response: 'Prikazuje lično ili tuđe usaglašeno vreme gledanja strima.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'watchtime', category: 'Statistika' },
   { id: 'builtin-chat', command: 'chat, aktivnost, stats', response: 'Prikazuje tačan broj poslatih poruka u četu i aktivnost.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'aktivnost', category: 'Statistika' },
@@ -2435,6 +2435,19 @@ const RANK_COLORS = {
   'moderator': '#10B981',
   'broadcaster': '#EF4444'
 };
+
+// Ugrađene komande u prikazu sadrže placeholder tekst (npr. "pin [tekst]", "samar @user",
+// "dodajkomandu !naziv Odgovor, addcom !naziv Odgovor"). Bot prepoznaje komande isključivo
+// po prvoj reči nakon "!" (bez zagrada, @user ili ostatka teksta), pa se u bazu MORA upisati
+// očišćeno ime komande — u suprotnom se uključi/isključi i izmena cooldown-a/ranga za builtin
+// komande tiho ne primenjuju na botu (bot ih nikad ne pronađe u custom_commands tabeli).
+function extractBuiltinAliasKeys(rawCommand) {
+  return (rawCommand || '')
+    .split(',')
+    .map(part => part.trim().split(/\s+/)[0].replace(/^!/, '').toLowerCase())
+    .filter(Boolean)
+    .join(', ');
+}
 
 function getSerbianPlural(n, wordOne, wordFew, wordMany) {
   const abs = Math.abs(n);
@@ -2767,7 +2780,7 @@ function renderBuiltinCommandsGrid() {
           
           <!-- Command Trigger Name -->
           <div style="font-family: var(--font-mono); color: #fff; font-weight: 700; font-size: 1.02rem; letter-spacing: -0.2px; word-break: break-word; line-height: 1.35; margin-top: 2px;">
-            !${escapeHtml(cmd.command)}
+            ${cmd.command.split(',').map(alias => `!${escapeHtml(alias.trim())}`).join(', ')}
           </div>
           
           <!-- Description -->
@@ -3467,16 +3480,18 @@ function renderPodium(top3) {
       : '';
     const avatarContent = safeAvatarUrl ? '' : (row.display_name || row.username || '?').charAt(0).toUpperCase();
 
+    const podiumId = `podium-avatar-${i}-${avatarKey}`;
+
     // Pokreni fetch ako nije keširano i ako imamo username
     if (!safeAvatarUrl && row.username) {
       setTimeout(() => {
-        getOrFetchAvatar(row.username, `podium-avatar-${i}`);
+        getOrFetchAvatar(row.username, podiumId);
       }, 30 * i);
     }
 
     return `
       <div class="podium-item ${cls}">
-        <div class="podium-avatar" id="podium-avatar-${i}" style="${avatarStyle}">${avatarContent}</div>
+        <div class="podium-avatar" id="${podiumId}" style="${avatarStyle}">${avatarContent}</div>
         <div class="podium-name">${escapeHtml(row.display_name || row.username)}</div>
         <div class="podium-points">${valStr}</div>
         <div class="podium-base">${num}</div>
@@ -5012,9 +5027,14 @@ async function saveCommand() {
   if (!isBuiltin && !response) { errEl.textContent = 'Unesi odgovor bota.'; errEl.style.display = 'block'; return; }
   if (!isBuiltin && response.length > 500) { errEl.textContent = 'Odgovor ne sme biti duži od 500 karaktera.'; errEl.style.display = 'block'; return; }
 
-  const enteredAliases = rawCommand.split(',')
-    .map(c => c.trim().replace(/^!/, '').toLowerCase())
-    .filter(Boolean);
+  // Za builtin komande cmdName polje je disabled i i dalje sadrži prikazani tekst sa
+  // placeholder-ima (npr. "pin [tekst]") — mora se očistiti na isti način kao u toggleCommand,
+  // inače bot nikad ne prepozna override za rang/cooldown/status u custom_commands tabeli.
+  const enteredAliases = isBuiltin
+    ? extractBuiltinAliasKeys(rawCommand).split(',').map(c => c.trim()).filter(Boolean)
+    : rawCommand.split(',')
+      .map(c => c.trim().replace(/^!/, '').toLowerCase())
+      .filter(Boolean);
 
   if (enteredAliases.length === 0) {
     errEl.textContent = 'Unesi bar jedan validan alias.';
@@ -5095,7 +5115,7 @@ async function toggleCommand(id, currentEnabled, _isDefault) {
     const payload = {
       user_id: getChannelOwnerId(),
       channel_id: activeChannel.id,
-      command: cmdObj.command,
+      command: extractBuiltinAliasKeys(cmdObj.command),
       response: cmdObj.response,
       cooldown: cmdObj.cooldown,
       min_rank: cmdObj.min_rank || 'everyone',
@@ -5655,30 +5675,8 @@ function setLoading(btnId, loading) {
   }
 }
 
-function fmtDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return `${d.getDate().toString().padStart(2, '0')}.${(d.getMonth() + 1).toString().padStart(2, '0')}.${d.getFullYear()}`;
-}
-
-function getCurrentMonth() {
-  const now = new Date();
-  return `${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
-}
-
-function rankColor(i) {
-  if (i === 0) return '#FBBF24';
-  if (i === 1) return '#94A3B8';
-  if (i === 2) return '#92400E';
-  return 'var(--text-primary)';
-}
-
-function downloadCsv(content, filename) {
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(content);
-  a.download = filename;
-  a.click();
-}
+// fmtDate, getCurrentMonth, rankColor i downloadCsv su definisani ranije u fajlu
+// (uklonjen duplikat koji je tiho pregazio te implementacije)
 
 // ── Add spinner keyframe to document ──────────────────────
 const style = document.createElement('style');

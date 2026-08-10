@@ -1182,7 +1182,7 @@ async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
                 realChatroomId = String(data.chatroom.id);
                 utils.log('INFO', `[${channelUsername}] Nađen pravi chatroom ID: ${realChatroomId} (baza: ${chatroomId})`);
                 if (realChatroomId !== String(chatroomId)) {
-                    database.syncChatroomId(channelUsername, chatroomId, realChatroomId).catch(err => {
+                    database.syncChatroomId(channelUsername, realChatroomId).catch(err => {
                         utils.log('ERR', `[${channelUsername}] Neuspešna sinhronizacija chatroom ID-ja: ${err.message}`);
                     });
                 }
