@@ -2820,6 +2820,76 @@ function fmtDate(dateStr) {
   }
 }
 
+function aggregateLeaderboardRows(rows) {
+  const list = rows || [];
+  const periodSel = document.getElementById('lbPeriodSelect');
+  const sel = document.getElementById('lbMonthSelect');
+  const periodMode = periodSel?.value || 'monthly';
+  if (periodMode === 'monthly') return [...list];
+
+  const selectedVal = sel?.value || (periodMode === 'yearly' ? String(new Date().getFullYear()) : getCurrentMonth());
+  const periodLabel = periodMode === 'alltime' ? 'Sve vreme' : selectedVal;
+  const map = {};
+
+  list.forEach(r => {
+    const key = (r.username || '').toLowerCase();
+    const chatCount = r.chat !== undefined ? r.chat : (r.points || 0);
+    if (!map[key]) {
+      map[key] = {
+        username: r.username,
+        display_name: r.display_name || r.username,
+        chat: 0,
+        points: 0,
+        watchtime_minutes: 0,
+        minutes: 0,
+        coins: r.coins || 0,
+        xp: r.xp || 0,
+        level: r.level || 1,
+        month: periodLabel,
+        updated_at: r.updated_at
+      };
+    }
+    map[key].chat += chatCount;
+    map[key].points += chatCount;
+    const mins = r.watchtime_minutes || r.minutes || 0;
+    map[key].watchtime_minutes += mins;
+    map[key].minutes += mins;
+    map[key].coins = Math.max(map[key].coins, r.coins || 0);
+    map[key].xp = Math.max(map[key].xp, r.xp || 0);
+    map[key].level = Math.max(map[key].level, r.level || 1);
+  });
+
+  return Object.values(map);
+}
+
+function sortLeaderboardRows(rows, type = activeLeaderboardType) {
+  const aggregated = aggregateLeaderboardRows(rows);
+
+  if (type === 'watchtime') {
+    return aggregated.sort((a, b) => (b.watchtime_minutes || b.minutes || 0) - (a.watchtime_minutes || a.minutes || 0));
+  }
+
+  if (type === 'ranking') {
+    return aggregated.sort((a, b) => {
+      const levelDiff = (b.level || 1) - (a.level || 1);
+      if (levelDiff !== 0) return levelDiff;
+      const xpDiff = (b.xp || 0) - (a.xp || 0);
+      if (xpDiff !== 0) return xpDiff;
+      return (b.coins || 0) - (a.coins || 0);
+    });
+  }
+
+  if (type === 'combined') {
+    return aggregated.sort((a, b) => {
+      const scoreA = (a.chat || a.points || 0) + Math.floor((a.minutes || a.watchtime_minutes || 0) / 6);
+      const scoreB = (b.chat || b.points || 0) + Math.floor((b.minutes || b.watchtime_minutes || 0) / 6);
+      return scoreB - scoreA;
+    });
+  }
+
+  return aggregated.sort((a, b) => (b.chat !== undefined ? b.chat : (b.points || 0)) - (a.chat !== undefined ? a.chat : (a.points || 0)));
+}
+
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -2842,7 +2912,6 @@ function downloadCsv(csvContent, fileName) {
   document.body.removeChild(link);
 }
 
-// ── Leaderboard ───────────────────────────────────────────
 // ── Leaderboard ───────────────────────────────────────────
 function populateMonthSelector() {
   const periodSel = document.getElementById('lbPeriodSelect');
@@ -2881,28 +2950,6 @@ function onLeaderboardPeriodChange() {
   loadLeaderboard();
 }
 
-function sortLeaderboardRows(rows, type = activeLeaderboardType) {
-  const list = [...(rows || [])];
-
-  if (type === 'watchtime') {
-    return list.sort((a, b) => (b.watchtime_minutes || b.minutes || 0) - (a.watchtime_minutes || a.minutes || 0));
-  }
-
-  if (type === 'ranking') {
-    return list.sort((a, b) => ((b.coins || b.xp || 0) - (a.coins || a.xp || 0)));
-  }
-
-  if (type === 'combined') {
-    return list.sort((a, b) => {
-      const scoreA = (a.chat || a.points || 0) + Math.floor((a.minutes || a.watchtime_minutes || 0) / 6);
-      const scoreB = (b.chat || b.points || 0) + Math.floor((b.minutes || b.watchtime_minutes || 0) / 6);
-      return scoreB - scoreA;
-    });
-  }
-
-  return list.sort((a, b) => (b.chat !== undefined ? b.chat : (b.points || 0)) - (a.chat !== undefined ? a.chat : (a.points || 0)));
-}
-
 async function loadWatchtime() {
   if (!activeChannel) return;
 
@@ -2917,10 +2964,6 @@ async function loadWatchtime() {
 }
 
 function refreshMiniPanels(rows) {
-  // Avatar cache is shared between mini panels (chatters + watchtime).
-  // When one panel resolves an avatar fetch for a user who also appears
-  // in the other panel, both need to re-render or the other panel gets
-  // stuck showing the fallback initial forever.
   if (document.getElementById('miniLeaderboard')) renderMiniLeaderboard(rows);
   if (document.getElementById('miniWatchtime')) renderMiniWatchtime(rows);
 }
@@ -2933,7 +2976,8 @@ function renderMiniLeaderboard(rows) {
     return;
   }
   const getChatVal = item => Number(item.chat !== undefined ? item.chat : (item.points || 0));
-  const topChatters = [...rows].sort((a, b) => getChatVal(b) - getChatVal(a)).slice(0, 5);
+  const aggregatedRows = aggregateLeaderboardRows(rows);
+  const topChatters = [...aggregatedRows].sort((a, b) => getChatVal(b) - getChatVal(a)).slice(0, 5);
   el.innerHTML = topChatters.map((item, idx) => {
     const avatarKey = (item.username || '').toLowerCase();
     const cachedUrl = avatarCache[avatarKey];
@@ -2948,35 +2992,37 @@ function renderMiniLeaderboard(rows) {
 
     if (!safeAvatarUrl && avatarCache[avatarKey] !== 'loading') {
       avatarCache[avatarKey] = 'loading';
-      getAvatarFromCache(item.username).then(cachedDB => {
-        if (cachedDB && cachedDB !== 'none') {
-          avatarCache[avatarKey] = cachedDB;
-          refreshMiniPanels(rows);
-        } else {
+      getAvatarFromCache(item.username)
+        .then(cached => {
+          if (cached && cached !== 'none') {
+            avatarCache[avatarKey] = cached;
+            refreshMiniPanels(rows);
+          } else {
+            fetchKickAvatar(item.username).then(url => {
+              avatarCache[avatarKey] = url || 'none';
+              setAvatarInCache(avatarKey, url || 'none').catch(() => {});
+              refreshMiniPanels(rows);
+            });
+          }
+        })
+        .catch(() => {
           fetchKickAvatar(item.username).then(url => {
             avatarCache[avatarKey] = url || 'none';
-            setAvatarInCache(avatarKey, url || 'none').catch(() => { });
+            setAvatarInCache(avatarKey, url || 'none').catch(() => {});
             refreshMiniPanels(rows);
           });
-        }
-      }).catch(() => {
-        fetchKickAvatar(item.username).then(url => {
-          avatarCache[avatarKey] = url || 'none';
-          setAvatarInCache(avatarKey, url || 'none').catch(() => { });
-          refreshMiniPanels(rows);
         });
-      });
     }
 
-    const countVal = getChatVal(item);
+    const val = getChatVal(item);
     return `
-      <div class="mini-item" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-weight:700; font-size:0.8rem; color:${rankColor(idx)}; min-width:16px;">${idx + 1}.</span>
+      <div class="mini-row" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-weight:700; color:var(--text-muted); width:16px;">${idx + 1}</span>
           ${avatarHtml}
-          <span style="font-weight:600; font-size:0.85rem; color:#fff;">@${escapeHtml(item.username)}</span>
+          <span style="font-weight:600; color:var(--text-main); font-size:0.9rem;">${escapeHtml(item.display_name || item.username)}</span>
         </div>
-        <span style="font-size:0.82rem; font-weight:700; color:#3B82F6;">${formatPorukeCount(countVal)}</span>
+        <span style="font-weight:700; color:#53fc18; font-size:0.85rem;">${val.toLocaleString('en-US')}</span>
       </div>
     `;
   }).join('');
@@ -2989,13 +3035,10 @@ function renderMiniWatchtime(rows) {
     el.innerHTML = '<div class="mini-empty" style="color:var(--text-muted); font-size:0.85rem; padding:12px 0;">Nema podataka za watchtime.</div>';
     return;
   }
-  const topWatchtime = [...rows].sort((a, b) => {
-    const valA = Number(a.watchtime_minutes !== undefined && a.watchtime_minutes !== null ? a.watchtime_minutes : (a.minutes || 0));
-    const valB = Number(b.watchtime_minutes !== undefined && b.watchtime_minutes !== null ? b.watchtime_minutes : (b.minutes || 0));
-    return valB - valA;
-  }).slice(0, 5);
-
-  el.innerHTML = topWatchtime.map((item, idx) => {
+  const getMins = item => Number(item.watchtime_minutes !== undefined && item.watchtime_minutes !== null ? item.watchtime_minutes : (item.minutes || 0));
+  const aggregatedRows = aggregateLeaderboardRows(rows);
+  const topWatchers = [...aggregatedRows].sort((a, b) => getMins(b) - getMins(a)).slice(0, 5);
+  el.innerHTML = topWatchers.map((item, idx) => {
     const avatarKey = (item.username || '').toLowerCase();
     const cachedUrl = avatarCache[avatarKey];
     const hasAvatar = cachedUrl && cachedUrl !== 'loading' && cachedUrl !== 'none';
@@ -3009,37 +3052,39 @@ function renderMiniWatchtime(rows) {
 
     if (!safeAvatarUrl && avatarCache[avatarKey] !== 'loading') {
       avatarCache[avatarKey] = 'loading';
-      getAvatarFromCache(item.username).then(cachedDB => {
-        if (cachedDB && cachedDB !== 'none') {
-          avatarCache[avatarKey] = cachedDB;
-          refreshMiniPanels(rows);
-        } else {
+      getAvatarFromCache(item.username)
+        .then(cached => {
+          if (cached && cached !== 'none') {
+            avatarCache[avatarKey] = cached;
+            refreshMiniPanels(rows);
+          } else {
+            fetchKickAvatar(item.username).then(url => {
+              avatarCache[avatarKey] = url || 'none';
+              setAvatarInCache(avatarKey, url || 'none').catch(() => {});
+              refreshMiniPanels(rows);
+            });
+          }
+        })
+        .catch(() => {
           fetchKickAvatar(item.username).then(url => {
             avatarCache[avatarKey] = url || 'none';
-            setAvatarInCache(avatarKey, url || 'none').catch(() => { });
+            setAvatarInCache(avatarKey, url || 'none').catch(() => {});
             refreshMiniPanels(rows);
           });
-        }
-      }).catch(() => {
-        fetchKickAvatar(item.username).then(url => {
-          avatarCache[avatarKey] = url || 'none';
-          setAvatarInCache(avatarKey, url || 'none').catch(() => { });
-          refreshMiniPanels(rows);
         });
-      });
     }
 
-    const mins = Number(item.watchtime_minutes !== undefined && item.watchtime_minutes !== null ? item.watchtime_minutes : (item.minutes || 0));
-    const watchStr = formatWatchtime(mins);
+    const totalMins = getMins(item);
+    const timeStr = formatWatchtime(totalMins);
 
     return `
-      <div class="mini-item" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-weight:700; font-size:0.8rem; color:${rankColor(idx)}; min-width:16px;">${idx + 1}.</span>
+      <div class="mini-row" style="display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-weight:700; color:var(--text-muted); width:16px;">${idx + 1}</span>
           ${avatarHtml}
-          <span style="font-weight:600; font-size:0.85rem; color:#fff;">@${escapeHtml(item.username)}</span>
+          <span style="font-weight:600; color:var(--text-main); font-size:0.9rem;">${escapeHtml(item.display_name || item.username)}</span>
         </div>
-        <span style="font-size:0.82rem; font-weight:700; color:var(--kick-green);">${watchStr}</span>
+        <span style="font-weight:700; color:#53fc18; font-size:0.85rem;">${timeStr}</span>
       </div>
     `;
   }).join('');
@@ -3047,6 +3092,7 @@ function renderMiniWatchtime(rows) {
 
 async function loadLeaderboard() {
   if (!activeChannel) return;
+
   leaderboardPage = 1;
 
   // Clear search input on month reload
@@ -3070,14 +3116,16 @@ async function loadLeaderboard() {
     query = query.eq('month', selectedVal);
   }
 
-  let { data, error } = await query.order('chat', { ascending: false }).limit(500);
+  // Za yearly/alltime period gde se uzima vise meseci po korisniku, povecavamo limit na 2500
+  const fetchLimit = periodMode === 'monthly' ? 500 : 2500;
+  let { data, error } = await query.order('chat', { ascending: false }).limit(fetchLimit);
 
   if (error) {
     console.warn('Leaderboard query with chat ordering returned error, attempting fallback:', error);
     const fallbackRes = await sb.from('leaderboard')
       .select('*')
       .eq('channel_id', String(activeChannel.id))
-      .limit(500);
+      .limit(fetchLimit);
     data = fallbackRes.data || [];
   }
   allLeaderboard = data || [];
@@ -3186,43 +3234,7 @@ function setLeaderboardType(type) {
 }
 
 function buildCombinedRows() {
-  const map = {};
-  const periodSel = document.getElementById('lbPeriodSelect');
-  const sel = document.getElementById('lbMonthSelect');
-  const periodMode = periodSel?.value || 'monthly';
-  const selectedVal = sel?.value || (periodMode === 'yearly' ? String(new Date().getFullYear()) : getCurrentMonth());
-  const periodLabel = periodMode === 'alltime' ? 'Sve vreme' : selectedVal;
-
-  allLeaderboard.forEach(r => {
-    const key = (r.username || '').toLowerCase();
-    const chatCount = r.chat !== undefined ? r.chat : (r.points || 0);
-    if (!map[key]) {
-      map[key] = {
-        username: r.username,
-        display_name: r.display_name || r.username,
-        chat: 0,
-        points: 0,
-        minutes: 0,
-        coins: r.coins || 0,
-        xp: r.xp || 0,
-        level: r.level || 1,
-        month: periodLabel,
-        updated_at: r.updated_at
-      };
-    }
-    map[key].chat += chatCount;
-    map[key].points += chatCount;
-    map[key].minutes += (r.watchtime_minutes || r.minutes || 0);
-    map[key].coins = Math.max(map[key].coins, r.coins || 0);
-    map[key].xp = Math.max(map[key].xp, r.xp || 0);
-    map[key].level = Math.max(map[key].level, r.level || 1);
-  });
-
-  return Object.values(map).sort((a, b) => {
-    const scoreA = (a.chat || a.points || 0) + Math.floor((a.minutes || 0) / 6);
-    const scoreB = (b.chat || b.points || 0) + Math.floor((b.minutes || 0) / 6);
-    return scoreB - scoreA;
-  });
+  return sortLeaderboardRows(allLeaderboard, 'combined');
 }
 
 function renderUnifiedLeaderboard(customRows = null) {
@@ -3234,30 +3246,21 @@ function renderUnifiedLeaderboard(customRows = null) {
   let rows;
   if (customRows) {
     rows = sortLeaderboardRows(customRows);
-  } else if (isCombined) {
-    rows = buildCombinedRows();
-  } else if (isChatters) {
-    rows = sortLeaderboardRows(allLeaderboard, 'chatters');
-  } else if (isWatchtime) {
-    rows = sortLeaderboardRows(allLeaderboard, 'watchtime');
-  } else if (isRanking) {
-    rows = sortLeaderboardRows(allLeaderboard, 'ranking');
   } else {
-    rows = buildCombinedRows();
+    rows = sortLeaderboardRows(allLeaderboard, activeLeaderboardType);
   }
 
   // Renderovanje podijuma (top 3)
   renderPodium(rows.slice(0, 3));
 
-  const tbody = document.getElementById('leaderboardBody');
-  if (!tbody) return;
+  const body = document.getElementById('leaderboardBody');
+  if (!body) return;
 
   const colCount = isCombined ? 6 : 5;
 
   if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="${colCount}" class="table-empty">Nema podataka za prikaz.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${colCount}" class="table-empty">Nema podataka za prikaz.</td></tr>`;
     document.getElementById('lbTableMeta').textContent = '0 korisnika';
-
     const prevBtn = document.getElementById('lbPrevPageBtn');
     const nextBtn = document.getElementById('lbNextPageBtn');
     const pageInfo = document.getElementById('lbPageInfo');
@@ -3269,17 +3272,17 @@ function renderUnifiedLeaderboard(customRows = null) {
 
   document.getElementById('lbTableMeta').textContent = `${rows.length} korisnika`;
 
-  // Plan limits check for Leaderboard
+  // Plan limits check
   const limits = getPlanLimits();
   if (limits.maxLeaderboardItems < Infinity && rows.length > limits.maxLeaderboardItems) {
     rows = rows.slice(0, limits.maxLeaderboardItems);
     const metaEl = document.getElementById('lbTableMeta');
     if (metaEl) {
-      metaEl.innerHTML = `${rows.length} korisnika <span style="color:#eab308; font-size:0.75rem; margin-left:8px;">(Besplatni plan - Top 20 \| <a href="#" onclick="openUpgradeModal('leaderboard'); return false;" style="color:#53fc18; text-decoration:underline;">Nadogradi za sve</a>)</span>`;
+      metaEl.innerHTML = `${rows.length} korisnika <span style="color:#eab308; font-size:0.75rem; margin-left:8px;">(Besplatni plan - Top 20 | <a href="#" onclick="openUpgradeModal('leaderboard'); return false;" style="color:#53fc18; text-decoration:underline;">Nadogradi za sve</a>)</span>`;
     }
   }
 
-  // Paginacija proračun
+  // Paginacija
   const totalPages = Math.ceil(rows.length / leaderboardLimit) || 1;
   if (leaderboardPage > totalPages) leaderboardPage = totalPages;
   if (leaderboardPage < 1) leaderboardPage = 1;
@@ -4804,18 +4807,22 @@ async function loadChannelLiveStatus() {
 async function fetchKickLiveStatus() {
   if (!activeChannel) return;
 
-  // 1. Pokušaj preko našeg lokalnog bot servera (zaobilazi CORS i Cloudflare)
-  try {
-    const kickApiBase = getBotApiBase();
+  const kickApiBase = getBotApiBase();
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const isDevWithoutBot = isLocalhost && (kickApiBase.includes(':5500') || kickApiBase === window.location.origin) && localStorage.getItem('use_local_bot') !== 'true';
 
-    const localRes = await fetch(`${kickApiBase}/api/kick/channel?username=${activeChannel.username}`);
-    if (localRes.ok) {
-      const data = await localRes.json();
-      const isLive = data?.livestream !== null && data?.livestream !== undefined;
-      updateLiveStatusUI(isLive);
-      return;
-    }
-  } catch (_) { }
+  // 1. Pokušaj preko našeg bot servera (ako nije dev okruženje bez bota)
+  if (!isDevWithoutBot) {
+    try {
+      const localRes = await fetch(`${kickApiBase}/api/kick/channel?username=${activeChannel.username}`);
+      if (localRes.ok) {
+        const data = await localRes.json();
+        const isLive = data?.livestream !== null && data?.livestream !== undefined;
+        updateLiveStatusUI(isLive);
+        return;
+      }
+    } catch (_) { }
+  }
 
   const apiUrl = `https://kick.com/api/v2/channels/${activeChannel.username}`;
   const cacheBust = `&_t=${Date.now()}`;
@@ -6860,8 +6867,20 @@ function startLiveActivityFeed() {
   async function fetchLogs() {
     if (!activeChannel) return;
 
+    const apiBase = getBotApiBase();
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    // Ako smo u dev režimu na npr. portu 5500 bez lokalnog bota, preskačemo fetch da ne spamuije 404 u konzoli
+    if (isLocalhost && (apiBase.includes(':5500') || apiBase === window.location.origin) && localStorage.getItem('use_local_bot') !== 'true') {
+      const dot = document.getElementById('botLiveFeedDot');
+      if (dot) {
+        dot.style.background = 'var(--text-muted)';
+        dot.style.boxShadow = 'none';
+      }
+      return;
+    }
+
     try {
-      const res = await fetch(`${getBotApiBase()}/api/kick/logs?chatroom_id=${activeChannel.id}`);
+      const res = await fetch(`${apiBase}/api/kick/logs?chatroom_id=${activeChannel.id}`);
       const dot = document.getElementById('botLiveFeedDot');
       if (res.ok) {
         if (dot) {
