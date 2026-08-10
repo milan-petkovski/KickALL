@@ -62,11 +62,9 @@ async function getAvatarFromCache(username) {
 
       request.onsuccess = () => {
         const result = request.result;
-        if (result && result.url && result.url !== 'none') {
-          resolve(result.url);
-        } else {
-          resolve(null);
-        }
+        // Vraćamo tačno ono što je keširano - uključujući 'none' (znači: već proveravano, korisnik nema avatar).
+        // Samo ako NIKAD nije keširano vraćamo null, da pozivalac zna da tek treba da proveri.
+        resolve(result ? result.url : null);
       };
 
       request.onerror = () => {

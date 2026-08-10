@@ -429,6 +429,18 @@ function povezi() {
                 watchtime.registrujAktivnogGledaoca(chatroomId, username);
             }
 
+            // Auto-announce brojač po broju poruka (broji SVE poruke u chatu, ne samo komande)
+            if (channelState.isStreamLive && channelState.announce_msg_enabled && userKey !== channelState.channelUsername.toLowerCase()) {
+                channelState.porukePosleAnnounce++;
+                if (channelState.porukePosleAnnounce >= (channelState.announce_message_threshold || 30)) {
+                    const sada = Date.now();
+                    const minGapMs = 5 * 60 * 1000; // 5 minuta
+                    if (sada - channelState.zadnjaAutoPorukaTs >= minGapMs) {
+                        triggerAutoAnnounce(chatroomId);
+                    }
+                }
+            }
+
             // Ako poruka ne počinje sa ispravnim prefiksom, proveravamo samo mentove, a sve ostale komande preskačemo
             const porukaLowerOriginal = porukaSredjena.toLowerCase();
             if (!startsWithPrefix) {
@@ -454,18 +466,6 @@ function povezi() {
                         messenger.posaljiPoruku(chatroomId, `❌ @${username}, ova komanda je rezervisana za ulogu: ${RANK_LABELS_SR[provera.requiredRank] || provera.requiredRank}.`);
                     }
                     return;
-                }
-            }
-
-            // Auto-announce brojač po broju poruka
-            if (channelState.isStreamLive && channelState.announce_msg_enabled) {
-                channelState.porukePosleAnnounce++;
-                if (channelState.porukePosleAnnounce >= (channelState.announce_message_threshold || 30)) {
-                    const sada = Date.now();
-                    const minGapMs = 5 * 60 * 1000; // 5 minuta
-                    if (sada - channelState.zadnjaAutoPorukaTs >= minGapMs) {
-                        triggerAutoAnnounce(chatroomId);
-                    }
                 }
             }
 
@@ -986,6 +986,7 @@ function povezi() {
                 return;
             }
 
+
             // Pošto su statičke komande uklonjene, komande koje se ne prepoznaju biće potpuno ignorisane.
         }
     });
@@ -1036,29 +1037,54 @@ function scheduleReconnect(immediate = false) {
 }
 
 // Provera statusa strima
-async function proveriDaLiJeLive(channelKey) {
-    const channelState = state.getChannelState(channelKey);
+async function proveriDaLiJeLive(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
-
     const channelUsername = channelState.channelUsername;
-    // Uvek koristimo user_id za primarni kljuc u bazi
-    const dbUserId = channelState.kickUserId || channelKey;
+    const realId = channelState.realChatroomId || chatroomId;
 
     try {
         const res = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}`);
         if (res.ok) {
             const data = await res.json();
-            const liveState = data.livestream !== null;
+            const liveState = !!data.livestream;
 
-            await database.supabase.from('channels').upsert({
-                id: dbUserId,
-                username: channelUsername,
-                is_active: liveState,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'id' });
+            // Moderator check - uklonjeno da bi bot radio i bez moderator statusa
+            const _isModOrOwner = (data.role === 'moderator' || data.role === 'creator' || data.role === 'broadcaster' || channelUsername.toLowerCase() === botUsernameResolved.toLowerCase());
+            channelState.isModerator = true; // Uvek dozvoli bota da radi
+
+            if (database.KORISTI_SUPABASE && database.supabase) {
+                try {
+                    await database.supabase
+                        .from('channels')
+                        .upsert({
+                            id: realId,
+                            username: channelUsername,
+                            is_active: liveState,
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'id' });
+                } catch (dbErr) {
+                    utils.log('ERR', `[${channelUsername}] Greška pri upisu statusa strima u bazu: ${dbErr.message}`);
+                }
+            }
+
+            if (liveState !== channelState.isStreamLive) {
+                channelState.isStreamLive = liveState;
+                utils.log('INFO', `[${channelUsername}] Status strima promenjen: ${channelState.isStreamLive ? '🔴 LIVE' : '⚪ OFFLINE'}`);
+                if (channelState.isStreamLive && !channelState.isFirstLiveCheck) {
+                    utils.log('INFO', `[${channelUsername}] Strim je počeo! Slanje pozdravne poruke i pinovanje...`);
+                    if (channelState.STREAM_START_PIN_MESSAGE) {
+                        messenger.posaljiIPinujPoruku(chatroomId, channelState.STREAM_START_PIN_MESSAGE);
+                    }
+                } else if (!channelState.isStreamLive) {
+                    watchtime.ocistiAktivneGledaoce(chatroomId);
+                    channelState.welcomedUsers.clear(); // Očisti pozdravljene korisnike za sledeći stream
+                }
+            }
+            channelState.isFirstLiveCheck = false;
         }
     } catch (err) {
-        console.error(`Greska pri proveri live statusa za ${channelUsername}:`, err);
+        utils.log('ERR', `[${channelUsername}] Greška pri proveri statusa strima: ${err.message}`);
     }
 }
 
@@ -1430,13 +1456,12 @@ async function handleHttpRequest(req, res) {
                 const dashboardUrl = `/Website/kickot/dashboard.html#kick_token=${encodeURIComponent(accessToken)}&token_type=${encodeURIComponent(tokenType)}&expires_in=${expiresIn}`;
                 res.writeHead(302, { 'Location': dashboardUrl });
                 res.end();
-                return;
             } catch (tokenErr) {
                 utils.log('ERR', `Kick OAuth grešk pri token razmeni: ${tokenErr.message}`);
                 res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
                 res.end('Interna greška pri OAuth autorizaciji.');
-                return;
             }
+            return;
         }
 
         // ─── Kick OAuth2 Token Exchange API (za Live Server / 5500) ──────────
@@ -1498,11 +1523,9 @@ async function handleHttpRequest(req, res) {
                         expires_in: tokenData.expires_in || 3600,
                         scope: tokenData.scope || ''
                     }));
-                    return;
                 } catch (err) {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-                    return;
                 }
             });
             return;
@@ -1568,12 +1591,11 @@ async function handleHttpRequest(req, res) {
                     profile_pic: avatar,
                     chatroom_id: chatroomId
                 }));
-                return;
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-                return;
             }
+            return;
         }
 
         if (parsedUrl.pathname === '/api/avatar') {
@@ -1588,30 +1610,30 @@ async function handleHttpRequest(req, res) {
                 const channelRes = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${username}`);
                 let avatar = '';
                 let chatroomId = '';
+                let userId = '';
                 let slug = username;
-                let channelData = null;
 
                 if (channelRes.ok) {
-                    channelData = await channelRes.json();
+                    const channelData = await channelRes.json();
                     avatar = channelData?.user?.profile_pic || '';
                     chatroomId = channelData?.chatroom?.id || '';
+                    userId = channelData?.user_id ? String(channelData.user_id) : '';
                     slug = channelData?.slug || username;
                 }
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
-                    id: channelData?.user?.id ? String(channelData.user.id) : '',
+                    id: userId,
                     username: username,
                     slug: slug,
                     avatar: avatar,
                     chatroom_id: chatroomId
                 }));
-                return;
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-                return;
             }
+            return;
         }
 
         // Global logout endpoint (zahteva autentikaciju)
@@ -1629,36 +1651,42 @@ async function handleHttpRequest(req, res) {
                 });
                 const { userId } = JSON.parse(body || '{}');
 
+                if (!global.logoutCache) {
+                    global.logoutCache = new Map();
+                }
                 if (userId) {
-                    state.loggedOutUsers = state.loggedOutUsers || new Set();
-                    state.loggedOutUsers.add(String(userId));
+                    global.logoutCache.set(userId, Date.now());
                 }
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true }));
-                return;
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-                return;
             }
+            return;
         }
 
         // Check logout status endpoint
         if (parsedUrl.pathname === '/api/check-logout' && req.method === 'GET') {
             try {
                 const userId = parsedUrl.searchParams.get('userId');
-                state.loggedOutUsers = state.loggedOutUsers || new Set();
-                const shouldLogout = userId ? state.loggedOutUsers.has(String(userId)) : false;
+                let shouldLogout = false;
+
+                if (global.logoutCache && userId) {
+                    const logoutTime = global.logoutCache.get(userId);
+                    if (logoutTime && Date.now() - logoutTime < 300000) { // 5 minutes
+                        shouldLogout = true;
+                    }
+                }
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ shouldLogout, userId }));
-                return;
+                res.end(JSON.stringify({ shouldLogout }));
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-                return;
             }
+            return;
         }
 
         if (parsedUrl.pathname === '/api/kick/channel') {
@@ -1684,12 +1712,11 @@ async function handleHttpRequest(req, res) {
                     res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: `Kick API returned status ${apiRes.status}` }));
                 }
-                return;
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: err.message }));
-                return;
             }
+            return;
         }
 
         if (parsedUrl.pathname === '/api/kick/logs' && req.method === 'GET') {
@@ -1739,11 +1766,9 @@ async function handleHttpRequest(req, res) {
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true, message: 'Test message sent' }));
-                    return;
                 } catch (err) {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Failed to send message', detail: err.message }));
-                    return;
                 }
             });
             return;
@@ -1769,12 +1794,11 @@ async function handleHttpRequest(req, res) {
                 utils.log('INFO', `[${chatroomId}] Bot konfiguracija i komande uspešno reloadovani preko API poziva.`);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, message: 'Reloaded successfully' }));
-                return;
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Failed to reload', detail: err.message }));
-                return;
             }
+            return;
         }
 
         if (parsedUrl.pathname === '/api/kick/check-moderator') {
@@ -1799,12 +1823,11 @@ async function handleHttpRequest(req, res) {
                     isModerator: channelState?.isModerator,
                     botActive: channelState?.botActive 
                 }));
-                return;
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Failed to check moderator status', detail: err.message }));
-                return;
             }
+            return;
         }
 
         if (parsedUrl.pathname === '/api/channels' && req.method === 'GET') {
@@ -1836,22 +1859,52 @@ async function handleHttpRequest(req, res) {
                     isConnectedToKick: state.isConnected,
                     channels: channelsSummary
                 }));
-                return;
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: 'Failed to fetch channels summary', detail: err.message }));
-                return;
             }
+            return;
         }
 
+        if (parsedUrl.pathname === '/api/global-logout' && req.method === 'POST') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized', detail: 'Missing or invalid authentication token' }));
+                return;
+            }
+            state.loggedOutUsers = state.loggedOutUsers || new Set();
+            let bodyStr = '';
+            req.on('data', chunk => { bodyStr += chunk; });
+            req.on('end', () => {
+                try {
+                    const payload = JSON.parse(bodyStr || '{}');
+                    if (payload.userId) {
+                        state.loggedOutUsers.add(String(payload.userId));
+                    }
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true }));
+                } catch (_e) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
+                }
+            });
+            return;
+        }
+
+        if (parsedUrl.pathname === '/api/check-logout' && req.method === 'GET') {
+            const userId = parsedUrl.searchParams.get('userId');
+            state.loggedOutUsers = state.loggedOutUsers || new Set();
+            const shouldLogout = userId ? state.loggedOutUsers.has(String(userId)) : false;
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ shouldLogout, userId }));
+            return;
+        }
     } catch (err) {
         console.error('Error handling HTTP request in bot.js:', err);
     }
 
-    if (!res.headersSent) {
-        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end(`🤖 Multi-channel Kick Bot je aktivan!\nKanali na kojima radi: ${Object.values(state.channels).map(c => '@' + c.channelUsername).join(', ') || 'nijedan'}\n`);
-    }
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(`🤖 Multi-channel Kick Bot je aktivan!\nKanali na kojima radi: ${Object.values(state.channels).map(c => '@' + c.channelUsername).join(', ') || 'nijedan'}\n`);
 }
 
 const PORT = process.env.PORT || 3000;
@@ -2004,6 +2057,7 @@ async function start() {
                 }
             })
             .subscribe();
+
 
     }
 }

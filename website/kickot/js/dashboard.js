@@ -1563,6 +1563,32 @@ async function loadUserProfile() {
     // Managed channels load failed - non-critical
   }
 
+  // Dohvati avatare i za managed kanale kojima nedostaju (ranije se preskakalo, pa je uvek ostajalo slovo umesto slike)
+  const managedNeedAvatar = managedChannels.filter(c => !c.avatar);
+  if (managedNeedAvatar.length > 0) {
+    await Promise.all(managedNeedAvatar.map(async (ch) => {
+      const resolved = await fetchKickAvatar(ch.username);
+      if (!resolved) return;
+      ch.avatar = resolved;
+      try {
+        const { data: ownerProfile } = await sb.from('user_profiles')
+          .select('kick_channels')
+          .eq('id', ch.owner_id)
+          .maybeSingle();
+        const ownerChannels = ownerProfile?.kick_channels || [];
+        const idx = ownerChannels.findIndex(c => (c.username || '').toLowerCase() === (ch.username || '').toLowerCase());
+        if (idx >= 0) {
+          ownerChannels[idx].avatar = resolved;
+          await sb.from('user_profiles')
+            .update({ kick_channels: ownerChannels })
+            .eq('id', ch.owner_id);
+        }
+      } catch (_) {
+        // Upis avatara u vlasnikov profil nije uspeo - nije kritično, probaće se ponovo sledeći put
+      }
+    }));
+  }
+
   const allAvailable = [...currentChannels, ...managedChannels];
   const savedChannelId = localStorage.getItem('kickbot_selected_channel_id');
   const savedChannelName = localStorage.getItem('kickbot_selected_channel_name');
@@ -3473,6 +3499,9 @@ function renderMiniLeaderboard(rows) {
         if (cachedDB && cachedDB !== 'none') {
           avatarCache[avatarKey] = cachedDB;
           refreshMiniPanels(rows);
+        } else if (cachedDB === 'none') {
+          // Već smo ranije proverili - korisnik nema Kick avatar. Ne pokušavaj ponovo, poštuj keš.
+          avatarCache[avatarKey] = 'none';
         } else {
           fetchKickAvatar(row.username).then(url => {
             avatarCache[avatarKey] = url || 'none';

@@ -14,6 +14,73 @@
     console.warn('[Kickov Widget] OBS Token nije pronađen u URL parametrima. Koristite: widget.html?token=TVOJ_TOKEN');
   }
 
+  // ── 0. Audio Autoplay Unlock (za OBS Browser Source) ──
+  // OBS/Chromium blokira play() sa zvukom dok ne postoji "user gesture".
+  // Trik: pustimo NEMI audio odmah pri učitavanju stranice (nemi autoplay je
+  // uvek dozvoljen), i taj ISTI <audio> element kasnije reciklujemo za prave
+  // alertove (menjamo mu src i skidamo mute) umesto da pravimo nov Audio().
+  // Element koji već ima aktivnu playback sesiju obično sme da nastavi da
+  // pušta zvuk i nakon što mu se ukloni mute, čak i bez klika korisnika.
+  const SILENT_AUDIO_SRC =
+    'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+
+  const unlockedAudio = new Audio();
+  unlockedAudio.muted = true;
+  unlockedAudio.loop = true;
+  unlockedAudio.src = SILENT_AUDIO_SRC;
+  unlockedAudio.play().catch(() => {
+    // Ako čak i nemi autoplay padne, probaj ponovo čim se dokument "vidljivo" pokrene
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) unlockedAudio.play().catch(() => {});
+    }, { once: true });
+  });
+
+  // Rezervni unlock: ako korisnik ipak klikne/pritisne bilo šta (npr. kroz OBS Interact),
+  // iskoristi taj gest da definitivno otključa audio.
+  ['click', 'keydown', 'touchstart'].forEach((evt) => {
+    document.addEventListener(evt, () => {
+      unlockedAudio.play().catch(() => {});
+    }, { once: true, passive: true });
+  });
+
+  function playAlertSound(soundUrl, volume) {
+    try {
+      unlockedAudio.pause();
+      unlockedAudio.src = soundUrl;
+      unlockedAudio.loop = false;
+      unlockedAudio.muted = false;
+      unlockedAudio.currentTime = 0;
+      unlockedAudio.volume = Math.min(1, Math.max(0, (volume || 80) / 100));
+
+      const playPromise = unlockedAudio.play();
+      if (playPromise && playPromise.catch) {
+        playPromise.catch((e) => {
+          console.warn('[Kickov Widget] Audio autoplay restriction (fallback na novi element):', e);
+          // Fallback: probaj sa potpuno novim Audio() objektom, za svaki slučaj
+          try {
+            const fallback = new Audio(soundUrl);
+            fallback.volume = unlockedAudio.volume;
+            fallback.play().catch((e2) => console.warn('[Kickov Widget] Fallback audio takođe blokiran:', e2));
+          } catch (e3) {
+            console.warn('[Kickov Widget] Fallback audio greška:', e3);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('[Kickov Widget] Audio playback error:', e);
+    }
+  }
+
+  // Kad se pravi alert-zvuk odsvira, vrati nemi loop da element ostane "zagrejan"
+  unlockedAudio.addEventListener('ended', () => {
+    if (unlockedAudio.muted === false) {
+      unlockedAudio.muted = true;
+      unlockedAudio.loop = true;
+      unlockedAudio.src = SILENT_AUDIO_SRC;
+      unlockedAudio.play().catch(() => {});
+    }
+  });
+
   // ── 1. Queue System Manager ────────────────────────────
   class AlertQueueManager {
     constructor() {
@@ -86,15 +153,9 @@
 
         this.container.appendChild(alertEl);
 
-        // Play Alert Audio
+        // Play Alert Audio (koristi unlock-ovan <audio> element, vidi sekciju 0 na vrhu fajla)
         if (cfg.soundUrl) {
-          try {
-            const audio = new Audio(cfg.soundUrl);
-            audio.volume = Math.min(1, Math.max(0, (cfg.soundVolume || 80) / 100));
-            audio.play().catch(e => console.warn('[Kickov Widget] Audio autoplay restriction:', e));
-          } catch (e) {
-            console.warn('[Kickov Widget] Audio playback error:', e);
-          }
+          playAlertSound(cfg.soundUrl, cfg.soundVolume);
         }
 
         // Play TTS if enabled
