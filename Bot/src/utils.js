@@ -197,6 +197,38 @@ function formatTemplateMessage(template, username) {
     return res;
 }
 
+// Formatira poruke chat alertova (Dobrodošlica, Follow, Sub, Resub, Giftsub, KICKs, Host/Raid).
+// Podržava varijable: @$(name) / $(name), $(amount), $(months), $(viewers).
+// Ako je poruka prazna, koristi razuman podrazumevani tekst kao fallback.
+function formatAlertMessage(template, vars = {}) {
+    const { name = '', amount, months, viewers, fallback = '' } = vars;
+
+    let res = (typeof template === 'string' && template.trim()) ? template : fallback;
+    if (!res) return '';
+
+    if (name) {
+        res = res
+            .replace(/@(?:\$\(name\)|\$\(user\)|\{name\}|\{username\}|\{user\}|\$name|\$user|%name%|%user%)/gi, `@${name}`)
+            .replace(/(?:\$\(name\)|\$\(user\)|\{name\}|\{username\}|\{user\}|\$name|\$user|%name%|%user%)/gi, name);
+    }
+
+    if (amount !== undefined && amount !== null) {
+        res = res.replace(/\$\(amount\)|\{amount\}|%amount%/gi, String(amount));
+    }
+    if (months !== undefined && months !== null) {
+        res = res.replace(/\$\(months\)|\{months\}|%months%/gi, String(months));
+    }
+    if (viewers !== undefined && viewers !== null) {
+        res = res.replace(/\$\(viewers\)|\{viewers\}|%viewers%/gi, String(viewers));
+    }
+
+    if (name && !res.includes(`@${name}`) && !res.includes(name)) {
+        res = `@${name}, ${res}`;
+    }
+
+    return res;
+}
+
 module.exports = {
     log,
     sanitizeInput,
@@ -205,5 +237,6 @@ module.exports = {
     dobijTrenutniMesec,
     proveraKulauna,
     prevediVreme,
-    formatTemplateMessage
+    formatTemplateMessage,
+    formatAlertMessage
 };

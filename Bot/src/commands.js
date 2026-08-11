@@ -991,7 +991,7 @@ function handleBotMentions(chatroomId, username, porukaLower) {
     }
 
     // 3. Provokacije / Uvrede
-    const pitajUvrede = ['glup si', 'glup bot', 'mrs', 'mrš', 'botino', 'lupicu ti samar', 'lupiću ti šamar', 'gasi se', 'ugasi se, budalo'];
+    const pitajUvrede = ['glup si', 'glup bot', 'mrs', 'mrš', 'botino', 'lupicu ti samar', 'lupiću ti šamar', 'gasi se', 'ugasi se', 'budalo'];
     if (pitajUvrede.some(rec => porukaLower.includes(rec))) {
         if (!proveraKulauna(chatroomId, 'bot_uvrede', username)) {
             const odgovori = [
@@ -1023,7 +1023,7 @@ function handleBotMentions(chatroomId, username, porukaLower) {
     }
 
     // 5. Ko te napravio / Vlasnik
-    const pitajKreator = ['ko te napravio', 'ko te stvorio', 'ko ti je programer', 'ko te kodirao', 'ko te programirao, napravio'];
+    const pitajKreator = ['ko te napravio', 'ko te stvorio', 'ko ti je programer', 'ko te kodirao', 'ko te programirao'];
     if (pitajKreator.some(rec => porukaLower.includes(rec))) {
         if (!proveraKulauna(chatroomId, 'bot_kreator', username)) {
             const odgovori = [
@@ -1053,7 +1053,7 @@ function handleBotMentions(chatroomId, username, porukaLower) {
     }
 
     // 7. Šale / Vicevi
-    const pitajVic = ['reci neku salu', 'reci vic', 'nasmej me', 'ispricaj vic', 'ispričaj vic, vic'];
+    const pitajVic = ['reci neku salu', 'reci vic', 'nasmej me', 'ispricaj vic', 'ispričaj vic'];
     if (pitajVic.some(rec => porukaLower.includes(rec))) {
         if (!proveraKulauna(chatroomId, 'bot_vic', username)) {
             const odgovori = [

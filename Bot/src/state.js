@@ -72,6 +72,7 @@ function getChannelState(chatroomId) {
             SPAM_WINDOW_MS: 15000,
             STREAM_START_PIN_MESSAGE: '',
             welcome_message: '',
+            alerts_settings: {},
             feature_leaderboard: true,
             feature_watchtime: true,
             feature_games: true,

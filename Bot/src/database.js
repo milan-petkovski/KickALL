@@ -678,6 +678,7 @@ async function ucitajBotConfig(chatroomId) {
             channelState.feature_songrequest = limits.allowSongRequest && (data.feature_songrequest ?? false);
             channelState.songrequest_settings = data.songrequest_settings || {};
             channelState.welcome_message = data.welcome_message || '';
+            channelState.alerts_settings = data.alerts_settings || {};
 
             channelState.botActive = data.bot_active || false;
 

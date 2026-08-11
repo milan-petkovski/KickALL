@@ -374,6 +374,56 @@ function povezi() {
                         watchtime.registrujAktivnogGledaoca(chatroomId, activeUser);
                     }
                 }
+
+                // Chat alertovi (Follow / Sub / Resub / Giftsub) — poštuju master toggle "Bot interakcija"
+                // i pojedinačni switch za svaki alert iz panela.
+                if (channelState && channelState.feature_autoresponse !== false) {
+                    const alerts = channelState.alerts_settings || {};
+
+                    if (response.event === 'App\\Events\\FollowersUpdateEvent') {
+                        // Kick šalje ovaj event i za follow i za unfollow — javljamo samo kad je followed !== false
+                        const followedNow = evtData.followed !== false;
+                        const followerName = evtData.username || evtData.follower?.username || evtData.user?.username;
+                        if (followedNow && followerName && alerts.follow_enabled) {
+                            const msg = utils.formatAlertMessage(alerts.follow_message, {
+                                name: followerName,
+                                fallback: `Hvala na praćenju @${followerName}!`
+                            });
+                            if (msg) messenger.posaljiPoruku(chatroomId, msg);
+                        }
+                    }
+
+                    if (response.event === 'App\\Events\\SubscriptionEvent') {
+                        const subName = evtData.username || evtData.subscriber?.username || evtData.user?.username;
+                        const months = evtData.months || evtData.duration || 1;
+                        if (subName) {
+                            const isResub = Number(months) > 1;
+                            const alertOn = isResub ? alerts.resub_enabled : alerts.sub_enabled;
+                            const template = isResub ? alerts.resub_message : alerts.sub_message;
+                            const fallback = isResub
+                                ? `Hvala @${subName} na obnovi pretplate od ${months} meseci!`
+                                : `Hvala na pretplati @${subName}!`;
+                            if (alertOn) {
+                                const msg = utils.formatAlertMessage(template, { name: subName, months, fallback });
+                                if (msg) messenger.posaljiPoruku(chatroomId, msg);
+                            }
+                        }
+                    }
+
+                    if (response.event === 'App\\Events\\GiftedSubscriptionsEvent') {
+                        const gifterName = evtData.gifter_username || evtData.gifter?.username || evtData.username;
+                        const giftedList = evtData.gifted_usernames || evtData.usernames || evtData.recipients || [];
+                        const amount = Array.isArray(giftedList) && giftedList.length ? giftedList.length : (evtData.quantity || 1);
+                        if (gifterName && alerts.giftsub_enabled) {
+                            const msg = utils.formatAlertMessage(alerts.giftsub_message, {
+                                name: gifterName,
+                                amount,
+                                fallback: `Hvala na poklonjenoj pretplati @${gifterName}!`
+                            });
+                            if (msg) messenger.posaljiPoruku(chatroomId, msg);
+                        }
+                    }
+                }
             }
             return;
         }
@@ -444,8 +494,10 @@ function povezi() {
                 porukaSredjena = prefix + ostatak;
             }
 
-            // Welcome message: pošalji pozdravnu poruku ako je definisana i korisnik se prvi put javlja u ovoj sesiji
-            if (channelState.welcome_message && !channelState.welcomedUsers.has(userKey)) {
+            // Welcome message: pošalji pozdravnu poruku ako je alert uključen, poruka je definisana
+            // i korisnik se prvi put javlja u ovoj sesiji
+            const welcomeAlertEnabled = (channelState.alerts_settings || {}).welcome_enabled ?? false;
+            if (welcomeAlertEnabled && channelState.welcome_message && !channelState.welcomedUsers.has(userKey)) {
                 channelState.welcomedUsers.add(userKey);
                 const welcomeMsg = utils.formatTemplateMessage(channelState.welcome_message, username);
                 messenger.posaljiPoruku(chatroomId, welcomeMsg);
@@ -1111,6 +1163,7 @@ async function proveriDaLiJeLive(chatroomId) {
                 } else if (!channelState.isStreamLive) {
                     watchtime.ocistiAktivneGledaoce(chatroomId);
                     channelState.welcomedUsers.clear(); // Očisti pozdravljene korisnike za sledeći stream
+                    channelState.porukePosleAnnounce = 0; // Resetuj brojač za "broj poruka" pravilo za sledeći stream
                 }
             }
             channelState.isFirstLiveCheck = false;
@@ -1272,6 +1325,7 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
 
     channelState.STREAM_START_PIN_MESSAGE = dbConfig.stream_pin_msg || '';
     channelState.welcome_message = dbConfig.welcome_message || '';
+    channelState.alerts_settings = dbConfig.alerts_settings || {};
 
     channelState.feature_leaderboard = limits.allowLeaderboard && (dbConfig.feature_leaderboard ?? true);
     channelState.feature_watchtime = limits.allowWatchtime && (dbConfig.feature_watchtime ?? true);
@@ -2035,8 +2089,26 @@ async function start() {
                         } else {
                             const cs = state.getChannelState(chatroomId);
                             logDebouncedUpdate(`config::${chatroomId}`, `⚙️ [PRO Plan] Podešavanja i komande sinhronizovane za @${channelUsername}.`);
+
+                            // Restartujemo auto-announce tajmer SAMO ako su se promenila polja koja ga se
+                            // stvarno tiču (interval ili time_enabled), ili ako tajmer trenutno i ne radi.
+                            // U suprotnom bi SVAKA izmena bilo kog podešavanja na dashboardu (ekonomija,
+                            // moderacija, prefiks, itd.) resetovala odbrojavanje na nulu, pa bi automatska
+                            // poruka na vreme mogla da kasni unedogled ako se streamer često petlja po
+                            // podešavanjima dok je interval podešen na duže vreme.
+                            const noviInterval = newRow.announce_interval_mins ?? 15;
+                            const noviTimeEnabled = newRow.announce_time_enabled ?? true;
+                            const relevantnoPromenjeno = (
+                                cs.announce_interval_mins !== noviInterval ||
+                                cs.announce_time_enabled !== noviTimeEnabled ||
+                                !cs.autoAnnounceTimer
+                            );
+
                             await azurirajKonfiguracijuKanala(cs, newRow);
-                            pokreniAutoAnnounceTajmer(chatroomId);
+
+                            if (relevantnoPromenjeno) {
+                                pokreniAutoAnnounceTajmer(chatroomId);
+                            }
                         }
                     } else {
                         if (state.channels[chatroomId]) {

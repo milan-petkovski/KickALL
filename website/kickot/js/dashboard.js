@@ -1407,7 +1407,7 @@ async function initApp() {
     const isReload = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0] && performance.getEntriesByType('navigation')[0].type === 'reload') || (performance.navigation && performance.navigation.type === 1);
     const sessionPanel = sessionStorage.getItem('active-dashboard-panel-session');
     const hashPanel = window.location.hash ? window.location.hash.replace('#', '') : null;
-    const validPanels = ['overview', 'leaderboard', 'commands', 'games', 'announces', 'autoresponse', 'marriages', 'minigames', 'songs', 'economy', 'config', 'moderation'];
+    const validPanels = ['overview', 'leaderboard', 'commands', 'builtin-commands', 'auto-announces', 'bot-interaction', 'marriages', 'minigames', 'songs', 'economy', 'config', 'moderation'];
 
     let lastPanel = 'overview';
     // Ako je eksplicitno naveden hash u URL-u ili ako je u pitanju F5 osvežavanje, zapamti trenutni panel
@@ -3014,7 +3014,7 @@ function renderMiniLeaderboard(rows) {
           } else {
             fetchKickAvatar(item.username).then(url => {
               avatarCache[avatarKey] = url || 'none';
-              setAvatarInCache(avatarKey, url || 'none').catch(() => {});
+              setAvatarInCache(avatarKey, url || 'none').catch(() => { });
               if (url) refreshMiniPanels(rows);
             });
           }
@@ -3022,7 +3022,7 @@ function renderMiniLeaderboard(rows) {
         .catch(() => {
           fetchKickAvatar(item.username).then(url => {
             avatarCache[avatarKey] = url || 'none';
-            setAvatarInCache(avatarKey, url || 'none').catch(() => {});
+            setAvatarInCache(avatarKey, url || 'none').catch(() => { });
             if (url) refreshMiniPanels(rows);
           });
         });
@@ -3078,7 +3078,7 @@ function renderMiniWatchtime(rows) {
           } else {
             fetchKickAvatar(item.username).then(url => {
               avatarCache[avatarKey] = url || 'none';
-              setAvatarInCache(avatarKey, url || 'none').catch(() => {});
+              setAvatarInCache(avatarKey, url || 'none').catch(() => { });
               if (url) refreshMiniPanels(rows);
             });
           }
@@ -3086,7 +3086,7 @@ function renderMiniWatchtime(rows) {
         .catch(() => {
           fetchKickAvatar(item.username).then(url => {
             avatarCache[avatarKey] = url || 'none';
-            setAvatarInCache(avatarKey, url || 'none').catch(() => {});
+            setAvatarInCache(avatarKey, url || 'none').catch(() => { });
             if (url) refreshMiniPanels(rows);
           });
         });
@@ -3864,6 +3864,7 @@ async function loadBotConfig() {
     document.getElementById('cfgAnnounceThreshold').value = data.announce_message_threshold ?? 30;
     document.getElementById('cfgAnnounceTimeEnabled').checked = data.announce_time_enabled ?? true;
     document.getElementById('cfgAnnounceMsgEnabled').checked = data.announce_msg_enabled ?? true;
+    if (document.getElementById('cfgAnnounceSubOptionTimeEnabled')) document.getElementById('cfgAnnounceSubOptionTimeEnabled').checked = data.announce_time_enabled ?? true;
 
     // Load economy settings (check top-level columns first, then fallback to nested economy_settings if any)
     const ecoSettings = data.economy_settings || {};
@@ -3981,6 +3982,7 @@ async function loadBotConfig() {
     document.getElementById('cfgAnnounceThreshold').value = 30;
     document.getElementById('cfgAnnounceTimeEnabled').checked = true;
     document.getElementById('cfgAnnounceMsgEnabled').checked = true;
+    if (document.getElementById('cfgAnnounceSubOptionTimeEnabled')) document.getElementById('cfgAnnounceSubOptionTimeEnabled').checked = true;
 
     // Reset chat alerts settings
     document.getElementById('cfgAlertFollowEnabled').checked = false;
@@ -4046,6 +4048,16 @@ async function loadBotConfig() {
   updateOverviewModulesUI();
 }
 
+// Sinhronizuje master toggle "Automatske poruke" (u Podešavanja panelu) i sub-toggle
+// "Slanje na vremenski interval" (u panelu Automatske poruke) — oba upravljaju istim
+// bot_config poljem announce_time_enabled i moraju uvek imati isto stanje.
+function syncAnnounceTimeToggle(isChecked) {
+  const master = document.getElementById('cfgAnnounceTimeEnabled');
+  const subOption = document.getElementById('cfgAnnounceSubOptionTimeEnabled');
+  if (master) master.checked = isChecked;
+  if (subOption) subOption.checked = isChecked;
+}
+
 async function saveBotConfig(silent = false) {
   if (!activeChannel) {
     if (!silent) showToast('error', 'Nema izabranog kanala', '❌');
@@ -4058,7 +4070,7 @@ async function saveBotConfig(silent = false) {
     channel_name: activeChannel.username,
     prefix: document.getElementById('cfgPrefix')?.value || '!',
     language: document.getElementById('cfgLanguage')?.value || 'sr',
-    cooldown: parseInt(document.getElementById('cfgCooldown')?.value) || 3000,
+    cooldown_ms: parseInt(document.getElementById('cfgCooldown')?.value) || 3000,
     feature_leaderboard: document.getElementById('cfgLeaderboard')?.checked ?? true,
     feature_watchtime: document.getElementById('cfgGambleEnabled')?.checked ?? true,
     feature_games: document.getElementById('cfgGames')?.checked ?? true,
@@ -4131,8 +4143,8 @@ async function saveBotConfig(silent = false) {
     store_items: (currentChannelConfig && currentChannelConfig.store_items) ? currentChannelConfig.store_items : [],
     store_redemptions: (currentChannelConfig && currentChannelConfig.store_redemptions) ? currentChannelConfig.store_redemptions : [],
     auto_announces: localAnnounces,
-    announce_interval_mins: parseInt(document.getElementById('cfgAnnounceInterval')?.value) || 15,
-    announce_message_threshold: parseInt(document.getElementById('cfgAnnounceThreshold')?.value) || 30,
+    announce_interval_mins: Math.min(1440, Math.max(1, parseInt(document.getElementById('cfgAnnounceInterval')?.value) || 15)),
+    announce_message_threshold: Math.min(1000, Math.max(1, parseInt(document.getElementById('cfgAnnounceThreshold')?.value) || 30)),
     announce_time_enabled: document.getElementById('cfgAnnounceTimeEnabled')?.checked ?? true,
     announce_msg_enabled: document.getElementById('cfgAnnounceMsgEnabled')?.checked ?? true,
     updated_at: new Date().toISOString(),
@@ -5212,14 +5224,14 @@ document.addEventListener('DOMContentLoaded', () => {
 const PANEL_NAMES = {
   overview: 'Overview',
   commands: 'Komande',
-  games: 'Ugrađene komande',
+  'builtin-commands': 'Ugrađene komande',
   leaderboard: 'Leaderboard',
   watchtime: 'Watchtime',
   marriages: 'Ljubav i brakovi',
   minigames: 'Mini igre',
   songs: 'Song Request',
-  autoresponse: 'Bot interakcija',
-  announces: 'Automatske poruke',
+  'bot-interaction': 'Bot interakcija',
+  'auto-announces': 'Automatske poruke',
   config: 'Bot Config',
   moderation: 'Moderacija',
   economy: 'Ranking sistem',
@@ -5306,8 +5318,8 @@ function switchPanel(panelId) {
   }
   if (panelId === 'leaderboard') { loadLeaderboard(); loadWatchtime(); }
   if (panelId === 'marriages') { loadMarriages(); loadLoveStatuses(); }
-  if (panelId === 'autoresponse' && !configLoaded) loadBotConfig();
-  if (panelId === 'announces') {
+  if (panelId === 'bot-interaction' && !configLoaded) loadBotConfig();
+  if (panelId === 'auto-announces') {
     if (!configLoaded) loadBotConfig();
     renderPlanLimitBanners(); // Update announces banner
   }
@@ -5322,7 +5334,7 @@ function switchPanel(panelId) {
     if (!configLoaded) loadBotConfig();
     switchEconomyTab(currentEconomyTab || 'config');
   }
-  if (panelId === 'games' || panelId === 'minigames') renderBuiltinCommandsGrid();
+  if (panelId === 'builtin-commands' || panelId === 'minigames') renderBuiltinCommandsGrid();
 
   if (window.innerWidth < 768) {
     document.getElementById('sidebar').classList.remove('mobile-open');
@@ -6550,7 +6562,14 @@ function updateOverviewModulesUI() {
     const toggle = document.getElementById(key);
     const master = document.getElementById(masterMap[key]);
     if (toggle && master) {
-      master.checked = toggle.checked;
+      // Header master za "Automatske poruke" treba da prati OR oba pravila slanja
+      // (isto obrazloženje kao kod overview bedža ispod), a ne samo vremensko pravilo.
+      if (key === 'cfgAnnounceTimeEnabled') {
+        const msgToggle = document.getElementById('cfgAnnounceMsgEnabled');
+        master.checked = toggle.checked || (msgToggle ? msgToggle.checked : false);
+      } else {
+        master.checked = toggle.checked;
+      }
     }
   });
 
@@ -6559,7 +6578,17 @@ function updateOverviewModulesUI() {
     const toggle = document.getElementById(m.toggleId);
     if (!el) return;
 
-    const isEnabled = toggle ? toggle.checked : true;
+    // "Automatske poruke" ima DVA nezavisna pravila slanja (na vreme / na broj poruka).
+    // Modul treba da se prikazuje kao aktivan dokle god je BAR JEDNO od ta dva pravila
+    // uključeno — inače isključivanje samo jednog pravila (npr. "Slanje na vremenski
+    // interval") bi nepotrebno prekrilo ceo panel banerom "Modul nije aktiviran", iako
+    // druga metoda slanja (na broj poruka) i dalje normalno radi.
+    let isEnabled = toggle ? toggle.checked : true;
+    if (m.toggleId === 'cfgAnnounceTimeEnabled') {
+      const msgToggle = document.getElementById('cfgAnnounceMsgEnabled');
+      isEnabled = (toggle ? toggle.checked : true) || (msgToggle ? msgToggle.checked : false);
+    }
+
     if (isEnabled) {
       el.innerHTML = `<span>${m.label}</span> ${checkSvg}`;
       el.className = 'module-status-badge active';
@@ -6579,6 +6608,14 @@ function updateOverviewModulesUI() {
 async function toggleModuleFromHeader(toggleId, isChecked) {
   const toggle = document.getElementById(toggleId);
   if (toggle) toggle.checked = isChecked;
+  if (toggleId === 'cfgAnnounceTimeEnabled') {
+    // Header/master prekidač je "sve ili ništa" za Automatske poruke: gasi/pali OBA
+    // pravila slanja (vremenski interval i broj poruka), ne samo vremensko pravilo,
+    // jer se korisnik ovde odlučuje za CELU funkciju, ne za jedno pravilo.
+    syncAnnounceTimeToggle(isChecked);
+    const msgToggle = document.getElementById('cfgAnnounceMsgEnabled');
+    if (msgToggle) msgToggle.checked = isChecked;
+  }
 
   // INSTANT SYNCHRONOUS UI UPDATE
   updateOverviewModulesUI();
@@ -6641,6 +6678,12 @@ async function toggleModuleFromOverview(toggleId) {
   } else if (toggleId === 'cfgSongRequestEnabled') {
     const master = document.getElementById('cfgFeatureSongRequestMaster');
     if (master) master.checked = newState;
+  } else if (toggleId === 'cfgAnnounceTimeEnabled') {
+    // Isto obrazloženje kao u toggleModuleFromHeader: klik na Overview bedž je master
+    // prekidač za CELU funkciju "Automatske poruke", pa gasi/pali oba pravila slanja.
+    syncAnnounceTimeToggle(newState);
+    const msgToggle = document.getElementById('cfgAnnounceMsgEnabled');
+    if (msgToggle) msgToggle.checked = newState;
   }
 
   // Odmah osveži izgled znački (on/off) bez loading stanja
