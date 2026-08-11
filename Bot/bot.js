@@ -199,7 +199,7 @@ const defaultBuiltinRanks = {
 
 function getUserRankLevel(username, senderObj, channelUsername) {
     const userKey = username.toLowerCase();
-    if (userKey === channelUsername.toLowerCase() || userKey === 'milan_567') return 5; // Streamer / Creator
+    if (userKey === channelUsername.toLowerCase() || (config.SUPER_ADMIN_USERNAME && userKey === config.SUPER_ADMIN_USERNAME)) return 5; // Streamer / Creator
 
     const identity = senderObj && senderObj.identity ? senderObj.identity : {};
     const badges = identity.badges || [];
@@ -281,7 +281,7 @@ async function obradiCustomKomandu(chatroomId, username, porukaNormalized, chann
         return true; // Konzumirano ali blokirano
     }
 
-    if (utils.proveraKulauna(chatroomId, 'custom_' + cmdIme, username, customCmd.cooldown_ms)) return true;
+    if (utils.proveraKulauna(chatroomId, 'custom_' + cmdIme, username, customCmd.cooldown)) return true;
 
     // Inkrementiraj uses_count u bazi
     if (database.KORISTI_SUPABASE && database.supabase) {
@@ -977,7 +977,7 @@ function povezi() {
 
             // Admin komande
             const isAuthorized = username.toLowerCase() === channelState.channelUsername.toLowerCase() ||
-                username.toLowerCase() === 'milan_567' ||
+                (config.SUPER_ADMIN_USERNAME && username.toLowerCase() === config.SUPER_ADMIN_USERNAME) ||
                 (chatData.sender.identity &&
                     chatData.sender.identity.badges &&
                     chatData.sender.identity.badges.some(b => b.type === 'broadcaster'));
@@ -1340,7 +1340,7 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     await database.ucitajAutoAnnounces(dbConfig.channel_id);
 
     channelState.announce_interval_mins = dbConfig.announce_interval_mins ?? 15;
-    channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 30;
+    channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 10;
     channelState.announce_time_enabled = dbConfig.announce_time_enabled ?? true;
     channelState.announce_msg_enabled = dbConfig.announce_msg_enabled ?? true;
     channelState.moderationSettings = dbConfig.moderation_settings || {};
@@ -1952,39 +1952,6 @@ async function handleHttpRequest(req, res) {
             return;
         }
 
-        if (parsedUrl.pathname === '/api/global-logout' && req.method === 'POST') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized', detail: 'Missing or invalid authentication token' }));
-                return;
-            }
-            state.loggedOutUsers = state.loggedOutUsers || new Set();
-            let bodyStr = '';
-            req.on('data', chunk => { bodyStr += chunk; });
-            req.on('end', () => {
-                try {
-                    const payload = JSON.parse(bodyStr || '{}');
-                    if (payload.userId) {
-                        state.loggedOutUsers.add(String(payload.userId));
-                    }
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: true }));
-                } catch (_e) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Invalid JSON payload' }));
-                }
-            });
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/check-logout' && req.method === 'GET') {
-            const userId = parsedUrl.searchParams.get('userId');
-            state.loggedOutUsers = state.loggedOutUsers || new Set();
-            const shouldLogout = userId ? state.loggedOutUsers.has(String(userId)) : false;
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ shouldLogout, userId }));
-            return;
-        }
     } catch (err) {
         console.error('Error handling HTTP request in bot.js:', err);
     }

@@ -8,6 +8,10 @@ const KICK_CLIENT_SECRET = process.env.KICK_CLIENT_SECRET;
 const SUPABASE_URL     = process.env.SUPABASE_URL;
 const SUPABASE_KEY     = process.env.SUPABASE_KEY;
 
+// Nalog koji dobija vlasnicki rang (nivo 5) na SVAKOM kanalu (npr. za admin/support pristup).
+// Ostavi prazno u .env ako ne zelis nikakav globalni super-admin nalog.
+const SUPER_ADMIN_USERNAME = (process.env.SUPER_ADMIN_USERNAME || '').toLowerCase();
+
 // Gist fallback (opciono)
 const GIST_ID          = process.env.GIST_ID;
 const GITHUB_TOKEN     = process.env.GITHUB_TOKEN;
@@ -22,6 +26,7 @@ module.exports = {
     KICK_CLIENT_SECRET,
     SUPABASE_URL,
     SUPABASE_KEY,
+    SUPER_ADMIN_USERNAME,
     GIST_ID,
     GITHUB_TOKEN,
     KORISTI_GIST,

@@ -1,6 +1,7 @@
 const { posaljiPoruku, obrisiPoruku } = require('./messenger');
 const { log } = require('./utils');
 const state = require('./state');
+const { normalizujZaPoredjenje } = require('./spam');
 
 /**
  * Checks a chat message against active moderation filters.
@@ -164,7 +165,9 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
     // ── 6. SPAM / DUPLICATE PROTECTION ───────────────────────────────────────
     if (!triggerReason && settings.spam_enabled) {
         const maxDuplicates = settings.spam_max_duplicates || 2;
-        const key = `${userKey}::${content.trim().toLowerCase()}`;
+        // Normalizujemo (skidamo zero-width/nevidljive karaktere) da raid nalozi
+        // ne bi zaobišli detekciju duplikata dodavanjem nevidljivog znaka na kraj poruke.
+        const key = `${userKey}::${normalizujZaPoredjenje(content)}`;
         
         if (!channelState.duplicateTracker) {
             channelState.duplicateTracker = new Map();

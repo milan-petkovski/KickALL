@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const state = require('../src/state');
 const config = require('../src/config');
-const { spamFilter } = require('../src/spam');
+const { spamFilter, normalizujZaPoredjenje } = require('../src/spam');
 
 // Mock fetch to prevent network calls from messenger
 global.fetch = async () => ({
@@ -77,4 +77,29 @@ test('Spam - Cooldown sprečava višestruko spuštanje poruka u kratkom vremenu'
     const countAfterSecondPenalty = channelState.leaderboard['cooldownuser'].count;
 
     assert.equal(countAfterFirstPenalty, countAfterSecondPenalty);
+});
+
+test('Spam - Zero-width karakteri se skidaju pre poređenja (raid bypass fix)', () => {
+    const chatroomId = 'test_spam_room_4';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.SPAM_THRESHOLD = 3;
+    channelState.SPAM_WINDOW_MS = 15000;
+    channelState.channelUsername = 'TestStreamer';
+
+    const username = 'RaidUser1';
+    const baseMsg = 'kicks and subs? telegram gokhanusta_bot';
+
+    // Ista poruka, ali svaki put sa drugim nevidljivim (zero-width) karakterom na kraju,
+    // tačno kao u zabeleženom raid scenariju. Bez normalizacije bi svaka od ovih bila
+    // tretirana kao "drugačija" poruka i nijedna ne bi dostigla prag za identične poruke.
+    assert.equal(spamFilter(chatroomId, username, baseMsg + '\u200B'), false);
+    assert.equal(spamFilter(chatroomId, username, baseMsg + '\u200C'), false);
+    // 3. varijanta (sa word joiner karakterom) dostiže prag i treba da bude uhvaćena
+    assert.equal(spamFilter(chatroomId, username, baseMsg + '\u2060'), true);
+});
+
+test('normalizujZaPoredjenje uklanja zero-width karaktere i normalizuje case/whitespace', () => {
+    const a = normalizujZaPoredjenje('Zdravo Svima\u200B');
+    const b = normalizujZaPoredjenje('  zdravo svima');
+    assert.equal(a, b);
 });

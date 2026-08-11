@@ -97,7 +97,7 @@ function getChannelState(chatroomId) {
             pendingDuels: {},
 
             announce_interval_mins: 15,
-            announce_message_threshold: 30,
+            announce_message_threshold: 10,
             announce_time_enabled: true,
             announce_msg_enabled: true,
 

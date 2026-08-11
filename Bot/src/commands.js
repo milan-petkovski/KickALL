@@ -1180,7 +1180,8 @@ async function handleOsvezi(chatroomId, sender, isAuthorized) {
 
         posaljiPoruku(chatroomId, '✅ Svi podaci (leaderboard, watchtime, ljubav, custom komande, bot config) su uspešno osveženi direktno iz baze! 🚀');
     } catch (err) {
-        posaljiPoruku(chatroomId, `❌ Greška pri osvežavanju podataka: ${err.message}`);
+        log('ERR', `handleOsvezi greška za kanal ${chatroomId}: ${err.message}`);
+        posaljiPoruku(chatroomId, `❌ Greška pri osvežavanju podataka. Pokušaj ponovo za koji trenutak.`);
     }
 }
 
@@ -1507,6 +1508,14 @@ async function handleAddCommand(chatroomId, sender, textRaw, senderObj) {
         return;
     }
 
+    // Bez validnog userId-a insert u custom_commands puca (user_id je NOT NULL kolona).
+    // Do ovoga dolazi ako kanal nije završio OAuth povezivanje ili plan nikad nije učitan.
+    if (!channelState.userId) {
+        posaljiPoruku(chatroomId, `❌ @${sender}, kanal još nije povezan sa nalogom preko Kickot Dashboard-a. Kontaktiraj podršku ili ponovo poveži kanal.`);
+        log('ERR', `handleAddCommand: channelState.userId je null/undefined za kanal ${chatroomId} (@${channelState.channelUsername}). Prekidam pre insert-a da izbegnem NOT NULL violation.`);
+        return;
+    }
+
     const database = require('./database');
     if (database.KORISTI_SUPABASE && database.supabase) {
         try {
@@ -1553,7 +1562,8 @@ async function handleAddCommand(chatroomId, sender, textRaw, senderObj) {
             await database.ucitajCustomKomande(chatroomId);
             posaljiPoruku(chatroomId, `✅ Custom komanda ${cmdName} je uspešno dodata!`);
         } catch (err) {
-            posaljiPoruku(chatroomId, `❌ Greška pri čuvanju komande: ${err.message}`);
+            log('ERR', `handleAddCommand greška za kanal ${chatroomId}: ${err.message}`);
+            posaljiPoruku(chatroomId, `❌ Greška pri čuvanju komande. Pokušaj ponovo, a ako se ponavlja javi se podršci.`);
         }
     } else {
         posaljiPoruku(chatroomId, `❌ Supabase baza nije dostupna.`);
@@ -1603,7 +1613,8 @@ async function handleDelCommand(chatroomId, sender, cmdRaw, senderObj) {
             await database.ucitajCustomKomande(chatroomId);
             posaljiPoruku(chatroomId, `✅ Custom komanda !${cmdName} je uspešno obrisana.`);
         } catch (err) {
-            posaljiPoruku(chatroomId, `❌ Greška pri brisanju komande: ${err.message}`);
+            log('ERR', `handleDelCommand greška za kanal ${chatroomId}: ${err.message}`);
+            posaljiPoruku(chatroomId, `❌ Greška pri brisanju komande. Pokušaj ponovo, a ako se ponavlja javi se podršci.`);
         }
     } else {
         posaljiPoruku(chatroomId, `❌ Supabase baza nije dostupna.`);

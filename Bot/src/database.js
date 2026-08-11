@@ -735,7 +735,7 @@ async function ucitajBotConfig(chatroomId) {
             await ucitajAutoAnnounces(chatroomId);
 
             channelState.announce_interval_mins = data.announce_interval_mins ?? 15;
-            channelState.announce_message_threshold = data.announce_message_threshold ?? 30;
+            channelState.announce_message_threshold = data.announce_message_threshold ?? 10;
             channelState.announce_time_enabled = data.announce_time_enabled ?? true;
             channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
             channelState.moderationSettings = data.moderation_settings || {};

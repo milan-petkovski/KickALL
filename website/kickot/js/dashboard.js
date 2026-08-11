@@ -1635,35 +1635,19 @@ async function fetchKickAvatar(username) {
   return null;
 }
 
-// ── Avatar Fetch Queue ─────────────────────────────────────────────────────
-// Sekvencijalni queue sa 300ms kašnjenjem između zahtjeva
-// kako ne bismo zatrpali Netlify rate limiter (30 req/min).
-const _avatarFetchQueue = [];
-let _avatarFetchRunning = false;
 
-function _enqueueAvatarFetch(fn) {
-  return new Promise((resolve, reject) => {
-    _avatarFetchQueue.push({ fn, resolve, reject });
-    if (!_avatarFetchRunning) _processAvatarQueue();
-  });
-}
-
-async function _processAvatarQueue() {
-  if (_avatarFetchRunning || _avatarFetchQueue.length === 0) return;
-  _avatarFetchRunning = true;
-  while (_avatarFetchQueue.length > 0) {
-    const { fn, resolve, reject } = _avatarFetchQueue.shift();
-    try { resolve(await fn()); } catch (e) { reject(e); }
-    if (_avatarFetchQueue.length > 0) {
-      await new Promise(r => setTimeout(r, 300));
-    }
-  }
-  _avatarFetchRunning = false;
-}
-// ──────────────────────────────────────────────────────────────────────────
+// Keš username-ova za koje smo već utvrdili da avatar ne postoji/ne može da se
+// dobavi — sprečava ponovljene (uvek neuspešne) mrežne pozive i pratећe greške
+// u konzoli pri svakom ponovnom renderu leaderboard-a/liste kanala.
+const _avatarFailCache = new Set();
 
 async function tryFetchKickAvatarForSlug(username) {
   const apiBase = getBotApiBase();
+  const cacheKey = String(username || '').toLowerCase();
+
+  if (_avatarFailCache.has(cacheKey)) {
+    return null;
+  }
 
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const isDevWithoutBot = isLocalhost && (apiBase.includes(':5500') || apiBase === window.location.origin) && localStorage.getItem('use_local_bot') !== 'true';
@@ -1683,25 +1667,13 @@ async function tryFetchKickAvatarForSlug(username) {
     }
   } catch (_) { }
 
-  const apiUrl = `https://kick.com/api/v2/channels/${username}`;
-
-  // 2. Netlify proxy funkcija (POST zahtev) — ide kroz queue da ne udari rate limit
-  return _enqueueAvatarFetch(async () => {
-    try {
-      const netlifyRes = await fetch(`/.netlify/functions/api-proxy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUrl: apiUrl }),
-        signal: AbortSignal.timeout(3500)
-      });
-      if (netlifyRes.ok) {
-        const data = await netlifyRes.json();
-        const pic = data?.user?.profile_pic || data?.avatar;
-        if (pic) return pic;
-      }
-    } catch (_) { }
-    return null;
-  });
+  // 2. Direktan Kick fallback (preko Netlify proxy-ja) je isključen kao redovan put:
+  // Kick.com blokira (403) server-to-server pozive sa Netlify servera (Cloudflare
+  // bot zaštita), a najčešći slučaj kad se uopšte stigne dovde je da kanal jednostavno
+  // nema postavljenu profilnu sliku na Kick-u — u oba slučaja krajnji rezultat je isti
+  // (nema avatara), pa dalji pokušaj samo puni konzolu nepotrebnim 403 greškama.
+  _avatarFailCache.add(cacheKey);
+  return null;
 }
 
 
@@ -3765,7 +3737,7 @@ function renderLoveStatuses(rows) {
     return `
       <tr>
         <td style="font-weight:600; color:#fff;">${escapeHtml(row.user1)}</td>
-        <td style="text-align:center; vertical-align:middle; text-overflow: clip;">${heartSvg}</td>
+        <td style="text-align:center; vertical-align:middle;">${heartSvg}</td>
         <td style="font-weight:600; color:#fff;">${escapeHtml(row.user2)}</td>
         <td><span class="status-pill ${statusObj.class}" style="${statusObj.style}">${statusObj.label}</span></td>
         <td class="td-num" style="font-weight:600; color:${modifier > 0 ? 'var(--kick-green)' : modifier < 0 ? '#FCA5A5' : 'var(--text-muted)'}">${displayModifier}</td>
@@ -3822,7 +3794,23 @@ async function loadBotConfig() {
     updateCustomBotStatusUI(loadedBotName, isBotActive);
 
     // Load chat alerts settings
-    const alerts = data.alerts_settings || {};
+    // NAPOMENA: alertovi se čuvaju u posebnoj tabeli `chat_alerts` (po alert_type redu),
+    // NE u bot_config.alerts_settings — bot (Bot/src/database.js -> ucitajAlerts) čita
+    // isključivo iz `chat_alerts`, pa dashboard mora da čita/piše iz iste tabele da bi
+    // izmene stigle do bota.
+    const { data: alertRows, error: alertsError } = await sb.from('chat_alerts')
+      .select('alert_type, enabled, message, min_amount, min_viewers')
+      .eq('channel_id', activeChannel.id);
+
+    const alerts = {};
+    if (!alertsError && alertRows) {
+      alertRows.forEach(row => {
+        alerts[`${row.alert_type}_enabled`] = row.enabled;
+        alerts[`${row.alert_type}_message`] = row.message;
+        if (row.alert_type === 'kicks') alerts.kicks_min_amount = row.min_amount ?? 0;
+        if (row.alert_type === 'host') alerts.host_min_viewers = row.min_viewers ?? 0;
+      });
+    }
     if (document.getElementById('cfgAlertFollowEnabled')) document.getElementById('cfgAlertFollowEnabled').checked = alerts.follow_enabled ?? false;
     if (document.getElementById('cfgAlertFollowMsg')) document.getElementById('cfgAlertFollowMsg').value = alerts.follow_message || '';
 
@@ -4072,7 +4060,12 @@ async function saveBotConfig(silent = false) {
     language: document.getElementById('cfgLanguage')?.value || 'sr',
     cooldown_ms: parseInt(document.getElementById('cfgCooldown')?.value) || 3000,
     feature_leaderboard: document.getElementById('cfgLeaderboard')?.checked ?? true,
-    feature_watchtime: document.getElementById('cfgGambleEnabled')?.checked ?? true,
+    // NAPOMENA: trenutno ne postoji poseban UI toggle za watchtime feature (cfgWatchtime
+    // element ne postoji u dashboard.html). Ranije se ovde greškom čitala vrednost iz
+    // cfgGambleEnabled checkbox-a (kockanje), što je pri svakom čuvanju konfiguracije
+    // tiho prepisivalo feature_watchtime u bazi pogrešnom vrednošću. Dok se ne doda
+    // pravi UI kontrola, čuvamo postojeću vrednost iz baze da je ne bismo korumpirali.
+    feature_watchtime: currentChannelConfig?.feature_watchtime ?? true,
     feature_games: document.getElementById('cfgGames')?.checked ?? true,
     feature_love: document.getElementById('cfgLove')?.checked ?? true,
     feature_moderation: document.getElementById('cfgModeration')?.checked ?? true,
@@ -4095,29 +4088,9 @@ async function saveBotConfig(silent = false) {
       return raw.startsWith('@') ? raw : '@' + raw;
     })(),
     custom_bot_active: window.currentCustomBotActive ?? false,
-    alerts_settings: {
-      follow_enabled: document.getElementById('cfgAlertFollowEnabled')?.checked ?? false,
-      follow_message: document.getElementById('cfgAlertFollowMsg')?.value?.trim() || null,
-
-      kicks_enabled: document.getElementById('cfgAlertKicksEnabled')?.checked ?? false,
-      kicks_message: document.getElementById('cfgAlertKicksMsg')?.value?.trim() || null,
-      kicks_min_amount: parseInt(document.getElementById('cfgAlertKicksMin')?.value) || 0,
-
-      sub_enabled: document.getElementById('cfgAlertSubEnabled')?.checked ?? false,
-      sub_message: document.getElementById('cfgAlertSubMsg')?.value?.trim() || null,
-
-      resub_enabled: document.getElementById('cfgAlertResubEnabled')?.checked ?? false,
-      resub_message: document.getElementById('cfgAlertResubMsg')?.value?.trim() || null,
-
-      giftsub_enabled: document.getElementById('cfgAlertGiftsubEnabled')?.checked ?? false,
-      giftsub_message: document.getElementById('cfgAlertGiftsubMsg')?.value?.trim() || null,
-
-      host_enabled: document.getElementById('cfgAlertHostEnabled')?.checked ?? false,
-      host_message: document.getElementById('cfgAlertHostMsg')?.value?.trim() || null,
-      host_min_viewers: parseInt(document.getElementById('cfgAlertHostMin')?.value) || 0,
-
-      welcome_enabled: document.getElementById('cfgAlertWelcomeEnabled')?.checked ?? false
-    },
+    // NAPOMENA: chat alertovi se NE čuvaju ovde. Bot ih čita iz posebne tabele
+    // `chat_alerts` (vidi saveChatAlerts ispod) — čuvanje u bot_config je bio uzrok
+    // zašto se izmene alertova nisu povlačile/prikazivale u chatu.
     feature_songrequest: document.getElementById('cfgSongRequestEnabled')?.checked ?? true,
     songrequest_settings: {
       request_role: document.getElementById('cfgSongRequestRank')?.value || 'everyone',
@@ -4165,6 +4138,8 @@ async function saveBotConfig(silent = false) {
   const { error } = await sb.from('bot_config')
     .upsert(config, { onConflict: 'channel_id' });
 
+  const alertsError = await saveChatAlerts();
+
   if (!silent) {
     if (btnConfig) setLoading('saveConfigBtn', false);
     if (btnConfigBottom) setLoading('saveConfigBtnBottom', false);
@@ -4172,7 +4147,7 @@ async function saveBotConfig(silent = false) {
     if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', false);
   }
 
-  if (error) {
+  if (error || alertsError) {
     showToast('error', 'Greška pri čuvanju config-a', '❌');
     return;
   }
@@ -4182,6 +4157,63 @@ async function saveBotConfig(silent = false) {
   }
   notifyBotToReload();
   updateOverviewModulesUI();
+}
+
+// Čuva chat alertove (follow/kicks/sub/resub/giftsub/host/welcome) u tabelu `chat_alerts`.
+// Bot (Bot/src/database.js -> ucitajAlerts) čita alertove ISKLJUČIVO iz ove tabele i
+// osluškuje realtime izmene na njoj (bot.js), pa ovde moraju da se upisuju da bi
+// izmene iz "Bot interakcija" panela stigle do bota i videle se u chatu.
+async function saveChatAlerts() {
+  if (!activeChannel) return null;
+
+  const rows = [
+    {
+      alert_type: 'follow',
+      enabled: document.getElementById('cfgAlertFollowEnabled')?.checked ?? false,
+      message: document.getElementById('cfgAlertFollowMsg')?.value?.trim() || null,
+    },
+    {
+      alert_type: 'kicks',
+      enabled: document.getElementById('cfgAlertKicksEnabled')?.checked ?? false,
+      message: document.getElementById('cfgAlertKicksMsg')?.value?.trim() || null,
+      min_amount: parseInt(document.getElementById('cfgAlertKicksMin')?.value) || 0,
+    },
+    {
+      alert_type: 'sub',
+      enabled: document.getElementById('cfgAlertSubEnabled')?.checked ?? false,
+      message: document.getElementById('cfgAlertSubMsg')?.value?.trim() || null,
+    },
+    {
+      alert_type: 'resub',
+      enabled: document.getElementById('cfgAlertResubEnabled')?.checked ?? false,
+      message: document.getElementById('cfgAlertResubMsg')?.value?.trim() || null,
+    },
+    {
+      alert_type: 'giftsub',
+      enabled: document.getElementById('cfgAlertGiftsubEnabled')?.checked ?? false,
+      message: document.getElementById('cfgAlertGiftsubMsg')?.value?.trim() || null,
+    },
+    {
+      alert_type: 'host',
+      enabled: document.getElementById('cfgAlertHostEnabled')?.checked ?? false,
+      message: document.getElementById('cfgAlertHostMsg')?.value?.trim() || null,
+      min_viewers: parseInt(document.getElementById('cfgAlertHostMin')?.value) || 0,
+    },
+    {
+      alert_type: 'welcome',
+      enabled: document.getElementById('cfgAlertWelcomeEnabled')?.checked ?? false,
+      message: document.getElementById('cfgAlertWelcomeMsg')?.value?.trim() || null,
+    },
+  ].map(row => ({
+    user_id: getChannelOwnerId(),
+    channel_id: activeChannel.id,
+    ...row,
+  }));
+
+  const { error } = await sb.from('chat_alerts')
+    .upsert(rows, { onConflict: 'channel_id,alert_type' });
+
+  return error || null;
 }
 
 async function saveBotConfigFields(fieldsToUpdate) {
@@ -4383,7 +4415,12 @@ function getBotApiBase() {
 function notifyBotToReload() {
   if (!activeChannel) return;
   const apiBase = getBotApiBase();
-  fetch(`${apiBase}/api/kick/reload?chatroom_id=${activeChannel.id}`).catch(() => { });
+  const targetUrl = `${apiBase}/api/kick/reload?chatroom_id=${activeChannel.id}`;
+  fetch(`/.netlify/functions/api-proxy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetUrl })
+  }).catch(() => { });
 }
 
 async function saveModerationSettings(silent = false) {
@@ -4659,11 +4696,17 @@ function testBotConnection() {
   showToast('info', 'Testiram vezu i šaljem ping u chat...', '🔄');
 
   const kickApiBase = getBotApiBase();
+  const targetUrl = `${kickApiBase}/api/kick/test-ping`;
 
-  fetch(`${kickApiBase}/api/kick/test-ping`, {
+  fetch(`/.netlify/functions/api-proxy`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ chatroom_id: activeChannel.id }).toString()
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      targetUrl,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ chatroom_id: activeChannel.id }).toString()
+    })
   })
     .then(async (res) => {
       if (res.ok) {
@@ -4791,10 +4834,16 @@ async function fetchKickLiveStatus() {
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const isDevWithoutBot = isLocalhost && (kickApiBase.includes(':5500') || kickApiBase === window.location.origin) && localStorage.getItem('use_local_bot') !== 'true';
 
-  // 1. Pokušaj preko našeg bot servera (ako nije dev okruženje bez bota)
+  // 1. Pokušaj preko našeg bot servera (ako nije dev okruženje bez bota), kroz Netlify proxy
+  //    koji server-side dodaje X-Internal-Token (direktan fetch na bot uvek vraca 401).
   if (!isDevWithoutBot) {
     try {
-      const localRes = await fetch(`${kickApiBase}/api/kick/channel?username=${activeChannel.username}`);
+      const targetUrl = `${kickApiBase}/api/kick/channel?username=${activeChannel.username}`;
+      const localRes = await fetch(`/.netlify/functions/api-proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUrl })
+      });
       if (localRes.ok) {
         const data = await localRes.json();
         const isLive = data?.livestream !== null && data?.livestream !== undefined;
@@ -5434,10 +5483,16 @@ function notifyGlobalLogout(userId) {
   localStorage.setItem('kickbot_global_logout', Date.now().toString());
 
   if (userId) {
-    fetch(`${getBotApiBase()}/api/global-logout`, {
+    const targetUrl = `${getBotApiBase()}/api/global-logout`;
+    fetch(`/.netlify/functions/api-proxy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: userId })
+      body: JSON.stringify({
+        targetUrl,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId })
+      })
     }).catch(() => { });
   }
 }
@@ -6536,8 +6591,8 @@ window.addEventListener('resize', syncOverviewCardsHeight);
 function updateOverviewModulesUI() {
   const modules = [
     { id: 'ovStatusLeaderboard', toggleId: 'cfgLeaderboard', label: 'Leaderboard', panelId: 'panel-leaderboard' },
-    { id: 'ovStatusAnnouncements', toggleId: 'cfgAnnounceTimeEnabled', label: 'Automatske poruke', panelId: 'panel-announces' },
-    { id: 'ovStatusInteraction', toggleId: 'cfgAutoresponse', label: 'Bot interakcija', panelId: 'panel-autoresponse' },
+    { id: 'ovStatusAnnouncements', toggleId: 'cfgAnnounceTimeEnabled', label: 'Automatske poruke', panelId: 'panel-auto-announces' },
+    { id: 'ovStatusInteraction', toggleId: 'cfgAutoresponse', label: 'Bot interakcija', panelId: 'panel-bot-interaction' },
     { id: 'ovStatusLove', toggleId: 'cfgLove', label: 'Ljubav i brakovi', panelId: 'panel-marriages' },
     { id: 'ovStatusGames', toggleId: 'cfgGames', label: 'Mini igre', panelId: 'panel-minigames' },
     { id: 'ovStatusSongRequest', toggleId: 'cfgSongRequestEnabled', label: 'Song request', panelId: 'panel-songs' },
@@ -6766,8 +6821,8 @@ async function enableCurrentPanelModule(btn) {
   const panelId = activePanel.id;
   const panelToToggleId = {
     'panel-leaderboard': 'cfgLeaderboard',
-    'panel-announces': 'cfgAnnounceTimeEnabled',
-    'panel-autoresponse': 'cfgAutoresponse',
+    'panel-auto-announces': 'cfgAnnounceTimeEnabled',
+    'panel-bot-interaction': 'cfgAutoresponse',
     'panel-marriages': 'cfgLove',
     'panel-minigames': 'cfgGames',
     'panel-songs': 'cfgSongRequestEnabled',
@@ -6879,7 +6934,12 @@ function startLiveActivityFeed() {
     }
 
     try {
-      const res = await fetch(`${apiBase}/api/kick/logs?chatroom_id=${activeChannel.id}`);
+      const targetUrl = `${apiBase}/api/kick/logs?chatroom_id=${activeChannel.id}`;
+      const res = await fetch(`/.netlify/functions/api-proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUrl })
+      });
       const dot = document.getElementById('botLiveFeedDot');
       if (res.ok) {
         if (dot) {

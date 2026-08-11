@@ -4,6 +4,22 @@ const { log } = require('./utils');
 const { smanjiPoruku } = require('./database');
 const { posaljiPoruku } = require('./messenger');
 
+// Nevidljivi/zero-width unicode karakteri koje spam-raid nalozi koriste da bi
+// "identičnu" poruku učinili tehnički drugačijom (drugačiji hash/string) i tako
+// zaobišli detekciju duplikata. Uklanjamo ih pre poređenja.
+// U200B-U200D: zero-width space/non-joiner/joiner, U200E-U200F: LTR/RTL mark,
+// UFEFF: zero-width no-break space (BOM), U2060-U2064: word joiner i slično,
+// U00AD: soft hyphen, U061C: Arabic letter mark.
+const NEVIDLJIVI_KARAKTERI_REGEX = /[\u200B-\u200F\uFEFF\u2060-\u2064\u00AD\u061C]/g;
+
+function normalizujZaPoredjenje(poruka) {
+    return poruka
+        .normalize('NFKC')
+        .replace(NEVIDLJIVI_KARAKTERI_REGEX, '')
+        .trim()
+        .toLowerCase();
+}
+
 function spamFilter(chatroomId, username, poruka) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return false;
@@ -12,7 +28,9 @@ function spamFilter(chatroomId, username, poruka) {
     const userKey = username.toLowerCase();
     
     // ── 1. Provera identičnih poruka ──────────────────────────────────────────
-    const kljucIdenticna = `${userKey}::${poruka.trim().toLowerCase()}`;
+    // Normalizujemo (skidamo zero-width karaktere) da bi "ista poruka + nevidljivi
+    // karakter na kraju" i dalje bila prepoznata kao duplikat.
+    const kljucIdenticna = `${userKey}::${normalizujZaPoredjenje(poruka)}`;
     if (!channelState.spamTracker[kljucIdenticna]) channelState.spamTracker[kljucIdenticna] = [];
     const windowIdenticnaTime = channelState.SPAM_WINDOW_MS !== undefined ? channelState.SPAM_WINDOW_MS : config.SPAM_WINDOW_MS;
     channelState.spamTracker[kljucIdenticna] = channelState.spamTracker[kljucIdenticna].filter(t => sada - t < windowIdenticnaTime);
@@ -43,15 +61,15 @@ function spamFilter(chatroomId, username, poruka) {
         if (sada - zadnjeUpozorenje > windowIdenticna) {
             posaljiPoruku(chatroomId, `@${username} molim te ne spamuj u chatu! 🙏`);
             channelState.lastWarned[userKey] = sada;
-            log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam: upozoren ${username} (${countIdenticna}x ista poruka)`);
+            log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [identična poruka]: upozoren ${username} (${countIdenticna}x ista poruka)`);
         } else {
-            log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam: preskočeno duplirano upozorenje za ${username}`);
+            log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [identična poruka]: preskočeno duplirano upozorenje za ${username}`);
         }
         return true;
     }
 
     if (countIdenticna > limitIdenticna) {
-        log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam: blokirano od ${username} (${countIdenticna}x ista poruka)`);
+        log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [identična poruka]: blokirano od ${username} (${countIdenticna}x ista poruka)`);
         return true;
     }
 
@@ -69,15 +87,15 @@ function spamFilter(chatroomId, username, poruka) {
         if (sada - zadnjeUpozorenje > windowIdenticna) {
             posaljiPoruku(chatroomId, `@${username} molim te ne spamuj u chatu! 🙏`);
             channelState.lastWarned[userKey] = sada;
-            log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam: upozoren ${username} (${countRapid}x brze poruke)`);
+            log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [brzo kucanje]: upozoren ${username} (${countRapid}x brze poruke)`);
         } else {
-            log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam: preskočeno duplirano upozorenje za ${username}`);
+            log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [brzo kucanje]: preskočeno duplirano upozorenje za ${username}`);
         }
         return true;
     }
 
     if (countRapid > config.RAPID_MSG_THRESHOLD) {
-        log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam: blokirano od ${username} (${countRapid}x brze poruke)`);
+        log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [brzo kucanje]: blokirano od ${username} (${countRapid}x brze poruke)`);
         return true;
     }
 
@@ -85,5 +103,6 @@ function spamFilter(chatroomId, username, poruka) {
 }
 
 module.exports = {
-    spamFilter
+    spamFilter,
+    normalizujZaPoredjenje
 };
