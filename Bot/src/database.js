@@ -157,7 +157,7 @@ async function sacuvajLeaderboard(chatroomId) {
                 return {
                     channel_id: chatroomId,
                     username: key,
-                    display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
+                    display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].display_name) || (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
                     chat: newChat,
                     watchtime_minutes: dbWatchtime,
                     month: mesecStr,
@@ -635,6 +635,56 @@ async function ucitajCustomKomande(chatroomId) {
     }
 }
 
+async function ucitajAlerts(chatroomId) {
+    try {
+        if (!KORISTI_SUPABASE) return;
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+
+        const { data, error } = await supabase
+            .from('chat_alerts')
+            .select('alert_type, enabled, message, min_amount, min_viewers')
+            .eq('channel_id', chatroomId);
+
+        if (error) throw error;
+
+        const alerts = {};
+        (data || []).forEach(row => {
+            alerts[`${row.alert_type}_enabled`] = row.enabled;
+            if (row.message !== null) alerts[`${row.alert_type}_message`] = row.message;
+            if (row.alert_type === 'kicks') alerts.kicks_min_amount = row.min_amount ?? 0;
+            if (row.alert_type === 'host') alerts.host_min_viewers = row.min_viewers ?? 0;
+        });
+        channelState.alerts_settings = alerts;
+    } catch (err) {
+        log('ERR', `Greška pri učitavanju alertova za ${chatroomId}: ${err.message}`);
+    }
+}
+
+async function ucitajAutoAnnounces(chatroomId) {
+    try {
+        if (!KORISTI_SUPABASE) return;
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+
+        const { data, error } = await supabase
+            .from('auto_announces')
+            .select('message, enabled, position')
+            .eq('channel_id', chatroomId)
+            .eq('enabled', true)
+            .order('position', { ascending: true });
+
+        if (error) throw error;
+
+        const limits = channelState.planLimits || config.PLAN_LIMITS.free;
+        const maxAnnounces = limits.maxAutoAnnounces || 2;
+        const rows = Array.isArray(data) ? data : [];
+        channelState.autoAnnounces = rows.slice(0, maxAnnounces).map(row => row.message);
+    } catch (err) {
+        log('ERR', `Greška pri učitavanju auto-najava za ${chatroomId}: ${err.message}`);
+    }
+}
+
 async function ucitajBotConfig(chatroomId) {
     try {
         if (!KORISTI_SUPABASE) return;
@@ -678,12 +728,11 @@ async function ucitajBotConfig(chatroomId) {
             channelState.feature_songrequest = limits.allowSongRequest && (data.feature_songrequest ?? false);
             channelState.songrequest_settings = data.songrequest_settings || {};
             channelState.welcome_message = data.welcome_message || '';
-            channelState.alerts_settings = data.alerts_settings || {};
+            await ucitajAlerts(chatroomId);
 
             channelState.botActive = data.bot_active || false;
 
-            const rawAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
-            channelState.autoAnnounces = rawAnnounces.slice(0, limits.maxAutoAnnounces || 2);
+            await ucitajAutoAnnounces(chatroomId);
 
             channelState.announce_interval_mins = data.announce_interval_mins ?? 15;
             channelState.announce_message_threshold = data.announce_message_threshold ?? 30;
@@ -699,8 +748,12 @@ async function ucitajBotConfig(chatroomId) {
             channelState.points_per_sub = data.points_per_sub ?? 1000;
             channelState.points_per_gift_sub = data.points_per_gift_sub ?? 2000;
             channelState.points_per_100_kicks = data.points_per_100_kicks ?? 500;
-            channelState.daily_streak_bonus = data.daily_streak_bonus ?? 150;
-            channelState.host_raid_bonus = data.host_raid_bonus ?? 300;
+            // NAPOMENA: kolone u bazi su `points_daily_streak` i `points_per_raid`
+            // (vidi bot_config šemu i dashboard.js saveBotConfig) — ranije se ovde
+            // čitalo iz `data.daily_streak_bonus`/`data.host_raid_bonus`, kolona koje
+            // ne postoje, pa se podešavanje sa dashboarda nikad nije primenjivalo.
+            channelState.daily_streak_bonus = data.points_daily_streak ?? 150;
+            channelState.host_raid_bonus = data.points_per_raid ?? 300;
 
             const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
             const rawStore = Array.isArray(data.store_items) ? data.store_items : [];
@@ -904,6 +957,8 @@ module.exports = {
     evidentirajPoruku,
     smanjiPoruku,
     ucitajCustomKomande,
+    ucitajAutoAnnounces,
+    ucitajAlerts,
     ucitajBotConfig,
     ucitajUserPlan,
     ucitajSveAktivneKanale,

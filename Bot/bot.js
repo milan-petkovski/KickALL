@@ -1325,7 +1325,7 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
 
     channelState.STREAM_START_PIN_MESSAGE = dbConfig.stream_pin_msg || '';
     channelState.welcome_message = dbConfig.welcome_message || '';
-    channelState.alerts_settings = dbConfig.alerts_settings || {};
+    await database.ucitajAlerts(dbConfig.channel_id);
 
     channelState.feature_leaderboard = limits.allowLeaderboard && (dbConfig.feature_leaderboard ?? true);
     channelState.feature_watchtime = limits.allowWatchtime && (dbConfig.feature_watchtime ?? true);
@@ -1337,8 +1337,7 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     channelState.songrequest_settings = dbConfig.songrequest_settings || {};
     channelState.botActive = dbConfig.bot_active || false;
 
-    const rawAnnounces = Array.isArray(dbConfig.auto_announces) ? dbConfig.auto_announces : [];
-    channelState.autoAnnounces = rawAnnounces.slice(0, limits.maxAutoAnnounces || 2);
+    await database.ucitajAutoAnnounces(dbConfig.channel_id);
 
     channelState.announce_interval_mins = dbConfig.announce_interval_mins ?? 15;
     channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 30;
@@ -1354,8 +1353,9 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     channelState.points_per_sub = dbConfig.points_per_sub ?? 1000;
     channelState.points_per_gift_sub = dbConfig.points_per_gift_sub ?? 2000;
     channelState.points_per_100_kicks = dbConfig.points_per_100_kicks ?? 500;
-    channelState.daily_streak_bonus = dbConfig.daily_streak_bonus ?? 150;
-    channelState.host_raid_bonus = dbConfig.host_raid_bonus ?? 300;
+    // Kolone u bazi su `points_daily_streak` i `points_per_raid` (vidi database.js ucitajBotConfig)
+    channelState.daily_streak_bonus = dbConfig.points_daily_streak ?? 150;
+    channelState.host_raid_bonus = dbConfig.points_per_raid ?? 300;
 
     const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
     const rawStore = Array.isArray(dbConfig.store_items) ? dbConfig.store_items : [];
@@ -2134,6 +2134,44 @@ async function start() {
                     if (state.channels[chatroomId]) {
                         logDebouncedUpdate(`custom_cmds::${chatroomId}`, `⚡ Custom komande osvežene za kanal.`);
                         await database.ucitajCustomKomande(chatroomId);
+                    }
+                }
+            })
+            .subscribe();
+
+        // 7b. Osluškuj izmene na auto-najavama (auto_announces) u realnom vremenu
+        database.supabase.channel('public:auto_announces')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'auto_announces'
+            }, async (payload) => {
+                const { new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (row) {
+                    const chatroomId = String(row.channel_id);
+                    if (state.channels[chatroomId]) {
+                        logDebouncedUpdate(`auto_announces::${chatroomId}`, `📢 Auto-najave osvežene za kanal.`);
+                        await database.ucitajAutoAnnounces(chatroomId);
+                    }
+                }
+            })
+            .subscribe();
+
+        // 7c. Osluškuj izmene na alertovima (chat_alerts) u realnom vremenu
+        database.supabase.channel('public:chat_alerts')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'chat_alerts'
+            }, async (payload) => {
+                const { new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (row) {
+                    const chatroomId = String(row.channel_id);
+                    if (state.channels[chatroomId]) {
+                        logDebouncedUpdate(`chat_alerts::${chatroomId}`, `🔔 Alertovi osveženi za kanal.`);
+                        await database.ucitajAlerts(chatroomId);
                     }
                 }
             })

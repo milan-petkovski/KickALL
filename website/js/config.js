@@ -88,7 +88,7 @@ window.CONFIG = {
     if (isLocalhost && localStorage.getItem('use_local_bot') === 'true') {
       return 'http://localhost:3000';
     }
-    return window.location.origin;
+    return 'https://kickbot-ihzb.onrender.com';
   },
 
   // OAuth Configuration

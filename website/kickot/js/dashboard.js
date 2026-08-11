@@ -3765,7 +3765,7 @@ function renderLoveStatuses(rows) {
     return `
       <tr>
         <td style="font-weight:600; color:#fff;">${escapeHtml(row.user1)}</td>
-        <td style="text-align:center; vertical-align:middle;">${heartSvg}</td>
+        <td style="text-align:center; vertical-align:middle; text-overflow: clip;">${heartSvg}</td>
         <td style="font-weight:600; color:#fff;">${escapeHtml(row.user2)}</td>
         <td><span class="status-pill ${statusObj.class}" style="${statusObj.style}">${statusObj.label}</span></td>
         <td class="td-num" style="font-weight:600; color:${modifier > 0 ? 'var(--kick-green)' : modifier < 0 ? '#FCA5A5' : 'var(--text-muted)'}">${displayModifier}</td>
@@ -4377,12 +4377,13 @@ function toggleModerationPanelState() {
 }
 
 function getBotApiBase() {
-  return window.KickotConfig.api.baseUrl;
+  return window.KickotConfig ? window.KickotConfig.api.baseUrl : 'https://kickbot-ihzb.onrender.com';
 }
 
 function notifyBotToReload() {
   if (!activeChannel) return;
-  fetch(`${getBotApiBase()}/api/kick/reload?chatroom_id=${activeChannel.id}`).catch(() => { });
+  const apiBase = getBotApiBase();
+  fetch(`${apiBase}/api/kick/reload?chatroom_id=${activeChannel.id}`).catch(() => { });
 }
 
 async function saveModerationSettings(silent = false) {
