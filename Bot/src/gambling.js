@@ -44,6 +44,11 @@ function proveriUlog(chatroomId, sender, amountRaw) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return { valid: false };
 
+    if (channelState.feature_games === false || (channelState.planLimits && channelState.planLimits.allowGambling === false)) {
+        posaljiPoruku(chatroomId, `❌ @${clean}, Kazino igre i komande kockanja su dostupne u PRO i ELITE paketima.`);
+        return { valid: false };
+    }
+
     const user          = dohvatiEkonomiju(channelState, key, clean);
     const trenutniCoins = user.coins || 0;
     const valuta        = dobijNazivValute(channelState);

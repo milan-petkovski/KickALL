@@ -64,7 +64,7 @@ module.exports = {
             allowAdvancedModeration: false,
             allowSongRequest: true,
             allowStore: true,
-            allowGambling: true,
+            allowGambling: false,
             allowLove: true,
             allowWatchtime: true,
             allowLeaderboard: true,

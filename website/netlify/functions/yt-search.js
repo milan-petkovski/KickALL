@@ -95,6 +95,22 @@ exports.handler = async function (event, _context) {
       uploader = uploaderMatch[1];
     }
 
+    // Attempt to extract duration in seconds
+    let duration = 0;
+    const lengthSecMatch = html.match(/"lengthSeconds":"(\d+)"/);
+    if (lengthSecMatch && lengthSecMatch[1]) {
+      duration = parseInt(lengthSecMatch[1], 10);
+    }
+    if (!duration || isNaN(duration)) {
+      const lengthTextMatch = html.match(/"lengthText":\s*\{\s*"accessibility":\s*\{[^}]*\}\s*,\s*"simpleText":\s*"([^"]+)"\}/) ||
+                              html.match(/"lengthText":\s*\{\s*"simpleText":\s*"([^"]+)"\}/);
+      if (lengthTextMatch && lengthTextMatch[1]) {
+        const parts = lengthTextMatch[1].split(':').map(p => parseInt(p, 10));
+        if (parts.length === 2) duration = parts[0] * 60 + parts[1];
+        else if (parts.length === 3) duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      }
+    }
+
     return {
       statusCode: 200,
       headers: {
@@ -106,7 +122,7 @@ exports.handler = async function (event, _context) {
         title: title,
         uploader: uploader,
         coverUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-        duration: 210
+        duration: (duration && !isNaN(duration)) ? duration : 0
       })
     };
   } catch (error) {

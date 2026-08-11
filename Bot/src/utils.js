@@ -229,6 +229,23 @@ function formatAlertMessage(template, vars = {}) {
     return res;
 }
 
+// Garancija da sacuvajLeaderboard i sacuvajWatchtime nikad ne rade istovremeno nad istim kanalom.
+async function runWithLeaderboardLock(channelState, task) {
+    if (!channelState) return await task();
+    if (!channelState.leaderboardSaveLock) {
+        channelState.leaderboardSaveLock = Promise.resolve();
+    }
+    const previousLock = channelState.leaderboardSaveLock;
+    let release;
+    channelState.leaderboardSaveLock = new Promise(resolve => { release = resolve; });
+    try {
+        await previousLock;
+        return await task();
+    } finally {
+        release();
+    }
+}
+
 module.exports = {
     log,
     sanitizeInput,
@@ -238,5 +255,7 @@ module.exports = {
     proveraKulauna,
     prevediVreme,
     formatTemplateMessage,
-    formatAlertMessage
+    formatAlertMessage,
+    runWithLeaderboardLock
 };
+

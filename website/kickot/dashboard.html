@@ -758,6 +758,19 @@
                 <div class="stat-label">Prilagođene komande</div>
               </div>
             </div>
+
+            <div class="stat-card">
+              <div class="stat-icon stat-pink" style="color: #F472B6;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                </svg>
+              </div>
+              <div class="stat-info">
+                <div class="stat-value" id="statMarriages">—</div>
+                <div class="stat-label">Aktivni brakovi</div>
+              </div>
+            </div>
           </div>
 
           <!-- Red 2: 2 Kartice (Top 5 Watchtime & Top 5 Chatters) -->
@@ -2352,7 +2365,7 @@
             <div class="panel-header-toggle">
               <span class="panel-header-toggle__label">Mini Igre:</span>
               <label class="toggle-switch">
-                <input type="checkbox" id="cfgFeatureGamesMaster" checked
+                <input type="checkbox" id="cfgFeatureGamesMaster"
                   onchange="toggleModuleFromHeader('cfgGames', this.checked)">
                 <span class="toggle-track"></span>
               </label>
@@ -2417,7 +2430,7 @@
                   style="font-family: var(--font-mono); color: #a78bfa; font-weight: 700; font-size: 0.92rem; margin-bottom: 6px;">
                   !ruskirulet</div>
                 <div style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
-                  Puca se revolverom od 6 metaka. Promašaj te ostavlja u chatu, a pogodak šalje na hlađenje 1 minut.
+                  Puca se revolverom od 6 metaka. Zabavna igra u chatu koja proveri vašu sreću pred svima.
                 </div>
               </div>
 
@@ -2492,10 +2505,10 @@
                     </div>
                     <span
                       style="font-size: 0.75rem; font-weight: 700; color: #eab308; background: rgba(234, 179, 8, 0.15); padding: 2px 8px; border-radius: 10px;">Jackpot
-                      50x</span>
+                      10x</span>
                   </div>
                   <p style="margin: 0 0 14px 0; font-size: 0.83rem; color: var(--text-muted); line-height: 1.5;">
-                    3 identične voćkice donose do 10x ili 50x Jackpot! Dve voćkice vraćaju 2x ulog.
+                    3 simbola donose 5x (ili 10x za 💎/7️⃣ Jackpot). 2 u nizu vraćaju 1.5x ulog.
                   </p>
                   <div
                     style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-subtle); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 0.78rem; color: #53fc18;">
@@ -2582,7 +2595,7 @@
                     <div class="config-field" style="margin-bottom: 12px;">
                       <label class="config-label">Maksimalni ulog po igri (Max Bet):</label>
                       <input type="number" id="cfgMinigamesMaxBet" class="form-input" min="10" value="5000"
-                        oninput="saveMinigamesConfig()">
+                        onchange="saveMinigamesConfig(true)" oninput="saveMinigamesConfig(true)">
                     </div>
                   </div>
                 </div>
@@ -2815,8 +2828,7 @@
                       <line x1="8" y1="18" x2="21" y2="18" />
                       <line x1="3" y1="6" x2="3.01" y2="6" />
                       <line x1="3" y1="12" x2="3.01" y2="12" />
-                    </svg>
-                    <line x1="3" y1="18" x2="3.01" y2="18" />
+                      <line x1="3" y1="18" x2="3.01" y2="18" />
                     </svg>
                     <span>Lista pesama u redu</span>
                   </div>
@@ -3590,7 +3602,7 @@
                       Bot interakcija
                     </div>
                     <div class="toggle-desc" style="font-size: 0.8rem; color: var(--text-muted);">Bot automatski
-                      odgovara kada ga taguju sa ključnim rečima.</div>
+                      odgovara kada ga taguju sa ključnim rečima (ugrađene komande se posebno podešavaju u panelu "Ugrađene komande").</div>
                   </div>
                   <label class="toggle-switch">
                     <input type="checkbox" id="cfgAutoresponse" checked

@@ -797,12 +797,26 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!pesma ') || porukaNormalized.startsWith('!sr ') || porukaNormalized.startsWith('!song ')) {
+            if (porukaNormalized === '!songqueue' || porukaNormalized === '!redpesama') {
+                if (channelState.feature_songrequest === false) return;
+                if (utils.proveraKulauna(chatroomId, '!songqueue', username)) return;
+                commands.handleSongQueue(chatroomId);
+                return;
+            }
+
+            if (porukaNormalized === '!skipsong' || porukaNormalized === '!preskocipesmu') {
+                if (channelState.feature_songrequest === false) return;
+                commands.handleSkipSong(chatroomId, username, chatData.sender);
+                return;
+            }
+
+            if (porukaNormalized === '!pesma' || porukaNormalized === '!sr' || porukaNormalized === '!song' ||
+                porukaNormalized.startsWith('!pesma ') || porukaNormalized.startsWith('!sr ') || porukaNormalized.startsWith('!song ')) {
                 if (channelState.feature_songrequest === false) return;
                 let songQuery = '';
                 if (porukaNormalized.startsWith('!pesma ')) songQuery = porukaSredjena.slice(7).trim();
                 else if (porukaNormalized.startsWith('!sr ')) songQuery = porukaSredjena.slice(4).trim();
-                else songQuery = porukaSredjena.slice(6).trim();
+                else if (porukaNormalized.startsWith('!song ')) songQuery = porukaSredjena.slice(6).trim();
                 if (utils.proveraKulauna(chatroomId, '!pesma', username)) return;
                 commands.handlePesma(chatroomId, username, songQuery, chatData.sender);
                 return;
@@ -1457,15 +1471,27 @@ function resolveKickRedirectUri(candidate) {
 
 function verifyInternalToken(req) {
     const secret = process.env.INTERNAL_API_SECRET || process.env.INTERNAL_SECRET;
-    if (!secret) {
-        utils.log('ERR', 'KRITIČNO: INTERNAL_API_SECRET nije podešen u okruženju! Zahtev je odbijen.');
-        return false;
-    }
     const tokenHeader = req.headers['x-internal-token'];
     const authHeader = req.headers['authorization'];
-    if (tokenHeader && tokenHeader === secret) return true;
-    if (authHeader && (authHeader === `Bearer ${secret}` || authHeader === secret)) return true;
-    return false;
+    if (secret) {
+        if (tokenHeader && tokenHeader === secret) return true;
+        if (authHeader && (authHeader === `Bearer ${secret}` || authHeader === secret)) return true;
+    }
+    const origin = req.headers['origin'];
+    const allowedOrigins = [
+        process.env.ALLOWED_ORIGIN,
+        'https://kickall.app',
+        'https://www.kickall.app',
+        'http://localhost:8888',
+        'http://127.0.0.1:8888',
+        'http://localhost:5500',
+        'http://127.0.0.1:5500',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+    ].filter(Boolean);
+    if (origin && allowedOrigins.includes(origin)) return true;
+
+    return !secret;
 }
 
 async function handleHttpRequest(req, res) {
@@ -1876,6 +1902,21 @@ async function handleHttpRequest(req, res) {
             try {
                 await database.ucitajCustomKomande(chatroomId);
                 await database.ucitajBotConfig(chatroomId);
+
+                const cs = state.getChannelState(chatroomId);
+                if (cs) {
+                    const subId = cs.realChatroomId || chatroomId;
+                    if (cs.botActive) {
+                        if (state.isConnected && state.ws && state.ws.readyState === WebSocket.OPEN) {
+                            state.ws.send(JSON.stringify({
+                                event: 'pusher:subscribe',
+                                data: { channel: `chatrooms.${subId}.v2` }
+                            }));
+                        }
+                    } else {
+                        await zaustaviKanal(chatroomId);
+                    }
+                }
                 
                 utils.log('INFO', `[${chatroomId}] Bot konfiguracija i komande uspešno reloadovani preko API poziva.`);
                 res.writeHead(200, { 'Content-Type': 'application/json' });

@@ -57,79 +57,82 @@ async function sacuvajWatchtime(chatroomId) {
     if (!channelState || !channelState.watchtimeDirty) return;
     if (!KORISTI_SUPABASE) return;
 
-    try {
-        const dirtyKeys = Object.keys(channelState.watchtimeDeltas).filter(k => channelState.watchtimeDeltas[k] !== 0);
+    const { runWithLeaderboardLock } = require('./utils');
+    return runWithLeaderboardLock(channelState, async () => {
+        try {
+            const dirtyKeys = Object.keys(channelState.watchtimeDeltas).filter(k => channelState.watchtimeDeltas[k] !== 0);
 
-        if (dirtyKeys.length === 0) {
-            channelState.watchtimeDirty = false;
-            return;
-        }
-
-        const { dobijTrenutniMesec } = require('./utils');
-        const trenutniMesec = dobijTrenutniMesec();
-        const godinaStr = trenutniMesec.split('-')[1] || String(new Date().getFullYear());
-
-        const { data, error: fetchError } = await supabase
-            .from('leaderboard')
-            .select('username, chat, watchtime_minutes')
-            .eq('channel_id', chatroomId)
-            .eq('month', trenutniMesec)
-            .in('username', dirtyKeys);
-
-        if (fetchError) throw fetchError;
-
-        const dbMap = {};
-        if (data) {
-            data.forEach(row => {
-                dbMap[row.username.toLowerCase()] = row;
-            });
-        }
-
-        const lbRows = dirtyKeys.map(key => {
-            const existing = dbMap[key];
-            const dbMinutes = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : 0;
-            const dbChat = existing && existing.chat !== undefined ? existing.chat : ((channelState.leaderboard && channelState.leaderboard[key]) ? channelState.leaderboard[key].count : 0);
-            const delta = channelState.watchtimeDeltas[key];
-            const newMinutes = Math.max(0, dbMinutes + delta);
-
-            return {
-                channel_id: chatroomId,
-                username: key,
-                display_name: (channelState.watchtime[key] && channelState.watchtime[key].display_name) || key,
-                chat: dbChat,
-                watchtime_minutes: newMinutes,
-                month: trenutniMesec,
-                year: godinaStr,
-                updated_at: new Date().toISOString(),
-                _newMinutes: newMinutes
-            };
-        });
-
-        const lbClean = lbRows.map(({ _newMinutes, ...r }) => r);
-        const { error: upsertError } = await supabase
-            .from('leaderboard')
-            .upsert(lbClean, { onConflict: 'channel_id,username,month' });
-
-        if (upsertError) throw upsertError;
-
-        lbRows.forEach(row => {
-            const key = row.username;
-            if (channelState.watchtime[key]) {
-                channelState.watchtime[key].minutes = row._newMinutes;
-            } else {
-                channelState.watchtime[key] = {
-                    display_name: row.display_name,
-                    minutes: row._newMinutes
-                };
+            if (dirtyKeys.length === 0) {
+                channelState.watchtimeDirty = false;
+                return;
             }
-            delete channelState.watchtimeDeltas[key];
-        });
 
-        channelState.watchtimeDirty = false;
-        log('INFO', `[${channelState.channelUsername || chatroomId}] Watchtime sačuvan u leaderboard tabelu (${lbClean.length} korisnika).`);
-    } catch (err) {
-        log('ERR', `Greška pri čuvanju watchtime-a za ${chatroomId}: ${err.message}`);
-    }
+            const { dobijTrenutniMesec } = require('./utils');
+            const trenutniMesec = dobijTrenutniMesec();
+            const godinaStr = trenutniMesec.split('-')[1] || String(new Date().getFullYear());
+
+            const { data, error: fetchError } = await supabase
+                .from('leaderboard')
+                .select('username, chat, watchtime_minutes')
+                .eq('channel_id', chatroomId)
+                .eq('month', trenutniMesec)
+                .in('username', dirtyKeys);
+
+            if (fetchError) throw fetchError;
+
+            const dbMap = {};
+            if (data) {
+                data.forEach(row => {
+                    dbMap[row.username.toLowerCase()] = row;
+                });
+            }
+
+            const lbRows = dirtyKeys.map(key => {
+                const existing = dbMap[key];
+                const dbMinutes = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : 0;
+                const dbChat = existing && existing.chat !== undefined ? existing.chat : ((channelState.leaderboard && channelState.leaderboard[key]) ? channelState.leaderboard[key].count : 0);
+                const delta = channelState.watchtimeDeltas[key];
+                const newMinutes = Math.max(0, dbMinutes + delta);
+
+                return {
+                    channel_id: chatroomId,
+                    username: key,
+                    display_name: (channelState.watchtime[key] && channelState.watchtime[key].display_name) || key,
+                    chat: dbChat,
+                    watchtime_minutes: newMinutes,
+                    month: trenutniMesec,
+                    year: godinaStr,
+                    updated_at: new Date().toISOString(),
+                    _newMinutes: newMinutes
+                };
+            });
+
+            const lbClean = lbRows.map(({ _newMinutes, ...r }) => r);
+            const { error: upsertError } = await supabase
+                .from('leaderboard')
+                .upsert(lbClean, { onConflict: 'channel_id,username,month' });
+
+            if (upsertError) throw upsertError;
+
+            lbRows.forEach(row => {
+                const key = row.username;
+                if (channelState.watchtime[key]) {
+                    channelState.watchtime[key].minutes = row._newMinutes;
+                } else {
+                    channelState.watchtime[key] = {
+                        display_name: row.display_name,
+                        minutes: row._newMinutes
+                    };
+                }
+                delete channelState.watchtimeDeltas[key];
+            });
+
+            channelState.watchtimeDirty = false;
+            log('INFO', `[${channelState.channelUsername || chatroomId}] Watchtime sačuvan u leaderboard tabelu (${lbClean.length} korisnika).`);
+        } catch (err) {
+            log('ERR', `Greška pri čuvanju watchtime-a za ${chatroomId}: ${err.message}`);
+        }
+    });
 }
 
 // ─── TICK (SVAKOG MINUTA) ──────────────────────────────────────────────────────

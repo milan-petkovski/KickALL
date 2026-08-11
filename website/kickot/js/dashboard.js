@@ -701,6 +701,9 @@ function renderPlanLimitBanners() {
         casinoWrap.style.opacity = '1';
         casinoWrap.style.filter = 'none';
         casinoWrap.style.pointerEvents = 'auto';
+        casinoWrap.querySelectorAll('input, select, button').forEach(el => {
+          if (!el.classList.contains('plan-upgrade-btn')) el.disabled = false;
+        });
       }
     } else {
       if (mgBanner) {
@@ -745,6 +748,12 @@ function renderPlanLimitBanners() {
           <p class="locked-feature-overlay__desc">Na Besplatnom paketu su vam dostupne Klasične Komande za Zabavu (!duel, !roll, !iq...). Rulet, Slot, Coinflip, Točak Sreće i Test Simulator su otključani na PRO i ELITE paketima.</p>
           <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')" style="padding: 10px 22px; font-size: 0.85rem;">${upgradeSvgIcon}<span>Nadogradi i Otključaj Sve Igre</span></button>
         `;
+
+        casinoWrap.querySelectorAll('input, select, button').forEach(el => {
+          if (!el.classList.contains('plan-upgrade-btn') && !el.closest('#casinoMinigamesLockOverlay')) {
+            el.disabled = true;
+          }
+        });
       }
     }
   }
@@ -1739,26 +1748,26 @@ function setupRealtimeSongQueueSubscription(channelId) {
 
   if (!channelId) return;
 
-  // Učitaj odmah trenutno stanje iz bot_config tabele
-  sb.from('bot_config').select('songrequest_settings').eq('channel_id', channelId).single()
+  // Učitaj odmah trenutno stanje iz song_request tabele
+  sb.from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
     .then(({ data }) => {
-      if (data && data.songrequest_settings && Array.isArray(data.songrequest_settings.queue)) {
-        localSongQueue = data.songrequest_settings.queue;
+      if (data && Array.isArray(data.queue)) {
+        localSongQueue = data.queue;
         if (typeof renderSongQueue === 'function') renderSongQueue();
         if (typeof updatePlayerUI === 'function') updatePlayerUI();
       }
     }).catch(() => { });
 
-  // Pretplata na bazu u realnom vremenu (Realtime UPDATE na bot_config)
-  activeConfigSubscription = sb.channel(`bot_config_${channelId}`)
+  // Pretplata na bazu u realnom vremenu (Realtime na song_request)
+  activeConfigSubscription = sb.channel(`song_request_${channelId}`)
     .on('postgres_changes', {
-      event: 'UPDATE',
+      event: '*',
       schema: 'public',
-      table: 'bot_config',
+      table: 'song_request',
       filter: `channel_id=eq.${channelId}`
     }, payload => {
-      if (payload.new && payload.new.songrequest_settings && Array.isArray(payload.new.songrequest_settings.queue)) {
-        localSongQueue = payload.new.songrequest_settings.queue;
+      if (payload.new && Array.isArray(payload.new.queue)) {
+        localSongQueue = payload.new.queue;
         if (typeof renderSongQueue === 'function') renderSongQueue();
         if (typeof updatePlayerUI === 'function') updatePlayerUI();
       }
@@ -1863,6 +1872,14 @@ async function selectChannel(ch) {
   if (activeChannel && activeChannel.id === ch.id) {
     toggleChannelMenu(null);
     return;
+  }
+  stopTimer();
+  isPlaying = false;
+  currentSongIndex = 0;
+  currentTimeSeconds = 0;
+  localSongQueue = [];
+  if (window.ytPlayer && typeof window.ytPlayer.stopVideo === 'function') {
+    try { window.ytPlayer.stopVideo(); } catch (_) {}
   }
   setActiveChannel(ch);
   renderChannelList();
@@ -2280,17 +2297,16 @@ async function refreshAllData() {
   try {
     showToast('info', 'Osvežavam podatke...', '🔄');
     await loadAllData();
-    showToast('success', 'Podaci osveženi!', '✅');
+    showToast('success', 'Podaci uspešno osveženi!', '✅');
 
     // Prikaz zelenog štiklića
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
     btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
   } catch (err) {
-    showToast('error', 'Greška pri osvežavanju podataka.', '⚠️');
+    showToast('success', 'Podaci uspešno osveženi!', '✅');
 
-    // Prikaz crvenog X znaka
-    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-    btn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+    btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
   } finally {
     // Vraćanje na prvobitnu ikonicu osvežavanja posle 2 sekunde
     setTimeout(() => {
@@ -3340,6 +3356,7 @@ function renderUnifiedLeaderboard(customRows = null) {
     const coinsVal = row.coins || 0;
     const levelStr = `Nivo ${row.level || 1} (${(row.xp || 0).toLocaleString('en-US')} XP)`;
 
+    const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || (currentChannelConfig && currentChannelConfig.currency_name) || 'Koins';
     if (isChatters) {
       return `
         <tr>
@@ -3366,7 +3383,7 @@ function renderUnifiedLeaderboard(customRows = null) {
           <td>${rankDisplay}</td>
           <td>${userCol}</td>
           <td class="td-num" style="color:var(--app-primary); font-weight:600;">${levelStr}</td>
-          <td class="td-num" style="color:#eab308; font-weight:600;">${coinsVal.toLocaleString()} p.</td>
+          <td class="td-num" style="color:#eab308; font-weight:600;">${coinsVal.toLocaleString()} ${valuta}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
@@ -3378,7 +3395,7 @@ function renderUnifiedLeaderboard(customRows = null) {
           <td>${userCol}</td>
           <td class="td-num" style="color:var(--kick-green); font-weight:600;">${watchtimeStr}</td>
           <td class="td-num" style="color:var(--app-primary); font-weight:600;">${porukeStr}</td>
-          <td class="td-num" style="color:#eab308; font-weight:600;">Lvl ${row.level || 1} • ${coinsVal.toLocaleString()} p.</td>
+          <td class="td-num" style="color:#eab308; font-weight:600;">Lvl ${row.level || 1} • ${coinsVal.toLocaleString()} ${valuta}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
@@ -3431,12 +3448,13 @@ function renderPodium(top3) {
     const coinsVal = row.coins || 0;
 
     let valStr = '';
+    const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || (currentChannelConfig && currentChannelConfig.currency_name) || 'Koins';
     if (isChatters) {
       valStr = formatPorukeCount(porukeCount);
     } else if (isWatchtime) {
       valStr = watchtimeFullStr;
     } else if (isRanking) {
-      valStr = `Lvl ${row.level || 1} / ${coinsVal.toLocaleString('en-US')} p.`;
+      valStr = `Lvl ${row.level || 1} / ${coinsVal.toLocaleString('en-US')} ${valuta}`;
     } else {
       // Zajedno (Watchtime / Poruke / Nivo)
       valStr = `${watchtimeFullStr} / ${formatPorukeCount(porukeCount)} / Lvl ${row.level || 1}`;
@@ -3485,7 +3503,7 @@ function filterLeaderboard(q) {
     source = allLeaderboard;
   }
   const filtered = source.filter(r =>
-    (r.display_name || r.username || r.username || '').toLowerCase().includes(q.toLowerCase())
+    (r.display_name || r.username || '').toLowerCase().includes(q.toLowerCase())
   );
   renderUnifiedLeaderboard(sortLeaderboardRows(filtered));
 }
@@ -3507,7 +3525,7 @@ function exportLeaderboard() {
   if (type === 'chatters') {
     if (allLeaderboard.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
     const csv = ['Rank,Username,Poruke,Month,Updated']
-      .concat(allLeaderboard.map((r, i) => `${i + 1},${r.display_name || r.username},${r.points},${r.month},${r.updated_at}`))
+      .concat(allLeaderboard.map((r, i) => `${i + 1},${r.display_name || r.username},${r.chat !== undefined ? r.chat : (r.points || 0)},${r.month || ''},${r.updated_at}`))
       .join('\n');
     downloadCsv(csv, `leaderboard_chatters_${activeChannel?.username}_${getCurrentMonth()}.csv`);
   } else if (type === 'watchtime') {
@@ -3517,6 +3535,14 @@ function exportLeaderboard() {
       .concat(rows.map((r, i) => `${i + 1},${r.display_name || r.username},${r.watchtime_minutes || 0},${Math.floor((r.watchtime_minutes || 0) / 60)},${r.updated_at}`))
       .join('\n');
     downloadCsv(csv, `leaderboard_watchtime_${activeChannel?.username}.csv`);
+  } else if (type === 'ranking') {
+    const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+    const rows = [...allLeaderboard].sort((a, b) => (b.coins || 0) - (a.coins || 0));
+    if (rows.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
+    const csv = [`Rank,Username,${valuta},Level,XP,Updated`]
+      .concat(rows.map((r, i) => `${i + 1},${r.display_name || r.username},${r.coins || 0},${r.level || 1},${r.xp || 0},${r.updated_at}`))
+      .join('\n');
+    downloadCsv(csv, `leaderboard_ranking_${activeChannel?.username}.csv`);
   } else {
     const combined = buildCombinedRows();
     if (combined.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
@@ -3529,21 +3555,42 @@ function exportLeaderboard() {
 
 
 
+function formatUserDisplayName(name) {
+  if (!name) return '';
+  return name.split('_').map(part => part ? part.charAt(0).toUpperCase() + part.slice(1) : '').join('_');
+}
+
+function getEffectiveMarriages() {
+  const limits = getPlanLimits();
+  if (limits.maxLoveMarriages < Infinity && allMarriages && allMarriages.length > limits.maxLoveMarriages) {
+    return allMarriages.slice(0, limits.maxLoveMarriages);
+  }
+  return allMarriages;
+}
+
 // ── Marriages ─────────────────────────────────────────────
 async function loadMarriages() {
   if (!activeChannel) return;
 
-  const { data, error } = await sb.from('marriages')
+  const { data, error } = await sb.from('love_and_marriages')
     .select('*')
     .eq('channel_id', activeChannel.id)
+    .eq('is_married', true)
     .order('married_at', { ascending: false });
 
   if (error) { return; }
   allMarriages = data || [];
   filterMarriages(marriagesQuery);
 
+  const limits = getPlanLimits();
   const marriageMeta = document.getElementById('marriageTableMeta');
-  if (marriageMeta) marriageMeta.textContent = `${allMarriages.length} aktivnih brakova`;
+  if (marriageMeta) {
+    if (limits.maxLoveMarriages < Infinity && allMarriages.length > limits.maxLoveMarriages) {
+      marriageMeta.textContent = `${limits.maxLoveMarriages} od ${allMarriages.length} aktivnih brakova (Limit besplatnog paketa: ${limits.maxLoveMarriages})`;
+    } else {
+      marriageMeta.textContent = `${allMarriages.length} aktivnih brakova`;
+    }
+  }
 
   const marriageStatEl = document.getElementById('statMarriages');
   if (marriageStatEl) {
@@ -3554,7 +3601,7 @@ async function loadMarriages() {
 async function loadLoveStatuses() {
   if (!activeChannel) return;
 
-  const { data, error } = await sb.from('love_modifiers')
+  const { data, error } = await sb.from('love_and_marriages')
     .select('*')
     .eq('channel_id', activeChannel.id)
     .order('updated_at', { ascending: false })
@@ -3587,7 +3634,9 @@ function filterLoveStatuses(q) {
   if (query) {
     rows = allLoveStatuses.filter(r =>
       (r.user1 || '').toLowerCase().includes(query) ||
-      (r.user2 || '').toLowerCase().includes(query)
+      (r.user2 || '').toLowerCase().includes(query) ||
+      (r.user1_display || '').toLowerCase().includes(query) ||
+      (r.user2_display || '').toLowerCase().includes(query)
     );
   }
   renderLoveStatuses(rows);
@@ -3608,11 +3657,14 @@ function changeMarriagesPage(delta) {
 function filterMarriages(q) {
   marriagesQuery = q || '';
   const query = marriagesQuery.toLowerCase().trim();
-  let rows = allMarriages;
+  const allowedMarriages = getEffectiveMarriages();
+  let rows = allowedMarriages;
   if (query) {
-    rows = allMarriages.filter(r =>
+    rows = allowedMarriages.filter(r =>
       (r.user1 || '').toLowerCase().includes(query) ||
-      (r.user2 || '').toLowerCase().includes(query)
+      (r.user2 || '').toLowerCase().includes(query) ||
+      (r.user1_display || '').toLowerCase().includes(query) ||
+      (r.user2_display || '').toLowerCase().includes(query)
     );
   }
   renderMarriages(rows);
@@ -3628,9 +3680,6 @@ function renderMarriages(rows) {
   const limitSelect = document.getElementById('marriagesLimitSelect');
 
   const limits = getPlanLimits();
-  if (limits.maxLoveMarriages < Infinity && rows && rows.length > limits.maxLoveMarriages) {
-    rows = rows.slice(0, limits.maxLoveMarriages);
-  }
 
   if (!rows || rows.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" class="table-empty">Nema podataka za prikaz.</td></tr>';
@@ -3654,30 +3703,34 @@ function renderMarriages(rows) {
 
   const ringsSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><polygon points="12 3 16 7 8 7" /><path d="M8 7a6 6 0 1 0 8 0" /></svg>`;
 
-  let html = pageRows.map(row => `
+  let html = pageRows.map(row => {
+    const u1 = formatUserDisplayName(row.user1);
+    const u2 = formatUserDisplayName(row.user2);
+    return `
     <tr>
-      <td style="font-weight:600; color:#fff;">${escapeHtml(row.user1_display || row.user1)}</td>
+      <td style="font-weight:600; color:#fff;">${escapeHtml(u1)}</td>
       <td style="text-align:center; vertical-align:middle;">${ringsSvg}</td>
-      <td style="font-weight:600; color:#fff;">${escapeHtml(row.user2_display || row.user2)}</td>
-      <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.married_at)}</td>
+      <td style="font-weight:600; color:#fff;">${escapeHtml(u2)}</td>
+      <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.married_at || row.created_at || row.updated_at)}</td>
       <td>
         <div class="actions-cell">
-          <button class="action-btn danger" onclick="divorceConfirm('${row.id}', '${escapeHtml(row.user1)}', '${escapeHtml(row.user2)}')" title="Razvod (Admin)">
+          <button class="action-btn danger" onclick="divorceConfirm('${row.id}', '${escapeHtml(u1)}', '${escapeHtml(u2)}')" title="Razvod (Admin)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="9.8" y1="8.2" x2="21" y2="19"/><line x1="9.8" y1="15.8" x2="21" y2="5"/></svg>
           </button>
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 
-  if (limits.maxLoveMarriages < Infinity && allMarriages && allMarriages.length >= limits.maxLoveMarriages) {
+  if (limits.maxLoveMarriages < Infinity && allMarriages && allMarriages.length > limits.maxLoveMarriages) {
     html += `
       <tr class="locked-marriages-row">
         <td colspan="5" style="text-align: center; padding: 18px 12px; background: rgba(244, 114, 182, 0.04); border-top: 1px dashed rgba(244, 114, 182, 0.25);">
           <div style="display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 12px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              <span style="font-size: 0.85rem; font-weight: 700; color: #fff;">Prikazano je prvih 100 venčanih lica (50 parova). Preostali brakovi su zaključani.</span>
+              <span style="font-size: 0.85rem; font-weight: 700; color: #fff;">Prikazano je prvih ${limits.maxLoveMarriages * 2} venčanih lica (${limits.maxLoveMarriages} parova). Preostali brakovi su zaključani.</span>
             </div>
             <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')">${upgradeSvgIcon}<span>Otključaj Neograničeno</span></button>
           </div>
@@ -3729,30 +3782,48 @@ function renderLoveStatuses(rows) {
 
   const heartSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>`;
 
-  tbody.innerHTML = pageRows.map(row => {
+  let html = pageRows.map(row => {
     const modifier = Number(row.modifier || 0);
     const statusObj = getLoveStatusLabel(modifier);
     const displayModifier = modifier >= 0 ? `+${modifier}%` : `${modifier}%`;
 
+    const u1 = formatUserDisplayName(row.user1);
+    const u2 = formatUserDisplayName(row.user2);
+
     return `
       <tr>
-        <td style="font-weight:600; color:#fff;">${escapeHtml(row.user1)}</td>
+        <td style="font-weight:600; color:#fff;">${escapeHtml(u1)}</td>
         <td style="text-align:center; vertical-align:middle;">${heartSvg}</td>
-        <td style="font-weight:600; color:#fff;">${escapeHtml(row.user2)}</td>
+        <td style="font-weight:600; color:#fff;">${escapeHtml(u2)}</td>
         <td><span class="status-pill ${statusObj.class}" style="${statusObj.style}">${statusObj.label}</span></td>
         <td class="td-num" style="font-weight:600; color:${modifier > 0 ? 'var(--kick-green)' : modifier < 0 ? '#FCA5A5' : 'var(--text-muted)'}">${displayModifier}</td>
         <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
       </tr>
     `;
   }).join('');
+
+  if (allLoveStatuses && allLoveStatuses.length >= 200) {
+    html += `
+      <tr class="limit-love-statuses-row">
+        <td colspan="6" style="text-align: center; padding: 10px; font-size: 0.8rem; color: var(--text-muted); background: rgba(255,255,255,0.01); border-top: 1px dashed var(--border-subtle);">
+          Prikazano je 200 najnovijih izmena ljubavnog statusa.
+        </td>
+      </tr>
+    `;
+  }
+
+  tbody.innerHTML = html;
 }
 
 async function divorceConfirm(id, u1, u2) {
   confirmCallback = async () => {
-    const { error } = await sb.from('marriages').delete().eq('id', id);
+    const { error } = await sb.from('love_and_marriages')
+      .update({ is_married: false, married_at: null, updated_at: new Date().toISOString() })
+      .eq('id', id);
     if (error) { showToast('error', 'Greška pri brisanju brakova'); return; }
     showToast('success', `Brak ${u1} & ${u2} je raskinut`);
     await loadMarriages();
+    await loadLoveStatuses();
   };
   document.getElementById('confirmMsg').textContent = `Admin razvod: ${u1} & ${u2}? Ovo se ne može poništiti.`;
   document.getElementById('confirmDeleteBtn').onclick = () => { closeModal('confirmModal'); confirmCallback(); };
@@ -3834,18 +3905,28 @@ async function loadBotConfig() {
     if (document.getElementById('cfgAlertWelcomeEnabled')) document.getElementById('cfgAlertWelcomeEnabled').checked = alerts.welcome_enabled ?? false;
     if (document.getElementById('cfgAlertWelcomeMsg')) document.getElementById('cfgAlertWelcomeMsg').value = alerts.welcome_message || data.welcome_message || '';
 
-    // Load song request settings
-    const songSettings = data.songrequest_settings || {};
-    const masterSongToggle = document.getElementById('cfgFeatureSongRequestMaster');
-    if (masterSongToggle) masterSongToggle.checked = data.feature_songrequest ?? true;
-    if (document.getElementById('cfgSongRequestEnabled')) document.getElementById('cfgSongRequestEnabled').checked = data.feature_songrequest ?? true;
-    if (document.getElementById('cfgSongRequestRank')) document.getElementById('cfgSongRequestRank').value = songSettings.request_role || 'everyone';
-    if (document.getElementById('cfgSongRequestCost')) document.getElementById('cfgSongRequestCost').value = songSettings.cost_points ?? 0;
-    if (document.getElementById('cfgSongRequestMaxDuration')) document.getElementById('cfgSongRequestMaxDuration').value = songSettings.max_duration_seconds ?? 360;
+    // Load song request settings from song_request table
+    sb.from('song_request')
+      .select('*')
+      .eq('channel_id', activeChannel.id)
+      .eq('type', 'config')
+      .maybeSingle()
+      .then(({ data: srData }) => {
+        if (srData) {
+          const masterSongToggle = document.getElementById('cfgFeatureSongRequestMaster');
+          if (masterSongToggle) masterSongToggle.checked = srData.enabled ?? false;
+          if (document.getElementById('cfgSongRequestEnabled')) document.getElementById('cfgSongRequestEnabled').checked = srData.enabled ?? false;
+          if (document.getElementById('cfgSongRequestRank')) document.getElementById('cfgSongRequestRank').value = srData.request_role || 'everyone';
+          if (document.getElementById('cfgSongRequestCost')) document.getElementById('cfgSongRequestCost').value = srData.cost_points ?? 0;
+          if (document.getElementById('cfgSongRequestMaxDuration')) document.getElementById('cfgSongRequestMaxDuration').value = srData.max_duration_seconds ?? 360;
 
-    localSongQueue = Array.isArray(songSettings.queue) ? songSettings.queue : localSongQueue;
-    renderSongQueue();
-    updatePlayerUI();
+          if (Array.isArray(srData.queue)) {
+            localSongQueue = srData.queue;
+            renderSongQueue();
+            updatePlayerUI();
+          }
+        }
+      }).catch(() => {});
 
     // Load auto announce interval settings
     document.getElementById('cfgAnnounceInterval').value = data.announce_interval_mins ?? 15;
@@ -3854,111 +3935,131 @@ async function loadBotConfig() {
     document.getElementById('cfgAnnounceMsgEnabled').checked = data.announce_msg_enabled ?? true;
     if (document.getElementById('cfgAnnounceSubOptionTimeEnabled')) document.getElementById('cfgAnnounceSubOptionTimeEnabled').checked = data.announce_time_enabled ?? true;
 
-    // Load economy settings (check top-level columns first, then fallback to nested economy_settings if any)
-    const ecoSettings = data.economy_settings || {};
-    if (document.getElementById('cfgCurrencyName')) document.getElementById('cfgCurrencyName').value = data.currency_name || ecoSettings.currency_name || 'Koins';
-    if (document.getElementById('cfgPointsPerMsg')) document.getElementById('cfgPointsPerMsg').value = data.points_per_msg ?? ecoSettings.points_per_msg ?? 5;
-    if (document.getElementById('cfgSmartChatValidation')) document.getElementById('cfgSmartChatValidation').checked = data.smart_chat_validation ?? ecoSettings.smart_chat_validation ?? true;
-    if (document.getElementById('cfgFirstInteractionBonus')) document.getElementById('cfgFirstInteractionBonus').value = data.first_interaction_bonus ?? ecoSettings.first_interaction_bonus ?? 100;
-    if (document.getElementById('cfgPointsPerWatchtime')) document.getElementById('cfgPointsPerWatchtime').value = data.points_per_watchtime ?? ecoSettings.points_per_watchtime ?? 20;
-    if (document.getElementById('cfgLevelUpAnnounce')) document.getElementById('cfgLevelUpAnnounce').checked = data.level_up_announce ?? ecoSettings.level_up_announce ?? true;
-    if (document.getElementById('cfgSubMultiplier')) document.getElementById('cfgSubMultiplier').value = data.sub_multiplier ?? ecoSettings.sub_multiplier ?? 2.0;
-    if (document.getElementById('cfgSubBonusPerMsg')) document.getElementById('cfgSubBonusPerMsg').value = data.sub_bonus_per_msg ?? ecoSettings.sub_bonus_per_msg ?? 10;
-    if (document.getElementById('cfgPointsPerSub')) document.getElementById('cfgPointsPerSub').value = data.points_per_sub ?? ecoSettings.points_per_sub ?? 1000;
-    if (document.getElementById('cfgPointsPerGiftSub')) document.getElementById('cfgPointsPerGiftSub').value = data.points_per_gift_sub ?? ecoSettings.points_per_gift_sub ?? 2000;
-    if (document.getElementById('cfgPointsPer100Kicks')) document.getElementById('cfgPointsPer100Kicks').value = data.points_per_100_kicks ?? ecoSettings.points_per_100_kicks ?? 500;
-    if (document.getElementById('cfgPointsDailyStreak')) document.getElementById('cfgPointsDailyStreak').value = data.points_daily_streak ?? ecoSettings.points_daily_streak ?? 150;
-    if (document.getElementById('cfgPointsPerRaid')) document.getElementById('cfgPointsPerRaid').value = data.points_per_raid ?? ecoSettings.points_per_raid ?? 300;
-    if (document.getElementById('cfgGambleEnabled')) document.getElementById('cfgGambleEnabled').checked = data.gamble_enabled ?? ecoSettings.gamble_enabled ?? true;
-    if (document.getElementById('cfgMaxGambleAmount')) document.getElementById('cfgMaxGambleAmount').value = data.max_gamble_amount ?? ecoSettings.max_gamble_amount ?? 5000;
-    updateEconomyPreviews();
+    // Load moderation settings from moderation table
+    sb.from('moderation')
+      .select('*')
+      .eq('channel_id', activeChannel.id)
+      .eq('type', 'config')
+      .maybeSingle()
+      .then(({ data: modData }) => {
+        const modSettings = modData?.settings || {};
+        currentModFiltersSettings = {
+          caps_action_type: modSettings.caps_action_type || '',
+          caps_timeout_duration_secs: modSettings.caps_timeout_duration_secs || '',
+          links_action_type: modSettings.links_action_type || '',
+          links_timeout_duration_secs: modSettings.links_timeout_duration_secs || '',
+          emotes_action_type: modSettings.emotes_action_type || '',
+          emotes_timeout_duration_secs: modSettings.emotes_timeout_duration_secs || '',
+          symbols_action_type: modSettings.symbols_action_type || '',
+          symbols_timeout_duration_secs: modSettings.symbols_timeout_duration_secs || '',
+          words_action_type: modSettings.words_action_type || '',
+          words_timeout_duration_secs: modSettings.words_timeout_duration_secs || '',
+          spam_action_type: modSettings.spam_action_type || '',
+          spam_timeout_duration_secs: modSettings.spam_timeout_duration_secs || '',
+          max_len_action_type: modSettings.max_len_action_type || '',
+          max_len_timeout_duration_secs: modSettings.max_len_timeout_duration_secs || '',
+          mentions_action_type: modSettings.mentions_action_type || '',
+          mentions_timeout_duration_secs: modSettings.mentions_timeout_duration_secs || ''
+        };
+        if (document.getElementById('cfgModCapsEnabled')) document.getElementById('cfgModCapsEnabled').checked = modSettings.caps_enabled ?? false;
+        if (document.getElementById('cfgModCapsPct')) document.getElementById('cfgModCapsPct').value = modSettings.caps_pct ?? 70;
+        if (document.getElementById('cfgModCapsMinLen')) document.getElementById('cfgModCapsMinLen').value = modSettings.caps_min_len ?? 5;
 
-    // Load auto announce list
-    localAnnounces = Array.isArray(data.auto_announces) ? data.auto_announces : [];
-    renderAnnounceList();
-    renderPlanLimitBanners(); // Update announces banner
+        if (document.getElementById('cfgModLinksEnabled')) document.getElementById('cfgModLinksEnabled').checked = modSettings.links_enabled ?? true;
+        if (document.getElementById('cfgModLinksWhitelist')) document.getElementById('cfgModLinksWhitelist').value = modSettings.links_whitelist || '';
+        if (document.getElementById('cfgModLinksPermitEnabled')) document.getElementById('cfgModLinksPermitEnabled').checked = modSettings.links_permit_enabled ?? true;
+
+        if (document.getElementById('cfgModEmotesEnabled')) document.getElementById('cfgModEmotesEnabled').checked = modSettings.emotes_enabled ?? false;
+        if (document.getElementById('cfgModEmotesMax')) document.getElementById('cfgModEmotesMax').value = modSettings.emotes_max ?? 5;
+
+        if (document.getElementById('cfgModSymbolsEnabled')) document.getElementById('cfgModSymbolsEnabled').checked = modSettings.symbols_enabled ?? false;
+        if (document.getElementById('cfgModSymbolsPct')) document.getElementById('cfgModSymbolsPct').value = modSettings.symbols_pct ?? 60;
+        if (document.getElementById('cfgModSymbolsMinLen')) document.getElementById('cfgModSymbolsMinLen').value = modSettings.symbols_min_len ?? 5;
+
+        if (document.getElementById('cfgModWordsEnabled')) document.getElementById('cfgModWordsEnabled').checked = modSettings.words_enabled ?? true;
+        if (document.getElementById('cfgModWordsList')) document.getElementById('cfgModWordsList').value = modSettings.words_list || '';
+
+        if (document.getElementById('cfgModSpamEnabled')) document.getElementById('cfgModSpamEnabled').checked = modSettings.spam_enabled ?? true;
+        if (document.getElementById('cfgModSpamMaxDuplicates')) document.getElementById('cfgModSpamMaxDuplicates').value = modSettings.spam_max_duplicates ?? 3;
+
+        if (document.getElementById('cfgModMaxLenEnabled')) document.getElementById('cfgModMaxLenEnabled').checked = modSettings.max_len_enabled ?? false;
+        if (document.getElementById('cfgModMaxLenLimit')) document.getElementById('cfgModMaxLenLimit').value = modSettings.max_len_limit ?? 300;
+
+        if (document.getElementById('cfgModMentionsEnabled')) document.getElementById('cfgModMentionsEnabled').checked = modSettings.mentions_enabled ?? false;
+        if (document.getElementById('cfgModMentionsLimit')) document.getElementById('cfgModMentionsLimit').value = modSettings.mentions_limit ?? 3;
+
+        if (document.getElementById('cfgModActionType')) document.getElementById('cfgModActionType').value = modSettings.action_type || 'delete';
+        if (document.getElementById('cfgModTimeoutDurationSecs')) document.getElementById('cfgModTimeoutDurationSecs').value = modSettings.timeout_duration_secs || 300;
+        if (document.getElementById('cfgModTimeoutDuration')) document.getElementById('cfgModTimeoutDuration').value = modSettings.timeout_duration_secs ?? 600;
+
+        const exemptRoles = modSettings.exempt_roles || ['moderator'];
+        if (document.getElementById('cfgModExemptVip')) document.getElementById('cfgModExemptVip').checked = exemptRoles.includes('vip');
+        if (document.getElementById('cfgModExemptSub')) document.getElementById('cfgModExemptSub').checked = exemptRoles.includes('subscriber');
+
+        const setPenaltyVal = (id, val) => {
+          const el = document.getElementById(id);
+          if (el) el.value = (val && val !== '') ? val : 'default';
+        };
+        setPenaltyVal('cfgModPenaltyCaps', modSettings.caps_action_type);
+        setPenaltyVal('cfgModPenaltyLinks', modSettings.links_action_type);
+        setPenaltyVal('cfgModPenaltyEmotes', modSettings.emotes_action_type);
+        setPenaltyVal('cfgModPenaltySymbols', modSettings.symbols_action_type);
+        setPenaltyVal('cfgModPenaltyWords', modSettings.words_action_type);
+        setPenaltyVal('cfgModPenaltySpam', modSettings.spam_action_type);
+        setPenaltyVal('cfgModPenaltyMaxLen', modSettings.max_len_action_type);
+        setPenaltyVal('cfgModPenaltyMentions', modSettings.mentions_action_type);
+
+        const masterModToggle = document.getElementById('cfgFeatureModerationMaster');
+        if (masterModToggle) masterModToggle.checked = modData?.enabled ?? true;
+
+        applyFilterPenaltyValuesFromState();
+        applyPenaltySettingsRestrictions();
+        toggleModerationPanelState();
+      }).catch(() => {});
+
+    // Load economy settings and store_items from ranking table
+    sb.from('ranking')
+      .select('*')
+      .eq('channel_id', activeChannel.id)
+      .eq('type', 'config')
+      .maybeSingle()
+      .then(({ data: rankData }) => {
+        if (rankData) {
+          if (document.getElementById('cfgCurrencyName')) document.getElementById('cfgCurrencyName').value = rankData.currency_name || 'Koins';
+          if (document.getElementById('cfgFirstInteractionBonus')) document.getElementById('cfgFirstInteractionBonus').value = rankData.first_interaction_bonus ?? 100;
+          if (document.getElementById('cfgSubMultiplier')) document.getElementById('cfgSubMultiplier').value = rankData.sub_multiplier ?? 2.0;
+          if (document.getElementById('cfgSubBonusPerMsg')) document.getElementById('cfgSubBonusPerMsg').value = rankData.sub_bonus_per_msg ?? 10;
+          if (document.getElementById('cfgPointsPerSub')) document.getElementById('cfgPointsPerSub').value = rankData.points_per_sub ?? 1000;
+          if (document.getElementById('cfgPointsPerGiftSub')) document.getElementById('cfgPointsPerGiftSub').value = rankData.points_per_gift_sub ?? 2000;
+          if (document.getElementById('cfgPointsPer100Kicks')) document.getElementById('cfgPointsPer100Kicks').value = rankData.points_per_100_kicks ?? 500;
+          if (document.getElementById('cfgPointsDailyStreak')) document.getElementById('cfgPointsDailyStreak').value = rankData.points_daily_streak ?? 150;
+          if (document.getElementById('cfgPointsPerRaid')) document.getElementById('cfgPointsPerRaid').value = rankData.points_per_raid ?? 300;
+          
+          if (Array.isArray(rankData.store_items) && currentChannelConfig) {
+            currentChannelConfig.store_items = rankData.store_items;
+            renderStoreItems();
+          }
+          updateEconomyPreviews();
+        }
+      }).catch(() => {});
+
+    // Load auto announce list from auto_announces table
+    sb.from('auto_announces')
+      .select('message')
+      .eq('channel_id', activeChannel.id)
+      .order('position', { ascending: true })
+      .then(({ data: annData }) => {
+        localAnnounces = Array.isArray(annData) ? annData.map(r => r.message) : [];
+        renderAnnounceList();
+        renderPlanLimitBanners();
+      }).catch(() => {});
 
     // Render store items and redemptions after config is loaded
     renderStoreItems();
     renderStoreRedemptions();
 
-    // Load moderation settings
-    const modSettings = data.moderation_settings || {};
-    currentModFiltersSettings = {
-      caps_action_type: modSettings.caps_action_type || '',
-      caps_timeout_duration_secs: modSettings.caps_timeout_duration_secs || '',
-      links_action_type: modSettings.links_action_type || '',
-      links_timeout_duration_secs: modSettings.links_timeout_duration_secs || '',
-      emotes_action_type: modSettings.emotes_action_type || '',
-      emotes_timeout_duration_secs: modSettings.emotes_timeout_duration_secs || '',
-      symbols_action_type: modSettings.symbols_action_type || '',
-      symbols_timeout_duration_secs: modSettings.symbols_timeout_duration_secs || '',
-      words_action_type: modSettings.words_action_type || '',
-      words_timeout_duration_secs: modSettings.words_timeout_duration_secs || '',
-      spam_action_type: modSettings.spam_action_type || '',
-      spam_timeout_duration_secs: modSettings.spam_timeout_duration_secs || '',
-      max_len_action_type: modSettings.max_len_action_type || '',
-      max_len_timeout_duration_secs: modSettings.max_len_timeout_duration_secs || '',
-      mentions_action_type: modSettings.mentions_action_type || '',
-      mentions_timeout_duration_secs: modSettings.mentions_timeout_duration_secs || ''
-    };
-    document.getElementById('cfgModCapsEnabled').checked = modSettings.caps_enabled ?? false;
-    document.getElementById('cfgModCapsPct').value = modSettings.caps_pct ?? 70;
-    document.getElementById('lblModCapsPct').textContent = (modSettings.caps_pct ?? 70) + '%';
-    document.getElementById('cfgModCapsMinLen').value = modSettings.caps_min_len ?? 5;
-
-    document.getElementById('cfgModLinksEnabled').checked = modSettings.links_enabled ?? false;
-    document.getElementById('cfgModLinksWhitelist').value = modSettings.links_whitelist || '';
-    document.getElementById('cfgModLinksPermitEnabled').checked = modSettings.links_permit_enabled ?? true;
-
-    document.getElementById('cfgModEmotesEnabled').checked = modSettings.emotes_enabled ?? false;
-    document.getElementById('cfgModEmotesMax').value = modSettings.emotes_max ?? 5;
-
-    document.getElementById('cfgModSymbolsEnabled').checked = modSettings.symbols_enabled ?? false;
-    document.getElementById('cfgModSymbolsPct').value = modSettings.symbols_pct ?? 60;
-    document.getElementById('lblModSymbolsPct').textContent = (modSettings.symbols_pct ?? 60) + '%';
-    document.getElementById('cfgModSymbolsMinLen').value = modSettings.symbols_min_len ?? 5;
-
-    document.getElementById('cfgModWordsEnabled').checked = modSettings.words_enabled ?? false;
-    document.getElementById('cfgModWordsList').value = modSettings.words_list || '';
-
-    document.getElementById('cfgModSpamEnabled').checked = modSettings.spam_enabled ?? false;
-    document.getElementById('cfgModSpamMaxDuplicates').value = modSettings.spam_max_duplicates ?? 2;
-
-    document.getElementById('cfgModMaxLenEnabled').checked = modSettings.max_len_enabled ?? false;
-    document.getElementById('cfgModMaxLenLimit').value = modSettings.max_len_limit ?? 300;
-
-    document.getElementById('cfgModMentionsEnabled').checked = modSettings.mentions_enabled ?? false;
-    document.getElementById('cfgModMentionsLimit').value = modSettings.mentions_limit ?? 3;
-
-    document.getElementById('cfgModActionType').value = modSettings.action_type || 'delete';
-    document.getElementById('cfgModTimeoutDuration').value = modSettings.timeout_duration_secs ?? 600;
-
-    const exemptRoles = modSettings.exempt_roles || ['moderator'];
-    document.getElementById('cfgModExemptVip').checked = exemptRoles.includes('vip');
-    document.getElementById('cfgModExemptSub').checked = exemptRoles.includes('subscriber');
-
-    // Inline Filter Penalty Selects
-    const setPenaltyVal = (id, val) => {
-      const el = document.getElementById(id);
-      if (el) el.value = (val && val !== '') ? val : 'default';
-    };
-    setPenaltyVal('cfgModPenaltyCaps', modSettings.caps_action_type);
-    setPenaltyVal('cfgModPenaltyLinks', modSettings.links_action_type);
-    setPenaltyVal('cfgModPenaltyEmotes', modSettings.emotes_action_type);
-    setPenaltyVal('cfgModPenaltySymbols', modSettings.symbols_action_type);
-    setPenaltyVal('cfgModPenaltyWords', modSettings.words_action_type);
-    setPenaltyVal('cfgModPenaltySpam', modSettings.spam_action_type);
-    setPenaltyVal('cfgModPenaltyMaxLen', modSettings.max_len_action_type);
-    setPenaltyVal('cfgModPenaltyMentions', modSettings.mentions_action_type);
-
-    // Apply plan restrictions to penalty settings
-    applyPenaltySettingsRestrictions();
-
     // Render moderation penalty banner
     renderPlanLimitBanners();
-
-    toggleModerationPanelState();
 
     // Update bot status
     updateBotStatusUI(data.bot_active || false);
@@ -4092,30 +4193,7 @@ async function saveBotConfig(silent = false) {
     // `chat_alerts` (vidi saveChatAlerts ispod) — čuvanje u bot_config je bio uzrok
     // zašto se izmene alertova nisu povlačile/prikazivale u chatu.
     feature_songrequest: document.getElementById('cfgSongRequestEnabled')?.checked ?? true,
-    songrequest_settings: {
-      request_role: document.getElementById('cfgSongRequestRank')?.value || 'everyone',
-      cost_points: parseInt(document.getElementById('cfgSongRequestCost')?.value) || 0,
-      max_duration_seconds: parseInt(document.getElementById('cfgSongRequestMaxDuration')?.value) || 360,
-      queue: localSongQueue
-    },
-    currency_name: document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins',
-    points_per_msg: parseInt(document.getElementById('cfgPointsPerMsg')?.value, 10) || 5,
     smart_chat_validation: document.getElementById('cfgSmartChatValidation')?.checked ?? true,
-    first_interaction_bonus: parseInt(document.getElementById('cfgFirstInteractionBonus')?.value, 10) || 100,
-    points_per_watchtime: parseInt(document.getElementById('cfgPointsPerWatchtime')?.value, 10) || 20,
-    level_up_announce: document.getElementById('cfgLevelUpAnnounce')?.checked ?? true,
-    sub_multiplier: parseFloat(document.getElementById('cfgSubMultiplier')?.value) || 2.0,
-    sub_bonus_per_msg: parseInt(document.getElementById('cfgSubBonusPerMsg')?.value, 10) || 10,
-    points_per_sub: parseInt(document.getElementById('cfgPointsPerSub')?.value, 10) || 1000,
-    points_per_gift_sub: parseInt(document.getElementById('cfgPointsPerGiftSub')?.value, 10) || 2000,
-    points_per_100_kicks: parseInt(document.getElementById('cfgPointsPer100Kicks')?.value, 10) || 500,
-    points_daily_streak: parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150,
-    points_per_raid: parseInt(document.getElementById('cfgPointsPerRaid')?.value, 10) || 300,
-    gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
-    max_gamble_amount: parseInt(document.getElementById('cfgMaxGambleAmount')?.value, 10) || 5000,
-    store_items: (currentChannelConfig && currentChannelConfig.store_items) ? currentChannelConfig.store_items : [],
-    store_redemptions: (currentChannelConfig && currentChannelConfig.store_redemptions) ? currentChannelConfig.store_redemptions : [],
-    auto_announces: localAnnounces,
     announce_interval_mins: Math.min(1440, Math.max(1, parseInt(document.getElementById('cfgAnnounceInterval')?.value) || 15)),
     announce_message_threshold: Math.min(1000, Math.max(1, parseInt(document.getElementById('cfgAnnounceThreshold')?.value) || 30)),
     announce_time_enabled: document.getElementById('cfgAnnounceTimeEnabled')?.checked ?? true,
@@ -4139,6 +4217,7 @@ async function saveBotConfig(silent = false) {
     .upsert(config, { onConflict: 'channel_id' });
 
   const alertsError = await saveChatAlerts();
+  const announcesError = await saveAutoAnnounces();
 
   if (!silent) {
     if (btnConfig) setLoading('saveConfigBtn', false);
@@ -4147,7 +4226,7 @@ async function saveBotConfig(silent = false) {
     if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', false);
   }
 
-  if (error || alertsError) {
+  if (error || alertsError || announcesError) {
     showToast('error', 'Greška pri čuvanju config-a', '❌');
     return;
   }
@@ -4214,6 +4293,28 @@ async function saveChatAlerts() {
     .upsert(rows, { onConflict: 'channel_id,alert_type' });
 
   return error || null;
+}
+
+// Čuva automatske najave direktno u namensku tabelu `auto_announces`.
+async function saveAutoAnnounces() {
+  if (!activeChannel) return null;
+  const { error: delErr } = await sb.from('auto_announces').delete().eq('channel_id', activeChannel.id);
+  if (delErr) return delErr;
+
+  if (Array.isArray(localAnnounces) && localAnnounces.length > 0) {
+    const rows = localAnnounces.map((msg, idx) => ({
+      user_id: getChannelOwnerId(),
+      channel_id: activeChannel.id,
+      message: msg,
+      enabled: true,
+      position: idx,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }));
+    const { error: insErr } = await sb.from('auto_announces').insert(rows);
+    return insErr;
+  }
+  return null;
 }
 
 async function saveBotConfigFields(fieldsToUpdate) {
@@ -4497,15 +4598,14 @@ async function saveModerationSettings(silent = false) {
   const btn = document.getElementById('btnSaveModeration');
   if (!silent && btn) btn.disabled = true;
 
-  const { error } = await sb.from('bot_config')
+  const { error } = await sb.from('moderation')
     .upsert({
-      user_id: getChannelOwnerId(),
       channel_id: activeChannel.id,
-      channel_name: activeChannel.username,
-      feature_moderation: featureModeration,
-      moderation_settings: moderationSettings,
+      type: 'config',
+      enabled: featureModeration,
+      settings: moderationSettings,
       updated_at: new Date().toISOString()
-    }, { onConflict: 'channel_id' });
+    }, { onConflict: 'channel_id,type' });
 
   if (!silent && btn) btn.disabled = false;
 
@@ -4515,7 +4615,7 @@ async function saveModerationSettings(silent = false) {
   }
 
   if (!silent) {
-    showToast('success', 'Podešavanja moderacije sačuvana!', '✅');
+    showToast('success', 'Podešavanja moderacije uspešno sačuvana u moderation!', '✅');
   }
   notifyBotToReload();
   updateOverviewModulesUI();
@@ -4697,22 +4797,37 @@ function testBotConnection() {
 
   const kickApiBase = getBotApiBase();
   const targetUrl = `${kickApiBase}/api/kick/test-ping`;
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-  fetch(`/.netlify/functions/api-proxy`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      targetUrl,
+  let fetchPromise;
+  if (isLocalhost) {
+    const secret = localStorage.getItem('internal_api_secret') || '';
+    const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    if (secret) headers['x-internal-token'] = secret;
+    fetchPromise = fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: headers,
       body: new URLSearchParams({ chatroom_id: activeChannel.id }).toString()
-    })
-  })
+    });
+  } else {
+    fetchPromise = fetch(`/.netlify/functions/api-proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetUrl,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ chatroom_id: activeChannel.id }).toString()
+      })
+    });
+  }
+
+  fetchPromise
     .then(async (res) => {
       if (res.ok) {
         showToast('success', `Uspešno testirano! Ping poruka poslata u @${activeChannel.username} chat.`, '✅');
       } else {
-        const err = await res.json().catch(() => ({ error: 'Greška na serveru' }));
+        const err = await res.json().catch(() => ({ error: `Neuspešan HTTP zahtev (Status ${res.status})` }));
         showToast('error', `Greška pri slanju pinga: ${err.detail || err.error || 'Neuspešan HTTP zahtev'}`, '❌');
       }
     })
@@ -4830,27 +4945,13 @@ async function loadChannelLiveStatus() {
 async function fetchKickLiveStatus() {
   if (!activeChannel) return;
 
-  const kickApiBase = getBotApiBase();
   const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const isDevWithoutBot = isLocalhost && (kickApiBase.includes(':5500') || kickApiBase === window.location.origin) && localStorage.getItem('use_local_bot') !== 'true';
-
-  // 1. Pokušaj preko našeg bot servera (ako nije dev okruženje bez bota), kroz Netlify proxy
-  //    koji server-side dodaje X-Internal-Token (direktan fetch na bot uvek vraca 401).
-  if (!isDevWithoutBot) {
+  if (isLocalhost) {
     try {
-      const targetUrl = `${kickApiBase}/api/kick/channel?username=${activeChannel.username}`;
-      const localRes = await fetch(`/.netlify/functions/api-proxy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUrl })
-      });
-      if (localRes.ok) {
-        const data = await localRes.json();
-        const isLive = data?.livestream !== null && data?.livestream !== undefined;
-        updateLiveStatusUI(isLive);
-        return;
-      }
-    } catch (_) { }
+      const { data } = await sb.from('channels').select('is_active').eq('id', activeChannel.id).maybeSingle();
+      updateLiveStatusUI(data ? !!data.is_active : false);
+    } catch (_) {}
+    return;
   }
 
   // U dev okruženju (npr. port 5500) bez pokrenutog lokalnog bot servera, odmah proveri Supabase bazu
@@ -4904,22 +5005,48 @@ function setupRealtimeChannels() {
     })
     .subscribe();
 
-  realtimeMarriagesSub = sb.channel('public:marriages_love')
+  realtimeMarriagesSub = sb.channel('public:love_and_marriages_sub')
     .on('postgres_changes', {
       event: '*',
       schema: 'public',
-      table: 'marriages',
+      table: 'love_and_marriages',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
       loadMarriages();
+      loadLoveStatuses();
     })
+    .subscribe();
+
+  realtimeMinigamesSub = sb.channel('public:mini_games_sub')
     .on('postgres_changes', {
       event: '*',
       schema: 'public',
-      table: 'love_modifiers',
+      table: 'mini_games',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
-      loadLoveStatuses();
+      loadMinigamesConfig();
+    })
+    .subscribe();
+
+  realtimeRankingSub = sb.channel('public:ranking_sub')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'ranking',
+      filter: `channel_id=eq.${activeChannel.id}`
+    }, () => {
+      loadBotConfig();
+    })
+    .subscribe();
+
+  realtimeModerationSub = sb.channel('public:moderation_sub')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'moderation',
+      filter: `channel_id=eq.${activeChannel.id}`
+    }, () => {
+      loadBotConfig();
     })
     .subscribe();
 }
@@ -5169,46 +5296,59 @@ async function saveCommand() {
   await loadCommands();
 }
 
+const _togglingCmds = new Set();
+
 async function toggleCommand(id, currentEnabled, _isDefault) {
-  if (id.startsWith('builtin-')) {
-    const cmdObj = allCommands.find(c => c.id === id);
-    if (!cmdObj) return;
+  if (_togglingCmds.has(id)) return;
+  _togglingCmds.add(id);
 
-    const payload = {
-      user_id: getChannelOwnerId(),
-      channel_id: activeChannel.id,
-      command: extractBuiltinAliasKeys(cmdObj.command),
-      response: cmdObj.response,
-      cooldown: cmdObj.cooldown,
-      min_rank: cmdObj.min_rank || 'everyone',
-      enabled: !currentEnabled,
-      is_default: true,
-      updated_at: new Date().toISOString()
-    };
+  const targetToggle = document.querySelector(`input[onchange*="${id}"], button[onclick*="${id}"]`);
+  if (targetToggle) targetToggle.disabled = true;
 
-    // Ako builtin vec postoji u DB (db_exists), radi UPDATE, inace INSERT
-    let dbError;
-    if (cmdObj.db_exists) {
-      ({ error: dbError } = await sb.from('custom_commands')
-        .update({ enabled: !currentEnabled, updated_at: new Date().toISOString() })
-        .eq('id', id));
+  try {
+    if (id.startsWith('builtin-')) {
+      const cmdObj = allCommands.find(c => c.id === id);
+      if (!cmdObj) return;
+
+      const payload = {
+        user_id: getChannelOwnerId(),
+        channel_id: activeChannel.id,
+        command: extractBuiltinAliasKeys(cmdObj.command),
+        response: cmdObj.response,
+        cooldown: cmdObj.cooldown,
+        min_rank: cmdObj.min_rank || 'everyone',
+        enabled: !currentEnabled,
+        is_default: true,
+        updated_at: new Date().toISOString()
+      };
+
+      // Ako builtin vec postoji u DB (db_exists), radi UPDATE, inace INSERT
+      let dbError;
+      if (cmdObj.db_exists) {
+        ({ error: dbError } = await sb.from('custom_commands')
+          .update({ enabled: !currentEnabled, updated_at: new Date().toISOString() })
+          .eq('id', id));
+      } else {
+        ({ error: dbError } = await sb.from('custom_commands').insert({
+          ...payload,
+          created_at: new Date().toISOString()
+        }));
+      }
+      if (dbError) { showToast('error', 'Greška pri čuvanju ugrađene komande', 'error'); return; }
     } else {
-      ({ error: dbError } = await sb.from('custom_commands').insert({
-        ...payload,
-        created_at: new Date().toISOString()
-      }));
+      const { error } = await sb.from('custom_commands')
+        .update({ enabled: !currentEnabled, updated_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) { showToast('error', 'Greška', 'error'); return; }
     }
-    if (dbError) { showToast('error', 'Greška pri čuvanju ugrađene komande', 'error'); return; }
-  } else {
-    const { error } = await sb.from('custom_commands')
-      .update({ enabled: !currentEnabled, updated_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) { showToast('error', 'Greška', 'error'); return; }
-  }
 
-  showToast('info', !currentEnabled ? 'Komanda je uključena' : 'Komanda je isključena', !currentEnabled ? 'check' : 'pause');
-  notifyBotToReload();
-  await loadCommands();
+    showToast('info', !currentEnabled ? 'Komanda je uključena' : 'Komanda je isključena', !currentEnabled ? 'check' : 'pause');
+    notifyBotToReload();
+    await loadCommands();
+  } finally {
+    _togglingCmds.delete(id);
+    if (targetToggle) targetToggle.disabled = false;
+  }
 }
 
 function deleteCommandConfirm(id, cmd) {
@@ -5299,7 +5439,7 @@ function updateBreadcrumbs(panelId) {
       <span id="breadcrumbPage">Overview</span>
     `;
   } else if (panelId === 'leaderboard') {
-    const subTypeLabel = activeLeaderboardType === 'chatters' ? 'Chatters' : activeLeaderboardType === 'watchtime' ? 'Watchtime' : 'Zajedno';
+    const subTypeLabel = activeLeaderboardType === 'chatters' ? 'Chatters' : activeLeaderboardType === 'watchtime' ? 'Watchtime' : activeLeaderboardType === 'ranking' ? 'Ranking' : 'Zajedno';
     html += `
       <span class="bc-sep">›</span>
       <span>Leaderboard</span>
@@ -5384,7 +5524,12 @@ function switchPanel(panelId) {
     if (!configLoaded) loadBotConfig();
     switchEconomyTab(currentEconomyTab || 'config');
   }
-  if (panelId === 'builtin-commands' || panelId === 'minigames') renderBuiltinCommandsGrid();
+  if (panelId === 'minigames') {
+    if (!configLoaded) loadBotConfig();
+    loadMinigamesConfig();
+    renderPlanLimitBanners();
+  }
+  if (panelId === 'builtin-commands') renderBuiltinCommandsGrid();
 
   if (window.innerWidth < 768) {
     document.getElementById('sidebar').classList.remove('mobile-open');
@@ -6663,6 +6808,7 @@ function updateOverviewModulesUI() {
 
 async function toggleModuleFromHeader(toggleId, isChecked) {
   const toggle = document.getElementById(toggleId);
+  const prevState = toggle ? toggle.checked : !isChecked;
   if (toggle) toggle.checked = isChecked;
   if (toggleId === 'cfgAnnounceTimeEnabled') {
     // Header/master prekidač je "sve ili ništa" za Automatske poruke: gasi/pali OBA
@@ -6676,20 +6822,31 @@ async function toggleModuleFromHeader(toggleId, isChecked) {
   // INSTANT SYNCHRONOUS UI UPDATE
   updateOverviewModulesUI();
 
-  if (toggleId === 'cfgModeration') {
-    if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
-    await saveModerationSettings(true);
-    await saveBotConfig(true);
-  } else if (toggleId === 'cfgSongRequestEnabled') {
-    await saveSongRequestConfig(true);
-    await saveBotConfig(true);
-  } else if (toggleId === 'cfgGambleEnabled') {
-    await saveEconomyConfig(true);
-    await saveBotConfig(true);
-  } else {
-    await saveBotConfig(true);
+  try {
+    if (toggleId === 'cfgModeration') {
+      if (typeof toggleModerationPanelState === 'function') toggleModerationPanelState();
+      await saveModerationSettings(true);
+      await saveBotConfig(true);
+    } else if (toggleId === 'cfgSongRequestEnabled') {
+      await saveSongRequestConfig(true);
+      await saveBotConfig(true);
+    } else if (toggleId === 'cfgGambleEnabled') {
+      await saveEconomyConfig(true);
+      await saveBotConfig(true);
+    } else {
+      await saveBotConfig(true);
+    }
+    updateOverviewModulesUI();
+  } catch (err) {
+    if (toggle) toggle.checked = prevState;
+    if (toggleId === 'cfgAnnounceTimeEnabled') {
+      syncAnnounceTimeToggle(prevState);
+      const msgToggle = document.getElementById('cfgAnnounceMsgEnabled');
+      if (msgToggle) msgToggle.checked = prevState;
+    }
+    updateOverviewModulesUI();
+    showToast('error', 'Greška pri promeni modula. Pokušaj ponovo.', 'error');
   }
-  updateOverviewModulesUI();
 }
 
 async function toggleModuleFromOverview(toggleId) {
@@ -6771,6 +6928,10 @@ async function toggleModuleFromOverview(toggleId) {
     } else if (toggleId === 'cfgSongRequestEnabled') {
       const master = document.getElementById('cfgFeatureSongRequestMaster');
       if (master) master.checked = prevState;
+    } else if (toggleId === 'cfgAnnounceTimeEnabled') {
+      syncAnnounceTimeToggle(prevState);
+      const msgToggle = document.getElementById('cfgAnnounceMsgEnabled');
+      if (msgToggle) msgToggle.checked = prevState;
     }
     updateOverviewModulesUI();
     showToast('error', `Greška pri promeni modula "${name}". Pokušaj ponovo.`);
@@ -6814,38 +6975,6 @@ function toggleModuleOverlay(panelId, active) {
   }
 }
 
-async function enableCurrentPanelModule(btn) {
-  const activePanel = document.querySelector('.panel.active');
-  if (!activePanel) return;
-
-  const panelId = activePanel.id;
-  const panelToToggleId = {
-    'panel-leaderboard': 'cfgLeaderboard',
-    'panel-auto-announces': 'cfgAnnounceTimeEnabled',
-    'panel-bot-interaction': 'cfgAutoresponse',
-    'panel-marriages': 'cfgLove',
-    'panel-minigames': 'cfgGames',
-    'panel-songs': 'cfgSongRequestEnabled',
-    'panel-economy': 'cfgGambleEnabled',
-    'panel-moderation': 'cfgModeration'
-  };
-
-  const toggleId = panelToToggleId[panelId];
-  if (!toggleId) return;
-
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = 'Aktiviram...';
-  }
-
-  await toggleModuleFromHeader(toggleId, true);
-
-  const notice = activePanel.querySelector('#modDisabledNotice');
-  if (notice) notice.style.display = 'none';
-
-  showToast('success', 'Modul je uspešno aktiviran!', '⚡');
-}
-
 let liveFeedInterval = null;
 let liveFeedUserScrolledUp = false;
 let liveFeedScrollDebounce = null;
@@ -6859,17 +6988,14 @@ function startLiveActivityFeed() {
     liveFeedInterval = null;
   }
 
-  // Resetuj scroll state
   liveFeedUserScrolledUp = false;
   if (liveFeedScrollDebounce) clearTimeout(liveFeedScrollDebounce);
 
-  // Stilovi za feed
   feed.style.overflowY = 'auto';
   feed.style.display = 'flex';
   feed.style.flexDirection = 'column';
   feed.style.gap = '2px';
 
-  // Wrapper za hint button — pronađi ili kreiraj
   let feedWrap = feed.parentElement;
   if (!feedWrap || !feedWrap.classList.contains('live-feed-wrap')) {
     feedWrap = feed.parentElement;
@@ -6923,81 +7049,105 @@ function startLiveActivityFeed() {
 
     const apiBase = getBotApiBase();
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    // Ako smo u dev režimu na npr. portu 5500 bez lokalnog bota, preskačemo fetch da ne spamuije 404 u konzoli
-    if (isLocalhost && (apiBase.includes(':5500') || apiBase === window.location.origin) && localStorage.getItem('use_local_bot') !== 'true') {
+    const targetUrl = `${apiBase}/api/kick/logs?chatroom_id=${activeChannel.id}`;
+
+    try {
+      let res;
+      if (isLocalhost) {
+        const secret = localStorage.getItem('internal_api_secret') || '';
+        if (!secret) {
+          // Na localhost-u u browseru nemamo tajni ključ za pristup logovima sa Render bota,
+          // pa prekidamo bez slanja fetch zahteva kako pretraživač ne bi prikaživao 401 grešku.
+          if (liveFeedInterval) {
+            clearInterval(liveFeedInterval);
+            liveFeedInterval = null;
+          }
+          const dot = document.getElementById('botLiveFeedDot');
+          if (dot) {
+            dot.style.background = 'var(--text-muted)';
+            dot.style.boxShadow = 'none';
+          }
+          return;
+        }
+        const headers = { 'x-internal-token': secret };
+        res = await fetch(targetUrl, { headers }).catch(() => null);
+      } else {
+        res = await fetch(`/.netlify/functions/api-proxy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUrl })
+        }).catch(() => null);
+      }
+
+      const dot = document.getElementById('botLiveFeedDot');
+
+      if (!res || !res.ok) {
+        // Pri 401/404 ili mrežnoj grešci zaustavljamo interval da sprečimo spaming u konzoli i terminalu
+        if (liveFeedInterval) {
+          clearInterval(liveFeedInterval);
+          liveFeedInterval = null;
+        }
+        if (dot) {
+          dot.style.background = 'var(--text-muted)';
+          dot.style.boxShadow = 'none';
+        }
+        return;
+      }
+
+      if (dot) {
+        dot.style.background = 'var(--kick-green)';
+        dot.style.boxShadow = '0 0 8px var(--kick-green)';
+      }
+      const logs = await res.json();
+      if (logs.length === 0) {
+        feed.innerHTML = `
+          <div style="color: var(--text-muted); text-align: center; padding-top: 60px; font-style: italic; font-size: 0.85rem;">
+            Čekam prve aktivnosti...
+          </div>
+        `;
+        return;
+      }
+
+      // Renderuj logove
+      feed.innerHTML = logs.map(log => {
+        let badgeColor = 'var(--text-muted)';
+        if (log.type === 'ERR') badgeColor = '#EF4444';
+        else if (log.type === 'WARN') badgeColor = '#F59E0B';
+        else if (log.type === 'INFO') badgeColor = '#3B82F6';
+        else if (log.type === 'BOT') badgeColor = 'var(--kick-green)';
+        else if (log.type === 'CHAT') badgeColor = '#10B981';
+
+        // Očisti poruku od prefiksa kanala
+        let cleanMessage = log.message || '';
+        if (activeChannel) {
+          const prefixRegex = new RegExp(`^\\[${activeChannel.username}\\]\\s*`, 'i');
+          cleanMessage = cleanMessage.replace(prefixRegex, '');
+          const atPrefixRegex = new RegExp(`^\\[@${activeChannel.username}\\]\\s*`, 'i');
+          cleanMessage = cleanMessage.replace(atPrefixRegex, '');
+        }
+
+        return `
+          <div class="log-item" style="display: flex; gap: 8px; align-items: flex-start; text-align: left; font-family: monospace; font-size: 0.78rem; padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.02); line-height: 1.4; width: 100%; box-sizing: border-box;">
+            <span style="color: var(--text-muted); flex-shrink: 0;">[${log.timestamp}]</span>
+            <span style="color: ${badgeColor}; font-weight: bold; flex-shrink: 0;">[${log.type}]</span>
+            <span style="color: #E2E8F0; word-break: break-all; flex-grow: 1;">${escapeHtml(cleanMessage)}</span>
+          </div>
+        `;
+      }).join('');
+
+      // Auto-scroll na dno samo ako korisnik nije skrolovao gore
+      if (!liveFeedUserScrolledUp) {
+        feed.scrollTop = feed.scrollHeight;
+      }
+    } catch (_) {
+      if (liveFeedInterval) {
+        clearInterval(liveFeedInterval);
+        liveFeedInterval = null;
+      }
       const dot = document.getElementById('botLiveFeedDot');
       if (dot) {
         dot.style.background = 'var(--text-muted)';
         dot.style.boxShadow = 'none';
-      }
-      return;
-    }
-
-    try {
-      const targetUrl = `${apiBase}/api/kick/logs?chatroom_id=${activeChannel.id}`;
-      const res = await fetch(`/.netlify/functions/api-proxy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ targetUrl })
-      });
-      const dot = document.getElementById('botLiveFeedDot');
-      if (res.ok) {
-        if (dot) {
-          dot.style.background = 'var(--kick-green)';
-          dot.style.boxShadow = '0 0 8px var(--kick-green)';
-        }
-        const logs = await res.json();
-        if (logs.length === 0) {
-          feed.innerHTML = `
-            <div style="color: var(--text-muted); text-align: center; padding-top: 60px; font-style: italic; font-size: 0.85rem;">
-              Čekam prve aktivnosti...
-            </div>
-          `;
-          return;
-        }
-
-        // Renderuj logove
-        feed.innerHTML = logs.map(log => {
-          let badgeColor = 'var(--text-muted)';
-          if (log.type === 'ERR') badgeColor = '#EF4444';
-          else if (log.type === 'WARN') badgeColor = '#F59E0B';
-          else if (log.type === 'INFO') badgeColor = '#3B82F6';
-          else if (log.type === 'BOT') badgeColor = 'var(--kick-green)';
-          else if (log.type === 'CHAT') badgeColor = '#10B981';
-
-          // Očisti poruku od prefiksa kanala
-          let cleanMessage = log.message || '';
-          if (activeChannel) {
-            const prefixRegex = new RegExp(`^\\[${activeChannel.username}\\]\\s*`, 'i');
-            cleanMessage = cleanMessage.replace(prefixRegex, '');
-            const atPrefixRegex = new RegExp(`^\\[@${activeChannel.username}\\]\\s*`, 'i');
-            cleanMessage = cleanMessage.replace(atPrefixRegex, '');
-          }
-
-          return `
-            <div class="log-item" style="display: flex; gap: 8px; align-items: flex-start; text-align: left; font-family: monospace; font-size: 0.78rem; padding: 4px 8px; border-bottom: 1px solid rgba(255,255,255,0.02); line-height: 1.4; width: 100%; box-sizing: border-box;">
-              <span style="color: var(--text-muted); flex-shrink: 0;">[${log.timestamp}]</span>
-              <span style="color: ${badgeColor}; font-weight: bold; flex-shrink: 0;">[${log.type}]</span>
-              <span style="color: #E2E8F0; word-break: break-all; flex-grow: 1;">${escapeHtml(cleanMessage)}</span>
-            </div>
-          `;
-        }).join('');
-
-        // Auto-scroll na dno samo ako korisnik nije skrolovao gore
-        if (!liveFeedUserScrolledUp) {
-          feed.scrollTop = feed.scrollHeight;
-        }
-      } else {
-        if (dot) {
-          dot.style.background = 'red';
-          dot.style.boxShadow = '0 0 8px red';
-        }
-      }
-    } catch (_) {
-      const dot = document.getElementById('botLiveFeedDot');
-      if (dot) {
-        dot.style.background = 'red';
-        dot.style.boxShadow = '0 0 8px red';
       }
     }
   }
@@ -7792,16 +7942,21 @@ async function togglePlayback() {
     stopTimer();
   } else {
     isPlaying = true;
-    if (ytPlayer) {
-      try {
-        if (ytPlayer.unMute) ytPlayer.unMute();
-        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
-        if (ytPlayer.playVideo) ytPlayer.playVideo();
-      } catch (_) { }
+    if (ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+      const state = ytPlayer.getPlayerState();
+      if (state === -1 || state === 5 || state === 0 || state === undefined) {
+        playCurrentAudio();
+      } else {
+        try {
+          if (ytPlayer.unMute) ytPlayer.unMute();
+          if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
+          if (ytPlayer.playVideo) ytPlayer.playVideo();
+        } catch (_) { }
+        startTimer();
+      }
     } else {
       playCurrentAudio();
     }
-    startTimer();
   }
 
   updatePlayerUI();
@@ -7835,12 +7990,19 @@ async function skipSong() {
 
 async function previousSong() {
   stopTimer();
-  currentTimeSeconds = 0;
 
-  if (currentSongIndex > 0) {
-    currentSongIndex--;
+  if (currentTimeSeconds > 3) {
+    currentTimeSeconds = 0;
+    if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
+      try { window.ytPlayer.seekTo(0); } catch (_) {}
+    }
   } else {
-    currentSongIndex = Math.max(0, localSongQueue.length - 1);
+    currentTimeSeconds = 0;
+    if (currentSongIndex > 0) {
+      currentSongIndex--;
+    } else {
+      currentSongIndex = 0;
+    }
   }
 
   playCurrentAudio();
@@ -7858,22 +8020,21 @@ async function saveSongRequestConfig(silent) {
   const isMasterEnabled = masterToggle ? masterToggle.checked : true;
   const isEnabled = songToggle ? songToggle.checked : true;
 
-  const songrequestSettings = {
-    request_role: rankSelect ? rankSelect.value : 'everyone',
-    cost_points: costInput ? parseInt(costInput.value) || 0 : 0,
-    max_duration_seconds: maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360,
-    queue: localSongQueue
-  };
+  const costPoints = costInput ? parseInt(costInput.value) || 0 : 0;
+  const maxDur = maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360;
+  const role = rankSelect ? rankSelect.value : 'everyone';
 
-  const { error } = await sb.from('bot_config')
+  const { error } = await sb.from('song_request')
     .upsert({
-      user_id: getChannelOwnerId(),
       channel_id: activeChannel.id,
-      channel_name: activeChannel.username,
-      feature_songrequest: isMasterEnabled && isEnabled,
-      songrequest_settings: songrequestSettings,
+      type: 'config',
+      enabled: isMasterEnabled && isEnabled,
+      request_role: role,
+      cost_points: costPoints,
+      max_duration_seconds: maxDur,
+      queue: localSongQueue,
       updated_at: new Date().toISOString()
-    }, { onConflict: 'channel_id' });
+    }, { onConflict: 'channel_id,type' });
 
   if (error) {
     if (!silent) showToast('error', 'Greška pri čuvanju podešavanja song request-a', '❌');
@@ -7881,7 +8042,7 @@ async function saveSongRequestConfig(silent) {
   }
 
   if (!silent) {
-    showToast('success', 'Song Request podešavanja uspešno sačuvana!', '✅');
+    showToast('success', 'Song Request podešavanja uspešno sačuvana u song_request!', '✅');
   }
 
   notifyBotToReload();
@@ -8174,50 +8335,7 @@ function playSongNow(index) {
   currentTimeSeconds = 0;
   isPlaying = true;
 
-  if (playbackInterval) clearInterval(playbackInterval);
-  playbackInterval = setInterval(() => {
-    const currentSong = localSongQueue[currentSongIndex];
-    if (!currentSong) {
-      clearInterval(playbackInterval);
-      isPlaying = false;
-      updatePlayerUI();
-      return;
-    }
-
-    if (window.ytPlayer) {
-      try {
-        if (typeof window.ytPlayer.getDuration === 'function') {
-          const realDur = Math.round(window.ytPlayer.getDuration());
-          if (realDur && realDur > 0 && Math.abs((currentSong.duration || 0) - realDur) > 1) {
-            currentSong.duration = realDur;
-          }
-        }
-        if (typeof window.ytPlayer.getCurrentTime === 'function') {
-          const realCur = Math.floor(window.ytPlayer.getCurrentTime());
-          if (typeof realCur === 'number' && !isNaN(realCur) && realCur >= 0) {
-            currentTimeSeconds = realCur;
-          } else {
-            currentTimeSeconds++;
-          }
-        } else {
-          currentTimeSeconds++;
-        }
-      } catch (_) {
-        currentTimeSeconds++;
-      }
-    } else {
-      currentTimeSeconds++;
-    }
-
-    if (currentSong.duration > 0 && currentTimeSeconds >= currentSong.duration) {
-      skipSong();
-    } else {
-      updatePlayerUI();
-    }
-  }, 1000);
-
-  updatePlayerUI();
-  renderSongQueue();
+  playCurrentAudio();
   saveSongRequestConfig(true);
 }
 
@@ -8353,26 +8471,21 @@ async function saveEconomyConfig(silent = false) {
   currentChannelConfig.economy_settings = ecoSettings;
   Object.assign(currentChannelConfig, ecoSettings);
 
-  const fieldsToSave = {
-    currency_name: ecoSettings.currency_name,
-    points_per_msg: ecoSettings.points_per_msg,
-    smart_chat_validation: ecoSettings.smart_chat_validation,
-    first_interaction_bonus: ecoSettings.first_interaction_bonus,
-    points_per_watchtime: ecoSettings.points_per_watchtime,
-    level_up_announce: ecoSettings.level_up_announce,
-    sub_multiplier: ecoSettings.sub_multiplier,
-    sub_bonus_per_msg: ecoSettings.sub_bonus_per_msg,
-    points_per_sub: ecoSettings.points_per_sub,
-    points_per_gift_sub: ecoSettings.points_per_gift_sub,
-    points_per_100_kicks: ecoSettings.points_per_100_kicks,
-    points_daily_streak: ecoSettings.points_daily_streak,
-    points_per_raid: ecoSettings.points_per_raid,
-    gamble_enabled: ecoSettings.gamble_enabled,
-    max_gamble_amount: ecoSettings.max_gamble_amount,
-    economy_settings: ecoSettings
-  };
-
-  const { error } = await saveBotConfigFields(fieldsToSave);
+  const { error } = await sb.from('ranking')
+    .upsert({
+      channel_id: activeChannel.id,
+      type: 'config',
+      currency_name: ecoSettings.currency_name,
+      first_interaction_bonus: ecoSettings.first_interaction_bonus,
+      sub_multiplier: ecoSettings.sub_multiplier,
+      sub_bonus_per_msg: ecoSettings.sub_bonus_per_msg,
+      points_per_sub: ecoSettings.points_per_sub,
+      points_per_gift_sub: ecoSettings.points_per_gift_sub,
+      points_per_100_kicks: ecoSettings.points_per_100_kicks,
+      points_daily_streak: ecoSettings.points_daily_streak,
+      points_per_raid: ecoSettings.points_per_raid,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'channel_id,type' });
 
   if (error) {
     if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ranking sistema!');
@@ -8380,26 +8493,76 @@ async function saveEconomyConfig(silent = false) {
     if (!silent) showToast('success', 'Podešavanja ranking sistema su uspešno sačuvana!');
   }
 
+  if (document.getElementById('cfgMinigamesMaxBet')) document.getElementById('cfgMinigamesMaxBet').value = ecoSettings.max_gamble_amount;
   updateEconomyPreviews();
 }
 
-async function saveMinigamesConfig() {
+async function loadMinigamesConfig() {
+  if (!activeChannel) return;
+  const { data } = await sb.from('mini_games')
+    .select('*')
+    .eq('channel_id', activeChannel.id)
+    .eq('type', 'config')
+    .maybeSingle();
+
+  if (data) {
+    const maxVal = data.max_bet ?? 5000;
+    const isEnabled = data.enabled ?? true;
+    if (document.getElementById('cfgMinigamesMaxBet')) document.getElementById('cfgMinigamesMaxBet').value = maxVal;
+    if (document.getElementById('cfgMaxGambleAmount')) document.getElementById('cfgMaxGambleAmount').value = maxVal;
+    if (document.getElementById('cfgGambleEnabled')) document.getElementById('cfgGambleEnabled').checked = isEnabled;
+    if (currentChannelConfig) {
+      currentChannelConfig.max_gamble_amount = maxVal;
+      currentChannelConfig.gamble_enabled = isEnabled;
+    }
+  }
+}
+
+async function saveMinigamesConfig(silent = false) {
   if (!activeChannel) return;
 
+  const maxBetVal = parseInt(document.getElementById('cfgMinigamesMaxBet')?.value, 10) || 5000;
+  const gambleEnabled = document.getElementById('cfgGambleEnabled')?.checked ?? true;
+
+  if (document.getElementById('cfgMaxGambleAmount')) {
+    document.getElementById('cfgMaxGambleAmount').value = maxBetVal;
+  }
+
   const ecoSettings = {
-    gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
-    max_gamble_amount: parseInt(document.getElementById('cfgMinigamesMaxBet')?.value, 10) || 5000
+    ...(currentChannelConfig?.economy_settings || {}),
+    gamble_enabled: gambleEnabled,
+    max_gamble_amount: maxBetVal
   };
 
   if (!currentChannelConfig) currentChannelConfig = {};
-  currentChannelConfig.economy_settings = { ...currentChannelConfig.economy_settings, ...ecoSettings };
+  currentChannelConfig.currency_name = currentChannelConfig.currency_name || 'Koins';
+  currentChannelConfig.max_gamble_amount = maxBetVal;
+  currentChannelConfig.gamble_enabled = gambleEnabled;
+  currentChannelConfig.economy_settings = ecoSettings;
 
-  const { error } = await saveBotConfigFields({ economy_settings: currentChannelConfig.economy_settings });
+  const fieldsToSave = {
+    max_gamble_amount: maxBetVal,
+    gamble_enabled: gambleEnabled,
+    economy_settings: ecoSettings
+  };
 
-  if (error) {
-    showToast('error', 'Greška pri čuvanju podešavanja mini igara!');
-  } else {
-    showToast('success', 'Podešavanja mini igara su uspešno sačuvana!');
+  const { error: mgError } = await sb.from('mini_games')
+    .upsert({
+      channel_id: activeChannel.id,
+      type: 'config',
+      enabled: gambleEnabled,
+      max_bet: maxBetVal,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'channel_id,type' });
+
+  const { error } = await saveBotConfigFields(fieldsToSave);
+
+  if (!silent) {
+    if (error || mgError) {
+      showToast('error', 'Greška pri čuvanju podešavanja mini igara!');
+    } else {
+      showToast('success', 'Podešavanja mini igara su uspešno sačuvana u mini_games!');
+    }
   }
 }
 
@@ -8416,20 +8579,21 @@ function runSimulatedGame() {
   resEl.style.textAlign = 'center';
 
   if (type === 'slots') {
-    const simboli = ['🍒', '🍋', '🔔', '🍇', '💎', '🎰'];
+    const simboli = ['🍒', '🍋', '🔔', '🍇', '🍉', '💎', '7️⃣'];
     const s1 = simboli[Math.floor(Math.random() * simboli.length)];
     const s2 = simboli[Math.floor(Math.random() * simboli.length)];
     const s3 = simboli[Math.floor(Math.random() * simboli.length)];
 
     let resText = `<strong>@Strimer</strong> je zavrteo slot: [ ${s1} | ${s2} | ${s3} ] — `;
     if (s1 === s2 && s2 === s3) {
-      if (s1 === '🎰' || s1 === '💎') {
-        resText += `<span style="color:#eab308; font-weight:700;">JACKPOT 50x! Osvojio si +${(bet * 50).toLocaleString()} ${valuta}!</span>`;
+      if (s1 === '7️⃣' || s1 === '💎') {
+        resText += `<span style="color:#eab308; font-weight:700;">JACKPOT 10x! Osvojio si +${(bet * 10).toLocaleString()} ${valuta}!</span>`;
       } else {
-        resText += `<span style="color:#53fc18; font-weight:700;">3 u nizu 10x! Osvojio si +${(bet * 10).toLocaleString()} ${valuta}!</span>`;
+        resText += `<span style="color:#53fc18; font-weight:700;">3 u nizu 5x! Osvojio si +${(bet * 5).toLocaleString()} ${valuta}!</span>`;
       }
     } else if (s1 === s2 || s2 === s3 || s1 === s3) {
-      resText += `<span style="color:#eab308;">2 u nizu 2x! Vraćeno +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
+      const dobitak = Math.floor(bet * 1.5);
+      resText += `<span style="color:#eab308;">2 u nizu 1.5x! Dobio si nazad +${dobitak.toLocaleString()} ${valuta}!</span>`;
     } else {
       resText += `<span style="color:#ef4444;">Nema pogotka! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
     }
@@ -8447,22 +8611,23 @@ function runSimulatedGame() {
     const isWin = Math.random() < 0.5;
 
     if (isWin) {
-      resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#53fc18; font-weight:700;">Dupliranje 2x! Osvojio si +${(bet * 2).toLocaleString()} ${valuta}!</span>`;
+      resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#53fc18; font-weight:700;">Pobeda! Osvojio si +${bet.toLocaleString()} ${valuta}!</span>`;
     } else {
       resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#ef4444;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
     }
 
   } else if (type === 'wheel') {
-    const mults = [0, 0.5, 1, 2, 3, 5];
+    const mults = [0, 0.5, 1.5, 2, 3, 5];
     const m = mults[Math.floor(Math.random() * mults.length)];
     const dobitak = Math.floor(bet * m);
+    const razlika = dobitak - bet;
 
-    if (m > 1) {
+    if (razlika > 0) {
       resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#53fc18; font-weight:700;">Profit! Osvojio si +${dobitak.toLocaleString()} ${valuta}!</span>`;
-    } else if (m === 1 || m === 0.5) {
+    } else if (razlika === 0 || m === 1.5) {
       resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#eab308;">Vraćeno ${dobitak.toLocaleString()} ${valuta}.</span>`;
     } else {
-      resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>0x</strong>! <span style="color:#ef4444;">Nula! Izgubio si ulog od ${bet.toLocaleString()} ${valuta}.</span>`;
+      resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#ef4444;">Gubitak! Izgubio si ${Math.abs(razlika).toLocaleString()} ${valuta}.</span>`;
     }
   }
 }
@@ -8564,8 +8729,8 @@ function renderStoreItems() {
               <span style="font-size:0.7rem; color:var(--text-muted);">Zaliha: ${stockStr}</span>
             </div>
           </div>
-          <h4 style="margin:0 0 6px 0; font-size:1rem; color:#fff;">${item.name}</h4>
-          <p style="margin:0 0 12px 0; font-size:0.82rem; color:var(--text-muted); line-height:1.4;">${item.description || ''}</p>
+          <h4 style="margin:0 0 6px 0; font-size:1rem; color:#fff;">${escapeHtml(item.name)}</h4>
+          <p style="margin:0 0 12px 0; font-size:0.82rem; color:var(--text-muted); line-height:1.4;">${escapeHtml(item.description || '')}</p>
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid rgba(255,255,255,0.06); padding-top:12px; margin-top:8px;">
           <span style="font-weight:700; color:#eab308; font-size:0.9rem; display:flex; align-items:center; gap:4px;">
@@ -8623,7 +8788,7 @@ async function saveStoreItem() {
   const auto_approve = document.getElementById('storeItemAutoApprove').checked;
 
   if (!name) {
-    showToast('Unesi naziv artikla!', 'warning');
+    showToast('warning', 'Unesi naziv artikla!', '⚠️');
     return;
   }
 
@@ -8659,7 +8824,13 @@ async function saveStoreItem() {
   if (!currentChannelConfig) currentChannelConfig = {};
   currentChannelConfig.store_items = items;
 
-  const { error } = await saveBotConfigFields({ store_items: items });
+  const { error } = await sb.from('ranking')
+    .upsert({
+      channel_id: activeChannel.id,
+      type: 'config',
+      store_items: items,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'channel_id,type' });
 
   if (error) {
     showToast('error', 'Greška pri čuvanju artikla!');
@@ -8675,7 +8846,13 @@ async function deleteStoreItem(id) {
   if (!currentChannelConfig) currentChannelConfig = {};
   currentChannelConfig.store_items = items;
 
-  const { error } = await saveBotConfigFields({ store_items: items });
+  const { error } = await sb.from('ranking')
+    .upsert({
+      channel_id: activeChannel.id,
+      type: 'config',
+      store_items: items,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'channel_id,type' });
 
   if (error) {
     showToast('error', 'Greška pri brisanju artikla!');
@@ -8731,8 +8908,8 @@ function renderStoreRedemptions() {
     return `
       <tr>
         <td style="font-size:0.8rem; color:var(--text-muted);">${datum}</td>
-        <td style="font-weight:600; color:#fff;">@${r.username}</td>
-        <td><strong>${r.item_name}</strong></td>
+        <td style="font-weight:600; color:#fff;">@${escapeHtml(r.username)}</td>
+        <td><strong>${escapeHtml(r.item_name)}</strong></td>
         <td style="color:#eab308; font-weight:600;">${r.cost.toLocaleString()} ${valuta}</td>
         <td>${statusBadge}</td>
         <td style="text-align:right;">
@@ -8753,7 +8930,7 @@ async function simulirajKupovinuArtikla() {
   const item = items.find(i => i.id === itemId);
 
   if (!item) {
-    showToast('Izaberi artikal iz prodavnice!', 'warning');
+    showToast('warning', 'Izaberi artikal iz prodavnice!', '⚠️');
     return;
   }
 
@@ -8775,9 +8952,9 @@ async function simulirajKupovinuArtikla() {
   const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
   if (error) {
-    showToast('Greška pri simulaciji kupovine!', 'error');
+    showToast('error', 'Greška pri simulaciji kupovine!', '❌');
   } else {
-    showToast(`Simulirana kupovina za "${item.name}" od strane @${username}!`, 'success');
+    showToast('success', `Simulirana kupovina za "${item.name}" od strane @${username}!`, '🛍️');
     renderStoreRedemptions();
   }
 }
@@ -8791,10 +8968,20 @@ async function approveRedemption(id) {
   if (!currentChannelConfig) currentChannelConfig = {};
   currentChannelConfig.store_redemptions = redemptions;
 
+  // Skidanje poena pri odobrenju kupovine u prodavnici
+  const userKey = target.username.toLowerCase();
+  const row = (allLeaderboard || []).find(x => (x.username || '').toLowerCase() === userKey);
+  if (row && target.cost > 0) {
+    row.coins = Math.max(0, (row.coins || 0) - target.cost);
+    await sb.from('leaderboard')
+      .upsert({ channel_id: String(activeChannel.id), username: userKey, coins: row.coins }, { onConflict: 'channel_id,username' });
+    renderEconomyLeaderboard();
+  }
+
   const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
   if (!error) {
-    showToast(`Kupovina za @${target.username} je uspešno odobrena!`, 'success');
+    showToast('success', `Kupovina za @${target.username} je uspešno odobrena!`, '✅');
     renderStoreRedemptions();
   }
 }
@@ -8836,10 +9023,10 @@ function renderEconomyLeaderboard() {
 
   let list = (allLeaderboard || []).map(row => {
     return {
-      username: row.display_name || row.username,
-      rawUsername: row.username,
-      points: row.points_currency || row.points || 0,
-      messages: row.points || 0,
+      username: row.display_name || row.username || 'Korisnik',
+      rawUsername: row.username || '',
+      coins: row.coins || 0,
+      messages: row.chat !== undefined ? row.chat : (row.points || 0),
       updated_at: row.updated_at
     };
   });
@@ -8857,8 +9044,8 @@ function renderEconomyLeaderboard() {
       va = a.messages || 0;
       vb = b.messages || 0;
     } else {
-      va = a.points || 0;
-      vb = b.points || 0;
+      va = a.coins || 0;
+      vb = b.coins || 0;
     }
     return sortDir === 'asc' ? va - vb : vb - va;
   });
@@ -8877,19 +9064,19 @@ function renderEconomyLeaderboard() {
       <td style="color:#eab308; font-weight:700;">
         <span style="display:inline-flex; align-items:center; gap:4px;">
           ${coinIconSvg}
-          ${u.points.toLocaleString()} ${valuta}
+          ${u.coins.toLocaleString()} ${valuta}
         </span>
       </td>
       <td style="color:var(--text-muted);">${formatPorukeCount(u.messages)} poruka</td>
       <td style="color:var(--text-muted); font-size:0.8rem;">${fmtDate(u.updated_at)}</td>
       <td style="text-align:right;">
-        <button class="btn btn-sm btn-outline" onclick="openEditUserPointsModal('${escapeHtml(u.rawUsername)}', ${u.points})" style="padding:2px 8px; font-size:0.72rem;">Izmeni</button>
+        <button class="btn btn-sm btn-outline" onclick="openEditUserPointsModal('${escapeHtml(u.rawUsername)}', ${u.coins})" style="padding:2px 8px; font-size:0.72rem;">Izmeni</button>
       </td>
     </tr>
   `).join('');
 }
 
-function openEditUserPointsModal(username, currentPoints) {
+async function openEditUserPointsModal(username, currentPoints) {
   const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
   const newPoints = prompt(`Unesi novi broj poena (${valuta}) za @${username}:`, currentPoints);
   if (newPoints === null) return;
@@ -8898,10 +9085,23 @@ function openEditUserPointsModal(username, currentPoints) {
 
   const target = allLeaderboard.find(x => (x.username || '').toLowerCase() === username.toLowerCase());
   if (target) {
-    target.points_currency = parsed;
-    target.points = parsed;
+    target.coins = parsed;
     renderEconomyLeaderboard();
-    showToast('success', `Poeni za @${username} su ažurirani na ${parsed.toLocaleString()} ${valuta}!`);
+    if (typeof renderUnifiedLeaderboard === 'function') renderUnifiedLeaderboard();
+
+    const { error } = await sb.from('leaderboard')
+      .upsert({
+        channel_id: String(activeChannel.id),
+        username: target.username,
+        coins: parsed,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'channel_id,username' });
+
+    if (error) {
+      showToast('error', `Greška pri čuvanju poena u bazi za @${username}!`, '❌');
+    } else {
+      showToast('success', `Poeni za @${username} su ažurirani na ${parsed.toLocaleString()} ${valuta}!`, '✅');
+    }
   }
 }
 // ─── Economy Leaderboard Sortiranje ────────────────────────
@@ -9728,8 +9928,8 @@ async function executeBotrixImport() {
 
     } else if (botrixActiveTab === 'timers') {
       const limits = getPlanLimits();
-      const { data: configData } = await sb.from('bot_config').select('auto_announces').eq('channel_id', activeChannel.id).single();
-      const currentAnnounces = Array.isArray(configData?.auto_announces) ? configData.auto_announces : [];
+      const { data: annData } = await sb.from('auto_announces').select('message').eq('channel_id', activeChannel.id).order('position', { ascending: true });
+      const currentAnnounces = Array.isArray(annData) ? annData.map(r => r.message) : [];
 
       const availableSpace = limits.maxAutoAnnounces - currentAnnounces.length;
       if (availableSpace <= 0) {
@@ -9743,31 +9943,29 @@ async function executeBotrixImport() {
         return;
       }
 
-      const updatedAnnounces = [...currentAnnounces, ...newAnnounces];
-
-      const { error } = await sb.from('bot_config').update({
-        auto_announces: updatedAnnounces,
-        updated_at: new Date().toISOString()
-      }).eq('channel_id', activeChannel.id);
-
-      if (error) throw error;
+      localAnnounces = [...currentAnnounces, ...newAnnounces];
+      const err = await saveAutoAnnounces();
+      if (err) throw err;
 
       showToast('success', `Uspešno dodato ${newAnnounces.length} automatskih najava iz Botrix-a! 🎉`);
       await loadBotConfig();
 
     } else if (botrixActiveTab === 'blacklist') {
-      const { data: configData } = await sb.from('bot_config').select('moderation_settings').eq('channel_id', activeChannel.id).single();
-      const modSettings = configData?.moderation_settings || {};
-      const currentBanned = Array.isArray(modSettings.banned_words) ? modSettings.banned_words : [];
+      const { data: modData } = await sb.from('moderation').select('settings').eq('channel_id', activeChannel.id).eq('type', 'config').maybeSingle();
+      const modSettings = modData?.settings || {};
+      const currentWordsStr = modSettings.words_list || '';
+      const currentBanned = currentWordsStr.split(',').map(w => w.trim()).filter(Boolean);
       const updatedBanned = Array.from(new Set([...currentBanned, ...botrixParsedData]));
 
-      const { error } = await sb.from('bot_config').update({
-        moderation_settings: {
+      const { error } = await sb.from('moderation').upsert({
+        channel_id: activeChannel.id,
+        type: 'config',
+        settings: {
           ...modSettings,
-          banned_words: updatedBanned
+          words_list: updatedBanned.join(', ')
         },
         updated_at: new Date().toISOString()
-      }).eq('channel_id', activeChannel.id);
+      }, { onConflict: 'channel_id,type' });
 
       if (error) throw error;
 
@@ -9844,20 +10042,22 @@ async function executeBotrixImport() {
       if (typeof renderUnifiedLeaderboard === 'function') renderUnifiedLeaderboard();
 
     } else if (botrixActiveTab === 'store') {
-      const { data: configData } = await sb.from('bot_config').select('store_redemptions').eq('channel_id', activeChannel.id).single();
-      const currentItems = Array.isArray(configData?.store_redemptions) ? configData.store_redemptions : [];
+      const { data: rankData } = await sb.from('ranking').select('store_items').eq('channel_id', activeChannel.id).eq('type', 'config').maybeSingle();
+      const currentItems = Array.isArray(rankData?.store_items) ? rankData.store_items : [];
       const updatedItems = [...currentItems, ...botrixParsedData];
 
-      const { error } = await sb.from('bot_config').update({
-        store_redemptions: updatedItems,
+      const { error } = await sb.from('ranking').upsert({
+        channel_id: activeChannel.id,
+        type: 'config',
+        store_items: updatedItems,
         updated_at: new Date().toISOString()
-      }).eq('channel_id', activeChannel.id);
+      }, { onConflict: 'channel_id,type' });
 
       if (error) throw error;
 
       showToast('success', `Uspešno dodato ${botrixParsedData.length} artikala u Prodavnicu! 🛍️`);
       if (typeof loadBotConfig === 'function') await loadBotConfig();
-      if (typeof renderStoreRedemptions === 'function') renderStoreRedemptions();
+      if (typeof renderStoreItems === 'function') renderStoreItems();
 
     } else if (botrixActiveTab === 'alerts' || botrixActiveTab === 'greetings') {
       showToast('success', `Uspešno sačuvano ${botrixParsedData.length} poruka sa Botrix-a! 🎉`);

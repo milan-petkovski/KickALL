@@ -3,7 +3,7 @@ const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const config = require('./config');
 const state = require('./state');
-const { log, dobijTrenutniMesec, sanitizeInput, isValidUsername } = require('./utils');
+const { log, dobijTrenutniMesec, sanitizeInput, isValidUsername, runWithLeaderboardLock } = require('./utils');
 
 // Inicijalizacija Supabase klijenta
 const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY) ? createClient(config.SUPABASE_URL, config.SUPABASE_KEY) : null;
@@ -16,7 +16,6 @@ async function ucitajLeaderboard(chatroomId) {
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
         const channelUsername = channelState.channelUsername || chatroomId;
-        let json = null;
         const trenutniMesec = dobijTrenutniMesec();
 
         if (KORISTI_SUPABASE) {
@@ -29,20 +28,25 @@ async function ucitajLeaderboard(chatroomId) {
 
             if (error) throw error;
 
+            const podaci = {};
             if (data && data.length > 0) {
-                const podaci = {};
                 data.forEach(row => {
                     podaci[row.username.toLowerCase()] = {
                         username: row.display_name,
                         count: row.chat || 0
                     };
                 });
-                json = {
-                    mesec: trenutniMesec,
-                    podaci: podaci
-                };
             }
-        } else if (config.KORISTI_GIST) {
+            channelState.leaderboard = podaci;
+            channelState.leaderboardDeltas = {};
+            channelState.tekuciMesecLeaderboarda = trenutniMesec;
+            channelState.leaderboardDirty = false;
+            log('INFO', `[${channelUsername}] Učitan Supabase leaderboard za mesec: ${trenutniMesec} (${Object.keys(podaci).length} aktivnih korisnika)`);
+            return;
+        }
+
+        let json = null;
+        if (config.KORISTI_GIST) {
             log('INFO', `Učitavam leaderboard sa GitHub Gist-a (${config.GIST_ID})...`);
             const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
                 headers: {
@@ -69,7 +73,7 @@ async function ucitajLeaderboard(chatroomId) {
 
         if (json) {
             let resetMeseca = false;
-            if (!KORISTI_SUPABASE && json.mesec && json.mesec !== trenutniMesec) {
+            if (json.mesec && json.mesec !== trenutniMesec) {
                 resetMeseca = true;
             }
 
@@ -118,124 +122,126 @@ async function ucitajLeaderboard(chatroomId) {
 async function sacuvajLeaderboard(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || !channelState.leaderboardDirty) return;
-    try {
-        const trenutniMesec = dobijTrenutniMesec();
+    return runWithLeaderboardLock(channelState, async () => {
+        try {
+            const trenutniMesec = dobijTrenutniMesec();
 
-        if (KORISTI_SUPABASE) {
-            const dirtyKeys = Object.keys(channelState.leaderboardDeltas).filter(k => channelState.leaderboardDeltas[k] !== 0);
+            if (KORISTI_SUPABASE) {
+                const dirtyKeys = Object.keys(channelState.leaderboardDeltas).filter(k => channelState.leaderboardDeltas[k] !== 0);
 
-            if (dirtyKeys.length === 0) {
-                channelState.leaderboardDirty = false;
-                return;
-            }
-
-            const { data, error: fetchError } = await supabase
-                .from('leaderboard')
-                .select('username, chat, watchtime_minutes')
-                .eq('channel_id', chatroomId)
-                .eq('month', channelState.tekuciMesecLeaderboarda)
-                .in('username', dirtyKeys);
-
-            if (fetchError) throw fetchError;
-
-            const dbMap = {};
-            if (data) {
-                data.forEach(row => {
-                    dbMap[row.username.toLowerCase()] = row;
-                });
-            }
-
-            const rowsToUpsert = dirtyKeys.map(key => {
-                const existing = dbMap[key];
-                const dbChat = existing && existing.chat !== undefined ? existing.chat : 0;
-                const dbWatchtime = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : ((channelState.watchtime && channelState.watchtime[key]) ? channelState.watchtime[key].minutes : 0);
-                const delta = channelState.leaderboardDeltas[key];
-                const newChat = Math.max(0, dbChat + delta);
-                const mesecStr = channelState.tekuciMesecLeaderboarda || trenutniMesec;
-                const godinaStr = mesecStr.includes('-') ? mesecStr.split('-')[1] : String(new Date().getFullYear());
-
-                return {
-                    channel_id: chatroomId,
-                    username: key,
-                    display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].display_name) || (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
-                    chat: newChat,
-                    watchtime_minutes: dbWatchtime,
-                    month: mesecStr,
-                    year: godinaStr,
-                    updated_at: new Date().toISOString(),
-                    _newChat: newChat
-                };
-            });
-
-            const rowsClean = rowsToUpsert.map(({ _newChat, ...r }) => r);
-            const { error: upsertError } = await supabase
-                .from('leaderboard')
-                .upsert(rowsClean, { onConflict: 'channel_id,username,month' });
-
-            if (upsertError) throw upsertError;
-
-            rowsToUpsert.forEach(row => {
-                const key = row.username;
-                if (channelState.leaderboard[key]) {
-                    channelState.leaderboard[key].count = row._newChat;
-                } else {
-                    channelState.leaderboard[key] = {
-                        username: row.display_name,
-                        count: row._newChat
-                    };
-                }
-                delete channelState.leaderboardDeltas[key];
-            });
-
-            channelState.leaderboardDirty = false;
-            log('INFO', `[${channelState.channelUsername || chatroomId}] Leaderboard uspešno sačuvan na Supabase (${rowsClean.length} korisnika).`);
-        } else {
-            Object.keys(channelState.leaderboardDeltas).forEach(key => {
-                if (channelState.leaderboard[key]) {
-                    channelState.leaderboard[key].count = Math.max(0, channelState.leaderboard[key].count + channelState.leaderboardDeltas[key]);
-                }
-                delete channelState.leaderboardDeltas[key];
-            });
-
-            const json = {
-                mesec: trenutniMesec,
-                podaci: channelState.leaderboard
-            };
-
-            if (config.KORISTI_GIST) {
-                const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Accept': 'application/vnd.github+json',
-                        'Authorization': `Bearer ${config.GITHUB_TOKEN}`,
-                        'X-GitHub-Api-Version': '2022-11-28',
-                        'User-Agent': 'Kickot-Bot',
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        files: {
-                            'leaderboard.json': {
-                                content: JSON.stringify(json, null, 2)
-                            }
-                        }
-                    })
-                });
-
-                if (res.ok) {
+                if (dirtyKeys.length === 0) {
                     channelState.leaderboardDirty = false;
-                    log('INFO', 'Leaderboard uspešno sačuvan na GitHub Gist.');
-                } else {
-                    throw new Error(`GitHub API status: ${res.status}`);
+                    return;
                 }
-            } else {
-                fs.writeFileSync(config.LEADERBOARD_FILE, JSON.stringify(json, null, 2), 'utf8');
+
+                const { data, error: fetchError } = await supabase
+                    .from('leaderboard')
+                    .select('username, chat, watchtime_minutes')
+                    .eq('channel_id', chatroomId)
+                    .eq('month', channelState.tekuciMesecLeaderboarda)
+                    .in('username', dirtyKeys);
+
+                if (fetchError) throw fetchError;
+
+                const dbMap = {};
+                if (data) {
+                    data.forEach(row => {
+                        dbMap[row.username.toLowerCase()] = row;
+                    });
+                }
+
+                const rowsToUpsert = dirtyKeys.map(key => {
+                    const existing = dbMap[key];
+                    const dbChat = existing && existing.chat !== undefined ? existing.chat : 0;
+                    const dbWatchtime = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : ((channelState.watchtime && channelState.watchtime[key]) ? channelState.watchtime[key].minutes : 0);
+                    const delta = channelState.leaderboardDeltas[key];
+                    const newChat = Math.max(0, dbChat + delta);
+                    const mesecStr = channelState.tekuciMesecLeaderboarda || trenutniMesec;
+                    const godinaStr = mesecStr.includes('-') ? mesecStr.split('-')[1] : String(new Date().getFullYear());
+
+                    return {
+                        channel_id: chatroomId,
+                        username: key,
+                        display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].display_name) || (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
+                        chat: newChat,
+                        watchtime_minutes: dbWatchtime,
+                        month: mesecStr,
+                        year: godinaStr,
+                        updated_at: new Date().toISOString(),
+                        _newChat: newChat
+                    };
+                });
+
+                const rowsClean = rowsToUpsert.map(({ _newChat, ...r }) => r);
+                const { error: upsertError } = await supabase
+                    .from('leaderboard')
+                    .upsert(rowsClean, { onConflict: 'channel_id,username,month' });
+
+                if (upsertError) throw upsertError;
+
+                rowsToUpsert.forEach(row => {
+                    const key = row.username;
+                    if (channelState.leaderboard[key]) {
+                        channelState.leaderboard[key].count = row._newChat;
+                    } else {
+                        channelState.leaderboard[key] = {
+                            username: row.display_name,
+                            count: row._newChat
+                        };
+                    }
+                    delete channelState.leaderboardDeltas[key];
+                });
+
                 channelState.leaderboardDirty = false;
-                log('INFO', 'Leaderboard uspešno sačuvan na disk.');
+                log('INFO', `[${channelState.channelUsername || chatroomId}] Leaderboard uspešno sačuvan na Supabase (${rowsClean.length} korisnika).`);
+            } else {
+                Object.keys(channelState.leaderboardDeltas).forEach(key => {
+                    if (channelState.leaderboard[key]) {
+                        channelState.leaderboard[key].count = Math.max(0, channelState.leaderboard[key].count + channelState.leaderboardDeltas[key]);
+                    }
+                    delete channelState.leaderboardDeltas[key];
+                });
+
+                const json = {
+                    mesec: trenutniMesec,
+                    podaci: channelState.leaderboard
+                };
+
+                if (config.KORISTI_GIST) {
+                    const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'Accept': 'application/vnd.github+json',
+                            'Authorization': `Bearer ${config.GITHUB_TOKEN}`,
+                            'X-GitHub-Api-Version': '2022-11-28',
+                            'User-Agent': 'Kickot-Bot',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            files: {
+                                'leaderboard.json': {
+                                    content: JSON.stringify(json, null, 2)
+                                }
+                            }
+                        })
+                    });
+
+                    if (res.ok) {
+                        channelState.leaderboardDirty = false;
+                        log('INFO', 'Leaderboard uspešno sačuvan na GitHub Gist.');
+                    } else {
+                        throw new Error(`GitHub API status: ${res.status}`);
+                    }
+                } else {
+                    fs.writeFileSync(config.LEADERBOARD_FILE, JSON.stringify(json, null, 2), 'utf8');
+                    channelState.leaderboardDirty = false;
+                    log('INFO', 'Leaderboard uspešno sačuvan na disk.');
+                }
             }
+        } catch (err) {
+            log('ERR', `Greška pri čuvanju leaderboarda za ${chatroomId}: ${err.message}`);
         }
-    } catch (err) {
-        log('ERR', `Greška pri čuvanju leaderboarda za ${chatroomId}: ${err.message}`);
-    }
+    });
 }
 
 function proveriIResetujMesec(chatroomId) {
@@ -364,37 +370,28 @@ async function ucitajLjubav(chatroomId) {
         let json = null;
 
         if (KORISTI_SUPABASE) {
-            log('INFO', `[${channelUsername}] Učitavam ljubavne podatke sa Supabase baze...`);
+            log('INFO', `[${channelUsername}] Učitavam ljubavne podatke sa Supabase baze (love_and_marriages)...`);
 
-            const { data: modData, error: modError } = await supabase
-                .from('love_modifiers')
-                .select('user1, user2, modifier')
+            const { data, error } = await supabase
+                .from('love_and_marriages')
+                .select('user1, user2, modifier, is_married, married_at')
                 .eq('channel_id', chatroomId);
 
-            if (modError) throw modError;
+            if (error) throw error;
 
-            const { data: marData, error: marError } = await supabase
-                .from('marriages')
-                .select('user1, user2, user1_display, user2_display, married_at')
-                .eq('channel_id', chatroomId);
-
-            if (marError) throw marError;
-
-            if (modData) {
-                modData.forEach(row => {
-                    const key = [row.user1, row.user2].sort().join('::');
-                    channelState.loveModifiers[key] = row.modifier;
-                });
-            }
-
-            if (marData) {
-                marData.forEach(row => {
-                    const key = [row.user1, row.user2].sort().join('::');
-                    channelState.marriedCouples[key] = {
-                        user1: row.user1_display,
-                        user2: row.user2_display,
-                        datum: new Date(row.married_at).toLocaleDateString('sr-RS')
-                    };
+            if (data) {
+                data.forEach(row => {
+                    const key = [row.user1.toLowerCase(), row.user2.toLowerCase()].sort().join('::');
+                    if (row.modifier !== null && row.modifier !== undefined) {
+                        channelState.loveModifiers[key] = row.modifier;
+                    }
+                    if (row.is_married) {
+                        channelState.marriedCouples[key] = {
+                            user1: row.user1,
+                            user2: row.user2,
+                            datum: row.married_at ? new Date(row.married_at).toLocaleDateString('sr-RS') : '—'
+                        };
+                    }
                 });
             }
 
@@ -449,26 +446,34 @@ async function sacuvajLjubav(chatroomId) {
         };
 
         if (KORISTI_SUPABASE) {
-            const rows = Object.entries(channelState.loveModifiers).map(([key, val]) => {
+            const keys = new Set([
+                ...Object.keys(channelState.loveModifiers),
+                ...Object.keys(channelState.marriedCouples)
+            ]);
+
+            const rows = Array.from(keys).map(key => {
                 const [u1, u2] = key.split('::');
+                const isMarried = !!channelState.marriedCouples[key];
                 return {
                     channel_id: chatroomId,
                     user1: u1,
                     user2: u2,
-                    modifier: val,
+                    modifier: channelState.loveModifiers[key] ?? 0,
+                    is_married: isMarried,
+                    married_at: isMarried ? new Date().toISOString() : null,
                     updated_at: new Date().toISOString()
                 };
             });
 
             if (rows.length > 0) {
                 const { error } = await supabase
-                    .from('love_modifiers')
+                    .from('love_and_marriages')
                     .upsert(rows, { onConflict: 'channel_id,user1,user2' });
 
                 if (error) throw error;
             }
             channelState.loveDirty = false;
-            log('INFO', `[${channelState.channelUsername || chatroomId}] Ljubavni modifikatori uspešno sačuvani na Supabase.`);
+            log('INFO', `[${channelState.channelUsername || chatroomId}] Ljubavni podaci uspešno sačuvani u love_and_marriages na Supabase.`);
         } else if (config.KORISTI_GIST) {
             const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
                 method: 'PATCH',
@@ -606,15 +611,16 @@ async function ucitajCustomKomande(chatroomId) {
         const { data, error } = await supabase
             .from('custom_commands')
             .select('command, response, cooldown, enabled, min_rank, is_default')
-            .eq('channel_id', chatroomId)
-            .eq('enabled', true);
+            .eq('channel_id', chatroomId);
 
         if (error) throw error;
 
         channelState.customCommands = {};
         if (data) {
             const maxCmds = channelState.planLimits?.maxCustomCommands || 50;
-            const limitedData = data.slice(0, maxCmds);
+            const enabledRows = data.filter(r => r.enabled !== false).slice(0, maxCmds);
+            const disabledRows = data.filter(r => r.enabled === false);
+            const limitedData = [...enabledRows, ...disabledRows];
             limitedData.forEach(row => {
                 const aliases = row.command.split(',').map(c => c.trim().toLowerCase());
                 aliases.forEach(alias => {
@@ -624,7 +630,8 @@ async function ucitajCustomKomande(chatroomId) {
                             response: row.response,
                             cooldown: Math.max(row.cooldown || 5000, minCd),
                             min_rank: row.min_rank || 'everyone',
-                            is_default: row.is_default || false
+                            is_default: row.is_default || false,
+                            enabled: row.enabled !== false
                         };
                     }
                 });
@@ -726,7 +733,6 @@ async function ucitajBotConfig(chatroomId) {
             channelState.feature_moderation = limits.allowAdvancedModeration && (data.feature_moderation ?? false);
             channelState.feature_autoresponse = data.feature_autoresponse ?? true;
             channelState.feature_songrequest = limits.allowSongRequest && (data.feature_songrequest ?? false);
-            channelState.songrequest_settings = data.songrequest_settings || {};
             channelState.welcome_message = data.welcome_message || '';
             await ucitajAlerts(chatroomId);
 
@@ -738,26 +744,91 @@ async function ucitajBotConfig(chatroomId) {
             channelState.announce_message_threshold = data.announce_message_threshold ?? 10;
             channelState.announce_time_enabled = data.announce_time_enabled ?? true;
             channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
-            channelState.moderationSettings = data.moderation_settings || {};
-            channelState.currency_name = data.currency_name || 'Koins';
-            channelState.max_gamble_amount = data.max_gamble_amount || 5000;
-            channelState.gamble_enabled = data.gamble_enabled ?? true;
-            channelState.first_interaction_bonus = data.first_interaction_bonus ?? 100;
-            channelState.sub_multiplier = data.sub_multiplier ?? 2.0;
-            channelState.sub_bonus_per_msg = data.sub_bonus_per_msg ?? 10;
-            channelState.points_per_sub = data.points_per_sub ?? 1000;
-            channelState.points_per_gift_sub = data.points_per_gift_sub ?? 2000;
-            channelState.points_per_100_kicks = data.points_per_100_kicks ?? 500;
-            // NAPOMENA: kolone u bazi su `points_daily_streak` i `points_per_raid`
-            // (vidi bot_config šemu i dashboard.js saveBotConfig) — ranije se ovde
-            // čitalo iz `data.daily_streak_bonus`/`data.host_raid_bonus`, kolona koje
-            // ne postoje, pa se podešavanje sa dashboarda nikad nije primenjivalo.
-            channelState.daily_streak_bonus = data.points_daily_streak ?? 150;
-            channelState.host_raid_bonus = data.points_per_raid ?? 300;
+            
+            // Učitavanje podešavanja Moderacije 100% isključivo iz `moderation` tabele
+            try {
+                const { data: modData } = await supabase
+                    .from('moderation')
+                    .select('settings')
+                    .eq('channel_id', chatroomId)
+                    .eq('type', 'config')
+                    .maybeSingle();
 
-            const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
-            const rawStore = Array.isArray(data.store_items) ? data.store_items : [];
-            channelState.store_items = rawStore.slice(0, maxStoreItems);
+                channelState.moderationSettings = modData?.settings || {};
+            } catch (modErr) {
+                channelState.moderationSettings = {};
+            }
+            
+            // Učitavanje podešavanja mini igara isključivo iz jedinstvene tabele `mini_games`
+            try {
+                const { data: mgData } = await supabase
+                    .from('mini_games')
+                    .select('enabled, max_bet')
+                    .eq('channel_id', chatroomId)
+                    .eq('type', 'config')
+                    .maybeSingle();
+
+                channelState.max_gamble_amount = mgData?.max_bet ?? 5000;
+                channelState.gamble_enabled = mgData?.enabled ?? true;
+            } catch (mgErr) {
+                channelState.max_gamble_amount = 5000;
+                channelState.gamble_enabled = true;
+            }
+
+            // Učitavanje podešavanja Song Request panela isključivo iz tabele `song_request`
+            try {
+                const { data: srData } = await supabase
+                    .from('song_request')
+                    .select('*')
+                    .eq('channel_id', chatroomId)
+                    .eq('type', 'config')
+                    .maybeSingle();
+
+                if (srData) {
+                    channelState.feature_songrequest = srData.enabled ?? false;
+                    channelState.songrequest_settings = {
+                        request_role: srData.request_role || 'everyone',
+                        cost_points: srData.cost_points ?? 0,
+                        points_price: srData.cost_points ?? 0,
+                        max_duration_seconds: srData.max_duration_seconds ?? 360,
+                        queue: Array.isArray(srData.queue) ? srData.queue : []
+                    };
+                } else {
+                    channelState.feature_songrequest = false;
+                    channelState.songrequest_settings = { request_role: 'everyone', cost_points: 0, points_price: 0, max_duration_seconds: 360, queue: [] };
+                }
+            } catch (srErr) {
+                channelState.feature_songrequest = false;
+                channelState.songrequest_settings = { request_role: 'everyone', cost_points: 0, points_price: 0, max_duration_seconds: 360, queue: [] };
+            }
+
+            // Učitavanje podešavanja Ranking sistema i Prodavnice 100% isključivo iz `ranking` tabele
+            try {
+                const { data: rankData } = await supabase
+                    .from('ranking')
+                    .select('*')
+                    .eq('channel_id', chatroomId)
+                    .eq('type', 'config')
+                    .maybeSingle();
+
+                if (rankData) {
+                    channelState.currency_name = rankData.currency_name || 'Koins';
+                    channelState.first_interaction_bonus = rankData.first_interaction_bonus ?? 100;
+                    channelState.sub_multiplier = rankData.sub_multiplier ?? 2.0;
+                    channelState.sub_bonus_per_msg = rankData.sub_bonus_per_msg ?? 10;
+                    channelState.points_per_sub = rankData.points_per_sub ?? 1000;
+                    channelState.points_per_gift_sub = rankData.points_per_gift_sub ?? 2000;
+                    channelState.points_per_100_kicks = rankData.points_per_100_kicks ?? 500;
+                    channelState.daily_streak_bonus = rankData.points_daily_streak ?? 150;
+                    channelState.host_raid_bonus = rankData.points_per_raid ?? 300;
+
+                    const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
+                    const rawStore = Array.isArray(rankData.store_items) ? rankData.store_items : [];
+                    channelState.store_items = rawStore.slice(0, maxStoreItems);
+                }
+            } catch (rankErr) {
+                log('ERR', `Greška pri učitavanju ranking podešavanja za ${chatroomId}: ${rankErr.message}`);
+            }
 
             if (data.channel_name && data.channel_name !== channelState.channelUsername) {
                 channelState.channelUsername = data.channel_name;
@@ -800,11 +871,17 @@ async function sacuvajSongQueue(chatroomId, queue) {
 
         if (KORISTI_SUPABASE) {
             const { error } = await supabase
-                .from('bot_config')
-                .update({
-                    songrequest_settings: channelState.songrequest_settings
-                })
-                .eq('channel_id', chatroomId);
+                .from('song_request')
+                .upsert({
+                    channel_id: chatroomId,
+                    type: 'config',
+                    enabled: channelState.feature_songrequest ?? true,
+                    request_role: channelState.songrequest_settings.request_role || 'everyone',
+                    cost_points: channelState.songrequest_settings.cost_points ?? 0,
+                    max_duration_seconds: channelState.songrequest_settings.max_duration_seconds ?? 360,
+                    queue: queue,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'channel_id,type' });
 
             if (error) throw error;
         }

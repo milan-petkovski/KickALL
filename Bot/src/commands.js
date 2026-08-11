@@ -527,19 +527,20 @@ function handlePrihvatiBrak(chatroomId, receiver) {
     if (KORISTI_SUPABASE) {
         (async () => {
             try {
-                const [u1, u2] = [cleanSender.toLowerCase(), cleanTarget.toLowerCase()].sort();
+                const [u1, u2] = [cleanSender, cleanTarget].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
                 const { error } = await supabase
-                    .from('marriages')
+                    .from('love_and_marriages')
                     .upsert([{
                         channel_id: chatroomId,
                         user1: u1,
                         user2: u2,
-                        user1_display: cleanSender,
-                        user2_display: cleanTarget,
-                        married_at: new Date().toISOString()
+                        modifier: channelState.loveModifiers[kljucBrak] ?? 0,
+                        is_married: true,
+                        married_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
                     }], { onConflict: 'channel_id,user1,user2' });
                 if (error) throw error;
-                log('INFO', `[${channelState.channelUsername || chatroomId}] Uspješno upisan brak u Supabase za par: ${u1} i ${u2}`);
+                log('INFO', `[${channelState.channelUsername || chatroomId}] Uspješno upisan brak u love_and_marriages za par: ${u1} i ${u2}`);
             } catch (err) {
                 log('ERR', `Greška pri upisu braka u Supabase za ${chatroomId}: ${err.message}`);
             }
@@ -602,26 +603,20 @@ function handleRazvod(chatroomId, sender, targetRaw) {
         (async () => {
             try {
                 const [u1, u2] = [sLower, tLower].sort();
-                const { error: marError } = await supabase
-                    .from('marriages')
-                    .delete()
-                    .eq('channel_id', chatroomId)
-                    .eq('user1', u1)
-                    .eq('user2', u2);
-                if (marError) throw marError;
-                
                 const { error: modError } = await supabase
-                    .from('love_modifiers')
+                    .from('love_and_marriages')
                     .upsert([{
                         channel_id: chatroomId,
                         user1: u1,
                         user2: u2,
-                        modifier: channelState.loveModifiers[kljucBrak],
+                        modifier: channelState.loveModifiers[kljucBrak] ?? 0,
+                        is_married: false,
+                        married_at: null,
                         updated_at: new Date().toISOString()
                     }], { onConflict: 'channel_id,user1,user2' });
                 if (modError) throw modError;
 
-                log('INFO', `[${channelState.channelUsername || chatroomId}] Uspješno obrisan brak i ažuriran modifikator u Supabase za par: ${u1} i ${u2}`);
+                log('INFO', `[${channelState.channelUsername || chatroomId}] Uspješno ažuriran razvod (is_married: false) u love_and_marriages za par: ${u1} i ${u2}`);
             } catch (err) {
                 log('ERR', `Greška pri razvodu u Supabase za ${chatroomId}: ${err.message}`);
             }
@@ -1146,7 +1141,7 @@ function handleBotMentions(chatroomId, username, porukaLower) {
     const pozdravi = ['cao', 'ćao', 'pozdrav', 'zdravo', 'hej', 'hi', 'hello', 'desi'];
     const imaPozdrav = pozdravi.some(rec => porukaLower.includes(rec));
     if (imaPozdrav) {
-        if (!proveraKulauna(chatroomId, 'bot_tag_welcome', username)) {
+        if (!proveraKulauna(chatroomId, `bot_tag_welcome_${username.toLowerCase()}`, username)) {
             const odgovori = [
                 `Ćao @${username}! Kako si danas? 😊`,
                 `Hej @${username}! Tu sam, pratim strim i družim se sa vama! 🔥`,
@@ -1258,28 +1253,15 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
         return;
     }
 
-    // Provera poena ako je definisana cena u poenima
-    const cenaPoena = channelState.songrequest_settings?.points_price || 0;
-    if (cenaPoena > 0) {
-        const economy = require('./economy');
-        const valuta = economy.dobijNazivValute(channelState);
-        const userEcon = channelState.economy[userKey];
-        const trenutniPoeni = userEcon ? (userEcon.coins || 0) : 0;
+    // Provera cene poena
+    const cenaPoena = channelState.songrequest_settings?.points_price ?? channelState.songrequest_settings?.cost_points ?? 0;
+    const economy = require('./economy');
+    const valuta = economy.dobijNazivValute(channelState);
+    const userEcon = channelState.economy[userKey];
+    const trenutniPoeni = userEcon ? (userEcon.coins || 0) : 0;
 
-        if (trenutniPoeni < cenaPoena) {
-            posaljiPoruku(chatroomId, `@${sender}, nemas dovoljno poena za muzicku zelju! Potrebno: ${cenaPoena} ${valuta}, a ti imas: ${trenutniPoeni} ${valuta}.`);
-            return;
-        }
-
-        userEcon.coins -= cenaPoena;
-        channelState.economyDirty = true;
-        channelState.economyDeltas.add(userKey);
-    }
-
-    // Provera da li je pesma već u redu
-    const exists = queue.some(s => s.title.toLowerCase() === songName.trim().toLowerCase());
-    if (exists) {
-        posaljiPoruku(chatroomId, `⚠️ @${sender}, ta pesma se već nalazi u redu za puštanje!`);
+    if (cenaPoena > 0 && trenutniPoeni < cenaPoena) {
+        posaljiPoruku(chatroomId, `@${sender}, nemas dovoljno poena za muzicku zelju! Potrebno: ${cenaPoena} ${valuta}, a ti imas: ${trenutniPoeni} ${valuta}.`);
         return;
     }
 
@@ -1290,7 +1272,7 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
     let title = query;
     let artist = '';
     let coverUrl = '';
-    let duration = 210;
+    let duration = 0;
 
     // 1. Provera da li je unet direktan YouTube URL / ID
     const ytMatch = query.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
@@ -1327,11 +1309,23 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
                     }
                 }
             }
+
+            const lenMatch = html.match(/"lengthSeconds":"(\d+)"/);
+            if (lenMatch && lenMatch[1]) {
+                duration = parseInt(lenMatch[1], 10);
+            }
         } catch (_) {}
     }
 
     if (!ytId) {
         posaljiPoruku(chatroomId, `❌ @${sender}, nije bilo moguće pronaći pesmu "${query}" na YouTube-u. Pokušaj sa tačnim nazivom ili YouTube linkom.`);
+        return;
+    }
+
+    // Provera duplikata u redu po ytId ili naslovu
+    const exists = queue.some(s => (s.ytId && s.ytId === ytId) || (s.id && s.id === 'yt_' + ytId) || (s.title && s.title.toLowerCase() === query.toLowerCase()));
+    if (exists) {
+        posaljiPoruku(chatroomId, `⚠️ @${sender}, ta pesma se već nalazi u redu za puštanje!`);
         return;
     }
 
@@ -1364,13 +1358,28 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
         }
     } catch (_) {}
 
+    // Provera maksimalnog trajanja pesme (ako je postavljeno u dashboardu)
+    const maxDuration = channelState.songrequest_settings?.max_duration_seconds || 0;
+    if (maxDuration > 0 && duration > 0 && duration > maxDuration) {
+        const maxMins = Math.floor(maxDuration / 60);
+        posaljiPoruku(chatroomId, `⚠️ @${sender}, trajanje pesme (${Math.floor(duration / 60)}m) prelazi maksimalno dozvoljeno trajanje od ${maxMins}m na ovom kanalu.`);
+        return;
+    }
+
+    // Skidanje poena tek NAKON svih uspešnih provera!
+    if (cenaPoena > 0 && userEcon) {
+        userEcon.coins -= cenaPoena;
+        channelState.economyDirty = true;
+        channelState.economyDeltas.add(userKey);
+    }
+
     queue.push({
         id: 'yt_' + ytId,
         ytId: ytId,
         title: title,
         artist: artist || 'YouTube',
         requester: sender,
-        duration: duration,
+        duration: duration || 210,
         source: 'youtube',
         coverUrl: coverUrl
     });
@@ -1662,9 +1671,50 @@ function handleHelp(chatroomId, username) {
     posaljiPoruku(chatroomId, `🤖 @${username}, ugrađene komande: ${spisak}`);
 }
 
+function handleSongQueue(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || channelState.feature_songrequest === false) return;
+    const queue = channelState.songrequest_settings?.queue || [];
+    if (queue.length === 0) {
+        posaljiPoruku(chatroomId, `🎵 Red pesama je trenutno prazan.`);
+        return;
+    }
+    const songsList = queue.slice(0, 3).map((s, i) => `${i + 1}. ${s.artist && s.artist !== 'YouTube' ? s.artist + ' - ' : ''}${s.title}`).join(' | ');
+    const extraCount = queue.length > 3 ? ` (+još ${queue.length - 3})` : '';
+    posaljiPoruku(chatroomId, `🎵 Trenutni red pesama (${queue.length}): ${songsList}${extraCount}`);
+}
+
+async function handleSkipSong(chatroomId, sender, senderObj) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || channelState.feature_songrequest === false) return;
+    const userKey = sender.toLowerCase();
+    const isStreamer = userKey === channelState.channelUsername.toLowerCase();
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || [];
+    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+
+    if (!isMod) {
+        posaljiPoruku(chatroomId, `❌ @${sender}, samo moderatori i strimer mogu preskočiti pesmu!`);
+        return;
+    }
+
+    const queue = channelState.songrequest_settings?.queue || [];
+    if (queue.length === 0) {
+        posaljiPoruku(chatroomId, `⚠️ Red pesama je prazan.`);
+        return;
+    }
+
+    const skipped = queue.shift();
+    const database = require('./database');
+    await database.sacuvajSongQueue(chatroomId, queue);
+    posaljiPoruku(chatroomId, `⏭️ Moderacija (@${sender}) je preskočila pesmu: ${skipped.artist && skipped.artist !== 'YouTube' ? skipped.artist + ' - ' : ''}${skipped.title}`);
+}
+
 module.exports = {
     handleHelp,
     handlePesma,
+    handleSongQueue,
+    handleSkipSong,
     handleIq,
     handleSamar,
     handleRoll,
