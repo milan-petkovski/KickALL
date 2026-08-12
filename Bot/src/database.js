@@ -3,8 +3,10 @@ const config = require('./config');
 const state = require('./state');
 const { log, dobijTrenutniMesec, sanitizeInput, isValidUsername, runWithLeaderboardLock } = require('./utils');
 
-// Inicijalizacija Supabase klijenta
-const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
+// Inicijalizacija Supabase klijenta (fallback na dummy klijent tokom CI testiranja bez .env)
+const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY)
+    ? createClient(config.SUPABASE_URL, config.SUPABASE_KEY)
+    : createClient('https://dummy.supabase.co', 'dummy_key');
 const sbPanels = supabase;
 // Uvek koristimo Supabase — nema lokalnih fallbackova
 const KORISTI_SUPABASE = true;

@@ -9,18 +9,15 @@ function log(tip, poruka, meta = null) {
     const boje = { BOT: '\x1b[36m', CHAT: '\x1b[32m', INFO: '\x1b[33m', ERR: '\x1b[31m', WARN: '\x1b[35m', MOD: '\x1b[34m' };
     const boja = boje[tip] || '\x1b[37m';
 
-    // Na Renderu / konzoli ispisujemo samo ako je greška, upozorenje ili moderacija (ERR, WARN, MOD)
-    if (['ERR', 'WARN', 'MOD'].includes(tip) || process.env.LOG_VERBOSE === 'true') {
-        if (process.env.LOG_FORMAT === 'json') {
-            console.log(JSON.stringify({
-                timestamp: new Date().toISOString(),
-                level: tip,
-                message: poruka,
-                ...(meta && typeof meta === 'object' ? meta : {})
-            }));
-        } else {
-            console.log(`\x1b[90m[${vreme}]\x1b[0m ${boja}[${tip}]\x1b[0m ${poruka}`);
-        }
+    if (process.env.LOG_FORMAT === 'json') {
+        console.log(JSON.stringify({
+            timestamp: new Date().toISOString(),
+            level: tip,
+            message: poruka,
+            ...(meta && typeof meta === 'object' ? meta : {})
+        }));
+    } else {
+        console.log(`\x1b[90m[${vreme}]\x1b[0m ${boja}[${tip}]\x1b[0m ${poruka}`);
     }
 
     // Baferuj logove u state za prikaz na dashboard-u

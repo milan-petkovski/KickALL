@@ -5,7 +5,9 @@ const { log } = require('./utils');
 const TABELA = 'bot_kick_tokens';
 const RED_ID = 1; // uvek čuvamo jedan red (bot ima jedan nalog)
 
-const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
+const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY)
+    ? createClient(config.SUPABASE_URL, config.SUPABASE_KEY)
+    : createClient('https://dummy.supabase.co', 'dummy_key');
 
 let keshTokeni = null;       // { access_token, refresh_token, expires_at }
 let refreshTimer = null;
