@@ -7,6 +7,7 @@ const { log, dobijTrenutniMesec, sanitizeInput, isValidUsername, runWithLeaderbo
 
 // Inicijalizacija Supabase klijenta
 const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY) ? createClient(config.SUPABASE_URL, config.SUPABASE_KEY) : null;
+const sbPanels = supabase;
 const KORISTI_SUPABASE = !!supabase;
 
 // ─── LEADERBOARD ─────────────────────────────────────────────────────────────
@@ -20,7 +21,7 @@ async function ucitajLeaderboard(chatroomId) {
 
         if (KORISTI_SUPABASE) {
             log('INFO', `[${channelUsername}] Učitavam leaderboard sa Supabase baze...`);
-            const { data, error } = await supabase
+            const { data, error } = await sbPanels
                 .from('leaderboard')
                 .select('username, display_name, chat')
                 .eq('channel_id', chatroomId)
@@ -134,7 +135,7 @@ async function sacuvajLeaderboard(chatroomId) {
                     return;
                 }
 
-                const { data, error: fetchError } = await supabase
+                const { data, error: fetchError } = await sbPanels
                     .from('leaderboard')
                     .select('username, chat, watchtime_minutes')
                     .eq('channel_id', chatroomId)
@@ -173,7 +174,7 @@ async function sacuvajLeaderboard(chatroomId) {
                 });
 
                 const rowsClean = rowsToUpsert.map(({ _newChat, ...r }) => r);
-                const { error: upsertError } = await supabase
+                const { error: upsertError } = await sbPanels
                     .from('leaderboard')
                     .upsert(rowsClean, { onConflict: 'channel_id,username,month' });
 
@@ -372,7 +373,7 @@ async function ucitajLjubav(chatroomId) {
         if (KORISTI_SUPABASE) {
             log('INFO', `[${channelUsername}] Učitavam ljubavne podatke sa Supabase baze (love_and_marriages)...`);
 
-            const { data, error } = await supabase
+            const { data, error } = await sbPanels
                 .from('love_and_marriages')
                 .select('user1, user2, modifier, is_married, married_at')
                 .eq('channel_id', chatroomId);
@@ -466,7 +467,7 @@ async function sacuvajLjubav(chatroomId) {
             });
 
             if (rows.length > 0) {
-                const { error } = await supabase
+                const { error } = await sbPanels
                     .from('love_and_marriages')
                     .upsert(rows, { onConflict: 'channel_id,user1,user2' });
 
@@ -608,7 +609,7 @@ async function ucitajCustomKomande(chatroomId) {
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
 
-        const { data, error } = await supabase
+        const { data, error } = await sbPanels
             .from('custom_commands')
             .select('command, response, cooldown, enabled, min_rank, is_default')
             .eq('channel_id', chatroomId);
@@ -648,8 +649,8 @@ async function ucitajAlerts(chatroomId) {
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
 
-        const { data, error } = await supabase
-            .from('chat_alerts')
+        const { data, error } = await sbPanels
+            .from('bot_interaction')
             .select('alert_type, enabled, message, min_amount, min_viewers')
             .eq('channel_id', chatroomId);
 
@@ -674,8 +675,8 @@ async function ucitajAutoAnnounces(chatroomId) {
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
 
-        const { data, error } = await supabase
-            .from('auto_announces')
+        const { data, error } = await sbPanels
+            .from('auto_messages')
             .select('message, enabled, position')
             .eq('channel_id', chatroomId)
             .eq('enabled', true)
@@ -747,7 +748,7 @@ async function ucitajBotConfig(chatroomId) {
             
             // Učitavanje podešavanja Moderacije 100% isključivo iz `moderation` tabele
             try {
-                const { data: modData } = await supabase
+                const { data: modData } = await sbPanels
                     .from('moderation')
                     .select('settings')
                     .eq('channel_id', chatroomId)
@@ -761,7 +762,7 @@ async function ucitajBotConfig(chatroomId) {
             
             // Učitavanje podešavanja mini igara isključivo iz jedinstvene tabele `mini_games`
             try {
-                const { data: mgData } = await supabase
+                const { data: mgData } = await sbPanels
                     .from('mini_games')
                     .select('enabled, max_bet')
                     .eq('channel_id', chatroomId)
@@ -777,7 +778,7 @@ async function ucitajBotConfig(chatroomId) {
 
             // Učitavanje podešavanja Song Request panela isključivo iz tabele `song_request`
             try {
-                const { data: srData } = await supabase
+                const { data: srData } = await sbPanels
                     .from('song_request')
                     .select('*')
                     .eq('channel_id', chatroomId)
@@ -804,7 +805,7 @@ async function ucitajBotConfig(chatroomId) {
 
             // Učitavanje podešavanja Ranking sistema i Prodavnice 100% isključivo iz `ranking` tabele
             try {
-                const { data: rankData } = await supabase
+                const { data: rankData } = await sbPanels
                     .from('ranking')
                     .select('*')
                     .eq('channel_id', chatroomId)
@@ -870,7 +871,7 @@ async function sacuvajSongQueue(chatroomId, queue) {
         channelState.songrequest_settings.queue = queue;
 
         if (KORISTI_SUPABASE) {
-            const { error } = await supabase
+            const { error } = await sbPanels
                 .from('song_request')
                 .upsert({
                     channel_id: chatroomId,
@@ -923,7 +924,7 @@ async function ucitajEkonomiju(chatroomId) {
 
         log('INFO', `[${channelUsername}] Učitavam ekonomiju (XP/level/coins) iz leaderboard tabele...`);
 
-        const { data, error } = await supabase
+        const { data, error } = await sbPanels
             .from('leaderboard')
             .select('username, display_name, xp, level, coins, daily_claimed_at, daily_streak')
             .eq('channel_id', chatroomId)
@@ -993,7 +994,7 @@ async function sacuvajEkonomiju(chatroomId) {
             return;
         }
 
-        const { error } = await supabase
+        const { error } = await sbPanels
             .from('leaderboard')
             .upsert(rows, { onConflict: 'channel_id,username,month' });
 
@@ -1021,6 +1022,7 @@ async function syncChatroomId(channelName, realChatroomId) {
 
 module.exports = {
     supabase,
+    sbPanels,
     KORISTI_SUPABASE,
     sacuvajSongQueue,
     ucitajLeaderboard,

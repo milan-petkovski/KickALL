@@ -576,9 +576,11 @@ function showReferralNotification() {
   }, 5000);
 }
 
-// Get user's referral code and stats
 async function getReferralStats(userId) {
   try {
+    const { data: statsJson, error: rpcErr } = await sb.rpc('get_user_referral_stats', { p_user_id: userId });
+    if (statsJson) return statsJson;
+
     const { data, error } = await sb
       .from('referral_stats')
       .select('*')
@@ -586,23 +588,18 @@ async function getReferralStats(userId) {
       .single();
     
     if (error) {
-      // Table might not exist yet, return default stats
-      if (error.code === '42P01' || error.message.includes('does not exist')) {
-        return {
-          total_referrals: 0,
-          successful_referrals: 0,
-          total_earned: 0,
-          total_withdrawn: 0,
-          available_balance: 0,
-          referral_code: null
-        };
-      }
-      throw error;
+      return {
+        total_referrals: 0,
+        successful_referrals: 0,
+        total_earned: 0,
+        total_withdrawn: 0,
+        available_balance: 0,
+        referral_code: null
+      };
     }
     return data;
   } catch (err) {
     console.error('Error fetching referral stats:', err);
-    // Return default stats if table doesn't exist
     return {
       total_referrals: 0,
       successful_referrals: 0,
@@ -617,20 +614,19 @@ async function getReferralStats(userId) {
 // Get user's referral rewards
 async function getReferralRewards(userId) {
   try {
-    const { data, error } = await sb
-      .from('referral_rewards')
-      .select('*')
-      .eq('user_id', userId)
+    const { data: rewards, error } = await sb
+      .from('referrals')
+      .select('id, reward_amount, status, created_at')
+      .eq('referrer_id', userId)
+      .gt('reward_amount', 0)
       .order('created_at', { ascending: false });
     
-    if (error) {
-      // Table might not exist yet, return empty array
-      if (error.code === '42P01' || error.message.includes('does not exist')) {
-        return [];
-      }
-      throw error;
-    }
-    return data || [];
+    return (rewards || []).map(r => ({
+      reward_description: 'Provizija od kupovine paketa',
+      reward_value: r.reward_amount,
+      status: r.status === 'purchased' ? 'available' : r.status,
+      created_at: r.created_at
+    }));
   } catch (err) {
     console.error('Error fetching referral rewards:', err);
     // Return empty array if table doesn't exist

@@ -146,7 +146,14 @@ const PLAN_LIMITS = {
 };
 
 function getPlanLimits() {
-  let p = (currentUserPlan || 'free').toLowerCase();
+  let p = 'free';
+  if (activeChannel && activeChannel.owner_plan) {
+    p = activeChannel.owner_plan.toLowerCase();
+  } else if (activeChannel && activeChannel.is_managed) {
+    p = (activeChannel.owner_plan || 'free').toLowerCase();
+  } else {
+    p = (currentUserPlan || 'free').toLowerCase();
+  }
   // Map business to elite
   if (p === 'business') p = 'elite';
   return PLAN_LIMITS[p] || PLAN_LIMITS.free;
@@ -286,8 +293,6 @@ function updatePlanButtons() {
   }
 }
 
-let currentPricingPeriod = 'monthly';
-
 function togglePricing(type) {
   currentPricingPeriod = type;
   const monthlyPricing = document.getElementById('monthlyPricing');
@@ -295,20 +300,22 @@ function togglePricing(type) {
   const monthlyBtn = document.getElementById('monthlyBtn');
   const yearlyBtn = document.getElementById('yearlyBtn');
 
+  if (!monthlyPricing || !yearlyPricing || !monthlyBtn || !yearlyBtn) return;
+
   if (type === 'monthly') {
-    monthlyPricing.style.display = 'grid';
-    yearlyPricing.style.display = 'none';
-    monthlyBtn.style.background = 'rgba(139, 92, 246, 0.2)';
-    monthlyBtn.style.color = '#fff';
-    yearlyBtn.style.background = 'transparent';
-    yearlyBtn.style.color = 'var(--text-muted)';
+    monthlyPricing.style.setProperty('display', 'grid', 'important');
+    yearlyPricing.style.setProperty('display', 'none', 'important');
+    monthlyBtn.style.setProperty('background', 'var(--app-primary, #8B5CF6)', 'important');
+    monthlyBtn.style.setProperty('color', '#ffffff', 'important');
+    yearlyBtn.style.setProperty('background', 'transparent', 'important');
+    yearlyBtn.style.setProperty('color', 'var(--text-muted)', 'important');
   } else {
-    monthlyPricing.style.display = 'none';
-    yearlyPricing.style.display = 'grid';
-    monthlyBtn.style.background = 'transparent';
-    monthlyBtn.style.color = 'var(--text-muted)';
-    yearlyBtn.style.background = 'rgba(139, 92, 246, 0.2)';
-    yearlyBtn.style.color = '#fff';
+    monthlyPricing.style.setProperty('display', 'none', 'important');
+    yearlyPricing.style.setProperty('display', 'grid', 'important');
+    monthlyBtn.style.setProperty('background', 'transparent', 'important');
+    monthlyBtn.style.setProperty('color', 'var(--text-muted)', 'important');
+    yearlyBtn.style.setProperty('background', 'var(--app-primary, #8B5CF6)', 'important');
+    yearlyBtn.style.setProperty('color', '#ffffff', 'important');
   }
 }
 window.openUpgradeModal = openUpgradeModal;
@@ -475,6 +482,7 @@ function renderPlanLimitBanners() {
   if (cmdBanner) {
     if (limits.maxCustomCommands === Infinity) {
       cmdBanner.style.display = 'none';
+      cmdBanner.innerHTML = '';
     } else {
       cmdBanner.style.display = 'flex';
       const customCount = allCommands ? allCommands.filter(c => !c.is_default && !(c.id && c.id.startsWith('builtin-'))).length : 0;
@@ -503,6 +511,7 @@ function renderPlanLimitBanners() {
   if (lbBanner) {
     if (limits.maxLeaderboardItems === Infinity) {
       lbBanner.style.display = 'none';
+      lbBanner.innerHTML = '';
     } else {
       lbBanner.style.display = 'flex';
       lbBanner.innerHTML = `
@@ -529,6 +538,7 @@ function renderPlanLimitBanners() {
   if (annBanner) {
     if (limits.maxAutoAnnounces === Infinity) {
       annBanner.style.display = 'none';
+      annBanner.innerHTML = '';
     } else {
       annBanner.style.display = 'flex';
       const annCount = typeof localAnnounces !== 'undefined' && localAnnounces ? localAnnounces.length : 0;
@@ -557,6 +567,7 @@ function renderPlanLimitBanners() {
   if (marBanner) {
     if (limits.maxLoveMarriages === Infinity) {
       marBanner.style.display = 'none';
+      marBanner.innerHTML = '';
     } else {
       marBanner.style.display = 'flex';
       marBanner.innerHTML = `
@@ -583,6 +594,7 @@ function renderPlanLimitBanners() {
   if (songBanner) {
     if (limits.maxSongQueue === Infinity) {
       songBanner.style.display = 'none';
+      songBanner.innerHTML = '';
     } else {
       songBanner.style.display = 'flex';
       songBanner.innerHTML = `
@@ -609,6 +621,7 @@ function renderPlanLimitBanners() {
   if (modPenaltyBanner) {
     if (limits.customPenaltySettings) {
       modPenaltyBanner.style.display = 'none';
+      modPenaltyBanner.innerHTML = '';
     } else {
       modPenaltyBanner.style.display = 'flex';
       modPenaltyBanner.innerHTML = `
@@ -633,60 +646,49 @@ function renderPlanLimitBanners() {
   // 7. Custom Bot Banner & Card Overlay
   const customBotBanner = document.getElementById('customBotPlanLimitBanner');
   const customBotCard = document.getElementById('customBotCard');
-  if (customBotBanner || customBotCard) {
+  if (customBotBanner) {
+    customBotBanner.style.display = 'none';
+    customBotBanner.innerHTML = '';
+  }
+
+  if (customBotCard) {
+    customBotCard.style.position = 'relative';
+    customBotCard.style.opacity = '1';
+    customBotCard.style.filter = 'none';
+
     let overlay = document.getElementById('customBotLockOverlay');
-    if (limits.customBotAllowed) {
-      if (customBotBanner) customBotBanner.style.display = 'none';
-      if (overlay) overlay.style.display = 'none';
-      if (customBotCard) {
-        customBotCard.style.opacity = '1';
-        customBotCard.style.filter = 'none';
-        customBotCard.style.pointerEvents = 'auto';
-      }
-    } else {
-      if (customBotBanner) {
-        customBotBanner.style.display = 'flex';
-        customBotBanner.innerHTML = `
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#EF4444; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
-              Zaključano (Free)
-            </div>
-            <div>
-              <div style="font-size:0.85rem; font-weight:700; color:#fff;">
-                Custom Bot Account (Sopstveno ime bota)
-              </div>
-              <div style="font-size:0.78rem; color:var(--text-muted);">
-                Povezivanje bota sa tvojim imenom je PRO i ELITE funkcija.
-              </div>
-            </div>
-          </div>
-          <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('customBot')">${upgradeSvgIcon}<span>Otključaj Custom Bot</span></button>
-        `;
-      }
-
-      if (customBotCard) {
-        customBotCard.style.position = 'relative';
-        customBotCard.style.opacity = '1';
-        customBotCard.style.filter = 'none';
-
-        if (!overlay) {
-          overlay = document.createElement('div');
-          overlay.id = 'customBotLockOverlay';
-          overlay.className = 'locked-feature-overlay';
-          customBotCard.appendChild(overlay);
-        }
-        overlay.style.display = 'flex';
-        overlay.style.pointerEvents = 'auto';
-        overlay.innerHTML = `
-          <div class="locked-feature-overlay__icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </div>
-          <h4 class="locked-feature-overlay__title"><span style="text-decoration: line-through; opacity: 0.7;">Custom Bot Ime</span> — DOLAZI USKORO ⏳</h4>
-          <p class="locked-feature-overlay__desc">Povezivanje sopstvenog bot naloga (npr. @MojKanalBot) je trenutno u fazi razvoja i biće dostupno uskoro. Svi kanali koriste zvanični @KickotBot nalog.</p>
-          <button type="button" class="btn btn-secondary" disabled style="padding: 10px 22px; font-size: 0.85rem; opacity: 0.75; cursor: default; border-color: rgba(245, 158, 11, 0.4); color: #F59E0B;"><span>Dolazi Uskoro</span></button>
-        `;
-      }
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'customBotLockOverlay';
+      overlay.className = 'locked-feature-overlay';
+      customBotCard.appendChild(overlay);
     }
+    overlay.style.display = 'flex';
+    overlay.style.pointerEvents = 'auto';
+    overlay.style.background = 'radial-gradient(circle at center, rgba(30, 20, 50, 0.96) 0%, rgba(11, 7, 22, 0.98) 100%)';
+    overlay.style.backdropFilter = 'blur(12px)';
+    overlay.style.webkitBackdropFilter = 'blur(12px)';
+    overlay.style.borderRadius = '16px';
+    overlay.style.padding = '32px 24px';
+    overlay.style.boxShadow = 'inset 0 0 30px rgba(139, 92, 246, 0.15)';
+
+    overlay.innerHTML = `
+      <div style="display:flex; flex-direction:column; align-items:center; text-align:center; margin:0 auto; gap:16px;">
+
+        <div style="display:flex; align-items:center; gap:8px; background:rgba(139, 92, 246, 0.12); border:1px solid rgba(139, 92, 246, 0.3); padding:4px 14px; border-radius:20px; color:#c4b5fd; font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.8px;">
+          <span>✨ FUNKCIJA U IZRADI</span>
+        </div>
+
+        <h3 style="margin:0; font-size:1.4rem; font-weight:800; color:#fff; letter-spacing:-0.3px; line-height:1.2;">
+          Custom Bot Ime <span style="background:linear-gradient(135deg, #a78bfa, #53fc18); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Dolazi Uskoro</span>
+        </h3>
+
+        <p style="margin:0; font-size:0.88rem; color:var(--text-secondary); line-height:1.55;">
+          Uskoro ćete moći da povežete Kick nalog bota (npr. <code style="color:#53fc18; background:rgba(83,252,24,0.1); padding:2px 6px; border-radius:4px; font-weight:700;">@MojKanalBot</code>) kako bi sve poruke od bota stizale sa vašim imenom!
+        </p>
+
+      </div>
+    `;
   }
 
   // 7. Mini Games Banner & Casino Games Overlay
@@ -695,7 +697,10 @@ function renderPlanLimitBanners() {
   if (mgBanner || casinoWrap) {
     let overlay = document.getElementById('casinoMinigamesLockOverlay');
     if (limits.name !== 'Free') {
-      if (mgBanner) mgBanner.style.display = 'none';
+      if (mgBanner) {
+        mgBanner.style.display = 'none';
+        mgBanner.innerHTML = '';
+      }
       if (overlay) overlay.style.display = 'none';
       if (casinoWrap) {
         casinoWrap.style.opacity = '1';
@@ -862,10 +867,17 @@ function formatWatchtime(totalMinutes) {
   return `${m}min`;
 }
 
+const getSbPanels = () => sb;
+
 let editingCmdId = null; // null = new, UUID = edit
 let confirmCallback = null;
 let realtimeSub = null;
 let realtimeMarriagesSub = null;
+let realtimeMinigamesSub = null;
+let realtimeRankingSub = null;
+let realtimeModerationSub = null;
+let realtimeNotifSub = null;
+let realtimeChangelogSub = null;
 let configLoaded = false;
 let localAnnounces = [];   // cached auto-announce messages
 let activeLeaderboardType = localStorage.getItem('active-leaderboard-tab') || 'combined'; // 'chatters', 'watchtime', 'combined'
@@ -1513,7 +1525,11 @@ async function loadUserProfile() {
       }
     }
 
-    currentChannels = data.kick_channels || [];
+    currentChannels = (data.kick_channels || []).map(ch => ({
+      ...ch,
+      owner_id: currentUser.id,
+      owner_plan: (data.plan || 'free').toLowerCase()
+    }));
 
     // Deduplicate channels by username (keep the first occurrence)
     const seenUsernames = new Set();
@@ -1568,6 +1584,7 @@ async function loadUserProfile() {
             managedChannels.push({
               ...ch,
               owner_id: p.id,
+              owner_plan: (p.plan || 'free').toLowerCase(),
               is_managed: true
             });
           }
@@ -1627,6 +1644,29 @@ async function loadUserProfile() {
 
   renderChannelList();
 }
+
+async function updateUserProfileData(fieldsToUpdate) {
+  if (!currentUser || !currentUser.id) return { data: null, error: new Error('Niste ulogovani') };
+  try {
+    const payload = {
+      ...fieldsToUpdate,
+      updated_at: new Date().toISOString()
+    };
+    const { data, error } = await sb.from('user_profiles')
+      .update(payload)
+      .eq('id', currentUser.id)
+      .select('*')
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data) currentUserProfileData = data;
+    return { data, error: null };
+  } catch (err) {
+    console.error('Error updating user profile:', err);
+    return { data: null, error: err };
+  }
+}
+window.updateUserProfileData = updateUserProfileData;
 
 async function fetchKickAvatar(username) {
   const raw = String(username || '').trim();
@@ -1695,6 +1735,17 @@ function setActiveChannel(ch) {
       localStorage.setItem('kickbot_selected_channel_name', String(ch.username || ''));
     } catch (_) { }
   }
+
+  // Osveži bedž i limite paketa prema vlasniku izabranog kanala
+  const limits = getPlanLimits();
+  const sidebarPlanEl = document.getElementById('sidebarPlan');
+  if (sidebarPlanEl) {
+    sidebarPlanEl.innerHTML = `<span class="plan-badge ${limits.badgeClass}">${limits.name}</span>`;
+  }
+  if (typeof renderPlanLimitBanners === 'function') {
+    renderPlanLimitBanners();
+  }
+
   document.getElementById('channelNameDisplay').textContent = ch.username;
   updateLiveStatusUI(false); // Resetuj na offline po defaultu kako ne bi flešovalo prethodno stanje
 
@@ -1749,7 +1800,7 @@ function setupRealtimeSongQueueSubscription(channelId) {
   if (!channelId) return;
 
   // Učitaj odmah trenutno stanje iz song_request tabele
-  sb.from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
+  getSbPanels().from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
     .then(({ data }) => {
       if (data && Array.isArray(data.queue)) {
         localSongQueue = data.queue;
@@ -1879,7 +1930,7 @@ async function selectChannel(ch) {
   currentTimeSeconds = 0;
   localSongQueue = [];
   if (window.ytPlayer && typeof window.ytPlayer.stopVideo === 'function') {
-    try { window.ytPlayer.stopVideo(); } catch (_) {}
+    try { window.ytPlayer.stopVideo(); } catch (_) { }
   }
   setActiveChannel(ch);
   renderChannelList();
@@ -2486,7 +2537,7 @@ function sortCommands(col) {
 async function loadCommands() {
   if (!activeChannel) return;
 
-  const { data, error } = await sb.from('custom_commands')
+  const { data, error } = await getSbPanels().from('custom_commands')
     .select('*')
     .eq('channel_id', activeChannel.id)
     .order('created_at', { ascending: false });
@@ -3189,8 +3240,8 @@ function setLeaderboardType(type) {
   if (type === 'combined' && tabCombined) tabCombined.classList.add('active');
 
   // Izmeni klase u sidebar navigaciji samo ako je trenutno na leaderboard panelu
-  const currentPanel = localStorage.getItem('active-dashboard-panel');
-  if (currentPanel === 'leaderboard') {
+  const currentPanel = document.querySelector('.panel.active');
+  if (currentPanel && currentPanel.id === 'panel-leaderboard') {
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     const navItem = document.querySelector(`[data-panel="leaderboard"]`);
     if (navItem) navItem.classList.add('active');
@@ -3520,36 +3571,65 @@ function changeLeaderboardLimit(limit) {
   renderUnifiedLeaderboard();
 }
 
+function escapeCsvField(val) {
+  if (val === null || val === undefined) return '""';
+  const str = String(val);
+  if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
 function exportLeaderboard() {
   const type = activeLeaderboardType;
+  const searchInput = document.getElementById('leaderboardSearchInput');
+  const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  let source = allLeaderboard;
+  if (query) {
+    source = source.filter(r => (r.display_name || r.username || '').toLowerCase().includes(query));
+  }
+
+  const sortedRows = sortLeaderboardRows(source, type);
+
+  if (sortedRows.length === 0) {
+    showToast('error', 'Nema podataka za export', '❌');
+    return;
+  }
+
+  const channelName = activeChannel?.username || 'kanal';
+
   if (type === 'chatters') {
-    if (allLeaderboard.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
     const csv = ['Rank,Username,Poruke,Month,Updated']
-      .concat(allLeaderboard.map((r, i) => `${i + 1},${r.display_name || r.username},${r.chat !== undefined ? r.chat : (r.points || 0)},${r.month || ''},${r.updated_at}`))
+      .concat(sortedRows.map((r, i) =>
+        `${i + 1},${escapeCsvField(r.display_name || r.username)},${r.chat !== undefined ? r.chat : (r.points || 0)},${escapeCsvField(r.month || '')},${escapeCsvField(fmtDate(r.updated_at))}`
+      ))
       .join('\n');
-    downloadCsv(csv, `leaderboard_chatters_${activeChannel?.username}_${getCurrentMonth()}.csv`);
+    downloadCsv(csv, `leaderboard_chatters_${channelName}_${getCurrentMonth()}.csv`);
   } else if (type === 'watchtime') {
-    const rows = [...allLeaderboard].sort((a, b) => (b.watchtime_minutes || 0) - (a.watchtime_minutes || 0));
-    if (rows.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
     const csv = ['Rank,Username,Minutes,Hours,Updated']
-      .concat(rows.map((r, i) => `${i + 1},${r.display_name || r.username},${r.watchtime_minutes || 0},${Math.floor((r.watchtime_minutes || 0) / 60)},${r.updated_at}`))
+      .concat(sortedRows.map((r, i) => {
+        const mins = r.watchtime_minutes || r.minutes || 0;
+        return `${i + 1},${escapeCsvField(r.display_name || r.username)},${mins},${formatWatchtime(mins)},${escapeCsvField(fmtDate(r.updated_at))}`;
+      }))
       .join('\n');
-    downloadCsv(csv, `leaderboard_watchtime_${activeChannel?.username}.csv`);
+    downloadCsv(csv, `leaderboard_watchtime_${channelName}.csv`);
   } else if (type === 'ranking') {
-    const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
-    const rows = [...allLeaderboard].sort((a, b) => (b.coins || 0) - (a.coins || 0));
-    if (rows.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
-    const csv = [`Rank,Username,${valuta},Level,XP,Updated`]
-      .concat(rows.map((r, i) => `${i + 1},${r.display_name || r.username},${r.coins || 0},${r.level || 1},${r.xp || 0},${r.updated_at}`))
+    const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || (currentChannelConfig && currentChannelConfig.currency_name) || 'Koins';
+    const csv = [`Rank,Username,Level,XP,${escapeCsvField(valuta)},Updated`]
+      .concat(sortedRows.map((r, i) =>
+        `${i + 1},${escapeCsvField(r.display_name || r.username)},${r.level || 1},${r.xp || 0},${r.coins || 0},${escapeCsvField(fmtDate(r.updated_at))}`
+      ))
       .join('\n');
-    downloadCsv(csv, `leaderboard_ranking_${activeChannel?.username}.csv`);
+    downloadCsv(csv, `leaderboard_ranking_${channelName}.csv`);
   } else {
-    const combined = buildCombinedRows();
-    if (combined.length === 0) { showToast('error', 'Nema podataka za export', '❌'); return; }
-    const csv = ['Rank,Username,Minutes,Hours,Poruke,Updated']
-      .concat(combined.map((r, i) => `${i + 1},${r.username},${r.minutes},${Math.floor((r.minutes || 0) / 60)},${r.points},${r.updated_at}`))
-      .join('\n');
-    downloadCsv(csv, `leaderboard_zajedno_${activeChannel?.username}.csv`);
+    const csv = ['Rank,Username,Watchtime,Poruke,Level,XP,Updated']
+      .concat(sortedRows.map((r, i) => {
+        const mins = r.minutes || r.watchtime_minutes || 0;
+        const poruke = r.chat !== undefined ? r.chat : (r.points || 0);
+        return `${i + 1},${escapeCsvField(r.display_name || r.username)},${formatWatchtime(mins)},${poruke},${r.level || 1},${r.xp || 0},${escapeCsvField(fmtDate(r.updated_at))}`;
+      }));
+    downloadCsv(csv.join('\n'), `leaderboard_zajedno_${channelName}.csv`);
   }
 }
 
@@ -3601,7 +3681,7 @@ async function loadMarriages() {
 async function loadLoveStatuses() {
   if (!activeChannel) return;
 
-  const { data, error } = await sb.from('love_and_marriages')
+  const { data, error } = await getSbPanels().from('love_and_marriages')
     .select('*')
     .eq('channel_id', activeChannel.id)
     .order('updated_at', { ascending: false })
@@ -3793,7 +3873,7 @@ function renderLoveStatuses(rows) {
     return `
       <tr>
         <td style="font-weight:600; color:#fff;">${escapeHtml(u1)}</td>
-        <td style="text-align:center; vertical-align:middle;">${heartSvg}</td>
+        <td style="text-align:center; vertical-align:middle; text-overflow: clip">${heartSvg}</td>
         <td style="font-weight:600; color:#fff;">${escapeHtml(u2)}</td>
         <td><span class="status-pill ${statusObj.class}" style="${statusObj.style}">${statusObj.label}</span></td>
         <td class="td-num" style="font-weight:600; color:${modifier > 0 ? 'var(--kick-green)' : modifier < 0 ? '#FCA5A5' : 'var(--text-muted)'}">${displayModifier}</td>
@@ -3817,7 +3897,7 @@ function renderLoveStatuses(rows) {
 
 async function divorceConfirm(id, u1, u2) {
   confirmCallback = async () => {
-    const { error } = await sb.from('love_and_marriages')
+    const { error } = await getSbPanels().from('love_and_marriages')
       .update({ is_married: false, married_at: null, updated_at: new Date().toISOString() })
       .eq('id', id);
     if (error) { showToast('error', 'Greška pri brisanju brakova'); return; }
@@ -3869,7 +3949,7 @@ async function loadBotConfig() {
     // NE u bot_config.alerts_settings — bot (Bot/src/database.js -> ucitajAlerts) čita
     // isključivo iz `chat_alerts`, pa dashboard mora da čita/piše iz iste tabele da bi
     // izmene stigle do bota.
-    const { data: alertRows, error: alertsError } = await sb.from('chat_alerts')
+    const { data: alertRows, error: alertsError } = await getSbPanels().from('bot_interaction')
       .select('alert_type, enabled, message, min_amount, min_viewers')
       .eq('channel_id', activeChannel.id);
 
@@ -3926,7 +4006,7 @@ async function loadBotConfig() {
             updatePlayerUI();
           }
         }
-      }).catch(() => {});
+      }).catch(() => { });
 
     // Load auto announce interval settings
     document.getElementById('cfgAnnounceInterval').value = data.announce_interval_mins ?? 15;
@@ -4015,7 +4095,7 @@ async function loadBotConfig() {
         applyFilterPenaltyValuesFromState();
         applyPenaltySettingsRestrictions();
         toggleModerationPanelState();
-      }).catch(() => {});
+      }).catch(() => { });
 
     // Load economy settings and store_items from ranking table
     sb.from('ranking')
@@ -4026,7 +4106,11 @@ async function loadBotConfig() {
       .then(({ data: rankData }) => {
         if (rankData) {
           if (document.getElementById('cfgCurrencyName')) document.getElementById('cfgCurrencyName').value = rankData.currency_name || 'Koins';
+          if (document.getElementById('cfgPointsPerMsg')) document.getElementById('cfgPointsPerMsg').value = rankData.points_per_msg ?? 5;
+          if (document.getElementById('cfgSmartChatValidation')) document.getElementById('cfgSmartChatValidation').checked = rankData.smart_chat_validation ?? true;
           if (document.getElementById('cfgFirstInteractionBonus')) document.getElementById('cfgFirstInteractionBonus').value = rankData.first_interaction_bonus ?? 100;
+          if (document.getElementById('cfgPointsPerWatchtime')) document.getElementById('cfgPointsPerWatchtime').value = rankData.points_per_watchtime ?? 20;
+          if (document.getElementById('cfgLevelUpAnnounce')) document.getElementById('cfgLevelUpAnnounce').checked = rankData.level_up_announce ?? true;
           if (document.getElementById('cfgSubMultiplier')) document.getElementById('cfgSubMultiplier').value = rankData.sub_multiplier ?? 2.0;
           if (document.getElementById('cfgSubBonusPerMsg')) document.getElementById('cfgSubBonusPerMsg').value = rankData.sub_bonus_per_msg ?? 10;
           if (document.getElementById('cfgPointsPerSub')) document.getElementById('cfgPointsPerSub').value = rankData.points_per_sub ?? 1000;
@@ -4034,17 +4118,17 @@ async function loadBotConfig() {
           if (document.getElementById('cfgPointsPer100Kicks')) document.getElementById('cfgPointsPer100Kicks').value = rankData.points_per_100_kicks ?? 500;
           if (document.getElementById('cfgPointsDailyStreak')) document.getElementById('cfgPointsDailyStreak').value = rankData.points_daily_streak ?? 150;
           if (document.getElementById('cfgPointsPerRaid')) document.getElementById('cfgPointsPerRaid').value = rankData.points_per_raid ?? 300;
-          
+
           if (Array.isArray(rankData.store_items) && currentChannelConfig) {
             currentChannelConfig.store_items = rankData.store_items;
             renderStoreItems();
           }
           updateEconomyPreviews();
         }
-      }).catch(() => {});
+      }).catch(() => { });
 
     // Load auto announce list from auto_announces table
-    sb.from('auto_announces')
+    getSbPanels().from('auto_messages')
       .select('message')
       .eq('channel_id', activeChannel.id)
       .order('position', { ascending: true })
@@ -4052,7 +4136,7 @@ async function loadBotConfig() {
         localAnnounces = Array.isArray(annData) ? annData.map(r => r.message) : [];
         renderAnnounceList();
         renderPlanLimitBanners();
-      }).catch(() => {});
+      }).catch(() => { });
 
     // Render store items and redemptions after config is loaded
     renderStoreItems();
@@ -4289,16 +4373,19 @@ async function saveChatAlerts() {
     ...row,
   }));
 
-  const { error } = await sb.from('chat_alerts')
+  const { error } = await getSbPanels().from('bot_interaction')
     .upsert(rows, { onConflict: 'channel_id,alert_type' });
 
   return error || null;
 }
 
-// Čuva automatske najave direktno u namensku tabelu `auto_announces`.
+// Čuva automatske najave direktno u namensku tabelu `auto_messages`.
 async function saveAutoAnnounces() {
   if (!activeChannel) return null;
-  const { error: delErr } = await sb.from('auto_announces').delete().eq('channel_id', activeChannel.id);
+  // Fetch existing items for rollback safety before deletion
+  const { data: existingRows } = await getSbPanels().from('auto_messages').select('*').eq('channel_id', activeChannel.id);
+
+  const { error: delErr } = await getSbPanels().from('auto_messages').delete().eq('channel_id', activeChannel.id);
   if (delErr) return delErr;
 
   if (Array.isArray(localAnnounces) && localAnnounces.length > 0) {
@@ -4311,8 +4398,14 @@ async function saveAutoAnnounces() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }));
-    const { error: insErr } = await sb.from('auto_announces').insert(rows);
-    return insErr;
+    const { error: insErr } = await getSbPanels().from('auto_messages').insert(rows);
+    if (insErr) {
+      // Attempt rollback if insert failed
+      if (Array.isArray(existingRows) && existingRows.length > 0) {
+        await getSbPanels().from('auto_messages').insert(existingRows).catch(() => { });
+      }
+      return insErr;
+    }
   }
   return null;
 }
@@ -4324,10 +4417,7 @@ async function saveBotConfigFields(fieldsToUpdate) {
   }
 
   const { error } = await sb.from('bot_config')
-    .update(fieldsToUpdate, {
-      channel_id: activeChannel.id,
-      user_id: getChannelOwnerId()
-    })
+    .update(fieldsToUpdate)
     .eq('channel_id', activeChannel.id)
     .eq('user_id', getChannelOwnerId());
 
@@ -4745,16 +4835,19 @@ async function loadBotStatus() {
 }
 
 function updateBotStatusUI(active) {
+  const isActive = Boolean(active && active !== 'false' && active !== 'off');
+  window.currentBotActiveState = isActive;
   const label = document.getElementById('botToggleLabel');
   const toggle = document.getElementById('botActiveToggle');
   const toggleLabel = toggle?.parentElement;
 
   if (label) {
-    label.innerHTML = `<span id="botToggleDot" style="width: 7px; height: 7px; border-radius: 50%; background: ${active ? '#53FC18' : '#EF4444'}; box-shadow: 0 0 8px ${active ? '#53FC18' : '#EF4444'};"></span> Bot: ${active ? 'ON' : 'OFF'}`;
-    label.style.color = active ? '#53FC18' : '#EF4444';
+    label.innerHTML = `<span id="botToggleDot" style="width: 7px; height: 7px; border-radius: 50%; background: ${isActive ? '#53FC18' : '#EF4444'}; box-shadow: 0 0 8px ${isActive ? '#53FC18' : '#EF4444'}; display: inline-block; margin-right: 6px;"></span> Bot: ${isActive ? 'ON' : 'OFF'}`;
+    label.style.color = isActive ? '#53FC18' : '#94A3B8';
+    label.className = isActive ? 'bot-toggle-label bot-on' : 'bot-toggle-label bot-off';
   }
-  if (toggle && toggle.checked !== active) { toggle.checked = active; }
-  if (toggleLabel) { toggleLabel.setAttribute('aria-checked', active); }
+  if (toggle && toggle.checked !== isActive) { toggle.checked = isActive; }
+  if (toggleLabel) { toggleLabel.setAttribute('aria-checked', isActive); }
 
   // Control Center updates
   const ctrlStatusLabel = document.getElementById('ctrlBotStatusLabel');
@@ -4769,21 +4862,28 @@ function updateBotStatusUI(active) {
   }
 
   if (ctrlStatus) {
-    ctrlStatus.innerHTML = active
-      ? '<span style="color: var(--kick-green); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-on" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--kick-green); box-shadow:0 0 8px var(--kick-green);"></span> Bot je Pokrenut</span>'
+    ctrlStatus.innerHTML = isActive
+      ? '<span style="color: #53FC18; font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-on" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#53FC18; box-shadow:0 0 8px #53FC18;"></span> Bot je Pokrenut</span>'
       : '<span style="color: var(--text-muted); font-weight: bold; display: flex; align-items: center; gap: 6px;"><span class="status-dot status-off" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#EF4444; box-shadow:0 0 8px #EF4444;"></span> Bot je Zaustavljen</span>';
   }
   if (ctrlBtn) {
-    ctrlBtn.textContent = active ? 'Zaustavi bota' : 'Pokreni bota';
-    ctrlBtn.className = active ? 'btn btn-sm btn-danger' : 'btn btn-primary btn-sm';
+    ctrlBtn.textContent = isActive ? 'Zaustavi bota' : 'Pokreni bota';
+    ctrlBtn.className = isActive ? 'btn btn-sm btn-danger kx-48' : 'btn btn-primary btn-sm kx-48';
   }
 }
 
 function toggleBotActiveFromCtrl() {
+  const ctrlBtn = document.getElementById('ctrlBotToggleBtn');
+  if (ctrlBtn) ctrlBtn.blur();
+
   const toggle = document.getElementById('botActiveToggle');
   if (toggle) {
     toggle.checked = !toggle.checked;
     toggleBotActive();
+  } else {
+    const nextState = !Boolean(window.currentBotActiveState);
+    updateBotStatusUI(nextState);
+    saveBotActiveToDb(nextState);
   }
 }
 
@@ -4870,8 +4970,14 @@ function addLocalLog(type, message) {
 
 async function toggleBotActive() {
   if (!activeChannel) return;
-  const active = document.getElementById('botActiveToggle').checked;
+  const toggle = document.getElementById('botActiveToggle');
+  const active = toggle ? toggle.checked : !Boolean(window.currentBotActiveState);
   updateBotStatusUI(active);
+  await saveBotActiveToDb(active);
+}
+
+async function saveBotActiveToDb(active) {
+  if (!activeChannel) return;
 
   // Track bot action
   if (window.KickALLDataLayer) {
@@ -4899,7 +5005,8 @@ async function toggleBotActive() {
 
   if (error) {
     showToast('error', 'Greška pri promeni statusa', '❌');
-    document.getElementById('botActiveToggle').checked = !active;
+    const toggle = document.getElementById('botActiveToggle');
+    if (toggle) toggle.checked = !active;
     updateBotStatusUI(!active);
 
     // Track bot action failure
@@ -4950,7 +5057,7 @@ async function fetchKickLiveStatus() {
     try {
       const { data } = await sb.from('channels').select('is_active').eq('id', activeChannel.id).maybeSingle();
       updateLiveStatusUI(data ? !!data.is_active : false);
-    } catch (_) {}
+    } catch (_) { }
     return;
   }
 
@@ -4982,13 +5089,35 @@ function updateLiveStatusUI(isLive) {
   }
 }
 
+
 function setupRealtimeChannels() {
-  if (realtimeSub) {
-    sb.removeChannel(realtimeSub);
-  }
-  if (realtimeMarriagesSub) {
-    sb.removeChannel(realtimeMarriagesSub);
-  }
+  if (realtimeSub) sb.removeChannel(realtimeSub);
+  if (realtimeMarriagesSub) sb.removeChannel(realtimeMarriagesSub);
+  if (realtimeMinigamesSub) sb.removeChannel(realtimeMinigamesSub);
+  if (realtimeRankingSub) sb.removeChannel(realtimeRankingSub);
+  if (realtimeModerationSub) sb.removeChannel(realtimeModerationSub);
+  if (realtimeNotifSub) sb.removeChannel(realtimeNotifSub);
+  if (realtimeChangelogSub) sb.removeChannel(realtimeChangelogSub);
+
+  realtimeNotifSub = sb.channel('public:notifications_sub')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'notifications'
+    }, () => {
+      loadNotifications();
+    })
+    .subscribe();
+
+  realtimeChangelogSub = sb.channel('public:changelog_sub')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'changelog'
+    }, () => {
+      loadChangelogs();
+    })
+    .subscribe();
 
   if (!activeChannel) return;
 
@@ -5008,7 +5137,7 @@ function setupRealtimeChannels() {
   realtimeMarriagesSub = sb.channel('public:love_and_marriages_sub')
     .on('postgres_changes', {
       event: '*',
-      schema: 'public',
+      schema: 'panels',
       table: 'love_and_marriages',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
@@ -5020,7 +5149,7 @@ function setupRealtimeChannels() {
   realtimeMinigamesSub = sb.channel('public:mini_games_sub')
     .on('postgres_changes', {
       event: '*',
-      schema: 'public',
+      schema: 'panels',
       table: 'mini_games',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
@@ -5031,7 +5160,7 @@ function setupRealtimeChannels() {
   realtimeRankingSub = sb.channel('public:ranking_sub')
     .on('postgres_changes', {
       event: '*',
-      schema: 'public',
+      schema: 'panels',
       table: 'ranking',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
@@ -5042,7 +5171,7 @@ function setupRealtimeChannels() {
   realtimeModerationSub = sb.channel('public:moderation_sub')
     .on('postgres_changes', {
       event: '*',
-      schema: 'public',
+      schema: 'panels',
       table: 'moderation',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
@@ -5277,9 +5406,9 @@ async function saveCommand() {
 
   let error;
   if (existsInDb) {
-    ({ error } = await sb.from('custom_commands').update(updatePayload).eq('id', editingCmdId));
+    ({ error } = await getSbPanels().from('custom_commands').update(updatePayload).eq('id', editingCmdId));
   } else {
-    ({ error } = await sb.from('custom_commands').insert(insertPayload));
+    ({ error } = await getSbPanels().from('custom_commands').insert(insertPayload));
   }
 
   setLoading('saveCmdBtn', false);
@@ -5460,7 +5589,7 @@ function loadEconomyPanelData() {
   switchEconomyTab(currentEconomyTab || 'config');
 }
 
-function switchPanel(panelId) {
+function switchPanel(panelId, resetTab = false) {
   // Prevent switching if already on this panel
   const currentPanel = document.querySelector('.panel.active');
   if (currentPanel && currentPanel.id === `panel-${panelId}`) return;
@@ -5506,30 +5635,32 @@ function switchPanel(panelId) {
       refreshMiniPanels(allLeaderboard);
     }
   }
+  if (panelId === 'commands') { loadCommands(); }
+  if (panelId === 'builtin-commands') { loadCommands(); renderBuiltinCommandsGrid(); }
   if (panelId === 'leaderboard') { loadLeaderboard(); loadWatchtime(); }
   if (panelId === 'marriages') { loadMarriages(); loadLoveStatuses(); }
-  if (panelId === 'bot-interaction' && !configLoaded) loadBotConfig();
+  if (panelId === 'bot-interaction') loadBotConfig();
   if (panelId === 'auto-announces') {
-    if (!configLoaded) loadBotConfig();
-    renderPlanLimitBanners(); // Update announces banner
+    loadBotConfig();
+    renderPlanLimitBanners();
   }
-  if (panelId === 'config' && !configLoaded) loadBotConfig();
+  if (panelId === 'config') loadBotConfig();
   if (panelId === 'moderation') {
-    if (!configLoaded) loadBotConfig();
-    renderPlanLimitBanners(); // Update moderation penalty banner
-    applyPenaltySettingsRestrictions(); // Apply penalty restrictions
+    loadBotConfig();
+    renderPlanLimitBanners();
+    applyPenaltySettingsRestrictions();
   }
-  if (panelId === 'songs' && !configLoaded) loadBotConfig();
+  if (panelId === 'songs') loadBotConfig();
   if (panelId === 'economy') {
-    if (!configLoaded) loadBotConfig();
-    switchEconomyTab(currentEconomyTab || 'config');
+    loadBotConfig();
+    const targetTab = resetTab ? 'config' : (currentEconomyTab || 'config');
+    switchEconomyTab(targetTab);
   }
   if (panelId === 'minigames') {
-    if (!configLoaded) loadBotConfig();
+    loadBotConfig();
     loadMinigamesConfig();
     renderPlanLimitBanners();
   }
-  if (panelId === 'builtin-commands') renderBuiltinCommandsGrid();
 
   if (window.innerWidth < 768) {
     document.getElementById('sidebar').classList.remove('mobile-open');
@@ -5609,8 +5740,11 @@ async function handleSignOut() {
 
 function notifyGlobalLogout(userId) {
   const domains = [
+    'https://kickall.app',
     'https://kickall.netlify.app',
     'https://kickall.milanwebportal.com',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
     window.location.origin
   ];
 
@@ -5644,7 +5778,7 @@ function notifyGlobalLogout(userId) {
 
 window.addEventListener('message', (event) => {
   // Bezbednosna provera: prihvati poruke samo od pouzdanih originа
-  const allowedOrigins = ['https://kickall.app', 'http://localhost:5500'];
+  const allowedOrigins = ['https://kickall.app', 'https://kickall.netlify.app', 'https://kickall.milanwebportal.com', 'http://localhost:5500', 'http://127.0.0.1:5500'];
   if (!allowedOrigins.includes(event.origin)) return;
 
   if (event.data && event.data.type === 'GLOBAL_LOGOUT') {
@@ -5754,118 +5888,25 @@ window.addEventListener('keydown', e => {
 });
 
 // ═══════════════════════════════════════════════════════════
-// TOASTS (Old glassmorphism system)
+// TOASTS (Using shared KickALL ToastSystem from ../js/toast.js)
 // ═══════════════════════════════════════════════════════════
-let toastId = 0;
-function showToast(type, msg, _iconEmoji = '💬', duration = null) {
-  let container = document.getElementById('toastContainer');
-  // Ensure container is a direct child of body (fixes DOM nesting issues)
-  if (!container || container.parentElement !== document.body) {
-    if (container) container.remove();
-    container = document.createElement('div');
-    container.className = 'toast-container';
-    container.id = 'toastContainer';
-    document.body.appendChild(container);
-  }
+// Toast system delegates directly to window.toastSystem & window.showToast from ../js/toast.js
+function showToast(a, b, c, d) {
+  if (window.toastSystem && typeof window.toastSystem.show === 'function') {
+    const types = ['success', 'error', 'warning', 'info'];
+    let message = b;
+    let type = a;
+    let duration = typeof c === 'number' ? c : (typeof d === 'number' ? d : 5000);
 
-  // Dinamičko izračunavanje trajanja ako nije eksplicitno prosleđeno:
-  // Osnovno vreme čitanja: ~60ms po karakteru + baznih 2500ms
-  // Greške i upozorenja se zadržavaju duže (+1000ms) radi bolje uočljivosti
-  if (!duration) {
-    const textLength = (msg || '').length;
-    const baseDuration = Math.max(2500, Math.min(8000, 2200 + textLength * 55));
-    duration = (type === 'error' || type === 'warning') ? baseDuration + 1200 : baseDuration;
-  }
-
-  const id = ++toastId;
-  const el = document.createElement('div');
-  el.className = `toast toast-${type}`;
-  el.id = `toast-${id}`;
-
-  let svgIcon = '';
-  if (type === 'success') {
-    svgIcon = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12"></polyline>
-      </svg>
-    `;
-  } else if (type === 'error') {
-    svgIcon = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="15" y1="9" x2="9" y2="15"></line>
-        <line x1="9" y1="9" x2="15" y2="15"></line>
-      </svg>
-    `;
-  } else if (type === 'info') {
-    svgIcon = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="16" x2="12" y2="12"></line>
-        <line x1="12" y1="8" x2="12.01" y2="8"></line>
-      </svg>
-    `;
-  } else {
-    svgIcon = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-        <line x1="12" y1="9" x2="12" y2="13"></line>
-        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-      </svg>
-    `;
-  }
-
-  el.innerHTML = `
-    <div class="toast-icon-wrap">${svgIcon}</div>
-    <div class="toast-msg">${msg}</div>
-    <button class="toast-close" onclick="removeToast(${id})">✕</button>
-  `;
-
-  // Max 3 newest toasts: push the oldest active one up with a smooth slide-up collapse
-  const activeToasts = Array.from(container.children).filter(child => !child.classList.contains('toast-leaving'));
-  if (activeToasts.length >= 3) {
-    const oldest = activeToasts[0];
-    oldest.classList.add('toast-leaving');
-    const match = oldest.id.match(/toast-(\d+)/);
-    if (match) {
-      removeToast(parseInt(match[1]));
-    } else {
-      oldest.remove();
+    if (!types.includes(a)) {
+      message = a;
+      type = types.includes(b) ? b : 'info';
     }
-  }
-
-  container.appendChild(el);
-
-  // Trigger entry animation in the next paint cycle
-  setTimeout(() => {
-    el.classList.add('toast-show');
-  }, 20);
-
-  setTimeout(() => removeToast(id), duration);
-}
-function removeToast(id) {
-  const el = document.getElementById(`toast-${id}`);
-  if (el) {
-    el.classList.add('toast-leaving');
-    el.classList.remove('toast-show');
-    setTimeout(() => el.remove(), 250);
+    return window.toastSystem.show(message, type, duration);
+  } else if (typeof window.showToast === 'function') {
+    return window.showToast(a, b, c);
   }
 }
-
-// Create ToastSystem interface for compatibility with existing code
-window.toastSystem = {
-  show: showToast,
-  success: (msg, duration) => showToast('success', msg, '✓', duration),
-  error: (msg, duration) => showToast('error', msg, '✕', duration),
-  warning: (msg, duration) => showToast('info', msg, '⚠', duration),
-  info: (msg, duration) => showToast('info', msg, 'ℹ', duration),
-  dismiss: (toastElement) => {
-    if (toastElement && toastElement.id) {
-      const match = toastElement.id.match(/toast-(\d+)/);
-      if (match) removeToast(parseInt(match[1]));
-    }
-  }
-};
 
 // ═══════════════════════════════════════════════════════════
 // UTILITIES
@@ -6132,27 +6173,44 @@ function switchSettingsTab(tabName) {
   const panelManagers = document.getElementById('settingsManagersPanel');
   const panelSubscription = document.getElementById('settingsSubscriptionPanel');
 
-  if (!tabProfile || !tabChannels || !tabManagers || !panelProfile || !panelChannels || !panelManagers) return;
+  const tabs = [
+    { name: 'profile', btn: tabProfile, panel: panelProfile },
+    { name: 'channels', btn: tabChannels, panel: panelChannels },
+    { name: 'managers', btn: tabManagers, panel: panelManagers },
+    { name: 'subscription', btn: tabSubscription, panel: panelSubscription }
+  ];
 
-  // Reset active states
-  tabProfile.classList.remove('active');
-  tabChannels.classList.remove('active');
-  tabManagers.classList.remove('active');
-  if (tabSubscription) tabSubscription.classList.remove('active');
+  tabs.forEach(t => {
+    if (t.btn) {
+      t.btn.classList.remove('active');
+      t.btn.setAttribute('aria-selected', 'false');
+      t.btn.style.setProperty('background', 'transparent', 'important');
+      t.btn.style.setProperty('color', 'var(--text-muted)', 'important');
+      t.btn.style.setProperty('font-weight', '600', 'important');
+      t.btn.style.setProperty('box-shadow', 'none', 'important');
+    }
+    if (t.panel) {
+      t.panel.style.setProperty('display', 'none', 'important');
+    }
+  });
 
-  panelProfile.style.display = 'none';
-  panelChannels.style.display = 'none';
-  panelManagers.style.display = 'none';
-  if (panelSubscription) panelSubscription.style.display = 'none';
+  const activeObj = tabs.find(t => t.name === tabName);
+  if (activeObj) {
+    if (activeObj.btn) {
+      activeObj.btn.classList.add('active');
+      activeObj.btn.setAttribute('aria-selected', 'true');
+      activeObj.btn.style.setProperty('background', 'var(--app-primary, #8B5CF6)', 'important');
+      activeObj.btn.style.setProperty('color', '#ffffff', 'important');
+      activeObj.btn.style.setProperty('font-weight', '700', 'important');
+      activeObj.btn.style.setProperty('box-shadow', '0 0 12px rgba(139, 92, 246, 0.4)', 'important');
+    }
+    if (activeObj.panel) {
+      activeObj.panel.style.setProperty('display', 'block', 'important');
+    }
+  }
 
-  if (tabName === 'profile') {
-    tabProfile.classList.add('active');
-    panelProfile.style.display = 'block';
-  } else if (tabName === 'channels') {
-    tabChannels.classList.add('active');
-    panelChannels.style.display = 'block';
+  if (tabName === 'channels') {
     renderSettingsChannelList();
-    // Block add button if at limit
     const addChBtn = document.getElementById('settingsAddChannelBtn');
     const chLimits = getPlanLimits();
     if (addChBtn && chLimits.maxChannels !== Infinity && currentChannels.length >= chLimits.maxChannels) {
@@ -6167,12 +6225,8 @@ function switchSettingsTab(tabName) {
       addChBtn.style.cursor = '';
     }
   } else if (tabName === 'managers') {
-    tabManagers.classList.add('active');
-    panelManagers.style.display = 'block';
     renderSettingsManagersList();
   } else if (tabName === 'subscription') {
-    if (tabSubscription) tabSubscription.classList.add('active');
-    if (panelSubscription) panelSubscription.style.display = 'block';
     renderSettingsSubscriptionPanel();
   }
 }
@@ -6258,15 +6312,15 @@ function renderSettingsManagersList() {
   if (!listEl || !ownerView || !guestView) return;
 
   // Proveri da li smo mi vlasnik ovog kanala
-  const isManaged = activeChannel && activeChannel.is_managed === true;
+  const isManaged = activeChannel && (activeChannel.is_managed === true || activeChannel.owner_id !== currentUser?.id);
   if (isManaged) {
-    ownerView.style.display = 'none';
-    guestView.style.display = 'block';
+    ownerView.style.setProperty('display', 'none', 'important');
+    guestView.style.setProperty('display', 'block', 'important');
     return;
   }
 
-  ownerView.style.display = 'block';
-  guestView.style.display = 'none';
+  ownerView.style.setProperty('display', 'block', 'important');
+  guestView.style.setProperty('display', 'none', 'important');
   listEl.innerHTML = '';
 
   const managers = activeChannel?.managers || [];
@@ -6975,6 +7029,30 @@ function toggleModuleOverlay(panelId, active) {
   }
 }
 
+async function enableCurrentPanelModule(btnElement) {
+  const panel = btnElement ? btnElement.closest('.panel, section, [id^="panel-"]') : null;
+  const activePanelEl = document.querySelector('.panel.active') || panel;
+  const panelId = (panel ? panel.id : (activePanelEl ? activePanelEl.id : '')).toLowerCase();
+
+  let toggleId = null;
+  if (panelId.includes('moderation') || panelId.includes('mod')) toggleId = 'cfgModeration';
+  else if (panelId.includes('leaderboard')) toggleId = 'cfgLeaderboard';
+  else if (panelId.includes('announce')) toggleId = 'cfgAnnounceTimeEnabled';
+  else if (panelId.includes('interaction') || panelId.includes('bot-interaction')) toggleId = 'cfgAutoresponse';
+  else if (panelId.includes('marriage') || panelId.includes('love')) toggleId = 'cfgLove';
+  else if (panelId.includes('minigame') || panelId.includes('game')) toggleId = 'cfgGames';
+  else if (panelId.includes('song')) toggleId = 'cfgSongRequestEnabled';
+  else if (panelId.includes('economy')) toggleId = 'cfgGambleEnabled';
+
+  if (toggleId) {
+    await toggleModuleFromHeader(toggleId, true);
+    showToast('success', 'Modul je uspešno aktiviran!');
+  } else {
+    showToast('error', 'Nije moguće odrediti modul za aktivaciju.');
+  }
+}
+window.enableCurrentPanelModule = enableCurrentPanelModule;
+
 let liveFeedInterval = null;
 let liveFeedUserScrolledUp = false;
 let liveFeedScrollDebounce = null;
@@ -7251,7 +7329,7 @@ function triggerAutosaveMod() {
 function setupAutosave() {
   // 1. Inputs koji okidaju saveBotConfig
   const configInputIds = [
-    'cfgPrefix', 'cfgLanguage', 'cfgCooldown', 'cfgLeaderboard', 'cfgWatchtime',
+    'cfgPrefix', 'cfgLanguage', 'cfgCooldown', 'cfgLeaderboard',
     'cfgGames', 'cfgLove', 'cfgModeration', 'cfgAutoresponse', 'cfgSpamThreshold',
     'cfgSpamWindow', 'cfgPinMsg', 'cfgWelcomeMsg', 'cfgAnnounceInterval',
     'cfgAnnounceThreshold', 'cfgAnnounceTimeEnabled', 'cfgAnnounceMsgEnabled',
@@ -7351,24 +7429,31 @@ function switchNotifTab(tab) {
   const tabCh = document.getElementById('notifTabChangelog');
   if (!tabOb || !tabCh) return;
 
-  const activeStyle = {
-    color: '#fff',
-    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1))',
-    border: '1px solid rgba(139, 92, 246, 0.3)',
-    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.2)',
-    fontWeight: '700'
-  };
+  if (tab === 'obaveštenja') {
+    tabOb.style.setProperty('background', 'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1))', 'important');
+    tabOb.style.setProperty('border', '1px solid rgba(139, 92, 246, 0.3)', 'important');
+    tabOb.style.setProperty('color', '#fff', 'important');
+    tabOb.style.setProperty('box-shadow', '0 2px 8px rgba(139, 92, 246, 0.2)', 'important');
+    tabOb.style.setProperty('font-weight', '700', 'important');
 
-  const inactiveStyle = {
-    color: 'var(--text-muted)',
-    background: 'transparent',
-    border: '1px solid transparent',
-    boxShadow: 'none',
-    fontWeight: '600'
-  };
+    tabCh.style.setProperty('background', 'transparent', 'important');
+    tabCh.style.setProperty('border', '1px solid transparent', 'important');
+    tabCh.style.setProperty('color', 'var(--text-muted)', 'important');
+    tabCh.style.setProperty('box-shadow', 'none', 'important');
+    tabCh.style.setProperty('font-weight', '600', 'important');
+  } else {
+    tabCh.style.setProperty('background', 'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1))', 'important');
+    tabCh.style.setProperty('border', '1px solid rgba(139, 92, 246, 0.3)', 'important');
+    tabCh.style.setProperty('color', '#fff', 'important');
+    tabCh.style.setProperty('box-shadow', '0 2px 8px rgba(139, 92, 246, 0.2)', 'important');
+    tabCh.style.setProperty('font-weight', '700', 'important');
 
-  Object.assign(tabOb.style, tab === 'obaveštenja' ? activeStyle : inactiveStyle);
-  Object.assign(tabCh.style, tab === 'changelog' ? activeStyle : inactiveStyle);
+    tabOb.style.setProperty('background', 'transparent', 'important');
+    tabOb.style.setProperty('border', '1px solid transparent', 'important');
+    tabOb.style.setProperty('color', 'var(--text-muted)', 'important');
+    tabOb.style.setProperty('box-shadow', 'none', 'important');
+    tabOb.style.setProperty('font-weight', '600', 'important');
+  }
 
   renderNotifContent();
 }
@@ -7834,15 +7919,18 @@ function updatePlayerUI() {
   if (!playerTitle) return;
 
   const currentSong = localSongQueue[currentSongIndex];
+  const ytIframe = document.getElementById('ytAudioPlayer');
+
   if (!currentSong) {
     playerTitle.textContent = 'Nema pesama u redu';
     playerRequester.textContent = 'Zatražite pesmu ispod ili u četu';
     if (playerProgress) playerProgress.style.width = '0%';
     if (playerCurrentTime) playerCurrentTime.textContent = '0:00';
     if (playerTotalTime) playerTotalTime.textContent = '0:00';
-    if (playerCoverImg) { playerCoverImg.style.display = 'none'; playerCoverImg.src = ''; }
-    if (playerDisk) { playerDisk.style.display = 'flex'; playerDisk.style.animationPlayState = 'paused'; }
-    if (playerSourceBadge) playerSourceBadge.style.display = 'none';
+    if (playerCoverImg) { playerCoverImg.style.setProperty('display', 'none', 'important'); playerCoverImg.src = ''; }
+    if (playerDisk) { playerDisk.style.setProperty('display', 'flex', 'important'); playerDisk.style.animationPlayState = 'paused'; }
+    if (ytIframe) ytIframe.style.setProperty('display', 'none', 'important');
+    if (playerSourceBadge) playerSourceBadge.style.setProperty('display', 'none', 'important');
     if (playIcon) {
       playIcon.setAttribute('viewBox', '0 0 24 24');
       playIcon.style.marginLeft = '2px';
@@ -7863,11 +7951,13 @@ function updatePlayerUI() {
 
   if (currentSong.coverUrl && playerCoverImg) {
     playerCoverImg.src = currentSong.coverUrl;
-    playerCoverImg.style.display = 'block';
-    if (playerDisk) playerDisk.style.display = 'none';
+    playerCoverImg.style.setProperty('display', 'block', 'important');
+    if (playerDisk) playerDisk.style.setProperty('display', 'none', 'important');
+    if (ytIframe) ytIframe.style.setProperty('display', 'none', 'important');
   } else {
-    if (playerCoverImg) playerCoverImg.style.display = 'none';
-    if (playerDisk) playerDisk.style.display = 'flex';
+    if (playerCoverImg) playerCoverImg.style.setProperty('display', 'none', 'important');
+    if (playerDisk) playerDisk.style.setProperty('display', 'none', 'important');
+    if (ytIframe) ytIframe.style.setProperty('display', 'block', 'important');
   }
 
   if (playerSourceBadge) {
@@ -7994,7 +8084,7 @@ async function previousSong() {
   if (currentTimeSeconds > 3) {
     currentTimeSeconds = 0;
     if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
-      try { window.ytPlayer.seekTo(0); } catch (_) {}
+      try { window.ytPlayer.seekTo(0); } catch (_) { }
     }
   } else {
     currentTimeSeconds = 0;
@@ -8476,7 +8566,11 @@ async function saveEconomyConfig(silent = false) {
       channel_id: activeChannel.id,
       type: 'config',
       currency_name: ecoSettings.currency_name,
+      points_per_msg: ecoSettings.points_per_msg,
+      smart_chat_validation: ecoSettings.smart_chat_validation,
       first_interaction_bonus: ecoSettings.first_interaction_bonus,
+      points_per_watchtime: ecoSettings.points_per_watchtime,
+      level_up_announce: ecoSettings.level_up_announce,
       sub_multiplier: ecoSettings.sub_multiplier,
       sub_bonus_per_msg: ecoSettings.sub_bonus_per_msg,
       points_per_sub: ecoSettings.points_per_sub,
@@ -8484,6 +8578,8 @@ async function saveEconomyConfig(silent = false) {
       points_per_100_kicks: ecoSettings.points_per_100_kicks,
       points_daily_streak: ecoSettings.points_daily_streak,
       points_per_raid: ecoSettings.points_per_raid,
+      gamble_enabled: ecoSettings.gamble_enabled,
+      max_gamble_amount: ecoSettings.max_gamble_amount,
       updated_at: new Date().toISOString()
     }, { onConflict: 'channel_id,type' });
 
@@ -8664,7 +8760,7 @@ function renderStoreItems() {
   const limits = getPlanLimits();
 
   if (simSelect) {
-    simSelect.innerHTML = items.map(i => `<option value="${i.id}">${i.name} (${i.cost} ${valuta})</option>`).join('');
+    simSelect.innerHTML = items.map(i => `<option value="${escapeHtml(i.id)}">${escapeHtml(i.name)} (${i.cost} ${escapeHtml(valuta)})</option>`).join('');
   }
 
   // Show store items limit banner
@@ -8974,7 +9070,7 @@ async function approveRedemption(id) {
   if (row && target.cost > 0) {
     row.coins = Math.max(0, (row.coins || 0) - target.cost);
     await sb.from('leaderboard')
-      .upsert({ channel_id: String(activeChannel.id), username: userKey, coins: row.coins }, { onConflict: 'channel_id,username' });
+      .upsert({ channel_id: String(activeChannel.id), username: userKey, month: row.month || 'all_time', year: row.year || null, coins: row.coins }, { onConflict: 'channel_id,username,month,year' });
     renderEconomyLeaderboard();
   }
 
@@ -9001,7 +9097,7 @@ async function rejectRedemption(id) {
   if (row) {
     row.coins = (row.coins || 0) + target.cost;
     const { error: lbError } = await sb.from('leaderboard')
-      .upsert({ channel_id: String(activeChannel.id), username: userKey, coins: row.coins }, { onConflict: 'channel_id,username' });
+      .upsert({ channel_id: String(activeChannel.id), username: userKey, month: row.month || 'all_time', year: row.year || null, coins: row.coins }, { onConflict: 'channel_id,username,month,year' });
     if (!lbError) renderEconomyLeaderboard();
   }
 
@@ -9050,16 +9146,39 @@ function renderEconomyLeaderboard() {
     return sortDir === 'asc' ? va - vb : vb - va;
   });
 
-  if (list.length === 0) {
+  const pageSizeSelect = document.getElementById('ecoLbPageSizeSelect');
+  if (pageSizeSelect) {
+    ecoLbPageSize = parseInt(pageSizeSelect.value, 10) || 15;
+  }
+
+  const totalItems = list.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ecoLbPageSize));
+
+  if (ecoLbCurrentPage < 1) ecoLbCurrentPage = 1;
+  if (ecoLbCurrentPage > totalPages) ecoLbCurrentPage = totalPages;
+
+  const startIndex = (ecoLbCurrentPage - 1) * ecoLbPageSize;
+  const pageItems = list.slice(startIndex, startIndex + ecoLbPageSize);
+
+  // Update pagination UI controls
+  const prevBtn = document.getElementById('ecoLbPrevPageBtn');
+  const nextBtn = document.getElementById('ecoLbNextPageBtn');
+  const pageInfo = document.getElementById('ecoLbPageInfo');
+
+  if (prevBtn) prevBtn.disabled = ecoLbCurrentPage <= 1;
+  if (nextBtn) nextBtn.disabled = ecoLbCurrentPage >= totalPages;
+  if (pageInfo) pageInfo.textContent = `Stranica ${ecoLbCurrentPage} od ${totalPages}`;
+
+  if (pageItems.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema podataka na rang listi.</td></tr>`;
     return;
   }
 
   const coinIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" style="vertical-align:middle;"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>`;
 
-  tbody.innerHTML = list.slice(0, 50).map((u, idx) => `
+  tbody.innerHTML = pageItems.map((u, idx) => `
     <tr>
-      <td style="font-weight:700; color:var(--text-muted);">${idx + 1}</td>
+      <td style="font-weight:700; color:var(--text-muted);">${startIndex + idx + 1}</td>
       <td style="font-weight:600; color:#fff;">@${escapeHtml(u.username)}</td>
       <td style="color:#eab308; font-weight:700;">
         <span style="display:inline-flex; align-items:center; gap:4px;">
@@ -9067,35 +9186,93 @@ function renderEconomyLeaderboard() {
           ${u.coins.toLocaleString()} ${valuta}
         </span>
       </td>
-      <td style="color:var(--text-muted);">${formatPorukeCount(u.messages)} poruka</td>
+      <td style="color:var(--text-muted);">${formatPorukeCount(u.messages)}</td>
       <td style="color:var(--text-muted); font-size:0.8rem;">${fmtDate(u.updated_at)}</td>
       <td style="text-align:right;">
-        <button class="btn btn-sm btn-outline" onclick="openEditUserPointsModal('${escapeHtml(u.rawUsername)}', ${u.coins})" style="padding:2px 8px; font-size:0.72rem;">Izmeni</button>
+        <button class="btn btn-sm btn-outline" onclick="openEditUserPointsModal('${escapeHtml(u.rawUsername || u.username)}', ${u.coins})" style="padding:2px 8px; font-size:0.72rem;">Izmeni</button>
       </td>
     </tr>
   `).join('');
 }
 
-async function openEditUserPointsModal(username, currentPoints) {
+let ecoLbCurrentPage = 1;
+let ecoLbPageSize = 15;
+
+function onEconomyLeaderboardPageSizeChange() {
+  const select = document.getElementById('ecoLbPageSizeSelect');
+  if (select) {
+    ecoLbPageSize = parseInt(select.value, 10) || 15;
+  }
+  ecoLbCurrentPage = 1;
+  renderEconomyLeaderboard();
+}
+
+function changeEconomyLeaderboardPage(delta) {
+  ecoLbCurrentPage += delta;
+  renderEconomyLeaderboard();
+}
+window.onEconomyLeaderboardPageSizeChange = onEconomyLeaderboardPageSizeChange;
+window.changeEconomyLeaderboardPage = changeEconomyLeaderboardPage;
+
+let editingUserPointsUsername = null;
+
+function openEditUserPointsModal(username, currentPoints) {
   const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
-  const newPoints = prompt(`Unesi novi broj poena (${valuta}) za @${username}:`, currentPoints);
-  if (newPoints === null) return;
-  const parsed = parseInt(newPoints, 10);
-  if (isNaN(parsed) || parsed < 0) return;
+  editingUserPointsUsername = username;
+
+  const headerEl = document.getElementById('editUserPointsModalHeader');
+  const descEl = document.getElementById('editUserPointsModalDesc');
+  const labelEl = document.getElementById('editUserPointsInputLabel');
+  const inputEl = document.getElementById('editUserPointsInput');
+  const errEl = document.getElementById('editUserPointsError');
+
+  if (headerEl) headerEl.textContent = `Izmeni Stanje Valute — @${username}`;
+  if (descEl) descEl.textContent = `Unesite novo stanje valute (${valuta}) za gledaoca @${username}.`;
+  if (labelEl) labelEl.textContent = `Novo stanje (${valuta})`;
+  if (inputEl) {
+    inputEl.value = currentPoints !== undefined && currentPoints !== null ? currentPoints : 0;
+  }
+  if (errEl) errEl.style.display = 'none';
+
+  openModal('editUserPointsModal');
+  setTimeout(() => { if (inputEl) inputEl.focus(); }, 100);
+}
+
+async function saveUserPointsModal() {
+  if (!editingUserPointsUsername) return;
+  const username = editingUserPointsUsername;
+  const inputEl = document.getElementById('editUserPointsInput');
+  const errEl = document.getElementById('editUserPointsError');
+  const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Koins';
+  const parsed = parseInt(inputEl?.value, 10);
+
+  if (isNaN(parsed) || parsed < 0) {
+    if (errEl) {
+      errEl.textContent = 'Unesite ispravan pozitivan broj poena.';
+      errEl.style.display = 'block';
+    }
+    return;
+  }
 
   const target = allLeaderboard.find(x => (x.username || '').toLowerCase() === username.toLowerCase());
   if (target) {
     target.coins = parsed;
     renderEconomyLeaderboard();
     if (typeof renderUnifiedLeaderboard === 'function') renderUnifiedLeaderboard();
+  }
 
+  closeModal('editUserPointsModal');
+
+  if (activeChannel && activeChannel.id && target) {
     const { error } = await sb.from('leaderboard')
       .upsert({
         channel_id: String(activeChannel.id),
         username: target.username,
+        month: target.month || 'all_time',
+        year: target.year || null,
         coins: parsed,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'channel_id,username' });
+      }, { onConflict: 'channel_id,username,month,year' });
 
     if (error) {
       showToast('error', `Greška pri čuvanju poena u bazi za @${username}!`, '❌');
@@ -9104,6 +9281,8 @@ async function openEditUserPointsModal(username, currentPoints) {
     }
   }
 }
+window.openEditUserPointsModal = openEditUserPointsModal;
+window.saveUserPointsModal = saveUserPointsModal;
 // ─── Economy Leaderboard Sortiranje ────────────────────────
 let ecoLbSortKey = 'points';  // 'points' | 'activity'
 let ecoLbSortDir = 'desc';    // 'asc' | 'desc'
@@ -9115,6 +9294,7 @@ function sortEconomyLeaderboard(key) {
     ecoLbSortKey = key;
     ecoLbSortDir = 'desc';
   }
+  ecoLbCurrentPage = 1;
 
   // Osvezi vizuelno stanje headera
   ['ecoLbThPoints', 'ecoLbThActivity'].forEach(id => {
@@ -9153,8 +9333,8 @@ async function openReferralModal() {
 
 async function ensureUserHasReferralCode(userId) {
   try {
-    const { data: stats } = await sb.from('referral_stats').select('referral_code').eq('user_id', userId).single();
-    if (!stats || !stats.referral_code) {
+    const { data: profile } = await sb.from('user_profiles').select('referral_code').eq('id', userId).maybeSingle();
+    if (!profile || !profile.referral_code) {
       await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: null });
     }
   } catch (err) {
@@ -9164,11 +9344,27 @@ async function ensureUserHasReferralCode(userId) {
 
 async function loadReferralData(userId) {
   try {
-    const { data: stats } = await sb.from('referral_stats').select('*').eq('user_id', userId).single();
-    if (stats) updateReferralStats(stats);
+    const { data: statsJson, error: rpcErr } = await sb.rpc('get_user_referral_stats', { p_user_id: userId });
+    if (statsJson) {
+      updateReferralStats(statsJson);
+    } else {
+      const { data: stats } = await sb.from('referral_stats').select('*').eq('user_id', userId).maybeSingle();
+      if (stats) updateReferralStats(stats);
+    }
 
-    const { data: rewards } = await sb.from('referral_rewards').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-    updateRewardsList(rewards || []);
+    const { data: rewards } = await sb.from('referrals')
+      .select('id, reward_amount, status, created_at')
+      .eq('referrer_id', userId)
+      .gt('reward_amount', 0)
+      .order('created_at', { ascending: false });
+
+    const formattedRewards = (rewards || []).map(r => ({
+      reward_description: 'Provizija od kupovine paketa',
+      reward_value: r.reward_amount,
+      status: r.status === 'purchased' ? 'Dostupno' : r.status
+    }));
+
+    updateRewardsList(formattedRewards);
   } catch (err) {
     // Error loading referral data
   }
@@ -9214,37 +9410,52 @@ function setupReferralCopyBtn(code, link) {
   if (!btn) return;
 
   btn.onclick = async () => {
+    if (btn.dataset.copying === 'true') return;
+    btn.dataset.copying = 'true';
+
     try {
       const textToCopy = `Moj referral kod: ${code}\nReferral link: ${link}`;
       await navigator.clipboard.writeText(textToCopy);
-      btn.textContent = 'Kopirano!';
-      btn.style.background = '#10B981';
+
+      const origContent = btn.innerHTML;
+      const copySvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+      btn.innerHTML = `${copySvg} <span>Kopirano!</span>`;
+      btn.classList.add('copied-success');
+
       showToast('success', 'Referral link je uspešno kopiran!');
+
       setTimeout(() => {
-        btn.textContent = 'Kopiraj Link';
-        btn.style.background = '';
+        btn.innerHTML = origContent;
+        btn.classList.remove('copied-success');
+        btn.dataset.copying = 'false';
       }, 2000);
     } catch (e) {
       showToast('error', 'Greška pri kopiranju!');
+      btn.dataset.copying = 'false';
     }
   };
 }
 
 function copyCustomRefEmail(btn) {
+  if (!btn || btn.dataset.copying === 'true') return;
+  btn.dataset.copying = 'true';
+
   const email = 'contact@milanwebportal.com';
   navigator.clipboard.writeText(email).then(() => {
-    const origHTML = btn.innerHTML;
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-    btn.style.color = '#53fc18';
-    btn.style.borderColor = '#53fc18';
+    const origContent = btn.innerHTML;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> <span>Kopirano!</span>`;
+    btn.classList.add('copied-success-outline');
+
     showToast('success', 'Mejl adresa je uspešno kopirana!');
+
     setTimeout(() => {
-      btn.innerHTML = origHTML;
-      btn.style.color = '';
-      btn.style.borderColor = '';
+      btn.innerHTML = origContent;
+      btn.classList.remove('copied-success-outline');
+      btn.dataset.copying = 'false';
     }, 2000);
   }).catch(() => {
     showToast('error', 'Greška pri kopiranju mejla.');
+    btn.dataset.copying = 'false';
   });
 }
 
@@ -9361,11 +9572,15 @@ let botrixParsedData = [];
 function openBotrixImportModal(initialTab = 'cmds') {
   botrixActiveTab = initialTab || 'cmds';
   botrixParsedData = [];
-  document.getElementById('botrixInputText').value = '';
-  document.getElementById('botrixParsedSummary').style.display = 'none';
-  document.getElementById('botrixImportError').style.display = 'none';
-  document.getElementById('btnExecuteBotrixImport').disabled = true;
-  switchBotrixTab(botrixActiveTab);
+  const txtInput = document.getElementById('botrixInputText');
+  if (txtInput) txtInput.value = '';
+  const summaryBox = document.getElementById('botrixParsedSummary');
+  if (summaryBox) summaryBox.style.display = 'none';
+  const errBox = document.getElementById('botrixImportError');
+  if (errBox) errBox.style.display = 'none';
+  const execBtn = document.getElementById('btnExecuteBotrixImport');
+  if (execBtn) execBtn.disabled = true;
+
   openModal('botrixImportModal');
 }
 
@@ -10020,7 +10235,7 @@ async function executeBotrixImport() {
             }).eq('id', existing.id);
             if (errUpd) console.error('Leaderboard watchtime update error:', errUpd);
           } else {
-            const { error: errIns } = await sb.from('leaderboard').insert({
+            const { error: errIns } = await getSbPanels().from('leaderboard').insert({
               channel_id: channelIdStr,
               username: u,
               display_name: u,
@@ -10042,11 +10257,11 @@ async function executeBotrixImport() {
       if (typeof renderUnifiedLeaderboard === 'function') renderUnifiedLeaderboard();
 
     } else if (botrixActiveTab === 'store') {
-      const { data: rankData } = await sb.from('ranking').select('store_items').eq('channel_id', activeChannel.id).eq('type', 'config').maybeSingle();
+      const { data: rankData } = await getSbPanels().from('ranking').select('store_items').eq('channel_id', activeChannel.id).eq('type', 'config').maybeSingle();
       const currentItems = Array.isArray(rankData?.store_items) ? rankData.store_items : [];
       const updatedItems = [...currentItems, ...botrixParsedData];
 
-      const { error } = await sb.from('ranking').upsert({
+      const { error } = await getSbPanels().from('ranking').upsert({
         channel_id: activeChannel.id,
         type: 'config',
         store_items: updatedItems,
