@@ -878,6 +878,7 @@ let realtimeRankingSub = null;
 let realtimeModerationSub = null;
 let realtimeNotifSub = null;
 let realtimeChangelogSub = null;
+let realtimeSongRequestSub = null;
 let configLoaded = false;
 let localAnnounces = [];   // cached auto-announce messages
 let activeLeaderboardType = localStorage.getItem('active-leaderboard-tab') || 'combined'; // 'chatters', 'watchtime', 'combined'
@@ -1813,7 +1814,7 @@ function setupRealtimeSongQueueSubscription(channelId) {
   activeConfigSubscription = sb.channel(`song_request_${channelId}`)
     .on('postgres_changes', {
       event: '*',
-      schema: 'public',
+      schema: '*',
       table: 'song_request',
       filter: `channel_id=eq.${channelId}`
     }, payload => {
@@ -1821,6 +1822,16 @@ function setupRealtimeSongQueueSubscription(channelId) {
         localSongQueue = payload.new.queue;
         if (typeof renderSongQueue === 'function') renderSongQueue();
         if (typeof updatePlayerUI === 'function') updatePlayerUI();
+      } else {
+        // Fallback: Ponovo učitaj iz baze ako payload nije sadržao ceo queue
+        getSbPanels().from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
+          .then(({ data }) => {
+            if (data && Array.isArray(data.queue)) {
+              localSongQueue = data.queue;
+              if (typeof renderSongQueue === 'function') renderSongQueue();
+              if (typeof updatePlayerUI === 'function') updatePlayerUI();
+            }
+          }).catch(() => { });
       }
     })
     .subscribe();
@@ -2399,35 +2410,40 @@ const defaultBuiltinCommands = [
   { id: 'builtin-igra', command: 'igra', response: 'Prikazuje trenutnu igru ili kategoriju na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'igra', category: 'Strim Info' },
   { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje tačno vreme koliko je strim aktivan uživo.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'uptime', category: 'Strim Info' },
   { id: 'builtin-vreme', command: 'vreme [grad], vrijeme [grad]', response: 'Prikazuje trenutnu vremensku prognozu i temperaturu za uneti grad.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'vreme', category: 'Strim Info' },
-  { id: 'builtin-info', command: 'info', response: 'Prikazuje osnovne informacije, verziju i status bota.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'info', category: 'Strim Info' },
+  // Strim Info
+  { id: 'builtin-komande', command: 'komande, help, pomoc, commands', response: 'Prikazuje spisak svih ugrađenih komandi bota prilagođenih ovom kanalu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'komande', category: 'Strim Info' },
+  { id: 'builtin-igra', command: 'igra', response: 'Prikazuje trenutnu igru ili kategoriju na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'igra', category: 'Strim Info' },
+  { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje tačno vreme koliko je strim aktivan uživo.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'uptime', category: 'Strim Info' },
+  { id: 'builtin-vreme', command: 'vreme [grad], vrijeme [grad]', response: 'Prikazuje trenutnu vremensku prognozu i temperaturu za uneti grad.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'vreme', category: 'Strim Info' },
+  { id: 'builtin-info', command: 'info', response: 'Prikazuje osnovne informacije o botu i link ka oficijelnom sajtu https://kickall.app.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'info', category: 'Strim Info' },
 
   // Moderacija
   { id: 'builtin-permit', command: 'permit @user, dozvoli @user', response: 'Dozvoljava izabranom korisniku slanje 1 linka u četu bez brisanja.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'permit', category: 'Moderacija' },
   { id: 'builtin-addcom', command: 'dodajkomandu !naziv Odgovor, addcom !naziv Odgovor', response: 'Kratica za moderatore: dodaje novu komandu direktno iz četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'addcom', category: 'Moderacija' },
   { id: 'builtin-delcom', command: 'obrisikomandu !naziv, delcom !naziv', response: 'Kratica za moderatore: briše komandu direktno iz četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'delcom', category: 'Moderacija' },
   { id: 'builtin-osvezi', command: 'osvezi', response: 'Osvežava sve postavke, komande i podatke kanala iz baze.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'osvezi', category: 'Moderacija' },
-  { id: 'builtin-pin', command: 'pin [tekst]', response: 'Pinuje istaknutu poruku na vrhu četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'pin', category: 'Moderacija' },
-  { id: 'builtin-unpin', command: 'unpin', response: 'Uklanja trenutno pinovanu poruku iz četa.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'unpin', category: 'Moderacija' },
+  { id: 'builtin-pin', command: 'pin [tekst]', response: 'Pinuje unetu ili podrazumevanu istaknutu poruku na vrhu četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'pin', category: 'Moderacija' },
+  { id: 'builtin-unpin', command: 'unpin', response: 'Uklanja trenutno pinovanu poruku iz četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'unpin', category: 'Moderacija' },
   { id: 'builtin-setlive', command: 'setlive [true/false]', response: 'Ručno postavlja status strima na live (uključeno) ili offline.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'setlive', category: 'Moderacija' },
   { id: 'builtin-setgame', command: 'setgame [naziv]', response: 'Ručno postavlja naziv igre koja se prikazuje u informacijama strima.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'setgame', category: 'Moderacija' },
 
   // Statistika
   { id: 'builtin-topwatchtime', command: 'topwatchtime [broj], topwatch [broj]', response: 'Prikazuje top listu gledalaca sa najviše provedenih sati na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'topwatchtime', category: 'Statistika' },
-  { id: 'builtin-topchat', command: 'top chat [broj], top [broj], leaderboard [broj]', response: 'Prikazuje rang listu najaktivnijih korisnika po broju poruka u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'top', category: 'Statistika' },
+  { id: 'builtin-topchat', command: 'top [broj], leaderboard [broj]', response: 'Prikazuje rang listu najaktivnijih korisnika po broju poruka u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'top', category: 'Statistika' },
   { id: 'builtin-watchtime', command: 'watchtime [@user]', response: 'Prikazuje lično ili tuđe usaglašeno vreme gledanja strima.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'watchtime', category: 'Statistika' },
   { id: 'builtin-chat', command: 'chat, aktivnost, stats', response: 'Prikazuje tačan broj poslatih poruka u četu i aktivnost.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'aktivnost', category: 'Statistika' },
   { id: 'builtin-me', command: 'me', response: 'Prikazuje tvoj lični karton: sate gledanja, broj poruka i nivo.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'me', category: 'Statistika' },
   { id: 'builtin-followage', command: 'followage', response: 'Prikazuje tačno koliko dana/meseci prate vaš kanal.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'followage', category: 'Statistika' },
   { id: 'builtin-resetleaderboard', command: 'resetleaderboard', response: 'Komanda za strimera: resetuje tabele aktivnosti i poena za novi mesec.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'resetleaderboard', category: 'Statistika' },
-  { id: 'builtin-leaderboard', command: 'leaderboard [broj]', response: 'Prikazuje top listu najaktivnijih korisnika u četu (alternativa za !top).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'leaderboard', category: 'Statistika' },
+  { id: 'builtin-leaderboard', command: 'leaderboard [broj]', response: 'Prikazuje top listu najaktivnijih korisnika po broju poruka (alternativa za !top).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'leaderboard', category: 'Statistika' },
 
   // Ekonomija
-  { id: 'builtin-rank', command: 'rank, level, xp [@user]', response: 'Prikazuje tvoj nivo, skupljeni XP i trenutu titulu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'rank', category: 'Ekonomija' },
-  { id: 'builtin-points-eco', command: 'points, poeni, bal, coins [@user]', response: 'Prikazuje stanje novčanika poena i zlatnika u ekonomiji kanala.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'points', category: 'Ekonomija' },
+  { id: 'builtin-rank', command: 'rank [@user], level [@user], xp [@user]', response: 'Prikazuje tvoj nivo ili nivo ciljanog korisnika, skupljeni XP i trenutnu titulu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'rank', category: 'Ekonomija' },
+  { id: 'builtin-points-eco', command: 'points [@user], poeni [@user], bal [@user], coins [@user]', response: 'Prikazuje stanje poena/zlatnika u ekonomiji kanala za tebe ili tagovanog korisnika.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'points', category: 'Ekonomija' },
   { id: 'builtin-daily', command: 'daily', response: 'Preuzmi svoj besplatni dnevni bonus poena i iskustva (jednom u 24h).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'daily', category: 'Ekonomija' },
-  { id: 'builtin-givepoints', command: 'givepoints, dajpoene, pay @user [iznos]', response: 'Prenaša poene drugom članu četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'givepoints', category: 'Ekonomija' },
-  { id: 'builtin-toplevel', command: 'toplevel, topxp [broj]', response: 'Prikazuje top listu korisnika sa najvećim nivoima i iskustvom.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'toplevel', category: 'Ekonomija' },
-  { id: 'builtin-topcoins', command: 'topcoins, toppoeni [broj]', response: 'Prikazuje top listu najbogatijih korisnika po broju poena.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'topcoins', category: 'Ekonomija' },
+  { id: 'builtin-givepoints', command: 'givepoints @user [iznos], dajpoene @user [iznos], pay @user [iznos]', response: 'Prenosi poene drugom članu četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'givepoints', category: 'Ekonomija' },
+  { id: 'builtin-toplevel', command: 'toplevel [broj], topxp [broj]', response: 'Prikazuje top listu korisnika sa najvećim nivoima i iskustvom.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'toplevel', category: 'Ekonomija' },
+  { id: 'builtin-topcoins', command: 'topcoins [broj], toppoeni [broj]', response: 'Prikazuje top listu najbogatijih korisnika po broju poena.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'topcoins', category: 'Ekonomija' },
 
   // Kockanje
   { id: 'builtin-slots', command: 'slots, slot [iznos]', response: 'Igraj slot mašinu sa poenima i osvoji do 10x nagrade.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'slots', category: 'Kockanje' },
@@ -4755,21 +4771,45 @@ function renderAnnounceList() {
     return;
   }
 
-  el.innerHTML = localAnnounces.map((msg, i) => `
-    <div style="border: 1px solid var(--border-subtle); padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--bg-surface); transition: all 0.2s ease;">
-      <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
-        <span style="background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.25); color: var(--app-primary); font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; flex-shrink: 0; font-family: var(--font-mono);">
-          #${i + 1}
-        </span>
-        <span style="font-size: 0.88rem; color: var(--text-main); line-height: 1.4; word-break: break-word; font-weight: 500;">
-          ${escapeHtml(msg)}
-        </span>
+  el.innerHTML = localAnnounces.map((msg, i) => {
+    const isLocked = limits.maxAutoAnnounces !== Infinity && i >= limits.maxAutoAnnounces;
+
+    if (isLocked) {
+      return `
+          <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+            <span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; font-size: 0.72rem; font-weight: 800; padding: 3px 9px; border-radius: 6px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;">
+              🔒 Preko limita (#${i + 1})
+            </span>
+            <span style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.4; word-break: break-word; font-weight: 500; text-decoration: line-through decoration-color: rgba(239, 68, 68, 0.5);">
+              ${escapeHtml(msg)}
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+            <span style="font-size: 0.72rem; color: #EF4444; font-weight: 700; background: rgba(239, 68, 68, 0.1); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.2);">Bot ne šalje</span>
+            <button type="button" class="action-btn danger" onclick="deleteAnnounceMessage(${i})" style="width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #EF4444; cursor: pointer; transition: all 0.2s ease;" title="Obriši poruku">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    return `
+      <div style="border: 1px solid var(--border-subtle); padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--bg-surface); transition: all 0.2s ease;">
+        <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
+          <span style="background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.25); color: var(--app-primary); font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; flex-shrink: 0; font-family: var(--font-mono);">
+            #${i + 1}
+          </span>
+          <span style="font-size: 0.88rem; color: var(--text-main); line-height: 1.4; word-break: break-word; font-weight: 500;">
+            ${escapeHtml(msg)}
+          </span>
+        </div>
+        <button type="button" class="action-btn danger" onclick="deleteAnnounceMessage(${i})" style="flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #EF4444; cursor: pointer; transition: all 0.2s ease;" title="Obriši poruku">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+        </button>
       </div>
-      <button type="button" class="action-btn danger" onclick="deleteAnnounceMessage(${i})" style="flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #EF4444; cursor: pointer; transition: all 0.2s ease;" title="Obriši poruku">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
-      </button>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function addAnnounceMessage() {
@@ -5098,6 +5138,7 @@ function setupRealtimeChannels() {
   if (realtimeModerationSub) sb.removeChannel(realtimeModerationSub);
   if (realtimeNotifSub) sb.removeChannel(realtimeNotifSub);
   if (realtimeChangelogSub) sb.removeChannel(realtimeChangelogSub);
+  if (realtimeSongRequestSub) sb.removeChannel(realtimeSongRequestSub);
 
   realtimeNotifSub = sb.channel('public:notifications_sub')
     .on('postgres_changes', {
@@ -5176,6 +5217,30 @@ function setupRealtimeChannels() {
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
       loadBotConfig();
+    })
+    .subscribe();
+
+  realtimeSongRequestSub = sb.channel('public:song_request_sub')
+    .on('postgres_changes', {
+      event: '*',
+      schema: '*',
+      table: 'song_request',
+      filter: `channel_id=eq.${activeChannel.id}`
+    }, payload => {
+      if (payload.new && Array.isArray(payload.new.queue)) {
+        localSongQueue = payload.new.queue;
+        if (typeof renderSongQueue === 'function') renderSongQueue();
+        if (typeof updatePlayerUI === 'function') updatePlayerUI();
+      } else {
+        getSbPanels().from('song_request').select('queue').eq('channel_id', activeChannel.id).eq('type', 'config').maybeSingle()
+          .then(({ data }) => {
+            if (data && Array.isArray(data.queue)) {
+              localSongQueue = data.queue;
+              if (typeof renderSongQueue === 'function') renderSongQueue();
+              if (typeof updatePlayerUI === 'function') updatePlayerUI();
+            }
+          }).catch(() => { });
+      }
     })
     .subscribe();
 }
@@ -7142,6 +7207,7 @@ function startLiveActivityFeed() {
           }
           const dot = document.getElementById('botLiveFeedDot');
           if (dot) {
+            dot.className = 'status-dot status-off kx-51';
             dot.style.background = 'var(--text-muted)';
             dot.style.boxShadow = 'none';
           }
@@ -7166,6 +7232,7 @@ function startLiveActivityFeed() {
           liveFeedInterval = null;
         }
         if (dot) {
+          dot.className = 'status-dot status-off kx-51';
           dot.style.background = 'var(--text-muted)';
           dot.style.boxShadow = 'none';
         }
@@ -7173,8 +7240,9 @@ function startLiveActivityFeed() {
       }
 
       if (dot) {
-        dot.style.background = 'var(--kick-green)';
-        dot.style.boxShadow = '0 0 8px var(--kick-green)';
+        dot.className = 'status-dot status-on kx-51';
+        dot.style.background = '#53FC18';
+        dot.style.boxShadow = '0 0 10px #53FC18, 0 0 18px rgba(83, 252, 24, 0.6)';
       }
       const logs = await res.json();
       if (logs.length === 0) {
@@ -7224,6 +7292,7 @@ function startLiveActivityFeed() {
       }
       const dot = document.getElementById('botLiveFeedDot');
       if (dot) {
+        dot.className = 'status-dot status-off kx-51';
         dot.style.background = 'var(--text-muted)';
         dot.style.boxShadow = 'none';
       }
@@ -7556,19 +7625,19 @@ function updateNotifBadgeUI() {
   const btn = document.getElementById('notifBellBtn');
 
   if (badge) {
-    badge.style.display = unreadCount > 0 ? 'flex' : 'none';
-    badge.innerText = unreadCount > 9 ? '9+' : unreadCount;
+    badge.style.setProperty('display', unreadCount > 0 ? 'flex' : 'none', 'important');
+    badge.innerText = unreadCount > 99 ? '99+' : unreadCount;
   }
 
   if (btn) {
     if (unreadCount > 0) {
-      btn.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-      btn.style.color = '#EF4444';
-      btn.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.25)';
+      btn.style.setProperty('border-color', '#EF4444', 'important');
+      btn.style.setProperty('color', '#EF4444', 'important');
+      btn.style.setProperty('box-shadow', '0 0 14px rgba(239, 68, 68, 0.45)', 'important');
     } else {
-      btn.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-      btn.style.color = 'var(--text-secondary)';
-      btn.style.boxShadow = 'none';
+      btn.style.setProperty('border-color', 'rgba(255, 255, 255, 0.08)', 'important');
+      btn.style.setProperty('color', 'var(--text-secondary)', 'important');
+      btn.style.setProperty('box-shadow', 'none', 'important');
     }
   }
 }
@@ -9344,7 +9413,7 @@ async function ensureUserHasReferralCode(userId) {
 
 async function loadReferralData(userId) {
   try {
-    const { data: statsJson, error: rpcErr } = await sb.rpc('get_user_referral_stats', { p_user_id: userId });
+    const { data: statsJson } = await sb.rpc('get_user_referral_stats', { p_user_id: userId });
     if (statsJson) {
       updateReferralStats(statsJson);
     } else {

@@ -33,7 +33,7 @@ function handleIq(chatroomId, sender, targetRaw) {
     } else if (iq < 130) {
         komentar = 'Pametnica! Možeš da sklopiš Lego set bez uputstva. 🧠';
     } else {
-        komentar = 'Genije! Milanov lični asistent i sledeća generacija AI-ja. 🤖🔥';
+        komentar = 'Genije! Noj lični asistent i sledeća generacija AI-ja. 🤖🔥';
     }
     
     posaljiPoruku(chatroomId, `🧠 IQ Test za @${user}: ${iq} | Komentar: ${komentar}`);
@@ -285,11 +285,38 @@ async function handleFollowage(chatroomId, sender, targetRaw) {
 
     try {
         const utils = require('./utils');
-        const res = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}/users/${cleanTarget}/follow-date`);
-        if (res.ok) {
-            const data = await res.json();
-            if (data && data.created_at) {
-                const followDate = new Date(data.created_at);
+        const kickAuth = require('./kickAuth');
+
+        let data = null;
+
+        // 1. Pokušaj preko zvaničnog Public API-ja (ako imamo token)
+        try {
+            const token = await kickAuth.getAccessToken();
+            if (token) {
+                const resAuth = await fetch(`https://api.kick.com/public/v1/channels/${channelUsername}/users/${cleanTarget}/follow-date`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Accept': 'application/json'
+                    }
+                });
+                if (resAuth.ok) {
+                    data = await resAuth.json();
+                }
+            }
+        } catch (_) {}
+
+        // 2. Ako 1 nije uspelo, probaj v2 API preko utils.fetchKickAPI
+        if (!data || !data.created_at) {
+            const res = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}/users/${cleanTarget}/follow-date`);
+            if (res.ok) {
+                data = await res.json();
+            }
+        }
+
+        if (data && (data.created_at || data.followed_at)) {
+            const rawDate = data.created_at || data.followed_at;
+            const followDate = new Date(rawDate);
+            if (!isNaN(followDate.getTime())) {
                 const diffTime = Math.abs(Date.now() - followDate.getTime());
                 const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                 const meseci = Math.floor(diffDays / 30);
@@ -854,7 +881,7 @@ async function handleIgra(chatroomId) {
 }
 
 // ─── ZANIMLJIVOSTI ────────────────────────────────────────────────────────────
-const INFO_FACTS = [
+const _INFO_FACTS = [
     "Med se nikada ne može pokvariti. Arheolozi su pronašli tegle meda u egipatskim grobnicama stare preko 3.000 godina koje su i dalje potpuno jestive! 🍯",
     "Bananu botanički gledano ubrajamo u bobice, dok jagoda to zapravo uopšte nije. 🍌🍓",
     "Prva računarska igra ikada napravljena bila je 'Spacewar!' i programirana je 1962. godine na MIT institutu. 🎮",
@@ -875,17 +902,7 @@ function handleInfo(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
-    if (channelState.zadnjiInfoIdx === undefined) {
-        channelState.zadnjiInfoIdx = -1;
-    }
-
-    let idx;
-    do {
-        idx = Math.floor(Math.random() * INFO_FACTS.length);
-    } while (idx === channelState.zadnjiInfoIdx && INFO_FACTS.length > 1);
-
-    channelState.zadnjiInfoIdx = idx;
-    posaljiPoruku(chatroomId, `💡 Zanimljivost: ${INFO_FACTS[idx]}`);
+    posaljiPoruku(chatroomId, `🤖 Kickot Bot | Oficijelni bot za Kick strimere! Dashboard & podešavanja: https://kickall.app 🚀`);
 }
 
 // !vreme <grad>

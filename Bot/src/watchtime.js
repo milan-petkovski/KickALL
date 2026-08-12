@@ -6,7 +6,7 @@ const { posaljiPoruku } = require('./messenger');
 // Interval ažuriranja (1 minut / 60.000 ms) i grace period (10 minuta / 600.000 ms)
 const TICK_INTERVAL_MS = 60 * 1000;
 const GRACE_PERIOD_MS = 10 * 60 * 1000;
-const SAVE_INTERVAL_MINUTES = 5;
+const SAVE_INTERVAL_MINUTES = 10;
 
 // ─── UČITAVANJE SA SUPABASE ───────────────────────────────────────────────────
 async function ucitajWatchtime(chatroomId) {

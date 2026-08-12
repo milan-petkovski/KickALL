@@ -20,6 +20,9 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            Bot/package-lock.json
 
       - name: Install Bot Dependencies
         working-directory: ./Bot

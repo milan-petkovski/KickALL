@@ -1,19 +1,16 @@
 /**
- * Jednokratna skripta: uloguj BOT nalog na Kick i dobij access_token + refresh_token
- * sa scope-ovima chat:write i moderation:chat_message:manage.
+ * Jednokratna skripta: uloguj BOT nalog na Kick i dobij access_token + refresh_token.
  *
  * Pokretanje:
  *   1. Uloguj se u browseru na kick.com KAO BOT nalog (ne kao tvoj glavni nalog).
  *   2. node scripts/kick-login.js
  *   3. Otvori link koji skripta ispiše, odobri pristup dok si ulogovan kao bot.
- *   4. Kick će te vratiti na localhost:8890, skripta automatski hvata kod i čuva tokene.
+ *   4. Kick će te vratiti na localhost:8890, skripta čuva tokene u Supabase.
  */
 
 require('dotenv').config();
 const http = require('http');
 const crypto = require('crypto');
-const path = require('path');
-const fs = require('fs');
 const { createClient } = require('@supabase/supabase-js');
 
 const CLIENT_ID = process.env.KICK_CLIENT_ID;
@@ -22,14 +19,18 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const REDIRECT_URI = 'http://localhost:8890/callback';
 const SCOPES = 'chat:write moderation:chat_message:manage moderation:ban channel:read';
-const TOKENS_FILE = path.join(__dirname, '..', 'kick_tokens.json');
-
-const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
     console.error('Nedostaje KICK_CLIENT_ID ili KICK_CLIENT_SECRET u .env fajlu.');
     process.exit(1);
 }
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error('Nedostaje SUPABASE_URL ili SUPABASE_KEY u .env fajlu. Tokeni se čuvaju isključivo u Supabase.');
+    process.exit(1);
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function base64url(buffer) {
     return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
@@ -95,35 +96,30 @@ const server = http.createServer(async (req, res) => {
             refresh_token: data.refresh_token,
             expires_at: Date.now() + ((data.expires_in || 3600) * 1000)
         };
-        fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokens, null, 2), 'utf8');
 
-        let supabaseNote = '';
-        if (supabase) {
-            const { error } = await supabase
-                .from('bot_kick_tokens')
-                .upsert({
-                    id: 1,
-                    access_token: tokens.access_token,
-                    refresh_token: tokens.refresh_token,
-                    expires_at: new Date(tokens.expires_at).toISOString(),
-                    updated_at: new Date().toISOString()
-                });
-            if (error) {
-                supabaseNote = `\nUPOZORENJE: nije uspelo upisivanje u Supabase (${error.message}). Bot na Renderu neće videti ove tokene dok se ovo ne reši!`;
-                console.error('Supabase upsert greška:', error.message);
-            } else {
-                supabaseNote = '\nTokeni su takođe upisani u Supabase (tabela bot_kick_tokens), bot na Renderu će ih automatski koristiti.';
-            }
-        } else {
-            supabaseNote = '\nSUPABASE_URL/SUPABASE_KEY nisu podešeni u .env, tokeni su sačuvani SAMO lokalno. Bot na Renderu ih neće videti.';
+        const { error } = await supabase
+            .from('bot_kick_tokens')
+            .upsert({
+                id: 1,
+                access_token: tokens.access_token,
+                refresh_token: tokens.refresh_token,
+                expires_at: new Date(tokens.expires_at).toISOString(),
+                updated_at: new Date().toISOString()
+            });
+
+        if (error) {
+            res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+            res.end('Greška pri upisivanju u Supabase: ' + error.message);
+            console.error('Supabase upsert greška:', error.message);
+            server.close();
+            return;
         }
 
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Uspešno! Tokeni su sačuvani. Možeš zatvoriti ovaj tab i vratiti se u terminal.');
+        res.end('Uspešno! Tokeni su sačuvani u Supabase. Možeš zatvoriti ovaj tab.');
 
-        console.log('\nUSPEŠNO! Tokeni sačuvani u:', TOKENS_FILE);
-        console.log(supabaseNote);
-        console.log('\nSada možeš pokrenuti bota normalno (npm start), ili ako je bot na Renderu, samo redeploy nije ni potreban, on će sam pokupiti token iz Supabase.\n');
+        console.log('\nUSPEŠNO! Tokeni upisani u Supabase (tabela bot_kick_tokens).');
+        console.log('Bot na Renderu će automatski koristiti nove tokene bez ponovnog deploya.\n');
         server.close();
         process.exit(0);
     } catch (err) {

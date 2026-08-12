@@ -1,14 +1,13 @@
-const fs = require('fs');
-const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 const config = require('./config');
 const state = require('./state');
 const { log, dobijTrenutniMesec, sanitizeInput, isValidUsername, runWithLeaderboardLock } = require('./utils');
 
 // Inicijalizacija Supabase klijenta
-const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY) ? createClient(config.SUPABASE_URL, config.SUPABASE_KEY) : null;
+const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
 const sbPanels = supabase;
-const KORISTI_SUPABASE = !!supabase;
+// Uvek koristimo Supabase — nema lokalnih fallbackova
+const KORISTI_SUPABASE = true;
 
 // ─── LEADERBOARD ─────────────────────────────────────────────────────────────
 
@@ -19,98 +18,31 @@ async function ucitajLeaderboard(chatroomId) {
         const channelUsername = channelState.channelUsername || chatroomId;
         const trenutniMesec = dobijTrenutniMesec();
 
-        if (KORISTI_SUPABASE) {
-            log('INFO', `[${channelUsername}] Učitavam leaderboard sa Supabase baze...`);
-            const { data, error } = await sbPanels
-                .from('leaderboard')
-                .select('username, display_name, chat')
-                .eq('channel_id', chatroomId)
-                .eq('month', trenutniMesec);
+        log('INFO', `[${channelUsername}] U\u010ditavam leaderboard sa Supabase baze...`);
+        const { data, error } = await sbPanels
+            .from('leaderboard')
+            .select('username, display_name, chat')
+            .eq('channel_id', chatroomId)
+            .eq('month', trenutniMesec);
 
-            if (error) throw error;
+        if (error) throw error;
 
-            const podaci = {};
-            if (data && data.length > 0) {
-                data.forEach(row => {
-                    podaci[row.username.toLowerCase()] = {
-                        username: row.display_name,
-                        count: row.chat || 0
-                    };
-                });
-            }
-            channelState.leaderboard = podaci;
-            channelState.leaderboardDeltas = {};
-            channelState.tekuciMesecLeaderboarda = trenutniMesec;
-            channelState.leaderboardDirty = false;
-            log('INFO', `[${channelUsername}] Učitan Supabase leaderboard za mesec: ${trenutniMesec} (${Object.keys(podaci).length} aktivnih korisnika)`);
-            return;
-        }
-
-        let json = null;
-        if (config.KORISTI_GIST) {
-            log('INFO', `Učitavam leaderboard sa GitHub Gist-a (${config.GIST_ID})...`);
-            const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
-                headers: {
-                    'Accept': 'application/vnd.github+json',
-                    'Authorization': `Bearer ${config.GITHUB_TOKEN}`,
-                    'X-GitHub-Api-Version': '2022-11-28',
-                    'User-Agent': 'Kickot-Bot'
-                }
+        const podaci = {};
+        if (data && data.length > 0) {
+            data.forEach(row => {
+                podaci[row.username.toLowerCase()] = {
+                    username: row.display_name,
+                    count: row.chat || 0
+                };
             });
-
-            if (res.ok) {
-                const gistData = await res.json();
-                const file = gistData.files['leaderboard.json'];
-                if (file && file.content) {
-                    json = JSON.parse(file.content);
-                }
-            }
-        } else {
-            if (fs.existsSync(config.LEADERBOARD_FILE)) {
-                const data = fs.readFileSync(config.LEADERBOARD_FILE, 'utf8');
-                json = JSON.parse(data);
-            }
         }
-
-        if (json) {
-            let resetMeseca = false;
-            if (json.mesec && json.mesec !== trenutniMesec) {
-                resetMeseca = true;
-            }
-
-            if (resetMeseca) {
-                log('INFO', `Detektovan novi mesec (${json.mesec} -> ${trenutniMesec}). Resetujem leaderboard.`);
-                const stariMesec = json.mesec;
-                if (!config.KORISTI_GIST) {
-                    const backupFile = path.join(__dirname, '..', `leaderboard_backup_${stariMesec}.json`);
-                    fs.writeFileSync(backupFile, JSON.stringify(json, null, 2), 'utf8');
-                } else {
-                    await sacuvajBackupUGist(stariMesec, json);
-                }
-
-                channelState.leaderboard = {};
-                channelState.leaderboardDeltas = {};
-                channelState.tekuciMesecLeaderboarda = trenutniMesec;
-                channelState.leaderboardDirty = true;
-                await sacuvajLeaderboard(chatroomId);
-            } else {
-                channelState.leaderboard = json.podaci || {};
-                channelState.leaderboardDeltas = {};
-                channelState.tekuciMesecLeaderboarda = trenutniMesec;
-                if (json.mesec !== trenutniMesec) {
-                    channelState.leaderboardDirty = true;
-                }
-                log('INFO', `[${channelUsername}] Učitan leaderboard za mesec: ${channelState.tekuciMesecLeaderboarda} (${Object.keys(channelState.leaderboard).length} aktivnih korisnika)`);
-            }
-        } else {
-            channelState.leaderboard = {};
-            channelState.leaderboardDeltas = {};
-            channelState.tekuciMesecLeaderboarda = trenutniMesec;
-            channelState.leaderboardDirty = true;
-            await sacuvajLeaderboard(chatroomId);
-        }
+        channelState.leaderboard = podaci;
+        channelState.leaderboardDeltas = {};
+        channelState.tekuciMesecLeaderboarda = trenutniMesec;
+        channelState.leaderboardDirty = false;
+        log('INFO', `[${channelUsername}] U\u010ditan Supabase leaderboard za mesec: ${trenutniMesec} (${Object.keys(podaci).length} aktivnih korisnika)`);
     } catch (err) {
-        log('ERR', `Greška pri učitavanju leaderboarda za ${chatroomId}: ${err.message}`);
+        log('ERR', `Gre\u0161ka pri u\u010ditavanju leaderboarda za ${chatroomId}: ${err.message}`);
         const channelState = state.getChannelState(chatroomId);
         if (channelState) {
             channelState.leaderboard = {};
@@ -126,119 +58,73 @@ async function sacuvajLeaderboard(chatroomId) {
     return runWithLeaderboardLock(channelState, async () => {
         try {
             const trenutniMesec = dobijTrenutniMesec();
+            const dirtyKeys = Object.keys(channelState.leaderboardDeltas).filter(k => channelState.leaderboardDeltas[k] !== 0);
 
-            if (KORISTI_SUPABASE) {
-                const dirtyKeys = Object.keys(channelState.leaderboardDeltas).filter(k => channelState.leaderboardDeltas[k] !== 0);
-
-                if (dirtyKeys.length === 0) {
-                    channelState.leaderboardDirty = false;
-                    return;
-                }
-
-                const { data, error: fetchError } = await sbPanels
-                    .from('leaderboard')
-                    .select('username, chat, watchtime_minutes')
-                    .eq('channel_id', chatroomId)
-                    .eq('month', channelState.tekuciMesecLeaderboarda)
-                    .in('username', dirtyKeys);
-
-                if (fetchError) throw fetchError;
-
-                const dbMap = {};
-                if (data) {
-                    data.forEach(row => {
-                        dbMap[row.username.toLowerCase()] = row;
-                    });
-                }
-
-                const rowsToUpsert = dirtyKeys.map(key => {
-                    const existing = dbMap[key];
-                    const dbChat = existing && existing.chat !== undefined ? existing.chat : 0;
-                    const dbWatchtime = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : ((channelState.watchtime && channelState.watchtime[key]) ? channelState.watchtime[key].minutes : 0);
-                    const delta = channelState.leaderboardDeltas[key];
-                    const newChat = Math.max(0, dbChat + delta);
-                    const mesecStr = channelState.tekuciMesecLeaderboarda || trenutniMesec;
-                    const godinaStr = mesecStr.includes('-') ? mesecStr.split('-')[1] : String(new Date().getFullYear());
-
-                    return {
-                        channel_id: chatroomId,
-                        username: key,
-                        display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].display_name) || (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
-                        chat: newChat,
-                        watchtime_minutes: dbWatchtime,
-                        month: mesecStr,
-                        year: godinaStr,
-                        updated_at: new Date().toISOString(),
-                        _newChat: newChat
-                    };
-                });
-
-                const rowsClean = rowsToUpsert.map(({ _newChat, ...r }) => r);
-                const { error: upsertError } = await sbPanels
-                    .from('leaderboard')
-                    .upsert(rowsClean, { onConflict: 'channel_id,username,month' });
-
-                if (upsertError) throw upsertError;
-
-                rowsToUpsert.forEach(row => {
-                    const key = row.username;
-                    if (channelState.leaderboard[key]) {
-                        channelState.leaderboard[key].count = row._newChat;
-                    } else {
-                        channelState.leaderboard[key] = {
-                            username: row.display_name,
-                            count: row._newChat
-                        };
-                    }
-                    delete channelState.leaderboardDeltas[key];
-                });
-
+            if (dirtyKeys.length === 0) {
                 channelState.leaderboardDirty = false;
-                log('INFO', `[${channelState.channelUsername || chatroomId}] Leaderboard uspešno sačuvan na Supabase (${rowsClean.length} korisnika).`);
-            } else {
-                Object.keys(channelState.leaderboardDeltas).forEach(key => {
-                    if (channelState.leaderboard[key]) {
-                        channelState.leaderboard[key].count = Math.max(0, channelState.leaderboard[key].count + channelState.leaderboardDeltas[key]);
-                    }
-                    delete channelState.leaderboardDeltas[key];
-                });
-
-                const json = {
-                    mesec: trenutniMesec,
-                    podaci: channelState.leaderboard
-                };
-
-                if (config.KORISTI_GIST) {
-                    const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
-                        method: 'PATCH',
-                        headers: {
-                            'Accept': 'application/vnd.github+json',
-                            'Authorization': `Bearer ${config.GITHUB_TOKEN}`,
-                            'X-GitHub-Api-Version': '2022-11-28',
-                            'User-Agent': 'Kickot-Bot',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            files: {
-                                'leaderboard.json': {
-                                    content: JSON.stringify(json, null, 2)
-                                }
-                            }
-                        })
-                    });
-
-                    if (res.ok) {
-                        channelState.leaderboardDirty = false;
-                        log('INFO', 'Leaderboard uspešno sačuvan na GitHub Gist.');
-                    } else {
-                        throw new Error(`GitHub API status: ${res.status}`);
-                    }
-                } else {
-                    fs.writeFileSync(config.LEADERBOARD_FILE, JSON.stringify(json, null, 2), 'utf8');
-                    channelState.leaderboardDirty = false;
-                    log('INFO', 'Leaderboard uspešno sačuvan na disk.');
-                }
+                return;
             }
+
+            const { data, error: fetchError } = await sbPanels
+                .from('leaderboard')
+                .select('username, chat, watchtime_minutes')
+                .eq('channel_id', chatroomId)
+                .eq('month', channelState.tekuciMesecLeaderboarda)
+                .in('username', dirtyKeys);
+
+            if (fetchError) throw fetchError;
+
+            const dbMap = {};
+            if (data) {
+                data.forEach(row => {
+                    dbMap[row.username.toLowerCase()] = row;
+                });
+            }
+
+            const rowsToUpsert = dirtyKeys.map(key => {
+                const existing = dbMap[key];
+                const dbChat = existing && existing.chat !== undefined ? existing.chat : 0;
+                const dbWatchtime = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : ((channelState.watchtime && channelState.watchtime[key]) ? channelState.watchtime[key].minutes : 0);
+                const delta = channelState.leaderboardDeltas[key];
+                const newChat = Math.max(0, dbChat + delta);
+                const mesecStr = channelState.tekuciMesecLeaderboarda || trenutniMesec;
+                const godinaStr = mesecStr.includes('-') ? mesecStr.split('-')[1] : String(new Date().getFullYear());
+
+                return {
+                    channel_id: chatroomId,
+                    username: key,
+                    display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].display_name) || (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
+                    chat: newChat,
+                    watchtime_minutes: dbWatchtime,
+                    month: mesecStr,
+                    year: godinaStr,
+                    updated_at: new Date().toISOString(),
+                    _newChat: newChat
+                };
+            });
+
+            const rowsClean = rowsToUpsert.map(({ _newChat, ...r }) => r);
+            const { error: upsertError } = await sbPanels
+                .from('leaderboard')
+                .upsert(rowsClean, { onConflict: 'channel_id,username,month' });
+
+            if (upsertError) throw upsertError;
+
+            rowsToUpsert.forEach(row => {
+                const key = row.username;
+                if (channelState.leaderboard[key]) {
+                    channelState.leaderboard[key].count = row._newChat;
+                } else {
+                    channelState.leaderboard[key] = {
+                        username: row.display_name,
+                        count: row._newChat
+                    };
+                }
+                delete channelState.leaderboardDeltas[key];
+            });
+
+            channelState.leaderboardDirty = false;
+            log('INFO', `[${channelState.channelUsername || chatroomId}] Leaderboard uspešno sačuvan na Supabase (${rowsClean.length} korisnika).`);
         } catch (err) {
             log('ERR', `Greška pri čuvanju leaderboarda za ${chatroomId}: ${err.message}`);
         }
@@ -253,31 +139,10 @@ function proveriIResetujMesec(chatroomId) {
         const stariMesec = channelState.tekuciMesecLeaderboarda;
         log('INFO', `[${channelState.channelUsername || chatroomId}] Novi mesec detektovan tokom rada bota (${stariMesec} -> ${trenutniMesec}). Resetujem leaderboard.`);
 
-        const stariPodaci = {
-            mesec: stariMesec,
-            podaci: { ...channelState.leaderboard }
-        };
-
         channelState.leaderboard = {};
         channelState.leaderboardDeltas = {};
         channelState.tekuciMesecLeaderboarda = trenutniMesec;
-
-        if (KORISTI_SUPABASE) {
-            channelState.leaderboardDirty = false;
-        } else {
-            channelState.leaderboardDirty = true;
-            (async () => {
-                if (!config.KORISTI_GIST) {
-                    try {
-                        const backupFile = path.join(__dirname, '..', `leaderboard_backup_${stariMesec}.json`);
-                        fs.writeFileSync(backupFile, JSON.stringify(stariPodaci, null, 2), 'utf8');
-                    } catch (e) {
-                        log('ERR', `Greška pri čuvanju lokalnog backupa: ${e.message}`);
-                    }
-                }
-                await sacuvajLeaderboard(chatroomId);
-            })();
-        }
+        channelState.leaderboardDirty = false;
     }
 }
 
@@ -368,72 +233,35 @@ async function ucitajLjubav(chatroomId) {
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
         const channelUsername = channelState.channelUsername || chatroomId;
-        let json = null;
 
-        if (KORISTI_SUPABASE) {
-            log('INFO', `[${channelUsername}] Učitavam ljubavne podatke sa Supabase baze (love_and_marriages)...`);
+        log('INFO', `[${channelUsername}] U\u010ditavam ljubavne podatke sa Supabase baze (love_and_marriages)...`);
 
-            const { data, error } = await sbPanels
-                .from('love_and_marriages')
-                .select('user1, user2, modifier, is_married, married_at')
-                .eq('channel_id', chatroomId);
+        const { data, error } = await sbPanels
+            .from('love_and_marriages')
+            .select('user1, user2, modifier, is_married, married_at')
+            .eq('channel_id', chatroomId);
 
-            if (error) throw error;
+        if (error) throw error;
 
-            if (data) {
-                data.forEach(row => {
-                    const key = [row.user1.toLowerCase(), row.user2.toLowerCase()].sort().join('::');
-                    if (row.modifier !== null && row.modifier !== undefined) {
-                        channelState.loveModifiers[key] = row.modifier;
-                    }
-                    if (row.is_married) {
-                        channelState.marriedCouples[key] = {
-                            user1: row.user1,
-                            user2: row.user2,
-                            datum: row.married_at ? new Date(row.married_at).toLocaleDateString('sr-RS') : '—'
-                        };
-                    }
-                });
-            }
-
-            log('INFO', `[${channelUsername}] Učitani ljubavni podaci sa Supabase (${Object.keys(channelState.loveModifiers).length} modifikatora, ${Object.keys(channelState.marriedCouples).length} brakova).`);
-            return;
-        } else if (config.KORISTI_GIST) {
-            log('INFO', `Učitavam ljubavne podatke sa GitHub Gist-a (${config.GIST_ID})...`);
-            const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
-                headers: {
-                    'Accept': 'application/vnd.github+json',
-                    'Authorization': `Bearer ${config.GITHUB_TOKEN}`,
-                    'X-GitHub-Api-Version': '2022-11-28',
-                    'User-Agent': 'Kickot-Bot'
+        if (data) {
+            data.forEach(row => {
+                const key = [row.user1.toLowerCase(), row.user2.toLowerCase()].sort().join('::');
+                if (row.modifier !== null && row.modifier !== undefined) {
+                    channelState.loveModifiers[key] = row.modifier;
+                }
+                if (row.is_married) {
+                    channelState.marriedCouples[key] = {
+                        user1: row.user1,
+                        user2: row.user2,
+                        datum: row.married_at ? new Date(row.married_at).toLocaleDateString('sr-RS') : '\u2014'
+                    };
                 }
             });
-
-            if (res.ok) {
-                const gistData = await res.json();
-                const file = gistData.files['love_data.json'];
-                if (file && file.content) {
-                    json = JSON.parse(file.content);
-                }
-            }
-        } else {
-            if (fs.existsSync(config.LOVE_DATA_FILE)) {
-                const data = fs.readFileSync(config.LOVE_DATA_FILE, 'utf8');
-                json = JSON.parse(data);
-            }
         }
 
-        if (json) {
-            if (json.loveModifiers) {
-                Object.assign(channelState.loveModifiers, json.loveModifiers);
-            }
-            if (json.marriedCouples) {
-                Object.assign(channelState.marriedCouples, json.marriedCouples);
-            }
-            log('INFO', `Učitani ljubavni podaci (${Object.keys(channelState.loveModifiers).length} modifikatora, ${Object.keys(channelState.marriedCouples).length} brakova).`);
-        }
+        log('INFO', `[${channelUsername}] U\u010ditani ljubavni podaci sa Supabase (${Object.keys(channelState.loveModifiers).length} modifikatora, ${Object.keys(channelState.marriedCouples).length} brakova).`);
     } catch (err) {
-        log('ERR', `Greška pri učitavanju ljubavnih podataka za ${chatroomId}: ${err.message}`);
+        log('ERR', `Gre\u0161ka pri u\u010ditavanju ljubavnih podataka za ${chatroomId}: ${err.message}`);
     }
 }
 
@@ -441,70 +269,34 @@ async function sacuvajLjubav(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || !channelState.loveDirty) return;
     try {
-        const json = {
-            loveModifiers: channelState.loveModifiers,
-            marriedCouples: channelState.marriedCouples
-        };
+        const keys = new Set([
+            ...Object.keys(channelState.loveModifiers),
+            ...Object.keys(channelState.marriedCouples)
+        ]);
 
-        if (KORISTI_SUPABASE) {
-            const keys = new Set([
-                ...Object.keys(channelState.loveModifiers),
-                ...Object.keys(channelState.marriedCouples)
-            ]);
+        const rows = Array.from(keys).map(key => {
+            const [u1, u2] = key.split('::');
+            const isMarried = !!channelState.marriedCouples[key];
+            return {
+                channel_id: chatroomId,
+                user1: u1,
+                user2: u2,
+                modifier: channelState.loveModifiers[key] ?? 0,
+                is_married: isMarried,
+                married_at: isMarried ? new Date().toISOString() : null,
+                updated_at: new Date().toISOString()
+            };
+        });
 
-            const rows = Array.from(keys).map(key => {
-                const [u1, u2] = key.split('::');
-                const isMarried = !!channelState.marriedCouples[key];
-                return {
-                    channel_id: chatroomId,
-                    user1: u1,
-                    user2: u2,
-                    modifier: channelState.loveModifiers[key] ?? 0,
-                    is_married: isMarried,
-                    married_at: isMarried ? new Date().toISOString() : null,
-                    updated_at: new Date().toISOString()
-                };
-            });
+        if (rows.length > 0) {
+            const { error } = await sbPanels
+                .from('love_and_marriages')
+                .upsert(rows, { onConflict: 'channel_id,user1,user2' });
 
-            if (rows.length > 0) {
-                const { error } = await sbPanels
-                    .from('love_and_marriages')
-                    .upsert(rows, { onConflict: 'channel_id,user1,user2' });
-
-                if (error) throw error;
-            }
-            channelState.loveDirty = false;
-            log('INFO', `[${channelState.channelUsername || chatroomId}] Ljubavni podaci uspešno sačuvani u love_and_marriages na Supabase.`);
-        } else if (config.KORISTI_GIST) {
-            const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
-                method: 'PATCH',
-                headers: {
-                    'Accept': 'application/vnd.github+json',
-                    'Authorization': `Bearer ${config.GITHUB_TOKEN}`,
-                    'X-GitHub-Api-Version': '2022-11-28',
-                    'User-Agent': 'Kickot-Bot',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    files: {
-                        'love_data.json': {
-                            content: JSON.stringify(json, null, 2)
-                        }
-                    }
-                })
-            });
-
-            if (res.ok) {
-                channelState.loveDirty = false;
-                log('INFO', 'Ljubavni podaci uspešno sačuvani na GitHub Gist.');
-            } else {
-                throw new Error(`GitHub API status: ${res.status}`);
-            }
-        } else {
-            fs.writeFileSync(config.LOVE_DATA_FILE, JSON.stringify(json, null, 2), 'utf8');
-            channelState.loveDirty = false;
-            log('INFO', 'Ljubavni podaci uspešno sačuvani na disk.');
+            if (error) throw error;
         }
+        channelState.loveDirty = false;
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Ljubavni podaci uspešno sačuvani u love_and_marriages na Supabase.`);
     } catch (err) {
         log('ERR', `Greška pri čuvanju ljubavnih podataka za ${chatroomId}: ${err.message}`);
     }
@@ -521,36 +313,6 @@ function osigurajCuvanjeLjubavi(chatroomId) {
         if (channelState.loveSaveTimer && typeof channelState.loveSaveTimer.unref === 'function') {
             channelState.loveSaveTimer.unref();
         }
-    }
-}
-
-// ─── GIST BACKUP ─────────────────────────────────────────────────────────────
-
-async function sacuvajBackupUGist(mesec, stariPodaci) {
-    try {
-        log('INFO', `Čuvam backup za mesec ${mesec} na GitHub Gist...`);
-        const res = await fetch(`https://api.github.com/gists/${config.GIST_ID}`, {
-            method: 'PATCH',
-            headers: {
-                'Accept': 'application/vnd.github+json',
-                'Authorization': `Bearer ${config.GITHUB_TOKEN}`,
-                'X-GitHub-Api-Version': '2022-11-28',
-                'User-Agent': 'Kickot-Bot',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                files: {
-                    [`leaderboard_backup_${mesec}.json`]: {
-                        content: JSON.stringify(stariPodaci, null, 2)
-                    }
-                }
-            })
-        });
-        if (!res.ok) {
-            log('ERR', `Neuspešan backup na Gist (status ${res.status})`);
-        }
-    } catch (err) {
-        log('ERR', `Greška pri čuvanju backupa na Gist: ${err.message}`);
     }
 }
 
@@ -1020,6 +782,40 @@ async function syncChatroomId(channelName, realChatroomId) {
     }
 }
 
+let realtimeChannel = null;
+
+/**
+ * Pokreće Supabase Realtime CDC (Change Data Capture) pretplatu na `bot_config` tabelu.
+ * Kada strimer izmeni podešavanje na web-u, bot u realnom vremenu automatski
+ * osvežava konfiguraciju tog kanala u memoriji bez ručnog osvežavanja.
+ */
+function postaviRealtimeSlusalac() {
+    if (!KORISTI_SUPABASE || !supabase || realtimeChannel) return;
+
+    try {
+        realtimeChannel = supabase
+            .channel('bot_realtime_config_sync')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'bot_config' },
+                async (payload) => {
+                    const chatroomId = payload?.new?.channel_id || payload?.old?.channel_id;
+                    if (chatroomId) {
+                        log('INFO', `[REALTIME] Detektovana izmena u bot_config za chatroomId ${chatroomId}. Sinhronizujem u realnom vremenu...`);
+                        await ucitajBotConfig(chatroomId);
+                    }
+                }
+            )
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    log('INFO', '[REALTIME] Supabase Realtime CDC sinhronizacija aktivna za izmene bota u realnom vremenu.');
+                }
+            });
+    } catch (err) {
+        log('ERR', `[REALTIME] Greška pri pokretanju Realtime CDC slušaoca: ${err.message}`);
+    }
+}
+
 module.exports = {
     supabase,
     sbPanels,
@@ -1042,6 +838,8 @@ module.exports = {
     ucitajUserPlan,
     ucitajSveAktivneKanale,
     posaljiKickovAlert,
-    syncChatroomId
+    syncChatroomId,
+    postaviRealtimeSlusalac
 };
+
 

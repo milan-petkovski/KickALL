@@ -578,7 +578,7 @@ function showReferralNotification() {
 
 async function getReferralStats(userId) {
   try {
-    const { data: statsJson, error: rpcErr } = await sb.rpc('get_user_referral_stats', { p_user_id: userId });
+    const { data: statsJson } = await sb.rpc('get_user_referral_stats', { p_user_id: userId });
     if (statsJson) return statsJson;
 
     const { data, error } = await sb
@@ -614,7 +614,7 @@ async function getReferralStats(userId) {
 // Get user's referral rewards
 async function getReferralRewards(userId) {
   try {
-    const { data: rewards, error } = await sb
+    const { data: rewards } = await sb
       .from('referrals')
       .select('id, reward_amount, status, created_at')
       .eq('referrer_id', userId)

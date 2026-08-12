@@ -1,16 +1,11 @@
 const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
-const path = require('path');
 const config = require('./config');
 const { log } = require('./utils');
 
 const TABELA = 'bot_kick_tokens';
 const RED_ID = 1; // uvek čuvamo jedan red (bot ima jedan nalog)
-const LOKALNI_FALLBACK_FAJL = path.join(__dirname, '..', 'kick_tokens.json');
 
-const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY)
-    ? createClient(config.SUPABASE_URL, config.SUPABASE_KEY)
-    : null;
+const supabase = createClient(config.SUPABASE_URL, config.SUPABASE_KEY);
 
 let keshTokeni = null;       // { access_token, refresh_token, expires_at }
 let refreshTimer = null;
@@ -19,36 +14,27 @@ let broadcasterIdCache = {}; // username -> user_id
 async function ucitajTokene() {
     if (keshTokeni) return keshTokeni;
 
-    if (supabase) {
-        try {
-            const { data, error } = await supabase
-                .from(TABELA)
-                .select('access_token, refresh_token, expires_at')
-                .eq('id', RED_ID)
-                .maybeSingle();
-
-            if (!error && data) {
-                keshTokeni = {
-                    access_token: data.access_token,
-                    refresh_token: data.refresh_token,
-                    expires_at: new Date(data.expires_at).getTime()
-                };
-                return keshTokeni;
-            }
-            if (error) {
-                log('WARN', `[AUTH] Ne mogu da učitam Kick tokene iz Supabase (${error.message}), probam lokalni fajl kao fallback.`);
-            }
-        } catch (err) {
-            log('WARN', `[AUTH] Greška pri konekciji na Supabase za Kick tokene (${err.message}), probam lokalni fajl kao fallback.`);
-        }
-    }
-
-    // Fallback za lokalni razvoj (kad Supabase nije podešen)
     try {
-        const raw = fs.readFileSync(LOKALNI_FALLBACK_FAJL, 'utf8');
-        keshTokeni = JSON.parse(raw);
-        return keshTokeni;
+        const { data, error } = await supabase
+            .from(TABELA)
+            .select('access_token, refresh_token, expires_at')
+            .eq('id', RED_ID)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+            keshTokeni = {
+                access_token: data.access_token,
+                refresh_token: data.refresh_token,
+                expires_at: new Date(data.expires_at).getTime()
+            };
+            return keshTokeni;
+        }
+
+        return null;
     } catch (err) {
+        log('ERR', `[AUTH] Greška pri učitavanju Kick tokena iz Supabase: ${err.message}`);
         return null;
     }
 }
@@ -56,31 +42,20 @@ async function ucitajTokene() {
 async function sacuvajTokene(data) {
     keshTokeni = data;
 
-    if (supabase) {
-        try {
-            const { error } = await supabase
-                .from(TABELA)
-                .upsert({
-                    id: RED_ID,
-                    access_token: data.access_token,
-                    refresh_token: data.refresh_token,
-                    expires_at: new Date(data.expires_at).toISOString(),
-                    updated_at: new Date().toISOString()
-                });
-
-            if (error) {
-                log('ERR', `[AUTH] Greška pri čuvanju Kick tokena u Supabase: ${error.message}`);
-            }
-        } catch (err) {
-            log('ERR', `[AUTH] Greška pri konekciji na Supabase pri čuvanju Kick tokena: ${err.message}`);
-        }
-    }
-
-    // Uvek upiši i lokalno, korisno za razvoj i kao dodatna kopija
     try {
-        fs.writeFileSync(LOKALNI_FALLBACK_FAJL, JSON.stringify(data, null, 2), 'utf8');
-    } catch (_) {
-        // Na Renderu fajl sistem je efemeran, ovo je samo best-effort
+        const { error } = await supabase
+            .from(TABELA)
+            .upsert({
+                id: RED_ID,
+                access_token: data.access_token,
+                refresh_token: data.refresh_token,
+                expires_at: new Date(data.expires_at).toISOString(),
+                updated_at: new Date().toISOString()
+            });
+
+        if (error) throw error;
+    } catch (err) {
+        log('ERR', `[AUTH] Greška pri čuvanju Kick tokena u Supabase: ${err.message}`);
     }
 }
 
@@ -118,7 +93,7 @@ async function razmeniTokenZaOsvezavanje(refreshToken) {
 async function getAccessToken() {
     const current = await ucitajTokene();
     if (!current || !current.refresh_token) {
-        throw new Error('Nema sačuvanih Kick bot tokena. Pokreni: node scripts/kick-login.js');
+        throw new Error('Nema sačuvanih Kick bot tokena u Supabase (bot_kick_tokens tabela).');
     }
 
     // Osveži ako ističe za manje od 5 minuta
@@ -172,17 +147,50 @@ async function getBroadcasterUserId(username) {
 }
 
 /**
- * Da li postoje sačuvani tokeni (proverava Supabase, pa lokalni fajl).
- * Sinhrona verzija za brzu proveru na startu; koristi keš ako postoji.
+ * Šalje poruku u chat kanala preko zvaničnog Kick Public API v1 (POST https://api.kick.com/public/v1/chat).
+ */
+async function posaljiPrekoZvanicnogApija(chatroomId, tekst, channelUsername, _channelState) {
+    if (!tekst || typeof tekst !== 'string') return null;
+
+    try {
+        const broadcasterId = await getBroadcasterUserId(channelUsername);
+        const accessToken = await getAccessToken();
+
+        const response = await fetch('https://api.kick.com/public/v1/chat', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                broadcaster_user_id: Number(broadcasterId) || broadcasterId,
+                content: tekst,
+                type: 'user'
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            log('ERR', `[${channelUsername || chatroomId}] Greška slanja na Kick API: HTTP ${response.status} - ${errText}`);
+            return null;
+        }
+
+        const data = await response.json();
+        const messageId = data?.data?.message_id || data?.message_id || data?.id || null;
+        log('INFO', `[${channelUsername}] Poslata poruka na chat: "${tekst.length > 60 ? tekst.substring(0, 57) + '...' : tekst}"`);
+        return messageId;
+    } catch (err) {
+        log('ERR', `[${channelUsername || chatroomId}] Neuspešno slanje poruke preko Kick API: ${err.message}`);
+        return null;
+    }
+}
+
+/**
+ * Da li postoje sačuvani tokeni (proverava keš).
  */
 function jeKonfigurisano() {
-    if (keshTokeni) return true;
-    try {
-        fs.readFileSync(LOKALNI_FALLBACK_FAJL, 'utf8');
-        return true;
-    } catch (_) {
-        return false;
-    }
+    return !!keshTokeni;
 }
 
 /**
@@ -198,5 +206,7 @@ module.exports = {
     getBroadcasterUserId,
     zakaziAutoOsvezavanje,
     jeKonfigurisano,
-    proveriKonfiguraciju
+    proveriKonfiguraciju,
+    posaljiPrekoZvanicnogApija
 };
+

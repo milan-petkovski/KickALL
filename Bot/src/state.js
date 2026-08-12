@@ -48,7 +48,6 @@ function getChannelState(chatroomId) {
 
             // Ekonomija Dirty Tracking
             economyDirty: false,
-            economySaveTimer: null,
 
             // Flags i statusi
             leaderboardDirty: false,

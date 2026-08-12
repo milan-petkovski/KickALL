@@ -1,7 +1,7 @@
 # Dependencies
 node_modules/
-package-lock.json
 bun.lockb
+
 
 # Build outputs
 # Note: minified assets in Website/ are tracked so Netlify serves production JS/CSS

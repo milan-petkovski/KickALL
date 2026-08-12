@@ -21,12 +21,12 @@ const kickAuth = require('./src/kickAuth');
         const konfigurisano = await kickAuth.proveriKonfiguraciju();
         if (konfigurisano) {
             kickAuth.zakaziAutoOsvezavanje();
-            utils.log('INFO', '[AUTH] Kick OAuth tokeni pronađeni (Supabase/lokalno), automatsko osvežavanje je aktivno. Bot koristi zvanični Public API za slanje poruka.');
+            utils.log('INFO', '[AUTH] Kick OAuth tokeni pronađeni u Supabase, automatsko osvežavanje je aktivno. Bot koristi zvanični Public API za slanje poruka.');
         } else {
-            utils.log('WARN', '[AUTH] Kick OAuth tokeni nisu podešeni. Bot koristi stari BEARER_TOKEN/BOT_COOKIE metod, koji Kick može bilo kada da poništi. Pokreni: node scripts/kick-login.js');
+            utils.log('ERR', '[AUTH] Kick OAuth tokeni nisu pronađeni u Supabase (bot_kick_tokens). Ulogujte bota preko: node scripts/kick-login.js');
         }
     } catch (err) {
-        utils.log('ERR', `[AUTH] Provera Kick OAuth tokena pri startu nije uspela (${err.message}). Bot nastavlja da radi sa starim BEARER_TOKEN/BOT_COOKIE metodom.`);
+        utils.log('ERR', `[AUTH] Provera Kick OAuth tokena pri startu nije uspela: ${err.message}`);
     }
 })();
 
@@ -92,7 +92,6 @@ const defaultBuiltinRanks = {
     'samar': 'everyone',
     'roll': 'everyone',
     'duel': 'everyone',
-    'rulet': 'everyone',
     'ruskirulet': 'everyone',
     'alkotest': 'everyone',
     'cinjenica': 'everyone',
@@ -125,6 +124,7 @@ const defaultBuiltinRanks = {
     'vreme': 'everyone',
     'vrijeme': 'everyone',
     'uptime': 'everyone',
+    'up': 'everyone',
     'igra': 'everyone',
     'info': 'everyone',
     
@@ -244,13 +244,59 @@ function pronadjiCustomKomandu(channelState, cmdImeRaw) {
     }
 
     const normalizedInput = ukloniSrpskeDijakritike(cmdImeRaw);
-    const foundKey = Object.keys(channelState.customCommands).find(k =>
+    let foundKey = Object.keys(channelState.customCommands).find(k =>
         ukloniSrpskeDijakritike(k.toLowerCase()) === normalizedInput
     );
 
-    if (!foundKey) return null;
+    // Ako komanda nije pronađena po tačnom nazivu (npr. !up), a komanda je alias za drugu (npr. uptime),
+    // proveri da li u customCommands postoji unos po glavnom ključu (npr. "uptime")
+    if (!foundKey) {
+        const ALIAS_TO_MAIN_KEY = {
+            'up': 'uptime',
+            'topwatch': 'topwatchtime',
+            'help': 'komande',
+            'pomoc': 'komande',
+            'commands': 'komande',
+            'vrijeme': 'vreme',
+            'dozvoli': 'permit',
+            'addcom': 'dodajkomandu',
+            'delcom': 'obrisikomandu',
+            'leaderboard': 'top',
+            'stats': 'me',
+            'aktivnost': 'me',
+            'level': 'rank',
+            'xp': 'rank',
+            'poeni': 'points',
+            'bal': 'points',
+            'coins': 'points',
+            'dajpoene': 'givepoints',
+            'pay': 'givepoints',
+            'topxp': 'toplevel',
+            'toppoeni': 'topcoins',
+            'slot': 'slots',
+            'rulet': 'roulette',
+            'piskoglava': 'coinflip',
+            'gamble': 'coinflip',
+            'kockaj': 'coinflip',
+            'wheel': 'tocak',
+            'dvoboj': 'duel',
+            'prodavnica': 'store',
+            'shop': 'store',
+            'kupi': 'redeem',
+            'sr': 'pesma',
+            'song': 'pesma'
+        };
+        const mainKey = ALIAS_TO_MAIN_KEY[normalizedInput];
+        if (mainKey && channelState.customCommands[mainKey]) {
+            foundKey = mainKey;
+        }
+    }
 
-    return { key: foundKey, cmd: channelState.customCommands[foundKey] };
+    if (foundKey) {
+        return { key: foundKey, cmd: channelState.customCommands[foundKey] };
+    }
+
+    return null;
 }
 
 async function obradiCustomKomandu(chatroomId, username, porukaNormalized, channelState, senderObj) {
@@ -292,7 +338,7 @@ async function obradiCustomKomandu(chatroomId, username, porukaNormalized, chann
                     p_command: cmdIme
                 });
             } catch (e) {
-                console.error('Error incrementing uses:', e);
+                utils.log('WARN', `[CMDS] Greška pri inkrementiranju uses za komandu ${cmdIme}: ${e.message}`);
             }
         })();
     }
@@ -546,6 +592,10 @@ function povezi() {
                 const podrazumevaniRank = defaultBuiltinRanks[cmdName];
                 const provera = proveriDozvoluKomande(chatroomId, username, cmdName, channelState, chatData.sender, podrazumevaniRank);
                 if (!provera.dozvoljeno) {
+                    if (provera.razlog === 'disabled') {
+                        // Komanda je onemogućena na dashboard-u za ovaj kanal — prekidamo izvršavanje bez odgovora
+                        return;
+                    }
                     if (provera.razlog === 'rank') {
                         messenger.posaljiPoruku(chatroomId, `❌ @${username}, ova komanda je rezervisana za ulogu: ${RANK_LABELS_SR[provera.requiredRank] || provera.requiredRank}.`);
                     }
@@ -566,7 +616,7 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!uptime') {
+            if (porukaNormalized === '!uptime' || porukaNormalized === '!up') {
                 if (utils.proveraKulauna(chatroomId, '!uptime', username)) return;
                 commands.handleUptime(chatroomId);
                 return;
@@ -1012,11 +1062,9 @@ function povezi() {
             }
 
             if (porukaNormalized === '!pin' || porukaNormalized.startsWith('!pin ')) {
-                const isCustom = porukaNormalized.startsWith('!pin ');
-                const allowed = isCustom ? isAuthorized : canPin;
-                if (allowed) {
+                if (canPin) {
                     let tekst = '';
-                    if (isCustom) {
+                    if (porukaNormalized.startsWith('!pin ')) {
                         tekst = porukaSredjena.slice(5).trim();
                     } else {
                         tekst = channelState.STREAM_START_PIN_MESSAGE;
@@ -1024,14 +1072,20 @@ function povezi() {
 
                     if (tekst) {
                         messenger.posaljiIPinujPoruku(chatroomId, tekst);
+                    } else {
+                        messenger.posaljiPoruku(chatroomId, `⚠️ Upotreba: !pin <tekst poruke za pinovanje>`);
                     }
+                } else {
+                    messenger.posaljiPoruku(chatroomId, `❌ Samo moderatori i strimer mogu pinovati poruku.`);
                 }
                 return;
             }
 
             if (porukaNormalized === '!unpin') {
-                if (isAuthorized) {
+                if (canPin) {
                     messenger.odpinujPoruku(chatroomId);
+                } else {
+                    messenger.posaljiPoruku(chatroomId, `❌ Samo moderatori i strimer mogu odpinovati poruku.`);
                 }
                 return;
             }
@@ -1232,8 +1286,22 @@ function pokreniAutoAnnounceTajmer(chatroomId) {
 }
 
 // ─── UPRAVLJANJE KANALIMA ──────────────────────────────────────────────────────
+// Mutex guard: sprečava race condition ako se isti kanal pokušava
+// pokrenuti/zaustaviti više puta pre nego što prva operacija završi.
+const pendingChannelOps = new Map();
+
 async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
-    utils.log('INFO', `Pokrećem rad na kanalu: @${channelUsername} (ID: ${chatroomId})...`);
+    // Ako je operacija za ovaj kanal već u toku, čekamo da završi.
+    if (pendingChannelOps.has(chatroomId)) {
+        await pendingChannelOps.get(chatroomId);
+    }
+
+    let resolve;
+    const guard = new Promise(r => { resolve = r; });
+    pendingChannelOps.set(chatroomId, guard);
+
+    try {
+        utils.log('INFO', `Pokrećem rad na kanalu: @${channelUsername} (ID: ${chatroomId})...`);
 
     // Inicijalizacija stanja kanala
     const channelState = state.getChannelState(chatroomId);
@@ -1270,26 +1338,41 @@ async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
     await database.ucitajCustomKomande(chatroomId);
     await watchtime.ucitajWatchtime(chatroomId);
 
-    // Ako je WebSocket već otvoren, odmah se pretplatimo na ovaj čet
-    if (state.isConnected && state.ws && state.ws.readyState === WebSocket.OPEN) {
-        state.ws.send(JSON.stringify({
-            event: 'pusher:subscribe',
-            data: { channel: `chatrooms.${channelState.realChatroomId || chatroomId}.v2` }
-        }));
+        // Ako je WebSocket već otvoren, odmah se pretplatimo na ovaj čet
+        if (state.isConnected && state.ws && state.ws.readyState === WebSocket.OPEN) {
+            state.ws.send(JSON.stringify({
+                event: 'pusher:subscribe',
+                data: { channel: `chatrooms.${channelState.realChatroomId || chatroomId}.v2` }
+            }));
+        }
+
+        // Pokrećemo auto-announce vremenski tajmer za ovaj kanal
+        pokreniAutoAnnounceTajmer(chatroomId);
+
+        // Prva provera da li je live
+        await proveriDaLiJeLive(chatroomId);
+    } finally {
+        resolve();
+        pendingChannelOps.delete(chatroomId);
     }
-
-    // Pokrećemo auto-announce vremenski tajmer za ovaj kanal
-    pokreniAutoAnnounceTajmer(chatroomId);
-
-    // Prva provera da li je live
-    await proveriDaLiJeLive(chatroomId);
 }
 
 async function zaustaviKanal(chatroomId) {
-    const channelState = state.channels[chatroomId];
-    if (!channelState) return;
+    // Ako je operacija za ovaj kanal već u toku, čekamo da završi.
+    if (pendingChannelOps.has(chatroomId)) {
+        await pendingChannelOps.get(chatroomId);
+    }
 
-    utils.log('INFO', `Zaustavljam rad na kanalu: @${channelState.channelUsername} (ID: ${chatroomId})...`);
+    let resolve;
+    const guard = new Promise(r => { resolve = r; });
+    pendingChannelOps.set(chatroomId, guard);
+
+    try {
+        const channelState = state.channels[chatroomId];
+        if (!channelState) return;
+
+        const displayName = channelState.channelUsername || chatroomId;
+        utils.log('INFO', `Zaustavljam rad na kanalu: @${displayName} (ID: ${chatroomId})...`);
 
     // Čuvamo podatke koji su izmenjeni
     if (channelState.leaderboardDirty) {
@@ -1305,25 +1388,29 @@ async function zaustaviKanal(chatroomId) {
         await database.sacuvajEkonomiju(chatroomId);
     }
 
-    // Otkazivanje pretplate sa četa
-    if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-        const subId = channelState.realChatroomId || chatroomId;
-        state.ws.send(JSON.stringify({
-            event: 'pusher:unsubscribe',
-            data: { channel: `chatrooms.${subId}.v2` }
-        }));
-    }
+        // Otkazivanje pretplate sa četa
+        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+            const subId = channelState.realChatroomId || chatroomId;
+            state.ws.send(JSON.stringify({
+                event: 'pusher:unsubscribe',
+                data: { channel: `chatrooms.${subId}.v2` }
+            }));
+        }
 
-    // Čišćenje tajmera
-    if (channelState.autoAnnounceTimer) {
-        clearInterval(channelState.autoAnnounceTimer);
-    }
-    if (channelState.economySaveTimer) {
-        clearTimeout(channelState.economySaveTimer);
-        channelState.economySaveTimer = null;
-    }
+        // Čišćenje tajmera
+        if (channelState.autoAnnounceTimer) {
+            clearInterval(channelState.autoAnnounceTimer);
+        }
+        if (channelState.economySaveTimer) {
+            clearTimeout(channelState.economySaveTimer);
+            channelState.economySaveTimer = null;
+        }
 
-    delete state.channels[chatroomId];
+        delete state.channels[chatroomId];
+    } finally {
+        resolve();
+        pendingChannelOps.delete(chatroomId);
+    }
 }
 
 async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
@@ -1621,7 +1708,7 @@ async function handleHttpRequest(req, res) {
 
                     if (!tokenRes.ok) {
                         const errText = await tokenRes.text();
-                        console.log('Kick token error response:', errText);
+                        utils.log('ERR', `[AUTH] Kick token exchange greška: ${errText}`);
                         res.writeHead(502, { 'Content-Type': 'application/json' });
                         res.end(JSON.stringify({ error: 'Token exchange failed', detail: errText }));
                         return;
@@ -1900,24 +1987,14 @@ async function handleHttpRequest(req, res) {
             }
 
             try {
-                await database.ucitajCustomKomande(chatroomId);
-                await database.ucitajBotConfig(chatroomId);
-
                 const cs = state.getChannelState(chatroomId);
                 if (cs) {
-                    const subId = cs.realChatroomId || chatroomId;
-                    if (cs.botActive) {
-                        if (state.isConnected && state.ws && state.ws.readyState === WebSocket.OPEN) {
-                            state.ws.send(JSON.stringify({
-                                event: 'pusher:subscribe',
-                                data: { channel: `chatrooms.${subId}.v2` }
-                            }));
-                        }
-                    } else {
-                        await zaustaviKanal(chatroomId);
-                    }
+                    // Samo reloadujemo konfiguraciju u memoriji — bez stop/start.
+                    // Supabase Realtime listener je zaduzen za reagovanje na bot_active promenama.
+                    await database.ucitajCustomKomande(chatroomId);
+                    await database.ucitajBotConfig(chatroomId);
                 }
-                
+
                 utils.log('INFO', `[${chatroomId}] Bot konfiguracija i komande uspešno reloadovani preko API poziva.`);
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: true, message: 'Reloaded successfully' }));
@@ -2091,10 +2168,10 @@ async function start() {
                     const botActive = newRow.bot_active || false;
 
                     if (botActive) {
-                        if (!state.channels[chatroomId]) {
+                        if (!state.channels[chatroomId] && !pendingChannelOps.has(chatroomId)) {
                             utils.log('INFO', `🟢 Bot je uspešno aktiviran za kanal @${channelUsername}!`);
                             await pokreniKanal(chatroomId, channelUsername, newRow);
-                        } else {
+                        } else if (state.channels[chatroomId]) {
                             const cs = state.getChannelState(chatroomId);
                             logDebouncedUpdate(`config::${chatroomId}`, `⚙️ [PRO Plan] Podešavanja i komande sinhronizovane za @${channelUsername}.`);
 
@@ -2119,7 +2196,7 @@ async function start() {
                             }
                         }
                     } else {
-                        if (state.channels[chatroomId]) {
+                        if (state.channels[chatroomId] && !pendingChannelOps.has(chatroomId)) {
                             utils.log('INFO', `⚪ Bot je zaustavljen za kanal @${channelUsername}.`);
                             await zaustaviKanal(chatroomId);
                         }
@@ -2209,8 +2286,42 @@ async function start() {
             .subscribe();
 
 
+        // 9. Pokreni Supabase Realtime CDC sinhronizaciju u realnom vremenu
+        database.postaviRealtimeSlusalac();
     }
 }
+
+async function gracefulShutdown(signal) {
+    utils.log('WARN', `Primljen signal ${signal}. Pokrećem bezbedno gašenje bota i sinhronizaciju podataka sa Supabase...`);
+
+    // Zaustavi watchtime tick tajmer
+    watchtime.zaustavljWatchtimeTick();
+
+    // Flush svih sačuvanih podataka za sve aktivne kanale
+    for (const chatroomId of Object.keys(state.channels)) {
+        try {
+            await database.sacuvajLeaderboard(chatroomId);
+            await database.sacuvajEkonomiju(chatroomId);
+            await database.sacuvajWatchtime(chatroomId);
+            await database.sacuvajLjubav(chatroomId);
+        } catch (e) {
+            utils.log('ERR', `Greška pri bezbednom čuvanju kanala ${chatroomId}: ${e.message}`);
+        }
+    }
+
+    // Zatvori WebSocket konekciju
+    if (state.ws) {
+        try {
+            state.ws.close();
+        } catch (_) {}
+    }
+
+    utils.log('INFO', 'Svi podaci bezbedno sačuvani u Supabase. Bot je spreman za gašenje.');
+    process.exit(0);
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 if (require.main === module) {
     pokreniServer();
@@ -2219,5 +2330,6 @@ if (require.main === module) {
 
 module.exports = {
     verifyInternalToken,
-    handleHttpRequest
+    handleHttpRequest,
+    gracefulShutdown
 };
