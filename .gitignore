@@ -3,13 +3,6 @@ node_modules/
 bun.lockb
 
 
-# Build outputs
-# Note: minified assets in Website/ are tracked so Netlify serves production JS/CSS
-!Website/**/*.min.js
-!Website/**/*.min.css
-!website/**/*.min.js
-!website/**/*.min.css
-
 # Test files
 api-test.html
 api-test.js

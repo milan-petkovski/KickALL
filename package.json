@@ -11,10 +11,9 @@
     "test:website": "node --test Website/tests/*.test.js",
     "lint": "npx eslint .",
     "audit": "npm audit --audit-level=high",
-    "build": "node scripts/build.js"
+    "verify": "node scripts/build.js"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1",
     "eslint": "^8.57.0"
   }
 }
