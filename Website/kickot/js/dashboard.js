@@ -1574,27 +1574,29 @@ async function loadUserProfile() {
   }
 
   // Učitavanje kanala kojima upravljamo (menadžeri)
+  // Napomena: koristi se SECURITY DEFINER RPC (get_managed_kick_channels) umesto
+  // select('*') nad celom user_profiles tabelom, jer bi to izlagalo kick_access_token
+  // svih korisnika klijentskom kodu. RPC vraća samo kanale gde je myUsername naveden
+  // kao manager (case-insensitive), bez tokena, sa owner_id/owner_plan uključenim.
   managedChannels = [];
   try {
-    const { data: allProfiles } = await sb.from('user_profiles').select('*');
-    if (allProfiles && myUsername) {
-      allProfiles.forEach(p => {
-        if (p.id === currentUser.id) return; // preskoči sopstveni profil
-        const channels = p.kick_channels || [];
-        channels.forEach(ch => {
-          if (ch.managers && ch.managers.map(m => m.toLowerCase()).includes(myUsername.toLowerCase())) {
-            managedChannels.push({
-              ...ch,
-              owner_id: p.id,
-              owner_plan: (p.plan || 'free').toLowerCase(),
-              is_managed: true
-            });
-          }
-        });
+    if (myUsername) {
+      const { data: rpcChannels, error: rpcErr } = await sb.rpc('get_managed_kick_channels', {
+        p_username: myUsername
       });
+      if (rpcErr) throw rpcErr;
+      if (Array.isArray(rpcChannels)) {
+        rpcChannels.forEach(ch => {
+          managedChannels.push({
+            ...ch,
+            owner_plan: (ch.owner_plan || 'free').toLowerCase(),
+            is_managed: true
+          });
+        });
+      }
     }
   } catch (err) {
-    // Managed channels load failed - non-critical
+    console.warn('[Kickot] Greška pri učitavanju managed kanala:', err);
   }
 
   // Dohvati avatare i za managed kanale kojima nedostaju (ranije se preskakalo, pa je uvek ostajalo slovo umesto slike)
@@ -8454,16 +8456,32 @@ async function requestSong() {
 function removeSong(index) {
   if (index < 0 || index >= localSongQueue.length) return;
 
+  const isCurrent = (index === currentSongIndex);
+  const wasPlaying = isPlaying;
   const removed = localSongQueue.splice(index, 1)[0];
-
-  if (currentSongIndex >= localSongQueue.length) {
-    currentSongIndex = Math.max(0, localSongQueue.length - 1);
-  }
 
   if (localSongQueue.length === 0) {
     isPlaying = false;
-    if (playbackInterval) clearInterval(playbackInterval);
+    stopTimer();
     currentTimeSeconds = 0;
+    currentSongIndex = 0;
+    if (ytPlayer && ytPlayer.stopVideo) {
+      try { ytPlayer.stopVideo(); } catch (_) { }
+    }
+  } else if (isCurrent) {
+    currentTimeSeconds = 0;
+    if (currentSongIndex >= localSongQueue.length) {
+      currentSongIndex = 0;
+    }
+    if (wasPlaying) {
+      playCurrentAudio();
+    } else {
+      if (ytPlayer && ytPlayer.stopVideo) {
+        try { ytPlayer.stopVideo(); } catch (_) { }
+      }
+    }
+  } else if (index < currentSongIndex) {
+    currentSongIndex = Math.max(0, currentSongIndex - 1);
   }
 
   renderSongQueue();
@@ -8482,9 +8500,10 @@ function clearSongQueue() {
   localSongQueue = [];
   currentSongIndex = 0;
   currentTimeSeconds = 0;
-  if (isPlaying) {
-    isPlaying = false;
-    if (playbackInterval) clearInterval(playbackInterval);
+  isPlaying = false;
+  stopTimer();
+  if (ytPlayer && ytPlayer.stopVideo) {
+    try { ytPlayer.stopVideo(); } catch (_) { }
   }
 
   renderSongQueue();
@@ -8574,9 +8593,21 @@ function switchEconomyTab(tabName) {
   if (storeTab) storeTab.style.display = tabName === 'store' ? 'block' : 'none';
   if (lbTab) lbTab.style.display = tabName === 'leaderboard' ? 'block' : 'none';
 
-  if (btnConfig) btnConfig.className = 'btn btn-sm ' + (tabName === 'config' ? 'btn-primary' : 'btn-outline');
-  if (btnStore) btnStore.className = 'btn btn-sm ' + (tabName === 'store' ? 'btn-primary' : 'btn-outline');
-  if (btnLb) btnLb.className = 'btn btn-sm ' + (tabName === 'leaderboard' ? 'btn-primary' : 'btn-outline');
+  if (btnConfig) {
+    btnConfig.classList.toggle('btn-primary', tabName === 'config');
+    btnConfig.classList.toggle('btn-outline', tabName !== 'config');
+    btnConfig.classList.toggle('active', tabName === 'config');
+  }
+  if (btnStore) {
+    btnStore.classList.toggle('btn-primary', tabName === 'store');
+    btnStore.classList.toggle('btn-outline', tabName !== 'store');
+    btnStore.classList.toggle('active', tabName === 'store');
+  }
+  if (btnLb) {
+    btnLb.classList.toggle('btn-primary', tabName === 'leaderboard');
+    btnLb.classList.toggle('btn-outline', tabName !== 'leaderboard');
+    btnLb.classList.toggle('active', tabName === 'leaderboard');
+  }
 
   if (tabName === 'store') {
     renderStoreItems();

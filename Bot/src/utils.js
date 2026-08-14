@@ -52,6 +52,43 @@ function isValidUsername(username) {
 }
 
 /**
+ * Izvlači XSRF-TOKEN iz kolačića (BOT_COOKIE) i url-dekodira ga.
+ * Kick-ov interni (v2) API koristi Laravel Sanctum SPA autentikaciju: pored
+ * sesijskog kolačića očekuje i X-XSRF-TOKEN header koji se poklapa sa
+ * XSRF-TOKEN vrednošću iz kolačića. Bez ovog headera zahtevi ka v2 API-ju
+ * (pin/unpin/brisanje poruke, followage) vraćaju HTTP 401, čak i kada su
+ * kolačić i bearer token validni.
+ */
+function izvuciXsrfToken(cookieString) {
+    if (!cookieString || typeof cookieString !== 'string') return null;
+    const match = cookieString.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+    if (!match) return null;
+    try {
+        return decodeURIComponent(match[1]);
+    } catch (_) {
+        return match[1];
+    }
+}
+
+/**
+ * Vraća standardni set headera za autentikovane zahteve ka Kick-ovom
+ * internom (v2) API-ju preko got-scraping (cookie + bearer + XSRF).
+ */
+function kickScrapingHeaders(extra = {}) {
+    const xsrfToken = izvuciXsrfToken(config.BOT_COOKIE);
+    const headers = {
+        'accept':        'application/json',
+        'authorization': config.BEARER_TOKEN,
+        'cookie':        config.BOT_COOKIE,
+        ...extra
+    };
+    if (xsrfToken) {
+        headers['x-xsrf-token'] = xsrfToken;
+    }
+    return headers;
+}
+
+/**
  * Got-scraping preuzimanje sa Kick API-ja
  */
 async function fetchKickAPI(url) {
@@ -60,10 +97,7 @@ async function fetchKickAPI(url) {
         const response = await gotScraping({
             url: url,
             responseType: 'json',
-            headers: {
-                'cookie': config.BOT_COOKIE,
-                'authorization': config.BEARER_TOKEN
-            },
+            headers: kickScrapingHeaders(),
             retry: { limit: 0 }
         });
         
@@ -261,6 +295,8 @@ module.exports = {
     sanitizeInput,
     isValidUsername,
     fetchKickAPI,
+    kickScrapingHeaders,
+    izvuciXsrfToken,
     dobijTrenutniMesec,
     proveraKulauna,
     prevediVreme,
@@ -268,4 +304,3 @@ module.exports = {
     formatAlertMessage,
     runWithLeaderboardLock
 };
-

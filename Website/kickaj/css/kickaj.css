@@ -213,6 +213,7 @@ body.kickaj-body {
 .winner-reveal-overlay.is-final-champ .winner-reveal-name {
   background: linear-gradient(135deg, #ffd700 0%, #fff 40%, #ff8c00 70%, #ec4899 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: wrChampTextRainbow 2s linear infinite, wrNameReveal 0.7s cubic-bezier(0.16,1,0.3,1) forwards;
   font-size: clamp(2rem, 6vw, 3.4rem);
@@ -704,13 +705,13 @@ body.kickaj-body {
 .sidebar-plan-badge.plan-pro   { background: rgba(147,51,234,0.18); border-color: rgba(147,51,234,0.4); color: #c084fc; }
 .sidebar-plan-badge.plan-elite { background: rgba(245,158,11,0.18); border-color: rgba(245,158,11,0.4); color: var(--aj-amber); }
 
-/* Sidebar Title Bar — prelepo centrirano */
+/* Sidebar Title Bar — savršeno centriran tekst nezavisno od ikonice */
 .sidebar-title-bar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 11px 16px;
+  padding: 11px 40px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   font-size: 0.82rem;
   font-weight: 800;
@@ -719,6 +720,20 @@ body.kickaj-body {
   color: var(--aj-green);
   text-align: center;
   flex-shrink: 0;
+}
+
+.sidebar-title-bar svg {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  flex-shrink: 0;
+}
+
+.sidebar-title-bar span {
+  width: 100%;
+  text-align: center;
+  display: block;
 }
 
 /* Sidebar Config — scrollable */
@@ -1170,8 +1185,6 @@ body.kickaj-body {
   align-items: center;
   gap: 0.75rem;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(139, 92, 246, 0.22);
   border-radius: 14px;
   cursor: pointer;
   transition: var(--transition-fast);
@@ -1183,7 +1196,6 @@ body.kickaj-body {
 .user-pill:hover,
 .user-pill:has(.user-menu-sm.open) {
   background: rgba(139, 92, 246, 0.12);
-  border-color: rgba(139, 92, 246, 0.45);
   box-shadow: 0 0 16px rgba(139, 92, 246, 0.2);
 }
 
@@ -2648,7 +2660,6 @@ body.kickaj-body {
   flex-direction: column;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 32px;
   overflow: hidden;
   opacity: 0;
   pointer-events: none;

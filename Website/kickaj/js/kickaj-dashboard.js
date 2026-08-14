@@ -16,6 +16,7 @@
   /* ── State ── */
   let sb               = null;
   let currentUser      = null;
+  let currentUserProfile = null;   // Pun red iz user_profiles za ulogovanog korisnika
   let userPlan         = 'free';   // 'free' | 'pro' | 'elite'
   let userChannels     = [];       // [{id, username, avatar, chatroom_id, is_primary, is_managed, role, owner_id, owner_plan}]
   let activeChannelObj = null;     // Trenutno selektovan kanal objekat
@@ -449,18 +450,42 @@
       userChannels = [];
 
       try {
-        const { data: profile } = await sb.from('user_profiles')
-          .select('*').eq('id', currentUser.id).maybeSingle();
+        let profile = null;
+        if (currentUser?.id) {
+          const { data: p1 } = await sb.from('user_profiles')
+            .select('*').eq('id', currentUser.id).maybeSingle();
+          if (p1) profile = p1;
+        }
+        if (!profile && currentUser?.email) {
+          const { data: p2 } = await sb.from('user_profiles')
+            .select('*').eq('email', currentUser.email).maybeSingle();
+          if (p2) profile = p2;
+        }
+        if (!profile) {
+          const kName = cleanUsername(currentUser?.user_metadata?.kick_username || currentUser?.user_metadata?.preferred_username || currentUser?.user_metadata?.name || username);
+          if (kName && kName !== 'Kanal' && kName !== 'DemoKanal') {
+            const { data: p3 } = await sb.from('user_profiles')
+              .select('*').ilike('kick_username', kName).maybeSingle();
+            if (p3) {
+              profile = p3;
+            } else {
+              const { data: p4 } = await sb.from('user_profiles')
+                .select('*').ilike('display_name', kName).maybeSingle();
+              if (p4) profile = p4;
+            }
+          }
+        }
 
         if (profile) {
           currentUserProfile = profile;
-          const rawPlan = (profile.plan || profile.plan_tier || 'free').toLowerCase();
+          const rawPlan = String(profile.plan || profile.plan_tier || profile.subscription_tier || profile.tier || 'free').toLowerCase().trim();
           let tier = 'free';
-          if (rawPlan.includes('elite')) tier = 'elite';
+          if (rawPlan.includes('elite') || rawPlan.includes('business')) tier = 'elite';
           else if (rawPlan.includes('pro')) tier = 'pro';
           userPlan = tier;
+          try { localStorage.setItem('kickaj_user_plan', tier); } catch (_) { }
 
-          const myUsername = profile.kick_username || username;
+          const myUsername = profile.kick_username || profile.display_name || username;
 
           // 1. Vlasnički kanali (iz profila)
           if (profile.kick_channels && Array.isArray(profile.kick_channels)) {
@@ -497,33 +522,37 @@
           }
 
           // 2. Managed / Dodeljeni kanali iz Kickot ekosistema
+          // Napomena: koristi se SECURITY DEFINER RPC (get_managed_kick_channels) umesto
+          // select('*') nad celom user_profiles tabelom, jer bi to izlagalo kick_access_token
+          // svih korisnika klijentskom kodu. RPC vraća samo kanale gde je myUsername naveden
+          // kao manager, bez tokena.
           try {
-            const { data: allProfiles } = await sb.from('user_profiles').select('*');
-            if (allProfiles && myUsername) {
-              allProfiles.forEach(p => {
-                if (p.id === currentUser.id) return;
-                const pChannels = p.kick_channels || [];
-                const pPlan = (p.plan || 'free').toLowerCase();
-                pChannels.forEach(ch => {
-                  if (ch.managers && Array.isArray(ch.managers) && ch.managers.some(m => m.toLowerCase() === myUsername.toLowerCase())) {
-                    userChannels.push({
-                      id: ch.id || null,
-                      username: cleanUsername(ch.username || ch.slug || ''),
-                      avatar: ch.avatar || ch.avatar_url || '',
-                      chatroom_id: ch.chatroom_id || null,
-                      is_primary: false,
-                      is_managed: true,
-                      role: 'managed',
-                      owner_id: p.id,
-                      owner_plan: pPlan
-                    });
-                  }
-                });
+            if (myUsername) {
+              const { data: managedChannels, error: managedErr } = await sb.rpc('get_managed_kick_channels', {
+                p_username: myUsername
               });
+              if (managedErr) throw managedErr;
+              if (Array.isArray(managedChannels)) {
+                managedChannels.forEach(ch => {
+                  const uName = cleanUsername(ch.username || ch.slug || '');
+                  if (!uName) return;
+                  userChannels.push({
+                    id: ch.id || null,
+                    username: uName,
+                    avatar: ch.avatar || ch.avatar_url || '',
+                    chatroom_id: ch.chatroom_id || null,
+                    is_primary: false,
+                    is_managed: true,
+                    role: 'managed',
+                    owner_id: ch.owner_id || null,
+                    owner_plan: (ch.owner_plan || 'free').toLowerCase()
+                  });
+                });
+              }
             }
-          } catch (_) { }
+          } catch (rpcErr) { console.warn('[Kickaj] Greška pri učitavanju managed kanala:', rpcErr); }
         }
-      } catch (e) { /* silent */ }
+      } catch (e) { console.warn('[Kickaj] Greška pri učitavanju profila/kanala:', e); }
 
       // 3. Dodaj sacuvane custom kanale iz LocalStorage ako postoje
       try {
@@ -731,9 +760,13 @@
     channelId = targetObj.id || null;
     chatroomId = targetObj.chatroom_id || null;
 
-    // Prilagodi plan za menadzer kanale prema vlasniku
-    if (targetObj.owner_plan) {
+    // Prilagodi plan: za menadžerske kanale koristi plan vlasnika, za sopstvene uvek stvarni plan
+    if (targetObj.role === 'managed' && targetObj.owner_plan) {
       userPlan = targetObj.owner_plan.includes('elite') ? 'elite' : (targetObj.owner_plan.includes('pro') ? 'pro' : 'free');
+    } else {
+      const myTier = currentUserProfile ? String(currentUserProfile.plan || currentUserProfile.plan_tier || currentUserProfile.tier || 'free').toLowerCase() : userPlan;
+      userPlan = (myTier.includes('elite') || myTier.includes('business')) ? 'elite' : (myTier.includes('pro') ? 'pro' : 'free');
+      targetObj.owner_plan = userPlan;
     }
 
     // Snimi u LocalStorage
@@ -919,13 +952,17 @@
     const soundLock = document.getElementById('soundLock');
     const soundToggleRow = document.getElementById('soundToggleRow');
     const volumeGroup = document.getElementById('volumeGroup');
+    const toggleSound = document.getElementById('toggleSound');
     if (soundLock) soundLock.style.display = limits.sound ? 'none' : 'inline-flex';
     if (!limits.sound) {
       settings.soundEnabled = false;
       if (soundToggleRow) soundToggleRow.style.opacity = '0.4';
       if (volumeGroup)    volumeGroup.style.opacity = '0.4';
-      const toggleSound = document.getElementById('toggleSound');
       if (toggleSound) { toggleSound.checked = false; toggleSound.disabled = true; }
+    } else {
+      if (soundToggleRow) soundToggleRow.style.opacity = '1';
+      if (volumeGroup)    volumeGroup.style.opacity = '1';
+      if (toggleSound) { toggleSound.disabled = false; }
     }
 
     /* Fullscreen button */
@@ -936,6 +973,11 @@
         fsBtn.style.opacity = '0.35';
         fsBtn.style.cursor = 'not-allowed';
         fsBtn.disabled = true;
+      } else {
+        fsBtn.title = 'Prikaži preko celog ekrana (F)';
+        fsBtn.style.opacity = '1';
+        fsBtn.style.cursor = 'pointer';
+        fsBtn.disabled = false;
       }
     }
   }
@@ -1654,17 +1696,26 @@
   }
 
   function updateStartButtonUI() {
-    const btn = document.getElementById('btnStartGiveaway');
-    if (!btn) return;
-    if (isRunning) {
-      btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg><span>Pauziraj giveaway</span>`;
-      btn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
-      btn.style.color = '#07050f';
-    } else {
-      btn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg><span>Pokreni giveaway</span>`;
-      btn.style.background = 'linear-gradient(135deg, #53fc18, #3de810)';
-      btn.style.color = '#07050f';
-    }
+    const playSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+    const pauseSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+
+    const startBtn    = document.getElementById('btnStartGiveaway');
+    const wfoStartBtn = document.getElementById('wfoBtnStart');
+
+    [startBtn, wfoStartBtn].forEach(btn => {
+      if (!btn) return;
+      if (isRunning) {
+        btn.classList.add('is-active');
+        btn.innerHTML = `${pauseSvg}<span>Pauziraj giveaway</span>`;
+        btn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+        btn.style.color = '#07050f';
+      } else {
+        btn.classList.remove('is-active');
+        btn.innerHTML = `${playSvg}<span>Pokreni giveaway</span>`;
+        btn.style.background = 'linear-gradient(135deg, #53fc18, #3de810)';
+        btn.style.color = '#07050f';
+      }
+    });
   }
 
   function addTestParticipant() {
@@ -2409,6 +2460,7 @@
      REFRESH ALL
   ════════════════════════════════════════ */
   function refreshAll() {
+    applyPlanRestrictions();
     updateSummary();
     updateStateBadge();
     updateActionStates();
@@ -2484,17 +2536,7 @@
     if (resetBtn)    resetBtn.disabled    = isResetDisabled;
     if (wfoResetBtn) wfoResetBtn.disabled = isResetDisabled;
 
-    [startBtn, wfoStartBtn].forEach(btn => {
-      if (!btn) return;
-      const span = btn.querySelector('span');
-      if (isRunning) {
-        btn.classList.add('is-active');
-        if (span) span.textContent = 'PAUZIRAJ GIVEAWAY';
-      } else {
-        btn.classList.remove('is-active');
-        if (span) span.textContent = 'POKRENI GIVEAWAY';
-      }
-    });
+    updateStartButtonUI();
   }
 
   /* ════════════════════════════════════════

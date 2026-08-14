@@ -405,12 +405,12 @@ function povezi() {
                 evtData = null;
             }
 
-            const match = response.channel ? response.channel.match(/^chatrooms\.(\d+)\.v2$/) : null;
+            const match = response.channel ? response.channel.match(/^chatrooms\.(\d+)/) : null;
             if (match && evtData) {
-                const pusherChatroomId = match[1];
+                const pusherChatroomId = String(match[1]);
                 let chatroomId = Object.keys(state.channels).find(k => {
                     const cs = state.channels[k];
-                    return cs.realChatroomId === pusherChatroomId || k === pusherChatroomId;
+                    return String(cs.realChatroomId) === pusherChatroomId || String(k) === pusherChatroomId;
                 }) || pusherChatroomId;
 
                 const channelState = state.getChannelState(chatroomId);
@@ -475,51 +475,72 @@ function povezi() {
         }
 
         // Nova chat poruka
-        if (response.event === 'App\\Events\\ChatMessageEvent') {
+        const isChatEvent = response.event && (
+            response.event === 'App\\Events\\ChatMessageEvent' ||
+            response.event === 'App\\Events\\ChatMessageSentEvent' ||
+            response.event === 'ChatMessageEvent' ||
+            response.event === 'ChatMessageSentEvent' ||
+            (typeof response.event === 'string' && response.event.includes('ChatMessage'))
+        );
+
+        if (isChatEvent) {
             let chatData;
             try {
-                chatData = JSON.parse(response.data);
+                chatData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
             } catch {
                 return;
             }
 
-            if (!chatData || !chatData.content || !chatData.sender || !chatData.sender.username) {
+            if (!chatData) return;
+
+            const poruka = (chatData.content || chatData.message || '').trim();
+            const username = chatData.sender?.username || chatData.sender?.slug || chatData.user?.username || chatData.username || '';
+
+            if (!poruka || !username) {
                 return;
             }
 
-            // Ekstrakcija chatroom ID-ja iz koverte Pusher kanala
-            const match = response.channel.match(/^chatrooms\.(\d+)\.v2$/);
+            // Ekstrakcija chatroom ID-ja iz koverte Pusher kanala (npr. chatrooms.93361227.v2 ili chatrooms.93361227)
+            const match = response.channel ? response.channel.match(/^chatrooms\.(\d+)/) : null;
             if (!match) return;
-            const pusherChatroomId = match[1];
+            const pusherChatroomId = String(match[1]);
 
             // Nađimo odgovarajući interni chatroomId (baza/state ključ)
             let chatroomId = Object.keys(state.channels).find(k => {
                 const cs = state.channels[k];
-                return cs.realChatroomId === pusherChatroomId || k === pusherChatroomId;
+                return String(cs.realChatroomId) === pusherChatroomId || String(k) === pusherChatroomId;
             });
             if (!chatroomId) {
                 chatroomId = pusherChatroomId;
             }
 
             const channelState = state.getChannelState(chatroomId);
-            if (!channelState || !channelState.botActive || channelState.isModerator === false) {
+            if (!channelState || channelState.botActive === false) {
                 return;
             }
 
-            const poruka = chatData.content.trim();
-            const username = chatData.sender.username;
-            const isBotMsg = chatData.sender.is_bot || false;
+            const isBotMsg = chatData.sender?.is_bot || false;
             const userKey = username.toLowerCase();
+            const botKey = (botUsernameResolved || '').toLowerCase();
 
-            // Preskačemo sopstvene poruke i poznate botove
-            if (isBotMsg || userKey === botUsernameResolved.toLowerCase() || userKey === 'kickotbot' || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs') {
+            // Preskačemo poznate eksterne botove
+            if (userKey === 'kickotbot' || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs') {
                 return;
             }
 
-            // Logujemo samo poruke drugih korisnika (ne botove)
-            if (userKey !== botUsernameResolved.toLowerCase()) {
-                utils.log('CHAT', `[@${channelState.channelUsername || chatroomId}] ${username}: ${poruka}`);
+            const prefix = channelState.PREFIX || '!';
+            const startsWithPrefix = poruka.startsWith(prefix);
+
+            // Ako je automatska poruka od samog bota (i nije komanda), preskačemo da izbegnemo petlje
+            if (isBotMsg && !startsWithPrefix) {
+                return;
             }
+            if (botKey && userKey === botKey && !startsWithPrefix) {
+                return;
+            }
+
+            // Logujemo chat poruku u konzoli / logovima
+            utils.log('CHAT', `[@${channelState.channelUsername || chatroomId}] ${username}: ${poruka}`);
 
             // Automatska moderacija četa
             const messageId = chatData.id || chatData.messageId || null;
@@ -529,9 +550,6 @@ function povezi() {
 
             // Anti-spam filter (izuzimamo strimera)
             if (userKey !== channelState.channelUsername.toLowerCase() && spam.spamFilter(chatroomId, username, poruka)) return;
-
-            const prefix = channelState.PREFIX || '!';
-            const startsWithPrefix = poruka.startsWith(prefix);
 
             // Ako poruka počinje sa prefiksom i posle njega ima razmak (npr. "! komanda"), spoj ih
             let porukaSredjena = poruka;

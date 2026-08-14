@@ -21,8 +21,8 @@ function handleIq(chatroomId, sender, targetRaw) {
     const cleanSender = sanitizeInput(sender);
     const cleanTarget = target ? sanitizeInput(target) : '';
     const user = cleanTarget ? cleanTarget : cleanSender;
-    const iq = Math.floor(Math.random() * 121) + 40; 
-    
+    const iq = Math.floor(Math.random() * 121) + 40;
+
     let komentar = '';
     if (iq < 70) {
         komentar = 'Sobna temperatura, ali zimi sa ugašenim grejanjem. 🥶';
@@ -35,7 +35,7 @@ function handleIq(chatroomId, sender, targetRaw) {
     } else {
         komentar = 'Genije! Noj lični asistent i sledeća generacija AI-ja. 🤖🔥';
     }
-    
+
     posaljiPoruku(chatroomId, `🧠 IQ Test za @${user}: ${iq} | Komentar: ${komentar}`);
 }
 
@@ -54,12 +54,12 @@ function handleSamar(chatroomId, sender, targetRaw) {
 
     const cleanSender = sanitizeInput(sender);
     const cleanTarget = sanitizeInput(target);
-    
+
     if (cleanSender.toLowerCase() === cleanTarget.toLowerCase()) {
         posaljiPoruku(chatroomId, `@${cleanSender} je pokušao da ošamari samog sebe i promašio! Kakav fail. 😂`);
         return;
     }
-    
+
     const predmeti = [
         'vlažnom pastrmkom 🐟',
         'starom tastaturom iz 2004. godine ⌨️',
@@ -79,7 +79,7 @@ function handleSamar(chatroomId, sender, targetRaw) {
         'plastičnom stolicom sa strima 🪑💥',
         'porukom od bivše u 3 ujutru 💔📱'
     ];
-    
+
     const predmet = predmeti[Math.floor(Math.random() * predmeti.length)];
     posaljiPoruku(chatroomId, `👋 @${cleanSender} je zalepio šamarčinu korisniku @${cleanTarget} sa ${predmet}!`);
 }
@@ -303,7 +303,7 @@ async function handleFollowage(chatroomId, sender, targetRaw) {
                     data = await resAuth.json();
                 }
             }
-        } catch (_) {}
+        } catch (_) { }
 
         // 2. Ako 1 nije uspelo, probaj v2 API preko utils.fetchKickAPI
         if (!data || !data.created_at) {
@@ -782,7 +782,7 @@ async function handleUptime(chatroomId) {
     const channelUsername = channelState.channelUsername;
 
     try {
-        const res  = await fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}`);
+        const res = await fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const podaci = await res.json();
 
@@ -792,14 +792,14 @@ async function handleUptime(chatroomId) {
         }
 
         const pocetak = new Date(podaci.livestream.created_at);
-        const sada    = new Date();
-        const diffMs  = sada - pocetak;
-        const sati    = Math.floor(diffMs / 3_600_000);
-        const minuti  = Math.floor((diffMs % 3_600_000) / 60_000);
+        const sada = new Date();
+        const diffMs = sada - pocetak;
+        const sati = Math.floor(diffMs / 3_600_000);
+        const minuti = Math.floor((diffMs % 3_600_000) / 60_000);
         const sekunde = Math.floor((diffMs % 60_000) / 1000);
 
         let trajanje = '';
-        if (sati > 0)   trajanje += `${sati}h `;
+        if (sati > 0) trajanje += `${sati}h `;
         trajanje += `${minuti}min`;
         if (sati === 0) trajanje += ` ${sekunde}s`;
 
@@ -813,7 +813,7 @@ async function handleUptime(chatroomId) {
             const sekunde = Math.floor((diffMs % 60_000) / 1000);
 
             let trajanje = '';
-            if (sati > 0)   trajanje += `${sati}h `;
+            if (sati > 0) trajanje += `${sati}h `;
             trajanje += `${minuti}min`;
             if (sati === 0) trajanje += ` ${sekunde}s`;
 
@@ -829,7 +829,7 @@ async function handleIgra(chatroomId) {
     if (!channelState) return;
     const channelUsername = channelState.channelUsername;
     const sada = Date.now();
-    
+
     if (channelState.cachedIgra && (sada - channelState.cachedIgraTs < config.WEATHER_TTL_MS)) {
         posaljiPoruku(chatroomId, `🎮 Trenutno se igra: ${channelState.cachedIgra}`);
         log('INFO', `Korišćena keširana igra za kanal @${channelUsername}.`);
@@ -837,7 +837,7 @@ async function handleIgra(chatroomId) {
     }
 
     try {
-        const res  = await fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}`);
+        const res = await fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const podaci = await res.json();
 
@@ -902,7 +902,7 @@ function handleInfo(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
-    posaljiPoruku(chatroomId, `🤖 Kickot Bot | Oficijelni bot za Kick strimere! Dashboard & podešavanja: https://kickall.app 🚀`);
+    posaljiPoruku(chatroomId, `🤖 Kickot Bot | Oficijalni bot za Kick strimere! Dashboard & podešavanja: https://kickall.app 🚀`);
 }
 
 // !vreme <grad>
@@ -945,12 +945,12 @@ async function handleVreme(chatroomId, grad) {
             return;
         }
 
-        const cc       = podaci.current_condition[0];
-        const tempC    = cc.temp_C;
-        const opis     = cc.weatherDesc[0].value;
+        const cc = podaci.current_condition[0];
+        const tempC = cc.temp_C;
+        const opis = cc.weatherDesc[0].value;
         const vlaznost = cc.humidity;
-        const vetar    = cc.windspeedKmph;
-        const osecaj   = cc.FeelsLikeC;
+        const vetar = cc.windspeedKmph;
+        const osecaj = cc.FeelsLikeC;
 
         const opisSrp = prevediVreme(opis);
 
@@ -1331,7 +1331,7 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
             if (lenMatch && lenMatch[1]) {
                 duration = parseInt(lenMatch[1], 10);
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     if (!ytId) {
@@ -1373,7 +1373,7 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
                 }
             }
         }
-    } catch (_) {}
+    } catch (_) { }
 
     // Provera maksimalnog trajanja pesme (ako je postavljeno u dashboardu)
     const maxDuration = channelState.songrequest_settings?.max_duration_seconds || 0;

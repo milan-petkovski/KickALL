@@ -1,6 +1,6 @@
 const config = require('./config');
 const state = require('./state');
-const { log } = require('./utils');
+const { log, kickScrapingHeaders } = require('./utils');
 const kickAuth = require('./kickAuth');
 const { posaljiPrekoZvanicnogApija } = kickAuth;
 
@@ -75,11 +75,7 @@ async function pinujPoruku(chatroomId, messageId) {
         const res = await gotScraping({
             url: url,
             method: 'POST',
-            headers: {
-                'accept':        'application/json',
-                'authorization': config.BEARER_TOKEN,
-                'cookie':        config.BOT_COOKIE
-            },
+            headers: kickScrapingHeaders(),
             json: {
                 message: {
                     id: messageId
@@ -109,11 +105,7 @@ async function odpinujPoruku(chatroomId) {
         const res = await gotScraping({
             url: url,
             method: 'DELETE',
-            headers: {
-                'accept':        'application/json',
-                'authorization': config.BEARER_TOKEN,
-                'cookie':        config.BOT_COOKIE
-            },
+            headers: kickScrapingHeaders(),
             retry: { limit: 0 }
         });
 
@@ -139,11 +131,7 @@ async function obrisiPoruku(chatroomId, messageId) {
         const res = await gotScraping({
             url: url,
             method: 'DELETE',
-            headers: {
-                'accept':        'application/json',
-                'authorization': config.BEARER_TOKEN,
-                'cookie':        config.BOT_COOKIE
-            },
+            headers: kickScrapingHeaders(),
             retry: { limit: 0 }
         });
         

@@ -180,7 +180,7 @@ async function posaljiPrekoZvanicnogApija(chatroomId, tekst, channelUsername, _c
 
         const data = await response.json();
         const messageId = data?.data?.message_id || data?.message_id || data?.id || null;
-        log('INFO', `[${channelUsername}] Poslata poruka na chat: "${tekst.length > 60 ? tekst.substring(0, 57) + '...' : tekst}"`);
+        log('BOT', `[${channelUsername}] ${tekst}`);
         return messageId;
     } catch (err) {
         log('ERR', `[${channelUsername || chatroomId}] Neuspešno slanje poruke preko Kick API: ${err.message}`);
