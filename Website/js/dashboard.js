@@ -564,9 +564,10 @@ function showReferralNotification() {
     box-shadow: 0 10px 40px rgba(83, 252, 24, 0.3);
     animation: slideIn 0.5s ease-out;
   `;
+  const iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px;"><path d="M20 12v10H4V12"/><path d="M2 7h20v5H2z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`;
   notification.innerHTML = currentLang === 'sr' 
-    ? '🎉 Referral kod primljen! Dobijaš bonus na prvu kupovinu!'
-    : '🎉 Referral code accepted! You get a bonus on your first purchase!';
+    ? `${iconSvg}Referral kod primljen! Dobijaš bonus na prvu kupovinu!`
+    : `${iconSvg}Referral code accepted! You get a bonus on your first purchase!`;
   
   document.body.appendChild(notification);
   

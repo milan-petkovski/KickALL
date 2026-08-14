@@ -1,6 +1,8 @@
 /**
  * KICKAJ — Giveaway Studio
- * Kompletna logika: Auth, Plan, WebSocket, Animacije, Zvuk, Fullscreen
+ * Kompletna logika: Auth, Plan, Menadzer kanala (Vlasnicki + Managed + Custom sa Kickot integracijom),
+ * WebSocket, Animacije, Zvuk, Fullscreen, Sinhronizacija baze (Supabase tabela 'kickaj')
+ * i LocalStorage, Trajna trajnost tajmera pobednika.
  */
 (function () {
   'use strict';
@@ -15,7 +17,10 @@
   let sb               = null;
   let currentUser      = null;
   let userPlan         = 'free';   // 'free' | 'pro' | 'elite'
-  let channelName      = '';
+  let userChannels     = [];       // [{id, username, avatar, chatroom_id, is_primary, is_managed, role, owner_id, owner_plan}]
+  let activeChannelObj = null;     // Trenutno selektovan kanal objekat
+  let channelName      = '';       // Slug / username aktivnog kanala
+  let channelId        = null;
   let chatroomId       = null;
   let kickWebSocket    = null;
   let pingInterval     = null;
@@ -48,7 +53,7 @@
   };
 
   const PLAN_LIMITS = {
-    free:  { maxParticipants: 500,  animations: ['wheel'],               sound: true,  fullscreen: true  },
+    free:  { maxParticipants: 500,  animations: ['wheel'],                   sound: true,  fullscreen: true  },
     pro:   { maxParticipants: 0,    animations: ['wheel','slot','roulette'], sound: true,  fullscreen: true  },
     elite: { maxParticipants: 0,    animations: ['wheel','slot','roulette'], sound: true,  fullscreen: true  }
   };
@@ -75,6 +80,27 @@
         storageKey
       }
     });
+
+    sb.auth.onAuthStateChange((event, _session) => {
+      if (event === 'SIGNED_OUT') {
+        const hasSavedToken = !!localStorage.getItem(storageKey);
+        if (!hasSavedToken) {
+          window.location.href = '../index.html?login=1';
+        }
+      }
+    });
+
+    if (window.CONFIG?.setupCrossTabSync) {
+      window.CONFIG.setupCrossTabSync(sb, (newSession, eventType) => {
+        if (!newSession || eventType === 'GLOBAL_LOGOUT' || eventType === 'SIGNED_OUT') {
+          window.location.href = '../index.html?login=1';
+        }
+      });
+    }
+  }
+
+  function getBotApiBase() {
+    return window.KickotConfig ? window.KickotConfig.api.baseUrl : 'https://kickbot-ihzb.onrender.com';
   }
 
   /* ════════════════════════════════════════
@@ -88,6 +114,7 @@
     setupListControls();
     setupFullscreen();
     setupMuteButton();
+    setupGlobalClickHandlers();
     initCanvasWheel();
     updateParticipantsUI();
     updateWinnersUI();
@@ -95,39 +122,225 @@
   });
 
   /* ════════════════════════════════════════
-     STATE PERSISTENCE
+     STATE PERSISTENCE & DB SYNC
   ════════════════════════════════════════ */
+  let dbSaveTimeout = null;
+
+  function getSerializableState() {
+    return {
+      channel_name: channelName || '',
+      channel_id: channelId ? String(channelId) : null,
+      chatroom_id: chatroomId ? parseInt(chatroomId, 10) : null,
+      settings: { ...settings },
+      participants: Array.from(participantsMap.entries()),
+      winners: winnersList.map(w => {
+        const now = Date.now();
+        const initSec = typeof w.initialConfirmSeconds === 'number' ? w.initialConfirmSeconds : (settings.confirmTime || 60);
+        let expiresAt = typeof w.expiresAt === 'number' ? w.expiresAt : (w.savedAt || now) + initSec * 1000;
+        let isExpired = !!w.isExpired || (now >= expiresAt) || (typeof w.confirmSeconds === 'number' && w.confirmSeconds <= 0);
+        let remSec = isExpired ? 0 : Math.max(0, Math.ceil((expiresAt - now) / 1000));
+
+        return {
+          username: w.username,
+          prize: w.prize || settings.prize || 'Misteriozna Nagrada',
+          confirmSeconds: isExpired ? 0 : remSec,
+          initialConfirmSeconds: initSec,
+          expiresAt: expiresAt,
+          savedAt: w.savedAt || now,
+          isExpired: isExpired
+        };
+      }),
+      isRunning: !!isRunning,
+      wheelAngle: wheelAngle || 0
+    };
+  }
+
   function saveState() {
+    const payload = getSerializableState();
+
+    // 1. Momentalno cuvanje u LocalStorage (opsti kljuc + per-channel kljuc)
     try {
-      localStorage.setItem(STATE_KEY, JSON.stringify({
-        settings,
-        participants: Array.from(participantsMap.entries()),
-        winners: winnersList.map(w => ({ username: w.username, prize: w.prize, confirmSeconds: w.confirmSeconds, savedAt: Date.now() })),
-        isRunning,
-        wheelAngle
-      }));
+      localStorage.setItem(STATE_KEY, JSON.stringify(payload));
+      if (channelName) {
+        localStorage.setItem(`${STATE_KEY}_${channelName.toLowerCase()}`, JSON.stringify(payload));
+        localStorage.setItem('kickbot_selected_channel_name', channelName);
+        if (channelId) localStorage.setItem('kickbot_selected_channel_id', String(channelId));
+      }
+    } catch (e) { /* silent */ }
+
+    // 2. Debounced cuvanje u Supabase bazi
+    syncStateToSupabaseDebounced(payload);
+  }
+
+  function syncStateToSupabaseDebounced(payload) {
+    if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
+    dbSaveTimeout = setTimeout(() => {
+      syncStateToSupabase(payload);
+    }, 600);
+  }
+
+  async function syncStateToSupabase(payload) {
+    if (!sb || !currentUser) return;
+    try {
+      const dataToSave = payload || getSerializableState();
+      const cleanName = cleanUsername(channelName);
+
+      if (cleanName && cleanName !== 'Kanal' && cleanName !== 'DemoKanal') {
+        const rowData = {
+          user_id: currentUser.id,
+          channel_name: cleanName,
+          channel_id: channelId ? String(channelId) : null,
+          chatroom_id: chatroomId ? parseInt(chatroomId, 10) : null,
+          settings: dataToSave.settings,
+          winners: dataToSave.winners,
+          updated_at: new Date().toISOString()
+        };
+
+        const { error: kickajErr } = await sb
+          .from('kickaj')
+          .upsert(rowData, { onConflict: 'user_id,channel_name' });
+
+        if (kickajErr) {
+          console.warn('[Kickaj DB] Upsert to kickaj table warning:', kickajErr.message);
+        }
+      }
+
+      // Rezervni backup u user_profiles
+      await sb.from('user_profiles').update({
+        kickaj_state: dataToSave
+      }).eq('id', currentUser.id);
+
+    } catch (e) {
+      console.warn('[Kickaj DB Sync] Error:', e);
+    }
+  }
+
+  async function syncStateFromSupabase(targetChannel = null) {
+    if (!sb || !currentUser) return;
+    const targetName = cleanUsername(targetChannel || channelName);
+    try {
+      let loadedData = null;
+
+      // 1. Primarno: Pokusaj citanja iz tabele 'kickaj' za aktivan kanal
+      if (targetName && targetName !== 'Kanal' && targetName !== 'DemoKanal') {
+        const { data: kickajRow, error: kErr } = await sb
+          .from('kickaj')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .eq('channel_name', targetName)
+          .maybeSingle();
+
+        if (!kErr && kickajRow) {
+          loadedData = {
+            channel_name: kickajRow.channel_name,
+            channel_id: kickajRow.channel_id,
+            chatroom_id: kickajRow.chatroom_id,
+            settings: kickajRow.settings,
+            winners: kickajRow.winners
+          };
+          if (kickajRow.chatroom_id && !chatroomId) {
+            chatroomId = parseInt(kickajRow.chatroom_id, 10);
+          }
+        }
+      }
+
+      // 2. Fallback: Proveri user_profiles.kickaj_state
+      if (!loadedData) {
+        const { data: profile } = await sb
+          .from('user_profiles')
+          .select('kickaj_state')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+        if (profile?.kickaj_state) {
+          loadedData = profile.kickaj_state;
+        }
+      }
+
+      if (loadedData) {
+        applyLoadedState(loadedData);
+        try {
+          localStorage.setItem(STATE_KEY, JSON.stringify(getSerializableState()));
+          if (targetName) {
+            localStorage.setItem(`${STATE_KEY}_${targetName.toLowerCase()}`, JSON.stringify(getSerializableState()));
+          }
+        } catch (e) { /* silent */ }
+      }
+    } catch (err) {
+      console.warn('[Kickaj DB Sync] Load error:', err);
+    }
+  }
+
+  function loadState(specificChannel = null) {
+    try {
+      const chKey = specificChannel ? `${STATE_KEY}_${specificChannel.toLowerCase()}` : null;
+      const raw = (chKey && localStorage.getItem(chKey)) || localStorage.getItem(STATE_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      applyLoadedState(d);
     } catch (e) { /* silent */ }
   }
 
-  function loadState() {
-    try {
-      const raw = localStorage.getItem(STATE_KEY);
-      if (!raw) return;
-      const d = JSON.parse(raw);
-      if (d.settings) {
-        settings = { ...settings, ...d.settings };
-        if (settings.prize === 'Misteriozna Nagrada') settings.prize = '';
-      }
-      if (d.participants)  participantsMap = new Map(d.participants);
-      if (d.winners)       winnersList = d.winners.map(w => {
-        const elapsed = w.savedAt ? Math.floor((Date.now() - w.savedAt) / 1000) : 0;
-        return { username: w.username, prize: w.prize, confirmSeconds: Math.max(0, (w.confirmSeconds || settings.confirmTime) - elapsed), timerId: null };
+  function applyLoadedState(d) {
+    if (!d) return;
+    if (d.settings) {
+      settings = { ...settings, ...d.settings };
+      if (settings.prize === 'Misteriozna Nagrada') settings.prize = '';
+    }
+    if (d.participants && Array.isArray(d.participants)) {
+      participantsMap = new Map(d.participants);
+    }
+
+    if (d.winners && Array.isArray(d.winners)) {
+      winnersList.forEach(w => { if (w.timerId) clearInterval(w.timerId); });
+      const now = Date.now();
+      winnersList = d.winners.map(w => {
+        const initSec = typeof w.initialConfirmSeconds === 'number'
+          ? w.initialConfirmSeconds
+          : (typeof w.confirmSeconds === 'number' ? w.confirmSeconds : (settings.confirmTime || 60));
+
+        const savedAt = w.savedAt || now;
+        let expiresAt = typeof w.expiresAt === 'number'
+          ? w.expiresAt
+          : (savedAt + (typeof w.confirmSeconds === 'number' ? w.confirmSeconds : initSec) * 1000);
+
+        // Kljucno pravilo: Ako je jednom istekao, trajno ostaje istekao!
+        let isExpired = !!w.isExpired || (now >= expiresAt);
+        let currSec = 0;
+
+        if (!isExpired) {
+          currSec = Math.max(0, Math.ceil((expiresAt - now) / 1000));
+          if (currSec <= 0) {
+            currSec = 0;
+            isExpired = true;
+          }
+        }
+
+        return {
+          username: w.username,
+          prize: w.prize || settings.prize || 'Misteriozna Nagrada',
+          confirmSeconds: isExpired ? 0 : currSec,
+          initialConfirmSeconds: initSec,
+          expiresAt: expiresAt,
+          savedAt: now,
+          isExpired: isExpired,
+          timerId: null
+        };
       });
-      if (typeof d.wheelAngle === 'number') wheelAngle = d.wheelAngle;
-      if (d.isRunning) isRunning = false; // safety
-      restoreFormInputs();
-      winnersList.forEach(w => { if (w.confirmSeconds > 0) startWinnerTimer(w); });
-    } catch (e) { /* silent */ }
+    }
+
+    if (typeof d.wheelAngle === 'number') wheelAngle = d.wheelAngle;
+    if (d.isRunning) isRunning = false; // safety
+
+    restoreFormInputs();
+    updateWinnersUI();
+    winnersList.forEach(w => {
+      if (!w.isExpired && w.confirmSeconds > 0) {
+        startWinnerTimer(w);
+      } else {
+        updateSingleWinnerTimerUI(w);
+      }
+    });
   }
 
   function restoreFormInputs() {
@@ -151,8 +364,43 @@
   }
 
   /* ════════════════════════════════════════
-     AUTH + PLAN
+     AUTH + PLAN + KICKOT CHANNELS SYNC
   ════════════════════════════════════════ */
+
+  // Global function declaration to ensure it's available everywhere
+  window.hideAuthGate = function () {
+    const authGate = document.getElementById('authGate');
+    const app = document.getElementById('app');
+    if (authGate) {
+      authGate.classList.add('fade-out');
+      setTimeout(() => {
+        authGate.style.display = 'none';
+      }, 400);
+    }
+    if (app) {
+      app.classList.add('fade-in');
+    }
+  };
+
+  // Local function for backward compatibility
+  function hideAuthGate() {
+    window.hideAuthGate();
+  }
+
+  async function fetchKickAvatar(username) {
+    const raw = String(username || '').trim();
+    if (!raw) return null;
+    try {
+      const apiBase = getBotApiBase();
+      const res = await fetch(`${apiBase}/api/avatar?username=${encodeURIComponent(raw)}`, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.avatar) return data.avatar;
+      }
+    } catch (_) { }
+    return null;
+  }
+
   async function checkAuth() {
     if (!sb) {
       setMsg('authGateMsg', 'Preusmeravanje na prijavu...');
@@ -160,6 +408,24 @@
       return;
     }
     try {
+      try {
+        sessionStorage.setItem('from_kickall', 'true');
+        sessionStorage.setItem('kick_origin_site', 'kickaj');
+        localStorage.setItem('kick_origin_site', 'kickaj');
+      } catch (e) {
+        console.warn('Failed to set origin flags:', e);
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const oauthError = urlParams.get('error');
+
+      if (oauthError) {
+        setMsg('authGateMsg', `Kick odbio autorizaciju: ${oauthError}`);
+        showToast(`Kick odbio autorizaciju: ${oauthError}`, 'error');
+        setTimeout(() => { window.location.href = '../index.html?login=1'; }, 2000);
+        return;
+      }
+
       const session = window.CONFIG?.getValidSessionWithRetry
         ? await window.CONFIG.getValidSessionWithRetry(sb, 3, 1500)
         : (await sb.auth.getSession())?.data?.session;
@@ -180,46 +446,431 @@
         || currentUser.user_metadata?.picture
         || currentUser.user_metadata?.profile_picture;
 
+      userChannels = [];
+
       try {
         const { data: profile } = await sb.from('user_profiles')
           .select('*').eq('id', currentUser.id).maybeSingle();
 
         if (profile) {
-          /* Plan tier from Supabase user_profiles (column: plan) */
+          currentUserProfile = profile;
           const rawPlan = (profile.plan || profile.plan_tier || 'free').toLowerCase();
           let tier = 'free';
           if (rawPlan.includes('elite')) tier = 'elite';
           else if (rawPlan.includes('pro')) tier = 'pro';
           userPlan = tier;
 
-          /* Channel */
-          if (profile.kick_channels?.length > 0) {
-            const savedId   = localStorage.getItem('kickbot_selected_channel_id');
-            const savedName = localStorage.getItem('kickbot_selected_channel_name');
-            const selected  = profile.kick_channels.find(c =>
-              String(c.id) === String(savedId) || c.username?.toLowerCase() === savedName?.toLowerCase()
-            );
-            const primary   = selected || profile.kick_channels.find(c => c.is_primary) || profile.kick_channels[0];
-            if (primary.username) username  = primary.username;
-            if (primary.avatar)   avatarUrl = primary.avatar;
-            if (primary.chatroom_id) chatroomId = primary.chatroom_id;
+          const myUsername = profile.kick_username || username;
+
+          // 1. Vlasnički kanali (iz profila)
+          if (profile.kick_channels && Array.isArray(profile.kick_channels)) {
+            profile.kick_channels.forEach(ch => {
+              const uName = cleanUsername(ch.username || ch.slug || ch.display_name || '');
+              if (uName) {
+                userChannels.push({
+                  id: ch.id || null,
+                  username: uName,
+                  avatar: ch.avatar || ch.avatar_url || '',
+                  chatroom_id: ch.chatroom_id || null,
+                  is_primary: !!ch.is_primary,
+                  is_managed: false,
+                  role: 'owner',
+                  owner_id: currentUser.id,
+                  owner_plan: tier
+                });
+              }
+            });
           }
-          if (!username && profile.display_name) username = profile.display_name;
+
+          if (userChannels.length === 0 && profile.kick_username) {
+            userChannels.push({
+              id: profile.kick_user_id || null,
+              username: cleanUsername(profile.kick_username),
+              avatar: profile.avatar_url || '',
+              chatroom_id: null,
+              is_primary: true,
+              is_managed: false,
+              role: 'owner',
+              owner_id: currentUser.id,
+              owner_plan: tier
+            });
+          }
+
+          // 2. Managed / Dodeljeni kanali iz Kickot ekosistema
+          try {
+            const { data: allProfiles } = await sb.from('user_profiles').select('*');
+            if (allProfiles && myUsername) {
+              allProfiles.forEach(p => {
+                if (p.id === currentUser.id) return;
+                const pChannels = p.kick_channels || [];
+                const pPlan = (p.plan || 'free').toLowerCase();
+                pChannels.forEach(ch => {
+                  if (ch.managers && Array.isArray(ch.managers) && ch.managers.some(m => m.toLowerCase() === myUsername.toLowerCase())) {
+                    userChannels.push({
+                      id: ch.id || null,
+                      username: cleanUsername(ch.username || ch.slug || ''),
+                      avatar: ch.avatar || ch.avatar_url || '',
+                      chatroom_id: ch.chatroom_id || null,
+                      is_primary: false,
+                      is_managed: true,
+                      role: 'managed',
+                      owner_id: p.id,
+                      owner_plan: pPlan
+                    });
+                  }
+                });
+              });
+            }
+          } catch (_) { }
         }
       } catch (e) { /* silent */ }
 
+      // 3. Dodaj sacuvane custom kanale iz LocalStorage ako postoje
+      try {
+        const savedCustomRaw = localStorage.getItem('kickaj_custom_channels_list');
+        if (savedCustomRaw) {
+          const customList = JSON.parse(savedCustomRaw);
+          if (Array.isArray(customList)) {
+            customList.forEach(c => {
+              const uName = cleanUsername(typeof c === 'string' ? c : c.username);
+              if (uName && !userChannels.some(ex => ex.username.toLowerCase() === uName.toLowerCase())) {
+                userChannels.push({
+                  id: typeof c === 'object' ? c.id : null,
+                  username: uName,
+                  avatar: typeof c === 'object' ? c.avatar || '' : '',
+                  chatroom_id: typeof c === 'object' ? c.chatroom_id : null,
+                  is_primary: false,
+                  is_managed: false,
+                  role: 'custom',
+                  owner_id: currentUser.id,
+                  owner_plan: userPlan
+                });
+              }
+            });
+          }
+        }
+      } catch (_) { }
+
+      // Deduplicate kanale
+      const seen = new Set();
+      userChannels = userChannels.filter(c => {
+        const key = c.username.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      // Odaberi inicijalni kanal
+      const savedId   = localStorage.getItem('kickbot_selected_channel_id');
+      const savedName = localStorage.getItem('kickbot_selected_channel_name');
+
+      let candidate = null;
+      if (savedName || savedId) {
+        candidate = userChannels.find(c =>
+          (savedId && String(c.id) === String(savedId)) ||
+          (savedName && c.username.toLowerCase() === savedName.toLowerCase())
+        );
+      }
+      if (!candidate && userChannels.length > 0) {
+        candidate = userChannels.find(c => c.is_primary) || userChannels[0];
+      }
+
+      if (candidate) {
+        activeChannelObj = candidate;
+        username = candidate.username;
+        if (candidate.avatar) avatarUrl = candidate.avatar;
+        if (candidate.chatroom_id) chatroomId = candidate.chatroom_id;
+        if (candidate.id) channelId = candidate.id;
+      }
+
       channelName = cleanUsername(username);
+
+      if (channelName && !userChannels.some(c => c.username.toLowerCase() === channelName.toLowerCase())) {
+        userChannels.unshift({
+          id: channelId,
+          username: channelName,
+          avatar: avatarUrl || '',
+          chatroom_id: chatroomId,
+          is_primary: true,
+          is_managed: false,
+          role: 'owner',
+          owner_id: currentUser.id,
+          owner_plan: userPlan
+        });
+      }
+
       updateProfileUI(channelName, avatarUrl);
       applyPlanRestrictions();
+      renderChannelDropdown();
 
       setText('connectedChannelName', channelName || 'DemoKanal');
+      setText('wfoChannelName', channelName || 'DemoKanal');
+
       if (channelName) await resolveKickChatroom(channelName);
 
-      dismissAuthGate();
+      await syncStateFromSupabase(channelName);
+
+      // Asinhrono popuni nedostajuce avatare
+      fetchMissingAvatars();
+
+      // Glatka tranzicija identicno kao na Kickot-u
+      await new Promise(resolve => setTimeout(resolve, 300));
+      hideAuthGate();
     } catch (err) {
       setMsg('authGateMsg', 'Preusmeravanje na prijavu...');
       setTimeout(() => { window.location.href = '../index.html?login=1'; }, 1200);
     }
+  }
+
+  async function fetchMissingAvatars() {
+    const missing = userChannels.filter(c => !c.avatar && c.username && c.username !== 'DemoKanal');
+    if (missing.length === 0) return;
+
+    let updatedAny = false;
+    for (const ch of missing) {
+      const pic = await fetchKickAvatar(ch.username);
+      if (pic) {
+        ch.avatar = pic;
+        updatedAny = true;
+        if (activeChannelObj && activeChannelObj.username.toLowerCase() === ch.username.toLowerCase()) {
+          activeChannelObj.avatar = pic;
+          updateProfileUI(ch.username, pic);
+        }
+      }
+    }
+    if (updatedAny) {
+      renderChannelDropdown();
+    }
+  }
+
+  /* ════════════════════════════════════════
+     CHANNEL MANAGER & SWITCHER
+  ════════════════════════════════════════ */
+  function renderChannelDropdown() {
+    const listEl = document.getElementById('cdmChannelList');
+    const badgeEl = document.getElementById('cdmCountBadge');
+    if (badgeEl) badgeEl.textContent = userChannels.length;
+    if (!listEl) return;
+
+    if (userChannels.length === 0) {
+      listEl.innerHTML = '<div class="cdm-empty">Nema pronađenih povezanih kanala.</div>';
+      return;
+    }
+
+    const checkSvg = `<svg class="cdm-active-check" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+    let html = '';
+    userChannels.forEach(ch => {
+      const isActive = ch.username.toLowerCase() === (channelName || '').toLowerCase();
+      const initial = ch.username.charAt(0).toUpperCase();
+      const avatarStyle = ch.avatar ? `background-image: url('${ch.avatar}'); background-size: cover; background-position: center;` : '';
+
+      let roleLabel = 'Vlasnik';
+      let roleClass = 'cdm-role-owner';
+      if (ch.role === 'managed' || ch.is_managed) {
+        roleLabel = 'Menadžer';
+        roleClass = 'cdm-role-managed';
+      } else if (ch.role === 'custom') {
+        roleLabel = 'Dodat';
+        roleClass = 'cdm-role-custom';
+      }
+
+      html += `
+        <button type="button" class="cdm-item ${isActive ? 'active' : ''}" onclick="window.selectChannel('${escHtml(ch.username)}')">
+          <div class="cdm-item-left">
+            <div class="cdm-avatar" style="${avatarStyle}">${ch.avatar ? '' : initial}</div>
+            <div class="cdm-name-wrap">
+              <span class="cdm-name">${escHtml(ch.username)}</span>
+              <span class="cdm-role-badge ${roleClass}">${roleLabel}</span>
+            </div>
+          </div>
+          ${isActive ? checkSvg : ''}
+        </button>
+      `;
+    });
+
+    listEl.innerHTML = html;
+  }
+
+  async function setActiveChannel(channelInput, reconnectIfRunning = true) {
+    if (!channelInput) return;
+    let targetName = '';
+    let targetObj = null;
+
+    if (typeof channelInput === 'string') {
+      targetName = cleanUsername(channelInput);
+      targetObj = userChannels.find(c => c.username.toLowerCase() === targetName.toLowerCase()) || {
+        username: targetName,
+        id: null,
+        avatar: '',
+        chatroom_id: null,
+        is_primary: false,
+        is_managed: false,
+        role: 'custom',
+        owner_id: currentUser?.id,
+        owner_plan: userPlan
+      };
+    } else {
+      targetObj = channelInput;
+      targetName = cleanUsername(targetObj.username);
+    }
+
+    if (!targetName) return;
+
+    if (!userChannels.some(c => c.username.toLowerCase() === targetName.toLowerCase())) {
+      userChannels.push(targetObj);
+      // Sacuvaj u listu custom kanala
+      try {
+        const customOnly = userChannels.filter(c => c.role === 'custom');
+        localStorage.setItem('kickaj_custom_channels_list', JSON.stringify(customOnly));
+      } catch (_) { }
+    }
+
+    channelName = targetName;
+    activeChannelObj = targetObj;
+    channelId = targetObj.id || null;
+    chatroomId = targetObj.chatroom_id || null;
+
+    // Prilagodi plan za menadzer kanale prema vlasniku
+    if (targetObj.owner_plan) {
+      userPlan = targetObj.owner_plan.includes('elite') ? 'elite' : (targetObj.owner_plan.includes('pro') ? 'pro' : 'free');
+    }
+
+    // Snimi u LocalStorage
+    try {
+      localStorage.setItem('kickbot_selected_channel_name', channelName);
+      if (channelId) localStorage.setItem('kickbot_selected_channel_id', String(channelId));
+    } catch (e) { /* silent */ }
+
+    // Azuriraj UI
+    setText('connectedChannelName', channelName);
+    setText('wfoChannelName', channelName);
+    updateProfileUI(channelName, targetObj.avatar);
+    applyPlanRestrictions();
+    renderChannelDropdown();
+    updateStateBadge();
+
+    // Ucitaj sacuvano stanje za ovaj specificni kanal iz localstorage
+    loadState(channelName);
+
+    // Razresi Chatroom ID za novi kanal
+    await resolveKickChatroom(channelName);
+
+    // Sinhronizuj iz baze za izabrani kanal
+    await syncStateFromSupabase(channelName);
+
+    // Ako nema avatar, pokusaj dobaviti
+    if (!targetObj.avatar) {
+      fetchKickAvatar(channelName).then(pic => {
+        if (pic) {
+          targetObj.avatar = pic;
+          updateProfileUI(channelName, pic);
+          renderChannelDropdown();
+        }
+      });
+    }
+
+    // Ako je giveaway aktivan, rekonektuj chatroom na novi kanal
+    if (reconnectIfRunning && isRunning) {
+      showToast(`Prebacujem chat konekciju na kanal "${channelName}"...`, 'info');
+      await connectKickChat();
+    }
+
+    saveState();
+  }
+
+  window.toggleChannelDropdown = function (event) {
+    if (event) event.stopPropagation();
+    const pill = document.getElementById('channelStatusPill');
+    const menu = document.getElementById('channelDropdownMenu');
+    if (!menu) return;
+
+    const isOpen = menu.classList.contains('open');
+    if (isOpen) {
+      menu.classList.remove('open');
+      if (pill) pill.classList.remove('open');
+    } else {
+      menu.classList.add('open');
+      if (pill) pill.classList.add('open');
+    }
+  };
+
+  window.selectChannel = async function (username) {
+    const clean = cleanUsername(username);
+    if (!clean) return;
+
+    const pill = document.getElementById('channelStatusPill');
+    const menu = document.getElementById('channelDropdownMenu');
+    if (menu) menu.classList.remove('open');
+    if (pill) pill.classList.remove('open');
+
+    if (clean.toLowerCase() === (channelName || '').toLowerCase()) {
+      return;
+    }
+
+    await setActiveChannel(clean, true);
+    showToast(`Aktivni kanal promenjen na: ${clean}`, 'success');
+  };
+
+  window.openCustomChannelModal = function (event) {
+    if (event) event.stopPropagation();
+    const pill = document.getElementById('channelStatusPill');
+    const menu = document.getElementById('channelDropdownMenu');
+    if (menu) menu.classList.remove('open');
+    if (pill) pill.classList.remove('open');
+
+    const input = document.getElementById('customChannelInput');
+    if (input) input.value = channelName || '';
+    window.openModal('customChannelModal');
+    setTimeout(() => { if (input) input.focus(); }, 150);
+  };
+
+  window.saveCustomChannel = async function () {
+    const input = document.getElementById('customChannelInput');
+    const raw = (input?.value || '').trim();
+    const clean = cleanUsername(raw);
+
+    if (!clean || clean === 'Kanal') {
+      showToast('Unesite validno Kick korisničko ime.', 'warning');
+      return;
+    }
+
+    window.closeModal('customChannelModal');
+
+    // Dodaj u custom kanale ako vec nije
+    let existing = userChannels.find(c => c.username.toLowerCase() === clean.toLowerCase());
+    if (!existing) {
+      existing = {
+        id: null,
+        username: clean,
+        avatar: '',
+        chatroom_id: null,
+        is_primary: false,
+        is_managed: false,
+        role: 'custom',
+        owner_id: currentUser?.id,
+        owner_plan: userPlan
+      };
+      userChannels.push(existing);
+      try {
+        const customOnly = userChannels.filter(c => c.role === 'custom');
+        localStorage.setItem('kickaj_custom_channels_list', JSON.stringify(customOnly));
+      } catch (_) { }
+    }
+
+    await setActiveChannel(existing, true);
+    showToast(`Uspešno povezan kanal: ${clean}`, 'success');
+  };
+
+  function setupGlobalClickHandlers() {
+    document.addEventListener('click', (e) => {
+      const pill = document.getElementById('channelStatusPill');
+      const menu = document.getElementById('channelDropdownMenu');
+      if (menu && pill && !pill.contains(e.target) && !menu.contains(e.target)) {
+        menu.classList.remove('open');
+        pill.classList.remove('open');
+      }
+    });
   }
 
   function applyPlanRestrictions() {
@@ -228,7 +879,6 @@
     /* Plan badges */
     const planBadgeEl    = document.getElementById('planBadge');
     const heroPlanBadge  = document.getElementById('heroPlanBadge');
-    const userPlanLabel  = document.getElementById('userPlanLabel');
     const planClass      = 'plan-' + userPlan;
     const planText       = userPlan.toUpperCase();
 
@@ -290,12 +940,6 @@
     }
   }
 
-  function dismissAuthGate() {
-    const gate = document.getElementById('authGate');
-    if (gate) { gate.classList.add('fade-out'); setTimeout(() => { gate.style.display = 'none'; }, 450); }
-    document.body.classList.remove('auth-loading');
-  }
-
   /* ════════════════════════════════════════
      SIDEBAR
   ════════════════════════════════════════ */
@@ -309,7 +953,6 @@
     bindClick('btnResetGiveaway', resetGiveaway);
     bindClick('btnStageDraw',     triggerDraw);
 
-    // Exclusive sidebar accordion (max 1 open at a time, first open by default)
     const accordions = Array.from(document.querySelectorAll('.sidebar-config details.sc-accordion'));
     accordions.forEach((acc, idx) => {
       acc.open = (idx === 0);
@@ -344,7 +987,6 @@
       }
     });
 
-    // Logout dugme je sad unutar dropdown-a
     const btnLogout = document.getElementById('btnLogout');
     if (btnLogout && sb) {
       btnLogout.addEventListener('click', async (e) => {
@@ -354,7 +996,6 @@
       });
     }
 
-    // Zatvori meni kliknuti van
     document.addEventListener('click', (e) => {
       const menu = document.getElementById('userMenuSm');
       const pill = document.getElementById('userPill');
@@ -364,7 +1005,6 @@
     });
   }
 
-  /* toggleUserMenu — globalna, poziva se iz onclick u HTML-u */
   window.toggleUserMenu = function () {
     const menu = document.getElementById('userMenuSm');
     if (menu) menu.classList.toggle('open');
@@ -398,17 +1038,15 @@
     } else {
       list.innerHTML = `
         <div style="padding: 10px; color: var(--aj-text); font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.06);">
-          <strong style="color: var(--aj-green);">v3.0 - Redizajn</strong><br>
-          - Novi Kickot-stil dizajn<br>
-          - Integracija Plan sistema (Free/Pro/Elite)<br>
-          - Unapređene animacije točka<br>
-          - Web Audio API efekti
+          <strong style="color: var(--aj-green);">v3.1 - Channel Manager &amp; Baza Sync</strong><br>
+          - Birač i menadžer Kick kanala u topbaru sa Kickot integracijom<br>
+          - Čuvanje u 'kickaj' tabeli baze podataka<br>
+          - Trajno fiksiran tajmer potvrde pobednika
         </div>
       `;
     }
   };
 
-  // Zatvaranje popovera na klik izvan njega
   document.addEventListener('click', (e) => {
     const pop = document.getElementById('notifPopover');
     const btn = document.getElementById('notifBellBtn');
@@ -423,9 +1061,9 @@
     if (svgEl) svgEl.style.animation = 'spin 1s linear infinite';
     try {
       await checkAuth();
-      window.toastSystem.success('Podaci uspesno osvezeni iz baze.');
+      await syncStateFromSupabase(channelName);
+      window.toastSystem.success('Podaci uspešno sinhronizovani iz baze.');
 
-      // Prebaci na zeleni štiklić
       if (btnEl) {
         if (svgEl) svgEl.style.animation = '';
         btnEl.classList.add('is-success');
@@ -445,7 +1083,7 @@
         }, 1800);
       }
     } catch (err) {
-      window.toastSystem.error('Greška pri osvezavanju podataka.');
+      window.toastSystem.error('Greška pri osvežavanju podataka.');
       if (svgEl) svgEl.style.animation = '';
     }
   };
@@ -466,7 +1104,6 @@
         avatarEl.textContent = '';
       } else {
         avatarEl.style.backgroundImage = '';
-        // Zadrzi gradient pozadinu iz CSS-a
         avatarEl.style.backgroundColor = '';
         avatarEl.textContent = clean.charAt(0).toUpperCase();
       }
@@ -569,7 +1206,7 @@
       const limits = PLAN_LIMITS[userPlan];
       if (!limits.animations.includes(e.target.value)) {
         e.target.value = settings.animation;
-        showToast('Ova animacija nije dostupna na vasem planu.', 'warning');
+        showToast('Ova animacija nije dostupna na vašem planu.', 'warning');
         return;
       }
       settings.animation = e.target.value;
@@ -588,7 +1225,7 @@
       });
     });
 
-    // Test dugme (Start/Draw/Reset se vezuju jednom u setupSidebar, ne ovde — dupli bind je pravio dvostruko okidanje)
+    // Test dugme
     bindClick('btnTestMessage', addTestParticipant);
   }
 
@@ -625,12 +1262,23 @@
 
     bindClick('btnClearParticipants', () => {
       if (participantsMap.size === 0) return;
-      if (!confirm('Da li ste sigurni da zelite da obrisete sve ucesnike?')) return;
+      if (!confirm('Da li ste sigurni da želite da obrišete sve učesnike?')) return;
       participantsMap.clear();
       updateParticipantsUI();
       drawVisualizerStage();
       refreshAll();
-      showToast('Lista ucesnika je ociscena.', 'info');
+      showToast('Lista učesnika je očišćena.', 'info');
+    });
+
+    bindClick('btnClearWinners', () => {
+      if (winnersList.length === 0) return;
+      if (!confirm('Da li ste sigurni da želite da obrišete sve pobednike?')) return;
+      winnersList.forEach(w => { if (w.timerId) clearInterval(w.timerId); });
+      winnersList = [];
+      updateWinnersUI();
+      refreshAll();
+      saveState();
+      showToast('Lista pobednika je uspešno očišćena.', 'info');
     });
 
     bindClick('btnExportWinners', () => {
@@ -727,14 +1375,6 @@
   window.openDocsModal     = function () { window.openModal('docsModal'); };
   window.openSettingsModal = function () { window.openModal('settingsModal'); };
 
-  window.submitFeedback = function () {
-    const txt = (document.getElementById('feedbackText')?.value || '').trim();
-    if (!txt) { showToast('Unesite vaš predlog ili ideju.', 'warning'); return; }
-    window.closeModal('feedbackModal');
-    if (document.getElementById('feedbackText')) document.getElementById('feedbackText').value = '';
-    showToast('Hvala na predlogu! Uspešno ste poslali ideju.', 'success');
-  };
-
   window.handleSignOut = async function () {
     if (sb) { try { await sb.auth.signOut(); } catch (e) { /* */ } }
     window.location.href = '../index.html';
@@ -747,7 +1387,7 @@
     const ov = document.getElementById('wheelFullscreenOverlay');
     if (!ov) return;
     ov.style.display = 'flex';
-    void ov.offsetWidth; // force reflow for smooth animation
+    void ov.offsetWidth;
     ov.classList.add('open');
     ov.removeAttribute('aria-hidden');
 
@@ -756,7 +1396,6 @@
     setText('wfoParticipantCount', participantsMap.size);
     setText('wfoWinnersCount',     winnersList.length);
 
-    // Prikazi ispravan stage (tocak/slot/rulet) i iscrtaj ga, umesto da uvek forsira tocak
     updateStageFrames();
     if (settings.animation === 'wheel')          drawWheelOnCanvas('wheelCanvasFullscreen');
     else if (settings.animation === 'slot')      drawSlotPreview();
@@ -781,8 +1420,8 @@
     const badge = document.getElementById('wfoStateBadge');
     if (!badge) return;
     badge.className = 'wfo-state-badge';
-    if (isSpinning) { badge.textContent = 'Izvlacenje u toku'; badge.classList.add('is-spinning'); }
-    else if (isRunning) { badge.textContent = 'Cekam sledece izvlacenje'; badge.classList.add('is-live'); }
+    if (isSpinning) { badge.textContent = 'Izvlačenje u toku'; badge.classList.add('is-spinning'); }
+    else if (isRunning) { badge.textContent = 'Čekam sledeće izvlačenje'; badge.classList.add('is-live'); }
     else { badge.textContent = 'Standby'; }
   }
 
@@ -813,7 +1452,6 @@
 
     const osc = ctx.createOscillator();
     osc.type = 'sawtooth';
-    // Pitch decreases as spin slows down
     osc.frequency.setValueAtTime(400, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + durationMs / 1000);
     gain.gain.setTargetAtTime(0, ctx.currentTime + durationMs / 1000 * 0.85, 0.1);
@@ -826,7 +1464,7 @@
 
   function stopSpinSound() {
     if (spinSoundNode) {
-      try { spinSoundNode.stop(); } catch (e) { /* already stopped */ }
+      try { spinSoundNode.stop(); } catch (e) { /* */ }
       spinSoundNode = null;
     }
   }
@@ -836,7 +1474,7 @@
     const ctx = getAudioCtx();
     if (!ctx) return;
 
-    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98]; // C5 E5 G5 C6 E6 G6
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98];
     notes.forEach((freq, i) => {
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.09);
@@ -858,7 +1496,7 @@
     const ctx = getAudioCtx();
     if (!ctx) return;
 
-    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+    const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((freq, i) => {
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.12);
@@ -922,9 +1560,8 @@
 
   async function connectKickChat() {
     if (kickWebSocket) { try { kickWebSocket.close(); } catch (e) { /* */ } kickWebSocket = null; }
-    if (!channelName) { showToast('Niste prijavljeni na Kick kanal!', 'warning'); return false; }
+    if (!channelName) { showToast('Nije izabran Kick kanal!', 'warning'); return false; }
 
-    showToast(`Povezivanje sa Kick chatom za kanal "${channelName}"...`, 'info');
     if (!chatroomId) await resolveKickChatroom(channelName);
     if (!chatroomId) { showToast(`Nije pronađen Chatroom ID za "${channelName}".`, 'error'); return false; }
 
@@ -941,7 +1578,7 @@
       }, 10000);
 
       try { kickWebSocket = new WebSocket('wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false'); }
-      catch (e) { clearTimeout(timeout); showToast('Gre\u0161ka pri kreiranju WebSocket konekcije.', 'error'); resolve(false); return; }
+      catch (e) { clearTimeout(timeout); showToast('Greška pri kreiranju WebSocket konekcije.', 'error'); resolve(false); return; }
 
       kickWebSocket.onopen = () => {
         if (resolved) return;
@@ -953,7 +1590,7 @@
         pingInterval = setInterval(() => {
           if (kickWebSocket?.readyState === WebSocket.OPEN) kickWebSocket.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
         }, 25000);
-        showToast(`Uspešno povezan chat za kanal: ${channelName}`, 'success');
+        showToast(`Povezan chat za kanal: ${channelName}`, 'success');
         resolve(true);
       };
 
@@ -1110,7 +1747,13 @@
     settings.prize = '';
     setVal('inputPrize', '');
     updateStartButtonUI();
-    localStorage.removeItem(STATE_KEY);
+    
+    // Ukloni stanje za trenutni kanal
+    try {
+      localStorage.removeItem(STATE_KEY);
+      if (channelName) localStorage.removeItem(`${STATE_KEY}_${channelName.toLowerCase()}`);
+    } catch (e) { /* */ }
+
     updateParticipantsUI();
     updateWinnersUI();
     drawVisualizerStage();
@@ -1167,18 +1810,32 @@
   };
 
   /* ════════════════════════════════════════
-     WINNERS UI
+     WINNERS UI & TIMER MANAGEMENT
   ════════════════════════════════════════ */
   function addWinner(username) {
     const remainingBefore = participantsMap.size;
     const isTop5 = remainingBefore <= 5;
-    const isFinalChamp = remainingBefore === 1; // Poslednji preostali ucesnik!
+    const isFinalChamp = remainingBefore === 1;
     
     const prizeName = settings.prize || 'Misteriozna Nagrada';
-    const w = { username, prize: prizeName, confirmSeconds: settings.confirmTime, timerId: null };
+    const initSec = settings.confirmTime || 60;
+    const now = Date.now();
+    const expiresAt = now + (initSec * 1000);
+
+    const w = {
+      username,
+      prize: prizeName,
+      confirmSeconds: initSec,
+      initialConfirmSeconds: initSec,
+      expiresAt: expiresAt,
+      savedAt: now,
+      isExpired: false,
+      timerId: null
+    };
     winnersList.unshift(w);
     updateWinnersUI();
     startWinnerTimer(w);
+    saveState();
     
     if (isFinalChamp) {
       playSoundChamp();
@@ -1186,7 +1843,7 @@
       playSoundWin();
     }
     
-    showWinnerOverlay(username, prizeName, settings.confirmTime, isTop5, isFinalChamp);
+    showWinnerOverlay(username, prizeName, initSec, isTop5, isFinalChamp);
   }
 
   /* ── Winner Reveal Overlay ── */
@@ -1215,18 +1872,17 @@
     if (fill) fill.style.width = '100%';
 
     if (top5Badge) {
-      if (isFinalChamp) top5Badge.textContent = '🏆 KONAČNI ŠAMPION 🏆';
+      if (isFinalChamp) top5Badge.textContent = 'KONAČNI ŠAMPION';
       else if (isTop5)  top5Badge.textContent = 'TOP 5 POBEDNIK';
       else              top5Badge.textContent = 'POBEDNIK GIVEAWAYA';
     }
 
     ov.classList.remove('is-top5', 'is-final-champ', 'open');
-    void ov.offsetWidth; // reflow
+    void ov.offsetWidth;
     if (isFinalChamp) ov.classList.add('is-final-champ');
     else if (isTop5)  ov.classList.add('is-top5');
     ov.classList.add('open');
 
-    // Timer bar animacija
     if (overlayTimerId) { clearInterval(overlayTimerId); overlayTimerId = null; }
     let rem = confirmSec;
     const tick = () => {
@@ -1238,10 +1894,8 @@
     };
     overlayTimerId = setInterval(tick, 1000);
 
-    // Partikule
     startParticles(isTop5, isFinalChamp);
 
-    // ESC zatvara
     const onKey = (e) => { if (e.key === 'Escape') { window.closeWinnerOverlay(); document.removeEventListener('keydown', onKey); } };
     document.addEventListener('keydown', onKey);
   }
@@ -1254,7 +1908,6 @@
   };
 
   /* ── Canvas Particle System ── */
-  /* ── Canvas Particle System (3D Fluttering Random Confetti) ── */
   function startParticles(isTop5, isFinalChamp) {
     stopParticles();
     const canvas = document.getElementById('particleCanvas');
@@ -1277,7 +1930,7 @@
     for (let i = 0; i < count; i++) {
       particles.push({
         x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height - canvas.height, // staggered random y
+        y: Math.random() * canvas.height - canvas.height,
         vx: (Math.random() - 0.5) * 3,
         vy: Math.random() * 3 + 2,
         w: Math.random() * 8 + 6,
@@ -1300,7 +1953,7 @@
         p.y += p.vy;
 
         if (p.y > canvas.height + 20) {
-          p.y = -20 - Math.random() * 100; // staggered reset
+          p.y = -20 - Math.random() * 100;
           p.x = Math.random() * canvas.width;
           p.vy = Math.random() * 3 + 2;
         }
@@ -1308,7 +1961,7 @@
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
-        ctx.scale(Math.cos(p.flip), 1); // 3D flip effect
+        ctx.scale(Math.cos(p.flip), 1);
         ctx.fillStyle = p.color;
         ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
         ctx.restore();
@@ -1324,14 +1977,37 @@
     if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
   }
 
-
+  /* ── Tajmer potvrde pobednika (Apsolutni expiresAt, nikad se ne resetuje) ── */
   function startWinnerTimer(w) {
     if (w.timerId) clearInterval(w.timerId);
-    w.timerId = setInterval(() => {
-      w.confirmSeconds--;
+
+    const now = Date.now();
+    const isPastExpires = typeof w.expiresAt === 'number' && now >= w.expiresAt;
+
+    if (w.isExpired || isPastExpires || (typeof w.confirmSeconds === 'number' && w.confirmSeconds <= 0)) {
+      w.confirmSeconds = 0;
+      w.isExpired = true;
+      w.timerId = null;
       updateSingleWinnerTimerUI(w);
-      saveState();
-      if (w.confirmSeconds <= 0) clearInterval(w.timerId);
+      return;
+    }
+
+    w.timerId = setInterval(() => {
+      const currentNow = Date.now();
+      const rem = Math.max(0, Math.ceil((w.expiresAt - currentNow) / 1000));
+      w.confirmSeconds = rem;
+      w.savedAt = currentNow;
+
+      if (rem <= 0) {
+        w.confirmSeconds = 0;
+        w.isExpired = true;
+        clearInterval(w.timerId);
+        w.timerId = null;
+        updateSingleWinnerTimerUI(w);
+        saveState();
+      } else {
+        updateSingleWinnerTimerUI(w);
+      }
     }, 1000);
   }
 
@@ -1339,10 +2015,17 @@
     const cleanId = String(w.username).replace(/[^a-zA-Z0-9_-]/g, '');
     const timerEl = document.getElementById(`w-timer-${cleanId}`);
     const barEl   = document.getElementById(`w-bar-${cleanId}`);
-    if (timerEl) timerEl.textContent = w.confirmSeconds > 0 ? `${w.confirmSeconds}s` : 'Isteklo';
+    const isExp   = !!w.isExpired || w.confirmSeconds <= 0;
+
+    if (timerEl) {
+      timerEl.textContent = isExp ? 'Isteklo' : `${w.confirmSeconds}s`;
+      timerEl.classList.toggle('is-expired', isExp);
+    }
     if (barEl) {
-      const pct = Math.max(0, (w.confirmSeconds / (settings.confirmTime || 60)) * 100);
+      const total = w.initialConfirmSeconds || settings.confirmTime || 60;
+      const pct   = isExp ? 0 : Math.max(0, (w.confirmSeconds / total) * 100);
       barEl.style.width = pct + '%';
+      barEl.classList.toggle('is-expired', isExp);
     }
   }
 
@@ -1360,21 +2043,43 @@
     const giftSvg   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--aj-green)" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`;
 
     let html = '';
-    winnersList.forEach(w => {
+    winnersList.forEach((w, idx) => {
       const cleanId = String(w.username).replace(/[^a-zA-Z0-9_-]/g, '');
-      const pct = Math.max(0, (w.confirmSeconds / (settings.confirmTime || 60)) * 100);
+      const total = w.initialConfirmSeconds || settings.confirmTime || 60;
+      const isExp = !!w.isExpired || w.confirmSeconds <= 0;
+      const pct = isExp ? 0 : Math.max(0, (w.confirmSeconds / total) * 100);
       html += `
         <div class="winner-card-item">
           <div class="winner-name-row">
             <div class="winner-name">${trophySvg}<span>${escHtml(w.username)}</span></div>
-            <span class="winner-timer" id="w-timer-${cleanId}">${w.confirmSeconds > 0 ? `${w.confirmSeconds}s` : 'Isteklo'}</span>
+            <div class="winner-name-right">
+              <span class="winner-timer ${isExp ? 'is-expired' : ''}" id="w-timer-${cleanId}">${isExp ? 'Isteklo' : `${w.confirmSeconds}s`}</span>
+              <button type="button" class="winner-remove-btn" onclick="window.removeWinner(${idx})" title="Obriši ovog pobednika">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
           </div>
           <div class="winner-prize-tag">${giftSvg} <span>Nagrada: <strong>${escHtml(w.prize)}</strong></span></div>
-          <div class="timer-bar-wrap"><div class="timer-bar-fill" id="w-bar-${cleanId}" style="width:${pct}%;"></div></div>
+          <div class="timer-bar-wrap"><div class="timer-bar-fill ${isExp ? 'is-expired' : ''}" id="w-bar-${cleanId}" style="width:${pct}%;"></div></div>
         </div>`;
     });
     container.innerHTML = html;
   }
+
+  window.removeWinner = function (index) {
+    const idx = parseInt(index, 10);
+    if (isNaN(idx) || idx < 0 || idx >= winnersList.length) return;
+    const removed = winnersList[idx];
+    if (removed && removed.timerId) {
+      clearInterval(removed.timerId);
+      removed.timerId = null;
+    }
+    winnersList.splice(idx, 1);
+    updateWinnersUI();
+    refreshAll();
+    saveState();
+    showToast(`Pobednik ${removed?.username || ''} je uklonjen.`, 'info');
+  };
 
   /* ════════════════════════════════════════
      VISUALIZER
@@ -1395,10 +2100,9 @@
     show('wheelStageFrame',    isWheel);
     show('slotStageFrame',     isSlot);
     show('rouletteStageFrame', isRoulette);
-    // Dugme "Izvuci pobednika" ispod stage-a — samo kad NIJE tocak (tocak se izvlaci klikom na njega)
     show('btnStageDraw', !isWheel);
 
-    // Fullscreen stage (moze biti otvoren dok se tip menja)
+    // Fullscreen stage
     show('wfoWheelFrame',    isWheel);
     show('wfoSlotFrame',     isSlot);
     show('wfoRouletteFrame', isRoulette);
@@ -1458,7 +2162,7 @@
       ctx.font = `bold ${Math.max(14, r * 0.055)}px 'Space Grotesk', sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(isRunning ? 'Cekanje poruka iz chata...' : 'Pokreni giveaway...', cx, cy);
+      ctx.fillText(isRunning ? 'Čekanje poruka iz chata...' : 'Pokreni giveaway...', cx, cy);
       return;
     }
 
@@ -1491,7 +2195,6 @@
       ctx.restore();
     }
 
-    /* Center cap / IZVUCI Button */
     const capRadius = Math.max(28, r * 0.18);
     ctx.beginPath();
     ctx.arc(0, 0, capRadius, 0, Math.PI * 2);
@@ -1501,14 +2204,12 @@
     ctx.strokeStyle = '#53fc18';
     ctx.stroke();
 
-    // Inner subtle ring
     ctx.beginPath();
     ctx.arc(0, 0, capRadius * 0.85, 0, Math.PI * 2);
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(83, 252, 24, 0.4)';
     ctx.stroke();
 
-    // Center text "IZVUCI" kept upright
     ctx.save();
     ctx.rotate(-wheelAngle);
     ctx.textAlign = 'center';
@@ -1522,7 +2223,7 @@
     ctx.restore();
   }
 
-  /* ── Slot Draw (azurira dashboard I fullscreen verziju istovremeno) ── */
+  /* ── Slot Draw ── */
   function drawSlotPreview(text = null) {
     const pool = getPoolList();
     const reelSets = [
@@ -1533,23 +2234,23 @@
     reelSets.forEach(([r1, r2, r3, wt]) => {
       if (pool.length === 0) {
         [r1, r2, r3].forEach(r => { if (r) r.innerHTML = '<div class="slot-symbol">---</div>'; });
-        if (wt) wt.textContent = 'Cekanje ucesnika...';
+        if (wt) wt.textContent = 'Čekanje učesnika...';
         return;
       }
       const sample = text || pool[0];
       [r1, r2, r3].forEach(r => { if (r) r.innerHTML = `<div class="slot-symbol">${escHtml(sample)}</div>`; });
-      if (wt) wt.textContent = text ? `Izvucen: ${text}` : `Spremno (${pool.length} sanse)`;
+      if (wt) wt.textContent = text ? `Izvučen: ${text}` : `Spremno (${pool.length} šanse)`;
     });
   }
 
-  /* ── Roulette Draw (azurira dashboard I fullscreen verziju istovremeno) ── */
+  /* ── Roulette Draw ── */
   function drawRoulettePreview(highlightName = null) {
     const pool = getPoolList();
     const strips = [document.getElementById('rouletteStrip'), document.getElementById('rouletteStripFullscreen')];
 
     strips.forEach(strip => {
       if (!strip) return;
-      if (pool.length === 0) { strip.innerHTML = '<div class="roulette-card">Cekanje ucesnika...</div>'; return; }
+      if (pool.length === 0) { strip.innerHTML = '<div class="roulette-card">Čekanje učesnika...</div>'; return; }
 
       const display = pool.slice(0, 24);
       let html = '';
@@ -1572,7 +2273,7 @@
   ════════════════════════════════════════ */
   function triggerDraw() {
     const pool = getPoolList();
-    if (pool.length === 0) { showToast('Nema ucesnika za izvlacenje!', 'error'); return; }
+    if (pool.length === 0) { showToast('Nema učesnika za izvlačenje!', 'error'); return; }
     if (isSpinning) return;
     isSpinning = true;
     refreshAll();
@@ -1588,7 +2289,6 @@
   function animateWheelDraw(pool, durMs) {
     const extraSpins = 6 + Math.floor(Math.random() * 3);
     const sliceAngle = (Math.PI * 2) / pool.length;
-    // Pre-determine winner index randomly
     const winIdx = Math.floor(Math.random() * pool.length);
     const targetOffset = (Math.PI * 1.5) - (winIdx + 0.5) * sliceAngle;
     const finalNormalized = ((targetOffset % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -1605,7 +2305,6 @@
 
     function frame(now) {
       const t = Math.min((now - startTime) / durMs, 1);
-      // Smooth organic S-curve easing: initial acceleration then smooth deceleration
       let ease;
       if (t < 0.15) {
         ease = 0.5 * Math.pow(t / 0.15, 2) * 0.15;
@@ -1730,7 +2429,6 @@
     else if (isRunning) { setText('summaryRunState', 'Giveaway aktivan'); }
     else              { setText('summaryRunState', 'Spremno za pokretanje'); }
 
-    // Also update spin time stat
     setText('statSpinTime', formatSpinTime(settings.spinTime));
   }
 
@@ -1743,9 +2441,11 @@
 
   function updateStateBadge() {
     const badge = document.getElementById('stageStateBadge');
-    const pill  = document.getElementById('channelStatusPill');
     const dot   = document.getElementById('channelDot');
+    const nameEl = document.getElementById('connectedChannelName');
     const safe  = escHtml(channelName || 'DemoKanal');
+
+    if (nameEl) nameEl.textContent = safe;
 
     if (!badge) return;
     badge.className = 'stage-state-badge';
@@ -1765,8 +2465,6 @@
     } else {
       badge.textContent = 'Standby';
     }
-
-    if (pill) pill.innerHTML = `<span class="channel-dot" id="channelDot"></span><span>Kanal: <strong>${safe}</strong></span>`;
   }
 
   function updateActionStates() {
@@ -1833,7 +2531,11 @@
     el.innerHTML = `
       <div style="flex-shrink:0;">${icons[type]}</div>
       <div class="toast-msg">${escHtml(msg)}</div>
-      <button class="toast-close" onclick="window.removeToast(${id})" aria-label="Zatvori">&#x2715;</button>`;
+      <button class="toast-close" onclick="window.removeToast(${id})" aria-label="Zatvori">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>`;
 
     const active = Array.from(container.children).filter(c => !c.classList.contains('toast-leaving'));
     if (active.length >= 3) {
@@ -1866,7 +2568,7 @@
   ════════════════════════════════════════ */
   function cleanUsername(raw) {
     if (!raw) return 'Kanal';
-    let s = String(raw).trim().replace(/^kick_user_/, '');
+    let s = String(raw).trim().replace(/^https?:\/\/(www\.)?kick\.com\//, '').replace(/^kick_user_/, '').replace(/^@/, '');
     if (s.includes('@')) s = s.split('@')[0];
     return s || 'Kanal';
   }

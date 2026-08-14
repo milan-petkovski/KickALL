@@ -676,7 +676,8 @@ function renderPlanLimitBanners() {
       <div style="display:flex; flex-direction:column; align-items:center; text-align:center; margin:0 auto; gap:16px;">
 
         <div style="display:flex; align-items:center; gap:8px; background:rgba(139, 92, 246, 0.12); border:1px solid rgba(139, 92, 246, 0.3); padding:4px 14px; border-radius:20px; color:#c4b5fd; font-size:0.75rem; font-weight:800; text-transform:uppercase; letter-spacing:0.8px;">
-          <span>✨ FUNKCIJA U IZRADI</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>FUNKCIJA U IZRADI</span>
         </div>
 
         <h3 style="margin:0; font-size:1.4rem; font-weight:800; color:#fff; letter-spacing:-0.3px; line-height:1.2;">
@@ -934,7 +935,7 @@ async function initAuth() {
 
     if (oauthError) {
       document.getElementById('authGateMsg').textContent = 'Kick odbio autorizaciju...';
-      showToast('error', `Kick odbio autorizaciju: ${oauthError}`, '❌');
+      showToast('error', `Kick odbio autorizaciju: ${oauthError}`);
       setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 2000);
       return;
     }
@@ -960,7 +961,7 @@ async function initAuth() {
       if (!window.KickotConfig.isLocalhost && (!stateParam || stateParam !== savedState)) {
         console.error('Kickot OAuth state mismatch - Expected:', savedState, 'Got:', stateParam);
         document.getElementById('authGateMsg').textContent = 'Nevalidan state parametar...';
-        showToast('error', 'State parametar se ne podudara.', '❌');
+        showToast('error', 'State parametar se ne podudara.');
         setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 2000);
         return;
       }
@@ -995,11 +996,11 @@ async function initAuth() {
           // Better error handling for Render cold starts
           if (res.status === 502) {
             document.getElementById('authGateMsg').textContent = 'Server se budi...';
-            showToast('error', 'Backend server se budi (Render cold start). Sačekajte 15-30 sekundi i pokušajte ponovo.', '❌');
+            showToast('error', 'Backend server se budi (Render cold start). Sačekajte 15-30 sekundi i pokušajte ponovo.');
             setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 15000);
           } else {
             document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
-            showToast('error', err.detail || err.error || 'Server nedostupan', '❌');
+            showToast('error', err.detail || err.error || 'Server nedostupan');
             setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 3000);
           }
           return;
@@ -1008,7 +1009,7 @@ async function initAuth() {
         const tokenData = await res.json();
         if (!tokenData.access_token) {
           document.getElementById('authGateMsg').textContent = 'Token nije primljen...';
-          showToast('error', 'Nije primljen access_token', '❌');
+          showToast('error', 'Nije primljen access_token');
           setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 3000);
           return;
         }
@@ -1057,7 +1058,7 @@ async function initAuth() {
 
           if (!kickUser || (!kickUser.id && !kickUser.chatroom_id)) {
             document.getElementById('authGateMsg').textContent = 'Greška: podaci kanala nedostupni...';
-            showToast('error', 'Nije moguće preuzeti podatke kanala sa Kick platforme.', '❌');
+            showToast('error', 'Nije moguće preuzeti podatke kanala sa Kick platforme.');
             setTimeout(() => { window.location.href = 'dashboard?settings=channels'; }, 3000);
             return;
           }
@@ -1097,12 +1098,12 @@ async function initAuth() {
 
           if (dbErr) {
             document.getElementById('authGateMsg').textContent = 'Greška pri čuvanju u bazu...';
-            showToast('error', dbErr.message, '❌');
+            showToast('error', dbErr.message);
             setTimeout(() => { window.location.href = 'dashboard?settings=channels'; }, 3000);
             return;
           }
 
-          showToast('success', `Kanal @${channelSlug} uspešno dodat!`, '✅');
+          showToast('success', `Kanal @${channelSlug} uspešno dodat!`);
           const cleanUrl = window.location.pathname + '?settings=channels';
           window.history.replaceState({}, '', cleanUrl);
           await initApp();
@@ -1113,7 +1114,7 @@ async function initAuth() {
         return;
       } catch (err) {
         document.getElementById('authGateMsg').textContent = 'Greška pri autorizaciji...';
-        showToast('error', err.message, '❌');
+        showToast('error', err.message);
         setTimeout(() => { window.location.href = window.KickotConfig.paths.indexUrl; }, 3000);
         return;
       }
@@ -1946,7 +1947,7 @@ async function selectChannel(ch) {
   setActiveChannel(ch);
   renderChannelList();
   toggleChannelMenu(null);
-  showToast('info', `Prebačeno na kanal @${ch.username}`, '🔄');
+  showToast('info', `Prebačeno na kanal @${ch.username}`);
   await loadAllData();
 }
 
@@ -2098,9 +2099,9 @@ function renderAddChannelStep2(channelName, verificationCode, errorMsg = '') {
       ${verificationCode}
     </div>
     <p style="color:var(--color-text-muted); font-size:0.82rem; line-height:1.5; margin-bottom:16px;">
-      💡 Kod možeš staviti uz ostali tekst, npr:<br>
-      <em style="color:var(--color-text-secondary);">"Profesionalni streamer 🔥 ${verificationCode}"</em><br>
-      Nakon verifikacije možeš ukloniti kod iz opisa.
+      Kod možete staviti uz ostali tekst, npr:<br>
+      <em style="color:var(--color-text-secondary);">"Streamer ${verificationCode}"</em><br>
+      Nakon verifikacije možete ukloniti kod iz opisa.
     </p>
     ${errorMsg ? `<div class="form-alert" style="display:block;color:#EF4444;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);padding:10px 14px;border-radius:8px;font-size:0.85rem;margin-bottom:12px;">${errorMsg}</div>` : ''}
     <div class="modal-foot" style="padding:0; margin-top:8px; border:none; background:none; display:flex; gap:10px; justify-content:flex-end;">
@@ -2217,7 +2218,7 @@ async function addChannelVerify() {
   setActiveChannel(newChannel);
   renderChannelList();
   closeModal('addChannelModal');
-  showToast('success', `Kanal @${channelName} je uspešno dodat i verifikovan!`, '✅');
+  showToast('success', `Kanal @${channelName} je uspešno dodat i verifikovan!`);
   await loadAllData();
   switchPanel('overview');
 }
@@ -2357,15 +2358,15 @@ async function refreshAllData() {
   if (icon) icon.style.animation = 'spin 0.8s linear infinite';
 
   try {
-    showToast('info', 'Osvežavam podatke...', '🔄');
+    showToast('info', 'Osvežavam podatke...');
     await loadAllData();
-    showToast('success', 'Podaci uspešno osveženi!', '✅');
+    showToast('success', 'Podaci uspešno osveženi!');
 
     // Prikaz zelenog štiklića
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
     btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
   } catch (err) {
-    showToast('success', 'Podaci uspešno osveženi!', '✅');
+    showToast('success', 'Podaci uspešno osveženi!');
 
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
     btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
@@ -3609,7 +3610,7 @@ function exportLeaderboard() {
   const sortedRows = sortLeaderboardRows(source, type);
 
   if (sortedRows.length === 0) {
-    showToast('error', 'Nema podataka za export', '❌');
+    showToast('error', 'Nema podataka za export');
     return;
   }
 
@@ -4249,7 +4250,7 @@ function syncAnnounceTimeToggle(isChecked) {
 
 async function saveBotConfig(silent = false) {
   if (!activeChannel) {
-    if (!silent) showToast('error', 'Nema izabranog kanala', '❌');
+    if (!silent) showToast('error', 'Nema izabranog kanala');
     return;
   }
 
@@ -4327,12 +4328,12 @@ async function saveBotConfig(silent = false) {
   }
 
   if (error || alertsError || announcesError) {
-    showToast('error', 'Greška pri čuvanju config-a', '❌');
+    showToast('error', 'Greška pri čuvanju config-a');
     return;
   }
 
   if (!silent) {
-    showToast('success', 'Bot config sačuvan!', '✅');
+    showToast('success', 'Bot config sačuvan!');
   }
   notifyBotToReload();
   updateOverviewModulesUI();
@@ -4428,7 +4429,7 @@ async function saveAutoAnnounces() {
 
 async function saveBotConfigFields(fieldsToUpdate) {
   if (!activeChannel) {
-    showToast('error', 'Nema izabranog kanala', '❌');
+    showToast('error', 'Nema izabranog kanala');
     return { error: 'No active channel' };
   }
 
@@ -4632,7 +4633,7 @@ function notifyBotToReload() {
 
 async function saveModerationSettings(silent = false) {
   if (!activeChannel) {
-    if (!silent) showToast('error', 'Nema izabranog kanala', '❌');
+    if (!silent) showToast('error', 'Nema izabranog kanala');
     return;
   }
 
@@ -4716,12 +4717,12 @@ async function saveModerationSettings(silent = false) {
   if (!silent && btn) btn.disabled = false;
 
   if (error) {
-    showToast('error', 'Greška pri čuvanju podešavanja moderacije', '❌');
+    showToast('error', 'Greška pri čuvanju podešavanja moderacije');
     return;
   }
 
   if (!silent) {
-    showToast('success', 'Podešavanja moderacije uspešno sačuvana u moderation!', '✅');
+    showToast('success', 'Podešavanja moderacije uspešno sačuvana u moderation!');
   }
   notifyBotToReload();
   updateOverviewModulesUI();
@@ -4741,7 +4742,7 @@ function applyGlobalPenaltyToAll() {
   });
 
   saveModerationSettings(true);
-  showToast('success', 'Globalna kazna je automatski primenjena na sve filtere i sačuvana!', '✅');
+  showToast('success', 'Globalna kazna je automatski primenjena na sve filtere i sačuvana!');
 }
 
 function renderAnnounceList() {
@@ -4777,8 +4778,9 @@ function renderAnnounceList() {
     if (isLocked) {
       return `
           <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
-            <span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; font-size: 0.72rem; font-weight: 800; padding: 3px 9px; border-radius: 6px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px;">
-              🔒 Preko limita (#${i + 1})
+            <span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; font-size: 0.72rem; font-weight: 800; padding: 3px 9px; border-radius: 6px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span>Preko limita (#${i + 1})</span>
             </span>
             <span style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.4; word-break: break-word; font-weight: 500; text-decoration: line-through decoration-color: rgba(239, 68, 68, 0.5);">
               ${escapeHtml(msg)}
@@ -4818,12 +4820,12 @@ function addAnnounceMessage() {
   const msg = input.value.trim();
 
   if (!msg) {
-    showToast('error', 'Poruka ne može biti prazna.', '⚠️');
+    showToast('error', 'Poruka ne može biti prazna.');
     return;
   }
 
   if (localAnnounces.includes(msg)) {
-    showToast('error', 'Ova poruka već postoji.', '⚠️');
+    showToast('error', 'Ova poruka već postoji.');
     return;
   }
 
@@ -4929,11 +4931,11 @@ function toggleBotActiveFromCtrl() {
 
 function testBotConnection() {
   if (!activeChannel) {
-    showToast('error', 'Nije izabran nijedan kanal za testiranje.', '❌');
+    showToast('error', 'Nije izabran nijedan kanal za testiranje.');
     return;
   }
 
-  showToast('info', 'Testiram vezu i šaljem ping u chat...', '🔄');
+  showToast('info', 'Testiram vezu i šaljem ping u chat...');
 
   const kickApiBase = getBotApiBase();
   const targetUrl = `${kickApiBase}/api/kick/test-ping`;
@@ -4965,14 +4967,14 @@ function testBotConnection() {
   fetchPromise
     .then(async (res) => {
       if (res.ok) {
-        showToast('success', `Uspešno testirano! Ping poruka poslata u @${activeChannel.username} chat.`, '✅');
+        showToast('success', `Uspešno testirano! Ping poruka poslata u @${activeChannel.username} chat.`);
       } else {
         const err = await res.json().catch(() => ({ error: `Neuspešan HTTP zahtev (Status ${res.status})` }));
-        showToast('error', `Greška pri slanju pinga: ${err.detail || err.error || 'Neuspešan HTTP zahtev'}`, '❌');
+        showToast('error', `Greška pri slanju pinga: ${err.detail || err.error || 'Neuspešan HTTP zahtev'}`);
       }
     })
     .catch((err) => {
-      showToast('error', `Nije moguće kontaktirati bot server: ${err.message}`, '❌');
+      showToast('error', `Nije moguće kontaktirati bot server: ${err.message}`);
     });
 }
 
@@ -5044,7 +5046,7 @@ async function saveBotActiveToDb(active) {
     }, { onConflict: 'channel_id' });
 
   if (error) {
-    showToast('error', 'Greška pri promeni statusa', '❌');
+    showToast('error', 'Greška pri promeni statusa');
     const toggle = document.getElementById('botActiveToggle');
     if (toggle) toggle.checked = !active;
     updateBotStatusUI(!active);
@@ -5058,7 +5060,7 @@ async function saveBotActiveToDb(active) {
       });
     }
   } else {
-    showToast(active ? 'success' : 'info', `Bot je ${active ? 'pokrenut' : 'zaustavljen'}`, active ? '🟢' : '⭕');
+    showToast(active ? 'success' : 'info', `Bot je ${active ? 'pokrenut' : 'zaustavljen'}`);
     addLocalLog('INFO', active ? 'Korisnik je pokrenuo bota' : 'Korisnik je zaustavio bota');
     notifyBotToReload();
 
@@ -6015,7 +6017,7 @@ function openSettingsModal(activeTab = 'profile') {
 
   sb.auth.getUser().then(({ data: { user } }) => {
     if (!user) {
-      showToast('error', 'Moraš biti prijavljen da pristupiš podešavanjima.', '⚠️');
+      showToast('error', 'Moraš biti prijavljen da pristupiš podešavanjima.');
       return;
     }
 
@@ -6149,10 +6151,15 @@ function handleSettingsAvatarFileSelect(e) {
 }
 
 function selectSettingsPresetAvatar(key) {
-  const emojis = { robot: '🤖', ninja: '🥷', gamepad: '🎮', star: '⭐' };
-  const emoji = emojis[key];
-  setSettingsAvatarPreview(emoji);
-  settingsUploadedAvatarBase64 = emoji;
+  const presets = {
+    robot: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2306b6d4' stroke-width='2'%3E%3Crect x='3' y='11' width='18' height='10' rx='2'/%3E%3Ccircle cx='12' cy='5' r='2'/%3E%3Cline x1='12' y1='7' x2='12' y2='11'/%3E%3C/svg%3E",
+    ninja: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239333ea' stroke-width='2'%3E%3Cpath d='M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z'/%3E%3C/svg%3E",
+    gamepad: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2353fc18' stroke-width='2'%3E%3Cline x1='6' y1='12' x2='10' y2='12'/%3E%3Cline x1='8' y1='10' x2='8' y2='14'/%3E%3Ccircle cx='15' cy='13' r='1'/%3E%3Ccircle cx='18' cy='11' r='1'/%3E%3Crect x='2' y='6' width='20' height='12' rx='6'/%3E%3C/svg%3E",
+    star: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f59e0b' stroke-width='2'%3E%3Cpolygon points='12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2'/%3E%3C/svg%3E"
+  };
+  const avatar = presets[key] || presets.gamepad;
+  setSettingsAvatarPreview(avatar);
+  settingsUploadedAvatarBase64 = avatar;
 }
 
 async function handleSaveSettings() {
@@ -6161,17 +6168,17 @@ async function handleSaveSettings() {
   const confirmPassword = document.getElementById('settingsConfirmPassword').value;
 
   if (!name) {
-    showToast('error', 'Ime ne može biti prazno.', '⚠️');
+    showToast('error', 'Ime ne može biti prazno.');
     return;
   }
 
   if (password) {
     if (password.length < 8) {
-      showToast('error', 'Lozinka mora imati barem 8 karaktera.', '⚠️');
+      showToast('error', 'Lozinka mora imati barem 8 karaktera.');
       return;
     }
     if (password !== confirmPassword) {
-      showToast('error', 'Lozinke se ne podudaraju.', '⚠️');
+      showToast('error', 'Lozinke se ne podudaraju.');
       return;
     }
   }
@@ -6193,7 +6200,7 @@ async function handleSaveSettings() {
       if (passwordError) throw passwordError;
     }
 
-    showToast('success', 'Podešavanja uspešno sačuvana!', '✅');
+    showToast('success', 'Podešavanja uspešno sačuvana!');
     closeSettingsModal();
 
     // Refresh user state
@@ -6216,7 +6223,7 @@ async function handleSaveSettings() {
     }
 
   } catch (err) {
-    showToast('error', err.message || 'Greška pri čuvanju podešavanja.', '❌');
+    showToast('error', err.message || 'Greška pri čuvanju podešavanja.');
   } finally {
     btn.disabled = false;
   }
@@ -6554,9 +6561,9 @@ async function addNewManager() {
     input.value = '';
 
     if (!profileUser) {
-      showToast('success', `Korisnik @${kickUsernameResolved} je dodat! Nalog na sajtu će mu biti aktiviran čim se prvi put prijavi preko Kick-a`, '✅');
+      showToast('success', `Korisnik @${kickUsernameResolved} je dodat! Nalog na sajtu će mu biti aktiviran čim se prvi put prijavi preko Kick-a`);
     } else {
-      showToast('success', `Korisnik @${kickUsernameResolved} je uspešno dodat kao menadžer!`, '✅');
+      showToast('success', `Korisnik @${kickUsernameResolved} je uspešno dodat kao menadžer!`);
     }
 
     renderSettingsManagersList();
@@ -6589,11 +6596,11 @@ async function removeChannelManager(username) {
     if (updateErr) throw updateErr;
 
     currentChannels = updatedChannels;
-    showToast('success', `Menadžer @${username} je uklonjen.`, '✅');
+    showToast('success', `Menadžer @${username} je uklonjen.`);
     renderSettingsManagersList();
 
   } catch (err) {
-    showToast('error', 'Greška pri uklanjanju menadžera.', '❌');
+    showToast('error', 'Greška pri uklanjanju menadžera.');
   }
 }
 
@@ -6608,7 +6615,7 @@ async function makeChannelPrimary(channelId) {
     .eq('id', currentUser.id);
 
   if (error) {
-    showToast('error', 'Greška pri postavljanju glavnog kanala.', '❌');
+    showToast('error', 'Greška pri postavljanju glavnog kanala.');
     return;
   }
 
@@ -6620,7 +6627,7 @@ async function makeChannelPrimary(channelId) {
 
   renderChannelList();
   renderSettingsChannelList();
-  showToast('success', 'Glavni kanal je ažuriran!', '✅');
+  showToast('success', 'Glavni kanal je ažuriran!');
 }
 
 async function deleteConnectedChannel(channelId) {
@@ -6640,7 +6647,7 @@ async function deleteConnectedChannel(channelId) {
       .eq('id', currentUser.id);
 
     if (error) {
-      showToast('error', 'Greška pri uklanjanju kanala.', '❌');
+      showToast('error', 'Greška pri uklanjanju kanala.');
       return;
     }
 
@@ -6660,7 +6667,7 @@ async function deleteConnectedChannel(channelId) {
 
     renderChannelList();
     renderSettingsChannelList();
-    showToast('success', 'Kanal je uspešno uklonjen.', '🗑️');
+    showToast('success', 'Kanal je uspešno uklonjen.');
   };
 
   const titleEl = document.getElementById('confirmModalTitle');
@@ -6824,7 +6831,7 @@ async function addNewChannel() {
 
   renderChannelList();
   renderSettingsChannelList();
-  showToast('success', `Kanal @${newCh.username} je dodat!`, '✅');
+  showToast('success', `Kanal @${newCh.username} je dodat!`);
 }
 
 function syncOverviewCardsHeight() {
@@ -7651,7 +7658,7 @@ function markAllNotifsAsRead() {
   updateNotifBadgeUI();
   renderNotifContent();
   if (typeof showToast === 'function') {
-    showToast('success', 'Sva obaveštenja su označena kao pročitana.', '✔');
+    showToast('success', 'Sva obaveštenja su označena kao pročitana.');
   }
 }
 
@@ -8089,7 +8096,7 @@ async function playCurrentAudio() {
 
 async function togglePlayback() {
   if (localSongQueue.length === 0) {
-    showToast('info', 'Dodajte najpre neku pesmu u red.', '🎵');
+    showToast('info', 'Dodajte najpre neku pesmu u red.');
     return;
   }
 
@@ -8138,7 +8145,7 @@ async function skipSong() {
   if (localSongQueue.length === 0) {
     isPlaying = false;
     if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
-    showToast('info', 'Završeno puštanje svih pesama iz reda.', '🎵');
+    showToast('info', 'Završeno puštanje svih pesama iz reda.');
   } else {
     playCurrentAudio();
   }
@@ -8196,12 +8203,12 @@ async function saveSongRequestConfig(silent) {
     }, { onConflict: 'channel_id,type' });
 
   if (error) {
-    if (!silent) showToast('error', 'Greška pri čuvanju podešavanja song request-a', '❌');
+    if (!silent) showToast('error', 'Greška pri čuvanju podešavanja song request-a');
     return;
   }
 
   if (!silent) {
-    showToast('success', 'Song Request podešavanja uspešno sačuvana u song_request!', '✅');
+    showToast('success', 'Song Request podešavanja uspešno sačuvana u song_request!');
   }
 
   notifyBotToReload();
@@ -8383,7 +8390,7 @@ async function requestSong() {
   const rawInput = inputEl.value ? inputEl.value.trim() : '';
 
   if (!rawInput) {
-    showToast('info', 'Molimo unesite naziv pesme, izvođača ili YouTube link.', '🎵');
+    showToast('info', 'Molimo unesite naziv pesme, izvođača ili YouTube link.');
     return;
   }
 
@@ -8400,7 +8407,7 @@ async function requestSong() {
     addBtn.innerHTML = 'Tražim...';
   }
 
-  showToast('info', `Tražim pesmu "${rawInput}" na YouTube-u...`, '🔍');
+  showToast('info', `Tražim pesmu "${rawInput}" na YouTube-u...`);
 
   const resolved = await resolveYouTubeSongSmart(rawInput);
 
@@ -8410,7 +8417,7 @@ async function requestSong() {
   }
 
   if (!resolved) {
-    showToast('error', 'Nije bilo moguće pronaći pesmu.', '❌');
+    showToast('error', 'Nije bilo moguće pronaći pesmu.');
     return;
   }
 
@@ -8441,7 +8448,7 @@ async function requestSong() {
     playCurrentAudio();
   }
 
-  showToast('success', `Pronađena pesma: "${resolved.artist ? resolved.artist + ' - ' : ''}${resolved.title}"`, '🎵');
+  showToast('success', `Pronađena pesma: "${resolved.artist ? resolved.artist + ' - ' : ''}${resolved.title}"`);
 }
 
 function removeSong(index) {
@@ -8463,7 +8470,7 @@ function removeSong(index) {
   updatePlayerUI();
   saveSongRequestConfig(true);
 
-  showToast('info', `Pesma "${removed ? removed.title : ''}" je uklonjena iz reda.`, '🗑️');
+  showToast('info', `Pesma "${removed ? removed.title : ''}" je uklonjena iz reda.`);
 }
 
 function clearSongQueue() {
@@ -8484,7 +8491,7 @@ function clearSongQueue() {
   updatePlayerUI();
   saveSongRequestConfig(true);
 
-  showToast('info', 'Red sa pesmama je uspešno očišćen.', '🧹');
+  showToast('info', 'Red sa pesmama je uspešno očišćen.');
 }
 
 function playSongNow(index) {
@@ -8953,7 +8960,7 @@ async function saveStoreItem() {
   const auto_approve = document.getElementById('storeItemAutoApprove').checked;
 
   if (!name) {
-    showToast('warning', 'Unesi naziv artikla!', '⚠️');
+    showToast('warning', 'Unesi naziv artikla!');
     return;
   }
 
@@ -9000,7 +9007,7 @@ async function saveStoreItem() {
   if (error) {
     showToast('error', 'Greška pri čuvanju artikla!');
   } else {
-    showToast('success', editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!', '✅');
+    showToast('success', editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!');
     closeModal('storeItemModal');
     renderStoreItems();
   }
@@ -9022,7 +9029,7 @@ async function deleteStoreItem(id) {
   if (error) {
     showToast('error', 'Greška pri brisanju artikla!');
   } else {
-    showToast('success', 'Artikal obrisan!', '✅');
+    showToast('success', 'Artikal obrisan!');
     renderStoreItems();
   }
 }
@@ -9060,11 +9067,11 @@ function renderStoreRedemptions() {
   }
 
   tbody.innerHTML = redemptions.map(r => {
-    let statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(234,179,8,0.15); color:#eab308; border:1px solid rgba(234,179,8,0.3);">Čeka odobrenje 🟡</span>`;
+    let statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(234,179,8,0.15); color:#eab308; border:1px solid rgba(234,179,8,0.3);">Čeka odobrenje</span>`;
     if (r.status === 'completed') {
-      statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">Odobreno 🟢</span>`;
+      statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(34,197,94,0.15); color:#22c55e; border:1px solid rgba(34,197,94,0.3);">Odobreno</span>`;
     } else if (r.status === 'rejected') {
-      statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">Odbijeno (Vraćeno) 🔴</span>`;
+      statusBadge = `<span style="padding:3px 8px; border-radius:12px; font-size:0.75rem; font-weight:600; background:rgba(239,68,68,0.15); color:#ef4444; border:1px solid rgba(239,68,68,0.3);">Odbijeno (Vraćeno)</span>`;
     }
 
     const datum = r.requested_at ? new Date(r.requested_at).toLocaleString('sr-RS') : '—';
@@ -9079,8 +9086,8 @@ function renderStoreRedemptions() {
         <td>${statusBadge}</td>
         <td style="text-align:right;">
           ${isPending ? `
-            <button class="btn btn-xs btn-primary" onclick="approveRedemption('${r.id}')" style="padding:4px 10px; margin-right:4px;">Odobri 🟢</button>
-            <button class="btn btn-xs btn-danger" onclick="rejectRedemption('${r.id}')" style="padding:4px 10px;">Odbij & Refundiraj 🔴</button>
+            <button class="btn btn-xs btn-primary" onclick="approveRedemption('${r.id}')" style="padding:4px 10px; margin-right:4px;">Odobri</button>
+            <button class="btn btn-xs btn-danger" onclick="rejectRedemption('${r.id}')" style="padding:4px 10px;">Odbij i Refundiraj</button>
           ` : `<span style="font-size:0.78rem; color:var(--text-muted);">—</span>`}
         </td>
       </tr>
@@ -9095,7 +9102,7 @@ async function simulirajKupovinuArtikla() {
   const item = items.find(i => i.id === itemId);
 
   if (!item) {
-    showToast('warning', 'Izaberi artikal iz prodavnice!', '⚠️');
+    showToast('warning', 'Izaberi artikal iz prodavnice!');
     return;
   }
 
@@ -9117,9 +9124,9 @@ async function simulirajKupovinuArtikla() {
   const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
   if (error) {
-    showToast('error', 'Greška pri simulaciji kupovine!', '❌');
+    showToast('error', 'Greška pri simulaciji kupovine!');
   } else {
-    showToast('success', `Simulirana kupovina za "${item.name}" od strane @${username}!`, '🛍️');
+    showToast('success', `Simulirana kupovina za "${item.name}" od strane @${username}!`);
     renderStoreRedemptions();
   }
 }
@@ -9146,7 +9153,7 @@ async function approveRedemption(id) {
   const { error } = await saveBotConfigFields({ store_redemptions: redemptions });
 
   if (!error) {
-    showToast('success', `Kupovina za @${target.username} je uspešno odobrena!`, '✅');
+    showToast('success', `Kupovina za @${target.username} je uspešno odobrena!`);
     renderStoreRedemptions();
   }
 }
@@ -9344,9 +9351,9 @@ async function saveUserPointsModal() {
       }, { onConflict: 'channel_id,username,month,year' });
 
     if (error) {
-      showToast('error', `Greška pri čuvanju poena u bazi za @${username}!`, '❌');
+      showToast('error', `Greška pri čuvanju poena u bazi za @${username}!`);
     } else {
-      showToast('success', `Poeni za @${username} su ažurirani na ${parsed.toLocaleString()} ${valuta}!`, '✅');
+      showToast('success', `Poeni za @${username} su ažurirani na ${parsed.toLocaleString()} ${valuta}!`);
     }
   }
 }
@@ -10207,7 +10214,7 @@ async function executeBotrixImport() {
         }
       }
 
-      showToast('success', `Uspešno sačuvano ${successCount} komandi sa Botrix-a! 🎉`);
+      showToast('success', `Uspešno sačuvano ${successCount} komandi sa Botrix-a!`);
       await loadCommands();
 
     } else if (botrixActiveTab === 'timers') {
@@ -10231,7 +10238,7 @@ async function executeBotrixImport() {
       const err = await saveAutoAnnounces();
       if (err) throw err;
 
-      showToast('success', `Uspešno dodato ${newAnnounces.length} automatskih najava iz Botrix-a! 🎉`);
+      showToast('success', `Uspešno dodato ${newAnnounces.length} automatskih najava iz Botrix-a!`);
       await loadBotConfig();
 
     } else if (botrixActiveTab === 'blacklist') {
@@ -10253,7 +10260,7 @@ async function executeBotrixImport() {
 
       if (error) throw error;
 
-      showToast('success', `Uspešno dodato ${botrixParsedData.length} zabranjenih reči iz Botrix-a! 🛡️`);
+      showToast('success', `Uspešno dodato ${botrixParsedData.length} zabranjenih reči iz Botrix-a!`);
       await loadBotConfig();
 
     } else if (botrixActiveTab === 'watchtime') {
@@ -10322,7 +10329,7 @@ async function executeBotrixImport() {
         successCount++;
       }
 
-      showToast('success', `Uspešno sačuvan Watchtime za ${successCount} gledalaca! ⏱️`);
+      showToast('success', `Uspešno sačuvan Watchtime za ${successCount} gledalaca!`);
       if (typeof renderUnifiedLeaderboard === 'function') renderUnifiedLeaderboard();
 
     } else if (botrixActiveTab === 'store') {
@@ -10339,12 +10346,12 @@ async function executeBotrixImport() {
 
       if (error) throw error;
 
-      showToast('success', `Uspešno dodato ${botrixParsedData.length} artikala u Prodavnicu! 🛍️`);
+      showToast('success', `Uspešno dodato ${botrixParsedData.length} artikala u Prodavnicu!`);
       if (typeof loadBotConfig === 'function') await loadBotConfig();
       if (typeof renderStoreItems === 'function') renderStoreItems();
 
     } else if (botrixActiveTab === 'alerts' || botrixActiveTab === 'greetings') {
-      showToast('success', `Uspešno sačuvano ${botrixParsedData.length} poruka sa Botrix-a! 🎉`);
+      showToast('success', `Uspešno sačuvano ${botrixParsedData.length} poruka sa Botrix-a!`);
       if (typeof loadBotConfig === 'function') await loadBotConfig();
     }
 
