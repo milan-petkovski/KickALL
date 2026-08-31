@@ -204,6 +204,11 @@
           queueManager.enqueue(payload.payload);
         }
       })
+      .on('broadcast', { event: 'alert_trigger' }, (payload) => {
+        if (payload?.payload) {
+          queueManager.enqueue(payload.payload);
+        }
+      })
       .subscribe((status) => {
         console.log(`[Kickov Widget OBS] Realtime status za kanal ${channelName}:`, status);
       });

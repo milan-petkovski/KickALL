@@ -614,7 +614,7 @@ async function setLanguage(lang) {
 
     if (startGiveawayBtn) {
         startGiveawayBtn.addEventListener('click', () => {
-            const prizeValue = giveawayPrize.value.trim() || 'Subscribe 🎁';
+            const prizeValue = giveawayPrize.value.trim() || 'Pretplata';
             const isEn = currentLang === 'en';
 
             prizeDisplay.textContent = prizeValue;
@@ -824,7 +824,7 @@ async function setLanguage(lang) {
     if (triggerDonation) {
         triggerDonation.addEventListener('click', () => {
             const names = ['Zverko', 'SponzorStrimera', 'Bata_Pera', 'Donator99'];
-            const msgs = ['Najjači si, samo napred!', 'Pozdrav za čet i strimera!', 'Kupi novu grafičku 😄', 'Ideeeemoooo'];
+            const msgs = ['Najjači si, samo napred!', 'Pozdrav za čet i strimera!', 'Kupi novu grafičku', 'Ideeeemoooo'];
             const randomName = names[Math.floor(Math.random() * names.length)];
             const randomMsg = msgs[Math.floor(Math.random() * msgs.length)];
             const randomAmount = (5 + Math.floor(Math.random() * 95));

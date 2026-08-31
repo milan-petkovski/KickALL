@@ -1,314 +1,1029 @@
 <!DOCTYPE html>
-<html lang="sr">
+<html lang="sr" dir="ltr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <title>KICKAN - Stream Analytics</title>
-  <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon">
-  <meta name="description" content="Kompletna analitika i statistika Kick kanala u realnom vremenu: poruke, gledaoci, pretplatnici, emoti i moderacija." />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="color-scheme" content="dark" />
+  <title>Kickan Stream Analytics Studio</title>
+  <meta name="description" content="Kompletna analitika i statistika Kick kanala u realnom vremenu: poruke, gledaoci, pretplatnici, emoti, brzina chata i moderacija." />
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="theme-color" content="#0B0816" />
+  <meta name="theme-color" content="#07050f" />
 
-  <!-- Fonts & Core Styles -->
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/base.css" />
-  <link rel="stylesheet" href="../css/style.css" />
-  <link rel="stylesheet" href="../css/dashboard.css" />
-  <link rel="stylesheet" href="css/kickan.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-  <!-- Supabase JS CDN & Config -->
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/kickan.css" />
+  <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon" />
+
+  <!-- Supabase + Core JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/config.js"></script>
   <script src="../js/toast.js" defer></script>
   <script src="../js/mobile-optimization.js" defer></script>
 </head>
-<body class="kickan-page auth-loading">
+<body class="kickan-body auth-loading">
 
-  <!-- Ambient Glow Blobs -->
-  <div class="glow-bg" aria-hidden="true">
-    <div class="blob blob-cyan"></div>
-    <div class="blob blob-green"></div>
-  </div>
-
-  <!-- Fullscreen Auth Loading Gate -->
-  <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
-    <div class="auth-gate-card">
-      <div class="auth-gate-logo">
-        <img src="../assets/kickan.webp" alt="Kickan Logo" class="logo-img" fetchpriority="high">
+  <!-- ══════════ MOBILE UNSUPPORTED OVERLAY (<=768px) ══════════ -->
+  <div class="mobile-unsupported-overlay" role="alertdialog" aria-modal="true" aria-labelledby="mobileOverlayTitle" aria-describedby="mobileOverlayDesc">
+    <div class="mobile-unsupported-card">
+      <div class="mobile-unsupported-icon">
+        <svg fill="none" height="38" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="38">
+          <rect height="14" rx="2" ry="2" width="20" x="2" y="3"></rect>
+          <line x1="8" x2="16" y1="21" y2="21"></line>
+          <line x1="12" x2="12" y1="17" y2="21"></line>
+        </svg>
       </div>
-      <div class="auth-gate-spinner"></div>
-      <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju i povezujemo chat...</p>
+      <h2 class="mobile-unsupported-title" id="mobileOverlayTitle">Kickan Studio zahteva veći ekran</h2>
+      <p class="mobile-unsupported-desc" id="mobileOverlayDesc">
+        Analitika i kontrolni panel sa detaljnom statistikom chata u realnom vremenu zahtevaju širi radni prostor.
+      </p>
+      <div class="mobile-steps-container">
+        <div class="mobile-step-item">
+          <div class="mobile-step-num">1</div>
+          <div class="mobile-step-text">Pređite na <strong>PC, Laptop</strong> ili <strong>Tablet</strong> uređaj.</div>
+        </div>
+        <div class="mobile-step-item">
+          <div class="mobile-step-num">2</div>
+          <div class="mobile-step-text">Ili uključite <strong>"Desktop site" (Verzija za računare)</strong> u opcijama vašeg pregledača.</div>
+        </div>
+      </div>
+      <a class="mobile-home-btn" href="/dashboard">
+        <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="18">
+          <line x1="19" x2="5" y1="12" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span>Nazad na Ekosistem</span>
+      </a>
     </div>
   </div>
 
-  <!-- Header / Navigation -->
-  <header class="header" role="banner">
-    <div class="container nav-container">
-      <a href="#" class="logo" id="navLogo">
-        <img src="../assets/kickan.webp" alt="Kickan Logo" class="logo-img" fetchpriority="high">
-      </a>
-      
-      <nav class="nav-menu" id="navMenu">
-        <a href="/dashboard" class="nav-link nav-logo-link" title="Ekosistem">
-          <img src="../assets/kickall.webp" alt="KickALL" class="nav-module-img" height="26">
-        </a>
-        <a href="/kickot/dashboard" class="nav-link nav-logo-link" title="Kickot">
-          <img src="../assets/kickot.webp" alt="Kickot" class="nav-module-img" height="26">
-        </a>
-        <a href="/kickaj/dashboard" class="nav-link nav-logo-link" title="Kickaj">
-          <img src="../assets/kickaj.webp" alt="Kickaj" class="nav-module-img" height="26">
-        </a>
-        <a href="/kickov/dashboard" class="nav-link nav-logo-link" title="Kickov">
-          <img src="../assets/kickov.webp" alt="Kickov" class="nav-module-img" height="26">
-        </a>
-      </nav>
+  <!-- ══════════ AUTH GATE ══════════ -->
+  <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
+    <div class="auth-gate-card">
+      <div class="auth-gate-logo">
+        <img src="../assets/kickan.webp" alt="Kickan Logo" class="auth-logo-img" fetchpriority="high" />
+      </div>
+      <div class="auth-gate-spinner"></div>
+      <p id="authGateMsg" class="auth-gate-msg" aria-live="polite">Proveravamo sesiju i povezujemo telemetriju...</p>
+    </div>
+  </div>
 
-      <div class="nav-actions">
-        <div class="lang-switcher">
-          <button class="lang-btn active" id="btn-sr">SR</button>
-          <button class="lang-btn" id="btn-en">EN</button>
-        </div>
-        
-        <div class="user-menu visible" id="userMenu">
-          <button class="user-menu-trigger" id="userMenuTrigger">
-            <div class="user-avatar" id="userAvatarDisplay" style="background:var(--kickan-accent-cyan); color:#000;">K</div>
-            <span class="user-name" id="userNameDisplay">Streamer</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="chevron-icon">
-              <polyline points="6 9 12 15 18 9" />
+  <!-- ══════════ APP SHELL ══════════ -->
+  <div class="app" id="app">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="sidebar">
+
+      <!-- Header: Back + Logo + Coffee -->
+      <div class="sidebar-header">
+        <a class="sidebar-header-btn back-btn" href="/dashboard" title="Nazad na KickALL">
+          <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="16">
+            <line x1="19" x2="5" y1="12" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </a>
+        <a class="sidebar-logo" href="#" title="Kickan — Stream Analytics Studio">
+          <img alt="Kickan Logo" class="logo-img" src="../assets/kickan.webp" />
+        </a>
+        <a class="sidebar-header-btn coffee-btn" href="https://paypal.me/milanwebportal/5EUR" rel="noopener noreferrer" target="_blank" title="Kupi mi kafu">
+          <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="16">
+            <path d="M17 8h1a4 4 0 1 1 0 8h-1"></path>
+            <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path>
+            <line x1="6" x2="6" y1="2" y2="4"></line>
+            <line x1="10" x2="10" y1="2" y2="4"></line>
+            <line x1="14" x2="14" y1="2" y2="4"></line>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Sidebar Title Bar -->
+      <div class="sidebar-title-bar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5">
+          <line x1="18" y1="20" x2="18" y2="10"></line>
+          <line x1="12" y1="20" x2="12" y2="4"></line>
+          <line x1="6" y1="20" x2="6" y2="14"></line>
+        </svg>
+        <span>Podešavanje analitike</span>
+      </div>
+
+      <!-- Config Panel (scrollable area) -->
+      <div class="sidebar-config" id="sidebarConfig">
+
+        <!-- Accordion 1: Vremenski raspon & Praćenje -->
+        <details class="sc-accordion" name="sidebar-accordion" open>
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span>Vremenski raspon & Praćenje</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <div class="sc-form-group">
+              <label class="sc-label" for="selectTimeframe">Vremenski period</label>
+              <select id="selectTimeframe" class="sc-input sc-select">
+                <option value="session" selected>Trenutna Live Sesija</option>
+                <option value="24h">Poslednja 24 sata</option>
+                <option value="7d">Poslednjih 7 dana</option>
+                <option value="all">Kumulativno (Svi podaci)</option>
+              </select>
+            </div>
+            <div class="sc-form-group">
+              <label class="sc-label" for="selectRefreshRate">Auto-osvežavanje telemetrije</label>
+              <select id="selectRefreshRate" class="sc-input sc-select">
+                <option value="realtime" selected>Real-time (Instant WebSocket)</option>
+                <option value="15">Svakih 15 sekundi</option>
+                <option value="30">Svakih 30 sekundi</option>
+                <option value="60">Svakog minuta</option>
+              </select>
+            </div>
+            <div class="sc-form-group">
+              <label class="sc-label" for="inputMinMsgThreshold">Min. poruka za Top Listu</label>
+              <input type="number" id="inputMinMsgThreshold" class="sc-input" min="1" max="100" value="1" />
+            </div>
+          </div>
+        </details>
+
+        <!-- Accordion 2: Parametri nadzora & Upozorenja -->
+        <details class="sc-accordion" name="sidebar-accordion">
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--an-violet)" stroke-width="2.5">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+              <span>Parametri nadzora & Upozorenja</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <div class="sc-form-group">
+              <label class="sc-label" for="inputSpikeThreshold">Chat Spike prag (msg/min)</label>
+              <input type="number" id="inputSpikeThreshold" class="sc-input" min="10" max="1000" value="60" placeholder="npr. 60" />
+            </div>
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">Zvučno obaveštenje za Raid/Host</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleSoundAlerts" checked />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">Zvučni signal za Chat Spike</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleSpikeAlert" checked />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-form-group" id="volumeGroup">
+              <label class="sc-label" for="inputVolume">Jačina zvuka: <strong id="volumeLabelVal">50%</strong></label>
+              <input type="range" id="inputVolume" class="sc-slider" min="0" max="100" value="50" step="5" />
+            </div>
+          </div>
+        </details>
+
+        <!-- Accordion 3: Prikaz & Grafici -->
+        <details class="sc-accordion" name="sidebar-accordion">
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--an-green)" stroke-width="2.5">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="9" y1="21" x2="9" y2="9"></line>
+              </svg>
+              <span>Prikaz & Grafici</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">Prikazuj Sub & VIP značke</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleShowBadges" checked />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">Filtriraj botove iz statistike</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleFilterBots" checked />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-form-group">
+              <label class="sc-label" for="selectChartStyle">Stil prikaza aktivnosti</label>
+              <select id="selectChartStyle" class="sc-input sc-select">
+                <option value="bars" selected>24h Satni Stubići (Histogram)</option>
+                <option value="velocity">Minutni Brzinomer (Velocity)</option>
+              </select>
+            </div>
+          </div>
+        </details>
+
+        <!-- Accordion 4: Izvoz & Arhiva -->
+        <details class="sc-accordion" name="sidebar-accordion">
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--an-amber)" stroke-width="2.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Izvoz & Arhiva</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <button type="button" class="sc-btn sc-btn-export-full" onclick="window.openExportModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              <span>Generiši Izveštaj (CSV / JSON)</span>
+            </button>
+            <button type="button" class="sc-btn sc-btn-copy-summary" onclick="window.copySummaryToClipboard()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Kopiraj Sažetak u Clipboard</span>
+            </button>
+          </div>
+        </details>
+      </div><!-- /sidebar-config -->
+
+      <!-- Action buttons (Pinned at bottom) -->
+      <div class="sc-section-actions">
+        <button class="sc-btn sc-btn-tracking active" id="btnToggleTracking" onclick="window.toggleLiveTracking()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span id="btnTrackingLabel">Praćenje je aktivno</span>
+        </button>
+        <div class="sc-btn-row">
+          <button class="sc-btn sc-btn-export" onclick="window.openExportModal()" title="Izvezi analitički izveštaj">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
+            <span>Izvezi</span>
           </button>
-          <div class="user-dropdown" id="userDropdown">
-            <a href="/dashboard" class="dropdown-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
+          <button class="sc-btn sc-btn-reset" onclick="window.openResetModal()" title="Resetuj statistiku sesije">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <path d="M3 3v5h5"></path>
+            </svg>
+            <span>Reset</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="user-pill" id="userPill" onclick="window.toggleUserMenu()">
+          <div class="user-avatar-sm" id="userAvatarDisplay">K</div>
+          <div class="user-info">
+            <div class="user-display-name" id="userNameDisplay">Streamer</div>
+            <div class="user-plan" id="userPlanLabel">
+              <span class="sidebar-plan-badge" id="planBadge">FREE</span>
+            </div>
+          </div>
+          <!-- Popup dropdown -->
+          <div class="user-menu-sm" id="userMenuSm">
+            <div class="dropdown-notice-item">
+              <svg class="dropdown-icon" fill="none" height="14" stroke="var(--an-cyan)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
-              <span>Dashboard</span>
-            </a>
-            <button class="dropdown-item danger" id="btnLogout">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
+              <span>Podešavanja se rade u Kickot delu</span>
+            </div>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" onclick="event.stopPropagation(); window.openHelpModal()">
+              <svg class="dropdown-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
               </svg>
+              <span>Pomoć</span>
+            </button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item danger" id="btnLogout" onclick="event.stopPropagation(); window.handleSignOut()">
+              <svg class="dropdown-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               <span>Odjavi se</span>
             </button>
           </div>
         </div>
       </div>
-    </div>
-  </header>
 
-  <!-- Main Workspace -->
-  <main class="kickan-container">
-    
-    <!-- Hero Banner Section -->
-    <section class="kickan-hero-card">
-      <div class="kickan-hero-top">
-        <div>
-          <div class="hero-tag-pill">
+    </aside><!-- /sidebar -->
+
+    <!-- ── MAIN CONTENT ── -->
+    <main class="main" id="mainContent">
+
+      <!-- Top Bar -->
+      <header class="main-topbar" role="banner">
+        <div class="topbar-left">
+          <div class="topbar-channel-wrap">
+            <button class="topbar-channel-pill" id="channelStatusPill" onclick="window.toggleChannelDropdown(event)" title="Izaberi ili promeni Kick kanal" aria-haspopup="true" aria-expanded="false">
+              <span class="channel-dot" id="channelDot"></span>
+              <span class="channel-pill-text">Kanal: <strong id="connectedChannelName">Učitavanje...</strong></span>
+              <svg class="channel-pill-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
+
+            <!-- Channel Dropdown -->
+            <div class="channel-dropdown-menu" id="channelDropdownMenu">
+              <div class="cdm-head">
+                <div class="cdm-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                  <span>Moji Kick Kanali</span>
+                </div>
+                <span class="cdm-count-badge" id="cdmCountBadge">0</span>
+              </div>
+              <div class="cdm-list" id="cdmChannelList">
+                <div class="cdm-empty">Učitavanje kanala...</div>
+              </div>
+              <div class="cdm-footer">
+                <button class="cdm-custom-btn" onclick="window.openCustomChannelModal(event)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  <span>Unesi drugi Kick kanal</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- Live Stream Status Pill -->
+          <div class="topbar-live-status-pill" id="streamLiveBadge">
+            <span class="stream-pulse-dot"></span>
+            <span id="streamStatusText">Offline</span>
+            <span class="stream-uptime" id="streamUptimeText" style="display:none;">00:00:00</span>
+          </div>
+
+          <!-- Chat Velocity Pill -->
+          <div class="topbar-velocity-pill" id="chatVelocityPill" title="Brzina pristizanja chat poruka">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--an-amber)" stroke-width="2.5">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            <span><strong id="topbarVelocityVal">0</strong> msg/min</span>
+          </div>
+
+          <!-- Mute Button -->
+          <button class="topbar-btn topbar-mute-btn" id="btnMuteSound" onclick="window.toggleMute()" title="Isključi/uključi zvuk">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="muteIcon">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+          </button>
+
+          <!-- Fullscreen Studio Button -->
+          <button class="topbar-btn" id="btnOpenFullscreen" onclick="window.openFullscreenStudio()" title="Studio HUD prikaz za drugi monitor">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="18" y1="20" x2="18" y2="10"/>
-              <line x1="12" y1="20" x2="12" y2="4"/>
-              <line x1="6" y1="20" x2="6" y2="14"/>
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
             </svg>
-            Ultimativna Analitika Strimova
-          </div>
-          <h1 class="kickan-hero-title">
-            <span class="gradient-text-glow">Kickan </span>Analytics Studio
-            <span class="beta-badge">BETA</span>
-          </h1>
-          <p class="kickan-hero-subtitle">Detaljna statistika tvog Kick kanala u realnom vremenu: chat poruke, aktivnost gledalaca, popularni emoti i nadzor moderacije.</p>
-        </div>
-        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:10px;">
-          <div class="kickan-channel-pill" id="channelStatusPill">
-            <span class="channel-dot"></span>
-            <span>Povezan kanal: <strong id="connectedChannelName">Učitavanje...</strong></span>
-          </div>
-        </div>
-      </div>
-    </section>
+          </button>
 
-    <!-- Top Key Metrics Grid -->
-    <section class="metrics-grid-4">
-      <div class="metric-card">
-        <div class="metric-header">
-          <div class="metric-label">Ukupno Poruka</div>
-          <div class="metric-icon" style="color:var(--kickan-accent-cyan);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-          </div>
-        </div>
-        <div class="metric-value" id="valTotalMessages">0</div>
-        <div class="metric-footer">Automatsko praćenje u chatu</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-header">
-          <div class="metric-label">Status Strima</div>
-          <div class="metric-icon" style="color:var(--kickan-accent-green);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-          </div>
-        </div>
-        <div class="metric-value" id="valAvgViewers">Offline</div>
-        <div class="metric-footer">Kick API Telemetrija</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-header">
-          <div class="metric-label">Pratioci & Pretplatnici</div>
-          <div class="metric-icon" style="color:var(--kickan-accent-violet);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
-          </div>
-        </div>
-        <div class="metric-value" id="valActiveSubs">0</div>
-        <div class="metric-footer">Ukupna zajednica</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-header">
-          <div class="metric-label">Jedinstveni Gledaoci</div>
-          <div class="metric-icon" style="color:var(--kickan-accent-amber);">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-            </svg>
-          </div>
-        </div>
-        <div class="metric-value" id="valUniqueChatters">0</div>
-        <div class="metric-footer">Aktivni u chatu</div>
-      </div>
-    </section>
+          <!-- Notification Bell -->
+          <div class="topbar-notif-wrap" style="position: relative;">
+            <button class="topbar-btn" id="notifBellBtn" onclick="window.toggleNotifCenter()" title="Obaveštenja">
+              <svg fill="none" height="17" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewBox="0 0 24 24" width="17">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <span class="notif-badge" id="notifBadge"></span>
+            </button>
 
-    <!-- Secondary Metrics Strip -->
-    <section class="metrics-grid-4" style="margin-bottom:36px;">
-      <div class="metric-card">
-        <div class="metric-label">Vrednost KICKs-a</div>
-        <div class="metric-value" style="color:var(--kickan-accent-green);" id="valTotalKicks">0</div>
-        <div class="metric-footer">Chat donacije</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Ukupno Banova</div>
-        <div class="metric-value" style="color:var(--kickan-accent-red);" id="valTotalBans">0</div>
-        <div class="metric-footer">Sankcije moderacije</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Hostovi & Raidovi</div>
-        <div class="metric-value" style="color:var(--kickan-accent-cyan);" id="valTotalHosts">0</div>
-        <div class="metric-footer">Dolazna podrška</div>
-      </div>
-      <div class="metric-card">
-        <div class="metric-label">Korišćenje Emotea</div>
-        <div class="metric-value" style="color:var(--kickan-accent-violet);" id="valTotalEmotes">0</div>
-        <div class="metric-footer">Aktivnost emojija</div>
-      </div>
-    </section>
-
-    <!-- Charts & Analytics Section -->
-    <section class="charts-grid-2">
-      <!-- Hourly Message Activity Chart -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <div class="chart-title">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-cyan)" stroke-width="2.5">
-              <path d="M12 20V10M18 20V4M6 20v-4" />
-            </svg>
-            <span>Aktivnost Poruka Po Satima (24h)</span>
+            <!-- Notifications Popover -->
+            <div class="notif-popover" id="notifPopover">
+              <div class="notif-popover-head">
+                <h4 class="notif-popover-title">
+                  <div class="notif-popover-icon">
+                    <svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" width="15">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                  </div>
+                  <span>Obaveštenja</span>
+                </h4>
+                <button class="notif-mark-read" onclick="window.markAllNotifsAsRead()" title="Pročitaj sve">
+                  <svg fill="none" height="11" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" width="11">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <span>Pročitaj sve</span>
+                </button>
+              </div>
+              <div class="notif-tabs">
+                <button class="notif-tab active" id="notifTabObavestenja" onclick="window.switchNotifTab('obavestenja')">Obaveštenja</button>
+                <button class="notif-tab" id="notifTabChangelog" onclick="window.switchNotifTab('changelog')">Changelog</button>
+              </div>
+              <div class="notif-content-list" id="notifContentList">
+                <div class="notif-empty">Nema novih obaveštenja.</div>
+              </div>
+            </div>
           </div>
-          <span style="font-size:0.85rem; color:var(--kickan-text-muted);" id="hourlyPeakLabel">Čeka se aktivnost chata...</span>
-        </div>
-        <div class="chart-viewport" id="hourlyChartViewport">
-          <!-- Dynamically generated bar graph via JS -->
-        </div>
-      </div>
 
-      <!-- Most Popular Emotes Progress List -->
-      <div class="chart-card">
-        <div class="chart-header">
-          <div class="chart-title">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-amber)" stroke-width="2.5">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-              <line x1="9" y1="9" x2="9.01" y2="9"/>
-              <line x1="15" y1="9" x2="15.01" y2="9"/>
+          <!-- Refresh Button -->
+          <button class="topbar-btn topbar-refresh-btn" id="btnRefreshDb" onclick="window.refreshDatabase()" title="Osveži telemetriju i podatke">
+            <svg class="refresh-icon" fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" width="16">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
             </svg>
-            <span>Omiljeni Emoti u Chatu</span>
-          </div>
-          <span style="font-size:0.85rem; color:var(--kickan-text-muted);" id="emotesTotalLabel">Ukupno: 0 emotea</span>
+          </button>
         </div>
-        <div class="progress-list-container" id="popularEmotesContainer">
-          <!-- Dynamically rendered emotes list via JS -->
+      </header>
+
+      <!-- Scrollable Main Container -->
+      <div class="main-scroll">
+
+        <!-- ── HERO STRIP ── -->
+        <section class="main-hero" aria-label="Pregled Kickan Analytics Studio">
+          <div class="hero-left">
+            <div class="hero-module-tag">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+              </svg>
+              Ultimativna Analitika Strimova
+            </div>
+            <h1 class="hero-title">
+              <span class="hero-grad">Kickan</span> Analytics Studio
+            </h1>
+            <p class="hero-subtitle">Napredna telemetrija, live metrika chata, ponašanje gledalaca i moderacija u realnom vremenu.</p>
+          </div>
+          <div class="hero-summary-cards">
+            <div class="hsc-card">
+              <span class="hsc-label">Poruke sesije</span>
+              <strong class="hsc-val" id="statTotalMessages">0</strong>
+            </div>
+            <div class="hsc-card">
+              <span class="hsc-label">Gledalaca uživo</span>
+              <strong class="hsc-val" id="statLiveViewers">0</strong>
+            </div>
+            <div class="hsc-card">
+              <span class="hsc-label">Chatters</span>
+              <strong class="hsc-val" id="statUniqueChatters">0</strong>
+            </div>
+            <div class="hsc-card">
+              <span class="hsc-label">Brzina chata</span>
+              <strong class="hsc-val" id="statChatVelocity">0/m</strong>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── LIVE TELEMETRY & CHANNEL OVERVIEW CARD ── -->
+        <section class="telemetry-card" aria-label="Kick Telemetrija Kanala">
+          <div class="telemetry-left">
+            <div class="telemetry-avatar" id="telemetryAvatar">K</div>
+            <div class="telemetry-channel-meta">
+              <div class="telemetry-channel-title-row">
+                <h3 class="telemetry-channel-name" id="telemetryChannelName">Učitavanje kanala...</h3>
+                <a href="#" target="_blank" rel="noopener noreferrer" class="telemetry-kick-link" id="telemetryKickLink" title="Poseti Kick kanal">
+                  <span>kick.com/<span id="telemetryKickSlug">---</span></span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                </a>
+              </div>
+              <div class="telemetry-stream-info">
+                <span class="telemetry-stream-title" id="streamTitleDisplay">Nema aktivnog strima</span>
+                <span class="telemetry-stream-bullet">•</span>
+                <span class="telemetry-category-pill" id="streamCategoryDisplay">Kategorija: Offline</span>
+              </div>
+            </div>
+          </div>
+          <div class="telemetry-right">
+            <div class="telemetry-stat-col">
+              <span class="tsc-label">Peak Gledaoci</span>
+              <strong class="tsc-val" id="statPeakViewers">0</strong>
+            </div>
+            <div class="telemetry-stat-col">
+              <span class="tsc-label">Pratioci</span>
+              <strong class="tsc-val" id="statFollowersCount">0</strong>
+            </div>
+            <div class="telemetry-stat-col">
+              <span class="tsc-label">Chatroom ID</span>
+              <strong class="tsc-val" id="statChatroomId">#---</strong>
+            </div>
+            <div class="telemetry-stat-col">
+              <span class="tsc-label">Trajanje strima</span>
+              <strong class="tsc-val" id="streamUptimeDisplay">--:--:--</strong>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── 8 BENTO METRICS GRID ── -->
+        <section class="metrics-grid-8" aria-label="Ključne analitičke metrike">
+          <div class="metric-card">
+            <div class="metric-header">
+              <div class="metric-label">Ukupno Poruka</div>
+              <div class="metric-icon" style="color:var(--an-cyan);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metricTotalMessages">0</div>
+            <div class="metric-footer">Automatsko praćenje u chatu</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <div class="metric-label">Gledaoci uživo</div>
+              <div class="metric-icon" style="color:var(--an-green);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metricAvgViewers">Offline</div>
+            <div class="metric-footer">Kick API Telemetrija</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <div class="metric-label">Jedinstveni Chatters</div>
+              <div class="metric-icon" style="color:var(--an-violet);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metricUniqueChatters">0</div>
+            <div class="metric-footer">Aktivna zajednica</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <div class="metric-label">Korišćenje Emotea</div>
+              <div class="metric-icon" style="color:var(--an-amber);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                  <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                  <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metricTotalEmotes">0</div>
+            <div class="metric-footer">Reakcije gledalaca</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <div class="metric-label">Vrednost KICKs-a</div>
+              <div class="metric-icon" style="color:var(--an-green);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" style="color:var(--an-green);" id="metricTotalKicks">0</div>
+            <div class="metric-footer">Chat donacije i podrška</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <div class="metric-label">Sankcije Moderacije</div>
+              <div class="metric-icon" style="color:var(--an-red);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" style="color:var(--an-red);" id="metricTotalBans">0</div>
+            <div class="metric-footer">Banovi i obrisane poruke</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <div class="metric-label">Hostovi & Raidovi</div>
+              <div class="metric-icon" style="color:var(--an-cyan);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" id="metricTotalHosts">0</div>
+            <div class="metric-footer">Dolazni stream hostovi</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-header">
+              <div class="metric-label">Pretplatnici (Subs)</div>
+              <div class="metric-icon" style="color:var(--an-pink);">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </div>
+            </div>
+            <div class="metric-value" style="color:var(--an-pink);" id="metricActiveSubs">0</div>
+            <div class="metric-footer">Udeo subova u chatu</div>
+          </div>
+        </section>
+
+        <!-- ── CHARTS & INTELLIGENCE SECTION ── -->
+        <section class="charts-grid-2" aria-label="Grafici i vizuelna analitika">
+
+          <!-- 24h Hourly Message Activity Chart -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5">
+                  <path d="M12 20V10M18 20V4M6 20v-4" />
+                </svg>
+                <span>Aktivnost Poruka Po Satima (24h)</span>
+              </div>
+              <span class="chart-tag-info" id="hourlyPeakLabel">Čeka se aktivnost chata...</span>
+            </div>
+            <div class="chart-viewport" id="hourlyChartViewport">
+              <!-- Dynamically rendered via JS -->
+            </div>
+          </div>
+
+          <!-- Most Popular Emotes Progress List -->
+          <div class="chart-card">
+            <div class="chart-header">
+              <div class="chart-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--an-amber)" stroke-width="2.5">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                  <line x1="9" y1="9" x2="9.01" y2="9"/>
+                  <line x1="15" y1="9" x2="15.01" y2="9"/>
+                </svg>
+                <span>Omiljeni Emoti u Chatu</span>
+              </div>
+              <span class="chart-tag-info" id="emotesTotalLabel">Ukupno: 0 emotea</span>
+            </div>
+            <div class="progress-list-container" id="popularEmotesContainer">
+              <div class="empty-list-notice">Emoti će se pojaviti ovde kada ih gledaoci iskoriste u chatu.</div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ── LIVE CHAT STREAM FEED & EVENT LOG ── -->
+        <section class="feed-card" aria-label="Real-time Live Chat Feed">
+          <div class="feed-header">
+            <div class="feed-title">
+              <span class="feed-live-dot"></span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--an-green)" stroke-width="2.5">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span>Live Chatroom Stream</span>
+            </div>
+            <div class="feed-filters">
+              <button class="feed-filter-btn active" data-filter="all" onclick="window.setChatFilter('all')">Sve poruke</button>
+              <button class="feed-filter-btn" data-filter="subs" onclick="window.setChatFilter('subs')">Samo Subovi</button>
+              <button class="feed-filter-btn" data-filter="mods" onclick="window.setChatFilter('mods')">Moderacija</button>
+              <button class="feed-filter-btn" data-filter="events" onclick="window.setChatFilter('events')">Donacije & Raid</button>
+            </div>
+          </div>
+          <div class="feed-messages-container" id="liveChatFeedContainer">
+            <div class="feed-empty-state">Povezivanje na Kick live chatroom... Čekamo prve poruke.</div>
+          </div>
+        </section>
+
+        <!-- ── DETAILED INTELLIGENCE TABLES ── -->
+        <section class="tables-grid-2" aria-label="Tabele i baze podataka">
+
+          <!-- Most Active Viewers Table -->
+          <div class="table-card">
+            <div class="table-header">
+              <div class="table-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--an-green)" stroke-width="2.5">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                </svg>
+                <span>Najaktivniji Gledaoci (Leaderboard)</span>
+              </div>
+              <div class="table-actions">
+                <input type="text" id="inputSearchChatters" class="table-search-input" placeholder="Pretraži gledaoca..." oninput="window.filterChattersTable()" />
+                <button class="table-icon-btn" onclick="window.copyChattersLeaderboard()" title="Kopiraj leaderboard">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th style="width:55px;">Rang</th>
+                    <th>Korisnik</th>
+                    <th>Poruka</th>
+                    <th>Udeo</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="tableMostActiveViewers">
+                  <tr>
+                    <td colspan="5" class="table-empty-state">Učitavamo prve chat poruke sa kanala uživo...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Moderation & Ban History Log -->
+          <div class="table-card">
+            <div class="table-header">
+              <div class="table-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--an-red)" stroke-width="2.5">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span>Istorija Banova & Moderacije</span>
+              </div>
+              <div class="table-actions">
+                <input type="text" id="inputSearchBans" class="table-search-input" placeholder="Pretraži banove..." oninput="window.filterBansTable()" />
+                <button class="table-icon-btn" onclick="window.clearBanHistory()" title="Očisti lokalni ban dnevnik">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Korisnik / Razlog</th>
+                    <th>Moderator</th>
+                    <th>Akcija</th>
+                    <th>Vreme</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBanHistory">
+                  <tr>
+                    <td colspan="4" class="table-empty-state">Nema nedavnih zabranjenih poruka ili banova.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </section>
+
+      </div><!-- /main-scroll -->
+    </main><!-- /main -->
+  </div><!-- /app -->
+
+  <!-- ══════════ FULLSCREEN STUDIO / STREAMER HUD OVERLAY ══════════ -->
+  <div class="studio-overlay" id="kickanFullscreenOverlay" style="display:none;" aria-hidden="true">
+    <!-- Header -->
+    <div class="studio-header">
+      <div class="studio-header-left">
+        <div class="studio-logo-badge">
+          <img src="../assets/kickan.webp" alt="Kickan Logo" height="28" />
+          <span>STUDIO HUD</span>
+        </div>
+        <div class="topbar-channel-pill" id="studioChannelPill">
+          <span class="channel-dot"></span>
+          <strong id="studioChannelName">Milan_567</strong>
         </div>
       </div>
-    </section>
+      <div class="studio-header-center">
+        <div class="studio-uptime-pill">
+          <span class="stream-pulse-dot"></span>
+          <span id="studioStreamStatus">LIVE</span>
+          <span class="studio-uptime-val" id="studioUptimeVal">00:00:00</span>
+        </div>
+      </div>
+      <div class="studio-header-right">
+        <div class="studio-quick-stats">
+          <div class="sqs-item">
+            <span>Poruke:</span>
+            <strong id="studioTotalMessages">0</strong>
+          </div>
+          <div class="sqs-item">
+            <span>Gledaoci:</span>
+            <strong id="studioLiveViewers" style="color:var(--an-green);">0</strong>
+          </div>
+          <div class="sqs-item">
+            <span>Brzina:</span>
+            <strong id="studioVelocity" style="color:var(--an-amber);">0/m</strong>
+          </div>
+        </div>
+        <button class="studio-close-btn" onclick="window.closeFullscreenStudio()" title="Zatvori Fullscreen (Esc)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
 
-    <!-- Detailed Intelligence Tables -->
-    <section class="tables-grid-2">
-      <!-- Most Active Viewers Table -->
-      <div class="table-card">
-        <div class="table-header">
-          <div class="table-title">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-green)" stroke-width="2.5">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
+    <!-- HUD Body -->
+    <div class="studio-body">
+      <div class="studio-left-column">
+        <div class="studio-chart-card">
+          <h4>Aktivnost Poruka Po Satima</h4>
+          <div class="chart-viewport" id="studioHourlyChartViewport"></div>
+        </div>
+        <div class="studio-emotes-card">
+          <h4>Top Emoti Kanala</h4>
+          <div class="progress-list-container" id="studioPopularEmotesContainer"></div>
+        </div>
+      </div>
+      <div class="studio-right-column">
+        <div class="studio-feed-card">
+          <h4>Live Chat Waterfall</h4>
+          <div class="studio-feed-stream" id="studioLiveFeedContainer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ CUSTOM CHANNEL MODAL ══════════ -->
+  <div class="modal-backdrop" id="customChannelModal" onclick="window.handleModalBg(event, 'customChannelModal')" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          <h3>Promena Kick Kanala</h3>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="window.closeModal('customChannelModal')" aria-label="Zatvori">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--an-muted); font-size:0.9rem; line-height:1.6; margin-bottom:16px;">
+          Unesite Kick korisničko ime kanala čiju analitiku, chat poruke i telemetriju želite da pratite uživo.
+        </p>
+        <div class="sc-form-group" style="margin-bottom:18px;">
+          <label class="sc-label" for="customChannelInput">Kick Korisničko Ime (Username)</label>
+          <div style="position:relative; display:flex; align-items:center;">
+            <span style="position:absolute; left:12px; color:var(--an-cyan); font-weight:700; font-family:'JetBrains Mono',monospace; font-size:0.85rem; pointer-events:none;">kick.com/</span>
+            <input type="text" id="customChannelInput" class="sc-input" placeholder="npr. stream_kanal" style="padding-left:92px;" maxlength="40" />
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="sc-btn sc-btn-reset" style="padding:9px 16px;" onclick="window.closeModal('customChannelModal')">
+            <span>Odustani</span>
+          </button>
+          <button type="button" class="sc-btn sc-btn-tracking" style="padding:9px 18px;" onclick="window.saveCustomChannel()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"/>
             </svg>
-            <span>Najaktivniji Gledaoci</span>
-          </div>
-        </div>
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width:60px;">Rang</th>
-                <th>Korisnik</th>
-                <th>Poruke</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="tableMostActiveViewers">
-              <tr>
-                <td colspan="4" class="table-empty-state">Učitavamo prve chat poruke sa kanala uživo...</td>
-              </tr>
-            </tbody>
-          </table>
+            <span>Poveži kanal</span>
+          </button>
         </div>
       </div>
+    </div>
+  </div>
 
-      <!-- Moderation & Ban History Log -->
-      <div class="table-card">
-        <div class="table-header">
-          <div class="table-title">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickan-accent-red)" stroke-width="2.5">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  <!-- ══════════ EXPORT REPORT MODAL ══════════ -->
+  <div class="modal-backdrop" id="exportReportModal" onclick="window.handleModalBg(event, 'exportReportModal')" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--an-amber)" stroke-width="2.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <h3>Izvoz Analitičkog Izveštaja</h3>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="window.closeModal('exportReportModal')" aria-label="Zatvori">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--an-muted); font-size:0.9rem; line-height:1.6; margin-bottom:16px;">
+          Izaberite format za preuzimanje kompletne statistike trenutne sesije (poruke, top gledaoci, emoti, mod akcije):
+        </p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px;">
+          <button type="button" class="sc-btn sc-btn-tracking" style="padding:14px; flex-direction:column; gap:6px;" onclick="window.downloadReport('csv')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="8" y1="13" x2="16" y2="13"></line>
+              <line x1="8" y1="17" x2="16" y2="17"></line>
             </svg>
-            <span>Istorija Banova & Moderacije</span>
-          </div>
-        </div>
-        <div class="table-responsive">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Korisnik</th>
-                <th>Moderator</th>
-                <th>Vreme</th>
-              </tr>
-            </thead>
-            <tbody id="tableBanHistory">
-              <tr>
-                <td colspan="3" class="table-empty-state">Nema nedavnih zabranjenih poruka ili banova.</td>
-              </tr>
-            </tbody>
-          </table>
+            <span>Preuzmi CSV Fajl</span>
+          </button>
+          <button type="button" class="sc-btn sc-btn-export" style="padding:14px; flex-direction:column; gap:6px;" onclick="window.downloadReport('json')">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="16 18 22 12 16 6"></polyline>
+              <polyline points="8 6 2 12 8 18"></polyline>
+            </svg>
+            <span>Preuzmi JSON Podatke</span>
+          </button>
         </div>
       </div>
-    </section>
+    </div>
+  </div>
 
-  </main>
+  <!-- ══════════ RESET CONFIRM MODAL ══════════ -->
+  <div class="modal-backdrop" id="resetStatsConfirmModal" onclick="window.handleModalBg(event, 'resetStatsConfirmModal')" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--an-red)" stroke-width="2.5">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <h3>Resetovanje Statistike Sesije</h3>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="window.closeModal('resetStatsConfirmModal')" aria-label="Zatvori">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--an-muted); font-size:0.9rem; line-height:1.6; margin-bottom:18px;">
+          Da li ste sigurni da želite da resetujete sve podatke trenutne sesije (brojač poruka, tabelu aktivnih gledalaca i istoriju emotea)?
+        </p>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="sc-btn sc-btn-reset" style="padding:9px 16px;" onclick="window.closeModal('resetStatsConfirmModal')">
+            <span>Odustani</span>
+          </button>
+          <button type="button" class="sc-btn danger-btn" style="padding:9px 18px;" onclick="window.confirmResetStats()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M3 6h18"></path>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span>Da, Resetuj Sve</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <!-- Script -->
+  <!-- ══════════ HELP MODAL ══════════ -->
+  <div class="modal-backdrop" id="helpModal" onclick="window.handleModalBg(event, 'helpModal')" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <h3>Pomoć i Tehnička Podrška</h3>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="window.closeModal('helpModal')" aria-label="Zatvori">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--an-muted); font-size:0.9rem; line-height:1.6;">Za sva pitanja, pomoć sa podešavanjem Kickan analitike ili tehničke nedoumice, naš tim podrške vam stoji na raspolaganju:</p>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+          <a href="mailto:contact@milanwebportal.com" class="sc-btn sc-btn-tracking" style="text-decoration:none; justify-content:center; font-weight:800; gap:8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            <span>contact@milanwebportal.com</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
   <script src="js/kickan-dashboard.js" defer></script>
 </body>
 </html>

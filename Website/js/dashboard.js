@@ -1448,14 +1448,14 @@ function simulateAlert(type) {
   
   if (type === 'sub') {
     alertText.innerHTML = currentLang === 'sr' 
-      ? '⭐ Novi Pretplatnik!<br><span style="color:#53FC18">milan_fan</span> se pretplatio!' 
-      : '⭐ New Subscriber!<br><span style="color:#53FC18">milan_fan</span> subscribed!';
+      ? 'Novi Pretplatnik!<br><span style="color:#53FC18">milan_fan</span> se pretplatio!' 
+      : 'New Subscriber!<br><span style="color:#53FC18">milan_fan</span> subscribed!';
     alertBox.style.borderColor = 'var(--color-green)';
     alertBox.style.boxShadow = '0 0 20px rgba(83, 252, 24, 0.4)';
   } else if (type === 'follow') {
     alertText.innerHTML = currentLang === 'sr' 
-      ? '💖 Novi Pratilac!<br><span style="color:#8B5CF6">stefan_bg</span> te prati!' 
-      : '💖 New Follower!<br><span style="color:#8B5CF6">stefan_bg</span> followed!';
+      ? 'Novi Pratilac!<br><span style="color:#8B5CF6">stefan_bg</span> te prati!' 
+      : 'New Follower!<br><span style="color:#8B5CF6">stefan_bg</span> followed!';
     alertBox.style.borderColor = 'var(--color-violet)';
     alertBox.style.boxShadow = '0 0 20px rgba(139, 92, 246, 0.4)';
   }

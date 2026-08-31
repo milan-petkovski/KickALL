@@ -110,6 +110,8 @@
   document.addEventListener('DOMContentLoaded', async () => {
     loadState();
     await checkAuth();
+    loadNotifications();
+    loadChangelogs();
     setupSidebar();
     setupSettingsForm();
     setupListControls();
@@ -1052,40 +1054,209 @@
     if (menu) menu.classList.toggle('open');
   };
 
-  /* Notifikacije */
-  window.toggleNotifCenter = function () {
-    const pop = document.getElementById('notifPopover');
-    if (pop) pop.classList.toggle('open');
+  /* ── Notifications & Changelog iz Baze (identično Kickot) ── */
+  let notifications = [];
+  let changelogs    = [];
+  let activeNotifTab = 'obavestenja';
+  let readNotifIds   = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+
+  function formatRelativeTime(isoString) {
+    if (!isoString) return '';
+    const date      = new Date(isoString);
+    const diffSec   = Math.floor((Date.now() - date.getTime()) / 1000);
+    const diffMin   = Math.floor(diffSec / 60);
+    const diffHours = Math.floor(diffMin / 60);
+    const diffDays  = Math.floor(diffHours / 24);
+
+    if (diffSec < 60)   return 'Upravo sada';
+    if (diffMin < 60)   return `Pre ${diffMin} min`;
+    if (diffHours < 24) return `Pre ${diffHours} h`;
+    return `Pre ${diffDays} d`;
+  }
+
+  async function loadNotifications() {
+    if (!sb) return;
+    try {
+      const { data, error } = await sb
+        .from('notifications')
+        .select('id, created_at, title, description, type')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) return;
+      if (data) {
+        notifications = data.map(item => ({
+          id: item.id,
+          title: item.title,
+          desc: item.description,
+          timestamp: item.created_at,
+          type: item.type || 'info'
+        }));
+        updateNotifBadgeUI();
+        renderNotifContent();
+      }
+    } catch (_) {}
+  }
+
+  async function loadChangelogs() {
+    if (!sb) return;
+    try {
+      const { data, error } = await sb
+        .from('changelog')
+        .select('id, created_at, version, title, details')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) return;
+      if (data) {
+        changelogs = data.map(item => {
+          const d = new Date(item.created_at);
+          const formattedDate = !isNaN(d.getTime()) ? d.toLocaleDateString('sr-RS') : item.created_at;
+          return {
+            id: item.id,
+            version: item.version,
+            title: item.title,
+            details: item.details,
+            date: formattedDate
+          };
+        });
+        renderNotifContent();
+      }
+    } catch (_) {}
+  }
+
+  function updateNotifBadgeUI() {
+    const unreadCount = notifications.filter(n => !readNotifIds.includes(String(n.id))).length;
+    const badge = document.getElementById('notifBadge');
+    const btn   = document.getElementById('notifBellBtn');
+
+    if (badge) {
+      badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+      badge.textContent   = unreadCount > 99 ? '99+' : String(unreadCount);
+    }
+    if (btn) {
+      if (unreadCount > 0) {
+        btn.style.borderColor = 'var(--aj-red, #ef4444)';
+        btn.style.color       = 'var(--aj-red, #ef4444)';
+      } else {
+        btn.style.borderColor = '';
+        btn.style.color       = '';
+      }
+    }
+  }
+
+  function renderNotifContent() {
+    const list = document.getElementById('notifContentList');
+    if (!list) return;
+
+    if (activeNotifTab === 'obavestenja') {
+      if (notifications.length === 0) {
+        list.innerHTML = `
+          <div style="color: var(--aj-muted); text-align: center; padding: 28px 14px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.5;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            <span>Trenutno nema novih obaveštenja.</span>
+          </div>`;
+        return;
+      }
+
+      const sorted = [...notifications].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      list.innerHTML = sorted.map(n => {
+        const isRead = readNotifIds.includes(String(n.id));
+        let color = '#3B82F6';
+        let iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        if (n.type === 'success') {
+          color = '#10B981';
+          iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
+        } else if (n.type === 'warning') {
+          color = '#F59E0B';
+          iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.03 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+        }
+
+        const opacityStyle = isRead ? 'opacity: 0.55;' : '';
+        const borderStyle  = isRead ? 'border: 1px solid rgba(255,255,255,0.05);' : `border: 1px solid ${color}40; box-shadow: 0 4px 14px ${color}15;`;
+        const bgStyle      = isRead ? 'background: rgba(255,255,255,0.02);' : 'background: rgba(255,255,255,0.04);';
+        const formattedTime = formatRelativeTime(n.timestamp);
+
+        return `
+          <div onclick="window.markNotifAsRead('${n.id}')" style="padding: 12px 14px; border-radius: 12px; ${bgStyle} ${borderStyle} transition: all 0.2s; cursor: pointer; ${opacityStyle} margin-bottom: 6px;">
+            <div style="display: flex; gap: 10px; align-items: flex-start; text-align: left;">
+              <div style="width: 24px; height: 24px; border-radius: 50%; background: ${color}20; color: ${color}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; border: 1px solid ${color}35;">
+                ${iconSvg}
+              </div>
+              <div style="flex-grow: 1;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
+                  <div style="font-size: 0.83rem; font-weight: 700; color: #fff; line-height: 1.3;">${escHtml(n.title)}</div>
+                  <div style="font-size: 0.68rem; color: var(--aj-muted); white-space: nowrap;">${formattedTime}</div>
+                </div>
+                <div style="font-size: 0.77rem; color: #cbd5e1; margin-top: 4px; line-height: 1.45;">${escHtml(n.desc)}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } else {
+      if (changelogs.length === 0) {
+        list.innerHTML = `
+          <div style="color: var(--aj-muted); text-align: center; padding: 28px 14px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.5;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>Trenutno nema novih changelog informacija.</span>
+          </div>`;
+        return;
+      }
+
+      list.innerHTML = changelogs.map(c => `
+        <div style="padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); transition: all 0.2s; margin-bottom: 6px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span style="font-size: 0.72rem; font-weight: 800; color: #a78bfa; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px;">${escHtml(c.version)}</span>
+            <span style="font-size: 0.68rem; color: var(--aj-muted); display: flex; align-items: center; gap: 4px;">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              ${escHtml(c.date)}
+            </span>
+          </div>
+          <div style="font-size: 0.84rem; font-weight: 700; color: #fff; margin-bottom: 4px; text-align: left;">${escHtml(c.title)}</div>
+          <div style="font-size: 0.77rem; color: #cbd5e1; line-height: 1.45; text-align: left;">${escHtml(c.details)}</div>
+        </div>
+      `).join('');
+    }
+  }
+
+  window.markNotifAsRead = function (id) {
+    if (!id) return;
+    const strId = String(id);
+    if (!readNotifIds.includes(strId)) {
+      readNotifIds.push(strId);
+      localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
+    }
+    updateNotifBadgeUI();
+    renderNotifContent();
   };
 
   window.markAllNotifsAsRead = function () {
-    const badge = document.getElementById('notifBadge');
-    if (badge) badge.style.display = 'none';
-    const list = document.getElementById('notifContentList');
-    if (list) list.innerHTML = '<div class="notif-empty">Nema novih obaveštenja.</div>';
-    window.toastSystem.info('Sva obaveštenja označena kao pročitana.');
+    notifications.forEach(n => {
+      const strId = String(n.id);
+      if (!readNotifIds.includes(strId)) readNotifIds.push(strId);
+    });
+    localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
+    updateNotifBadgeUI();
+    renderNotifContent();
+    window.toastSystem.info('Sva obaveštenja su označena kao pročitana.');
   };
 
   window.switchNotifTab = function (tabId) {
+    activeNotifTab = tabId;
     const btn1 = document.getElementById('notifTabObavestenja');
     const btn2 = document.getElementById('notifTabChangelog');
     if (btn1) btn1.classList.toggle('active', tabId === 'obavestenja');
     if (btn2) btn2.classList.toggle('active', tabId === 'changelog');
-    
-    const list = document.getElementById('notifContentList');
-    if (!list) return;
+    renderNotifContent();
+  };
 
-    if (tabId === 'obavestenja') {
-      list.innerHTML = '<div class="notif-empty">Nema novih obaveštenja.</div>';
-    } else {
-      list.innerHTML = `
-        <div style="padding: 10px; color: var(--aj-text); font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.06);">
-          <strong style="color: var(--aj-green);">v3.1 - Channel Manager &amp; Baza Sync</strong><br>
-          - Birač i menadžer Kick kanala u topbaru sa Kickot integracijom<br>
-          - Čuvanje u 'kickaj' tabeli baze podataka<br>
-          - Trajno fiksiran tajmer potvrde pobednika
-        </div>
-      `;
+  window.toggleNotifCenter = function () {
+    const pop = document.getElementById('notifPopover');
+    if (!pop) return;
+    const isOpen = pop.classList.toggle('open');
+    if (isOpen) {
+      renderNotifContent();
     }
   };
 
@@ -1104,6 +1275,7 @@
     try {
       await checkAuth();
       await syncStateFromSupabase(channelName);
+      await Promise.all([loadNotifications(), loadChangelogs()]);
       window.toastSystem.success('Podaci uspešno sinhronizovani iz baze.');
 
       if (btnEl) {

@@ -1,284 +1,768 @@
 <!DOCTYPE html>
-<html lang="sr">
+<html lang="sr" dir="ltr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <title>KICKOV - Alerts & Overlays</title>
-  <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon">
-  <meta name="description" content="Podesi moderni Kickov OBS browser source vid et, alertove u realnom vremenu i prihvataj PayPal donacije 100% direktno bez provizije." />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="color-scheme" content="dark" />
+  <title>Kickov Alert Studio</title>
+  <meta name="description" content="Podesi unikatne alertove u realnom vremenu, generiši OBS vidžete i prihvataj donacije 100% direktno na svoj PayPal bez provizije." />
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="theme-color" content="#0B0816" />
+  <meta name="theme-color" content="#07050f" />
 
-  <!-- Fonts & Core Styles -->
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../css/base.css" />
-  <link rel="stylesheet" href="../css/style.css" />
-  <link rel="stylesheet" href="../css/dashboard.css" />
-  <link rel="stylesheet" href="css/kickov.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-  <!-- Supabase JS CDN & Global System Config -->
+  <!-- Styles -->
+  <link rel="stylesheet" href="css/kickov.css" />
+  <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon" />
+
+  <!-- Supabase + Core JS -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../js/config.js"></script>
   <script src="../js/toast.js" defer></script>
   <script src="../js/mobile-optimization.js" defer></script>
 </head>
-<body class="kickov-page auth-loading">
+<body class="kickov-body auth-loading">
 
-  <!-- Background Grid Glows -->
-  <div class="glow-bg" aria-hidden="true">
-    <div class="blob blob-violet"></div>
-    <div class="blob blob-green"></div>
-  </div>
-
-  <!-- Fullscreen Auth Loading Gate -->
-  <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
-    <div class="auth-gate-card">
-      <div class="auth-gate-logo">
-        <img src="../assets/kickov.webp" alt="Kickov Logo" class="logo-img" width="173" height="52" fetchpriority="high">
+  <!-- ══════════ MOBILE UNSUPPORTED OVERLAY (<=768px) ══════════ -->
+  <div class="mobile-unsupported-overlay" role="alertdialog" aria-modal="true" aria-labelledby="mobileOverlayTitle" aria-describedby="mobileOverlayDesc">
+    <div class="mobile-unsupported-card">
+      <div class="mobile-unsupported-icon">
+        <svg fill="none" height="38" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="38">
+          <rect height="14" rx="2" ry="2" width="20" x="2" y="3"></rect>
+          <line x1="8" x2="16" y1="21" y2="21"></line>
+          <line x1="12" x2="12" y1="17" y2="21"></line>
+        </svg>
       </div>
-      <div class="auth-gate-spinner"></div>
-      <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju...</p>
+      <h2 class="mobile-unsupported-title" id="mobileOverlayTitle">Kickov Studio zahteva veći ekran</h2>
+      <p class="mobile-unsupported-desc" id="mobileOverlayDesc">
+        Podešavanje OBS alertova, preview simulator i konfiguracija donacija zahtevaju širi radni prostor.
+      </p>
+      <div class="mobile-steps-container">
+        <div class="mobile-step-item">
+          <div class="mobile-step-num">1</div>
+          <div class="mobile-step-text">Pređite na <strong>PC, Laptop</strong> ili <strong>Tablet</strong> uređaj.</div>
+        </div>
+        <div class="mobile-step-item">
+          <div class="mobile-step-num">2</div>
+          <div class="mobile-step-text">Ili uključite <strong>"Desktop site" (Verzija za računare)</strong> u opcijama vašeg pregledača.</div>
+        </div>
+      </div>
+      <a class="mobile-home-btn" href="/dashboard">
+        <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="18">
+          <line x1="19" x2="5" y1="12" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span>Nazad na Ekosistem</span>
+      </a>
     </div>
   </div>
 
-  <!-- Header / Navigation -->
-  <header class="header" role="banner">
-    <div class="container nav-container">
-      <a href="#" class="logo" id="navLogo">
-        <img src="../assets/kickov.webp" alt="Kickov Logo" class="logo-img" width="160" height="48" fetchpriority="high">
-      </a>
-      
-      <nav class="nav-menu" id="navMenu">
-        <a href="/dashboard" class="nav-link nav-logo-link" title="Ekosistem">
-          <img src="../assets/kickall.webp" alt="KickALL" class="nav-module-img" height="26">
-        </a>
-        <a href="/kickot/dashboard" class="nav-link nav-logo-link" title="Kickot">
-          <img src="../assets/kickot.webp" alt="Kickot" class="nav-module-img" height="26">
-        </a>
-        <a href="/kickaj/dashboard" class="nav-link nav-logo-link" title="Kickaj">
-          <img src="../assets/kickaj.webp" alt="Kickaj" class="nav-module-img" height="26">
-        </a>
-        <a href="/kickan/dashboard" class="nav-link nav-logo-link" title="Kickan">
-          <img src="../assets/kickan.webp" alt="Kickan" class="nav-module-img" height="26">
-        </a>
-      </nav>
+  <!-- ══════════ AUTH GATE ══════════ -->
+  <div id="authGate" class="auth-gate" role="dialog" aria-modal="true" aria-label="Provera sesije">
+    <div class="auth-gate-card">
+      <div class="auth-gate-logo">
+        <img src="../assets/kickov.webp" alt="Kickov Logo" class="auth-logo-img" fetchpriority="high" />
+      </div>
+      <div class="auth-gate-spinner"></div>
+      <p id="authGateMsg" class="auth-gate-msg" aria-live="polite">Proveravamo sesiju i učitavamo alertove...</p>
+    </div>
+  </div>
 
-      <div class="nav-actions">
-        <div class="lang-switcher">
-          <button class="lang-btn active" id="btn-sr">SR</button>
-          <button class="lang-btn" id="btn-en">EN</button>
-        </div>
-        
-        <div class="user-menu visible" id="userMenu">
-          <button class="user-menu-trigger" id="userMenuTrigger">
-            <div class="user-avatar" id="userAvatarDisplay" style="background:var(--kickov-accent-green); color:#000; font-weight:700;">K</div>
-            <span class="user-name" id="userNameDisplay">Streamer</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="chevron-icon">
-              <polyline points="6 9 12 15 18 9" />
+  <!-- ══════════ APP SHELL ══════════ -->
+  <div class="app" id="app">
+
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="sidebar">
+
+      <!-- Header: Back + Logo + Coffee -->
+      <div class="sidebar-header">
+        <a class="sidebar-header-btn back-btn" href="/dashboard" title="Nazad na KickALL">
+          <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="16">
+            <line x1="19" x2="5" y1="12" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </a>
+        <a class="sidebar-logo" href="#" title="Kickov — Alert Studio">
+          <img alt="Kickov Logo" class="logo-img" src="../assets/kickov.webp" />
+        </a>
+        <a class="sidebar-header-btn coffee-btn" href="https://paypal.me/milanwebportal/5EUR" rel="noopener noreferrer" target="_blank" title="Kupi mi kafu">
+          <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="16">
+            <path d="M17 8h1a4 4 0 1 1 0 8h-1"></path>
+            <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"></path>
+            <line x1="6" x2="6" y1="2" y2="4"></line>
+            <line x1="10" x2="10" y1="2" y2="4"></line>
+            <line x1="14" x2="14" y1="2" y2="4"></line>
+          </svg>
+        </a>
+      </div>
+
+      <!-- Sidebar Title Bar -->
+      <div class="sidebar-title-bar">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ov-green)" stroke-width="2.5">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span>Podešavanje alertova</span>
+      </div>
+
+      <!-- Config Panel (scrollable area) -->
+      <div class="sidebar-config" id="sidebarConfig">
+
+        <!-- Accordion 1: Status Alert Kartica -->
+        <details class="sc-accordion" name="sidebar-accordion" open>
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ov-green)" stroke-width="2.5">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <span>Aktivni Alert Moduli</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">Pratioci (Followers)</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleCardFollower" checked onchange="window.toggleCardState('follower', this.checked)" />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">Subscriberi (Subs)</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleCardSub" checked onchange="window.toggleCardState('sub', this.checked)" />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">Gifted Subs</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleCardGiftSub" checked onchange="window.toggleCardState('gift_sub', this.checked)" />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">Hostovi & Raidovi</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleCardHost" checked onchange="window.toggleCardState('host', this.checked)" />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">KICK-ovi</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleCardKicks" checked onchange="window.toggleCardState('kicks', this.checked)" />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">Donacije & PayPal</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleCardDonation" checked onchange="window.toggleCardState('donation', this.checked)" />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <!-- Accordion 2: OBS Browser Source Povezivanje -->
+        <details class="sc-accordion" name="sidebar-accordion">
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ov-violet)" stroke-width="2.5">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+              <span>OBS Browser Source</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <div class="sc-form-group">
+              <label class="sc-label" for="sidebarObsInput">Tvoj OBS Link</label>
+              <input type="text" id="sidebarObsInput" class="sc-input" readonly value=" " data-visible="false" style="font-family:'JetBrains Mono',monospace; font-size:0.75rem;" />
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+              <button type="button" class="sc-btn sc-btn-export-full" onclick="window.toggleObsLinkVisibility()">
+                <span>Prikaži</span>
+              </button>
+              <button type="button" class="sc-btn sc-btn-copy-summary" onclick="window.copyObsLink()">
+                <span>Kopiraj</span>
+              </button>
+            </div>
+          </div>
+        </details>
+
+        <!-- Accordion 3: PayPal & Donacije -->
+        <details class="sc-accordion" name="sidebar-accordion">
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ov-cyan)" stroke-width="2.5">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+              </svg>
+              <span>PayPal & Donacije</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <div class="sc-form-group">
+              <label class="sc-label" for="inputPaypalMe">PayPal.me Korisničko Ime</label>
+              <div style="position:relative; display:flex; align-items:center;">
+                <span style="position:absolute; left:10px; color:var(--ov-cyan); font-weight:700; font-family:'JetBrains Mono',monospace; font-size:0.8rem; pointer-events:none;">paypal.me/</span>
+                <input type="text" id="inputPaypalMe" class="sc-input" placeholder="tvojeIme" style="padding-left:85px;" maxlength="40" />
+              </div>
+            </div>
+            <div class="sc-form-group">
+              <label class="sc-label" for="inputPaypalEmail">PayPal Email</label>
+              <input type="email" id="inputPaypalEmail" class="sc-input" placeholder="streamer@email.com" />
+            </div>
+            <button type="button" class="sc-btn sc-btn-export-full" onclick="window.copyTipLink()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Kopiraj Javno Tip Link</span>
+            </button>
+          </div>
+        </details>
+
+        <!-- Accordion 4: Zvuk & TTS Parametri -->
+        <details class="sc-accordion" name="sidebar-accordion">
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ov-amber)" stroke-width="2.5">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+              </svg>
+              <span>Zvuk & TTS Govor</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <div class="sc-toggle-row">
+              <div class="sc-toggle-title">TTS Čitanje Poruka</div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleGlobalTTS" checked />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-form-group">
+              <label class="sc-label" for="selectTtsVoice">TTS Jezik i Glas</label>
+              <select id="selectTtsVoice" class="sc-input sc-select">
+                <option value="sr-RS" selected>Srpski (sr-RS)</option>
+                <option value="en-US">Engleski (en-US)</option>
+                <option value="de-DE">Nemački (de-DE)</option>
+              </select>
+            </div>
+            <div class="sc-form-group">
+              <label class="sc-label" for="inputGlobalSoundVolume">Jačina Zvuka: <strong id="globalSoundLabelVal">80%</strong></label>
+              <input type="range" id="inputGlobalSoundVolume" class="sc-slider" min="0" max="100" value="80" step="5" />
+            </div>
+          </div>
+        </details>
+      </div><!-- /sidebar-config -->
+
+      <!-- Action buttons (Pinned at bottom) -->
+      <div class="sc-section-actions">
+        <button class="sc-btn sc-btn-test-obs" id="btnSendTestObs" onclick="window.sendTestAlertToOBS()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          <span>Pošalji test alert u OBS</span>
+        </button>
+        <div class="sc-btn-row">
+          <button class="sc-btn sc-btn-save-all" onclick="window.saveAllKickovSettings()" title="Sačuvaj sva podešavanja">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
             </svg>
+            <span>Sačuvaj</span>
           </button>
-          <div class="user-dropdown" id="userDropdown">
-            <a href="/dashboard" class="dropdown-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                <polyline points="9 22 9 12 15 12 15 22" />
+          <button class="sc-btn sc-btn-reset" onclick="window.openResetModal()" title="Resetuj na podrazumevano">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+              <path d="M3 3v5h5"></path>
+            </svg>
+            <span>Reset</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="user-pill" id="userPill" onclick="window.toggleUserMenu()">
+          <div class="user-avatar-sm" id="userAvatarDisplay">K</div>
+          <div class="user-info">
+            <div class="user-display-name" id="userNameDisplay">Streamer</div>
+            <div class="user-plan" id="userPlanLabel">
+              <span class="sidebar-plan-badge" id="planBadge">FREE</span>
+            </div>
+          </div>
+          <!-- Popup dropdown -->
+          <div class="user-menu-sm" id="userMenuSm">
+            <div class="dropdown-notice-item">
+              <svg class="dropdown-icon" fill="none" height="14" stroke="var(--ov-green)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
-              <span>Dashboard</span>
-            </a>
-            <button class="dropdown-item danger" id="btnLogout">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-icon">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" y1="12" x2="9" y2="12" />
+              <span>Podešavanja se rade u Kickot delu</span>
+            </div>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" onclick="event.stopPropagation(); window.openHelpModal()">
+              <svg class="dropdown-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
               </svg>
+              <span>Pomoć</span>
+            </button>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item danger" id="btnLogout" onclick="event.stopPropagation(); window.handleSignOut()">
+              <svg class="dropdown-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               <span>Odjavi se</span>
             </button>
           </div>
         </div>
       </div>
-    </div>
-  </header>
 
-  <!-- Main Workspace -->
-  <main class="kickov-container">
-    
-    <!-- Hero Card Banner Section -->
-    <section class="kickov-hero-card">
-      <div class="kickov-hero-top">
-        <div>
-          <div class="hero-tag-pill">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-            Ultimativni alertovi i donacije
-          </div>
-          <h1 class="kickov-hero-title">
-            <span class="gradient-text-glow">Kickov </span>Alert Studio <span style="display:inline-block; font-size:0.8rem; padding:4px 10px; border-radius:9999px; background:rgba(6,182,212,0.15); border:1px solid rgba(6,182,212,0.4); color:#06b6d4; vertical-align:middle; margin-left:8px; font-weight:800;">BETA</span>
-          </h1>
-          <p class="kickov-hero-subtitle">Podesi unikatne alertove u realnom vremenu, generiši OBS vidžete i prihvataj donacije 100% direktno na svoj PayPal nalog.</p>
-        </div>
-        <div class="kickov-live-telemetry">
-          <div class="telemetry-pill" id="wsStatusPill">
-            <span class="status-dot"></span>
-            <span>Realtime Konekcija Aktivna</span>
-          </div>
-        </div>
-      </div>
-    </section>
+    </aside><!-- /sidebar -->
 
-    <!-- Quick Stats Grid -->
-    <section class="kickov-stats-grid">
-      <div class="kickov-stat-card">
-        <div class="kickov-stat-icon" style="color:var(--kickov-accent-green);">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-        </div>
-        <div>
-          <div class="kickov-stat-val" id="statActiveCardsVal">6 / 6</div>
-          <div class="kickov-stat-lbl">Aktivnih Kartica Alertova</div>
-        </div>
-      </div>
-      <div class="kickov-stat-card">
-        <div class="kickov-stat-icon" style="color:var(--kickov-accent-violet);">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-        </div>
-        <div>
-          <div class="kickov-stat-val">Spremno</div>
-          <div class="kickov-stat-lbl">OBS Browser Source</div>
-        </div>
-      </div>
-      <div class="kickov-stat-card">
-        <div class="kickov-stat-icon" style="color:#3b82f6;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-        </div>
-        <div>
-          <div class="kickov-stat-val">0% Provizije</div>
-          <div class="kickov-stat-lbl">PayPal Direktne Uplate</div>
-        </div>
-      </div>
-    </section>
+    <!-- ── MAIN CONTENT ── -->
+    <main class="main" id="mainContent">
 
-    <!-- OBS Link Secret Card -->
-    <section class="obs-url-card">
-      <div class="obs-url-header">
-        <div class="obs-url-title-group">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--kickov-accent-green)" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <h2>Tvoj Unikatni OBS Browser Source Link</h2>
-        </div>
-        <div style="display:flex; gap:12px;">
-          <button class="btn-icon-text btn-secondary-dark" id="btnToggleObsUrl">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Prikaži Link
-          </button>
-          <button class="btn-icon-text btn-primary-green" id="btnCopyObsUrl">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Kopiraj OBS Link
-          </button>
-        </div>
-      </div>
-      <div class="obs-url-box">
-        <input type="text" id="obsUrlInput" class="obs-url-input" value=" " readonly data-visible="false">
-      </div>
-      <div class="obs-steps-container">
-        <div class="obs-step-chip">
-          <div class="obs-step-num">1</div>
-          <div class="obs-step-text">Kopiraj unikatni OBS link klikom na dugme iznad.</div>
-        </div>
-        <div class="obs-step-chip">
-          <div class="obs-step-num">2</div>
-          <div class="obs-step-text">U OBS Studiju dodaj novi izvor: <strong>Browser Source</strong>.</div>
-        </div>
-        <div class="obs-step-chip">
-          <div class="obs-step-num">3</div>
-          <div class="obs-step-text">Zalepi URL, postavi dimenzije i providnu pozadinu.</div>
-        </div>
-      </div>
-    </section>
+      <!-- Top Bar -->
+      <header class="main-topbar" role="banner">
+        <div class="topbar-left">
+          <div class="topbar-channel-wrap">
+            <button class="topbar-channel-pill" id="channelStatusPill" onclick="window.toggleChannelDropdown(event)" title="Izaberi ili promeni Kick kanal" aria-haspopup="true" aria-expanded="false">
+              <span class="channel-dot" id="channelDot"></span>
+              <span class="channel-pill-text">Kanal: <strong id="connectedChannelName">Učitavanje...</strong></span>
+              <svg class="channel-pill-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
 
-    <!-- Studio Core Layout -->
-    <section class="kickov-studio-layout">
-      <!-- Tabs Sidebar -->
-      <aside class="kickov-tabs-sidebar">
-        <div class="sidebar-section-title">KARTICE ALERTOVA</div>
-        
-        <button class="kickov-tab-btn active enabled" data-tab="follower">
-          <div class="tab-btn-content">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
-            <span>Pratioci</span>
-          </div>
-          <div class="tab-badge-switch"></div>
-        </button>
-        <button class="kickov-tab-btn enabled" data-tab="sub">
-          <div class="tab-btn-content">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            <span>Subscriberi</span>
-          </div>
-          <div class="tab-badge-switch"></div>
-        </button>
-        <button class="kickov-tab-btn enabled" data-tab="gift_sub">
-          <div class="tab-btn-content">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
-            <span>Gifted Subscribers</span>
-          </div>
-          <div class="tab-badge-switch"></div>
-        </button>
-        <button class="kickov-tab-btn enabled" data-tab="host">
-          <div class="tab-btn-content">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-            <span>Hostovi & Raidovi</span>
-          </div>
-          <div class="tab-badge-switch"></div>
-        </button>
-        <button class="kickov-tab-btn enabled" data-tab="kicks">
-          <div class="tab-btn-content">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            <span>KICK-ovi</span>
-          </div>
-          <div class="tab-badge-switch"></div>
-        </button>
-        <button class="kickov-tab-btn enabled" data-tab="donation">
-          <div class="tab-btn-content">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-            <span>Donacije & PayPal</span>
-          </div>
-          <div class="tab-badge-switch"></div>
-        </button>
-      </aside>
-
-      <!-- Main Config & Preview Area -->
-      <div class="kickov-workspace">
-        <!-- Live Interactive Preview Stage -->
-        <div class="preview-stage-card">
-          <div class="stage-header">
-            <div class="stage-title">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kickov-accent-green)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-              <span>Uživo Pregled Alerta</span>
+            <!-- Channel Dropdown -->
+            <div class="channel-dropdown-menu" id="channelDropdownMenu">
+              <div class="cdm-head">
+                <div class="cdm-title">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ov-green)" stroke-width="2.5">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                  </svg>
+                  <span>Moji Kick Kanali</span>
+                </div>
+                <span class="cdm-count-badge" id="cdmCountBadge">0</span>
+              </div>
+              <div class="cdm-list" id="cdmChannelList">
+                <div class="cdm-empty">Učitavanje kanala...</div>
+              </div>
+              <div class="cdm-footer">
+                <button class="cdm-custom-btn" onclick="window.openCustomChannelModal(event)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  <span>Unesi drugi Kick kanal</span>
+                </button>
+              </div>
             </div>
-            <button class="btn-icon-text btn-primary-green" id="btnSendTestAlert">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              Pošalji Test Alert u OBS
+          </div>
+        </div>
+
+        <div class="topbar-right">
+          <!-- OBS Status Pill -->
+          <div class="topbar-live-status-pill live" id="obsStatusPill">
+            <span class="stream-pulse-dot" style="background:var(--ov-green); box-shadow:0 0 8px var(--ov-green);"></span>
+            <span>OBS Vidžet Spremno</span>
+          </div>
+
+          <!-- Direct PayPal 0% Fee Pill -->
+          <div class="topbar-velocity-pill" title="100% direktne PayPal uplate bez ikakve provizije">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ov-green)" stroke-width="2.5">
+              <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+              <line x1="2" y1="10" x2="22" y2="10"></line>
+            </svg>
+            <span>0% Provizije</span>
+          </div>
+
+          <!-- Mute Button -->
+          <button class="topbar-btn topbar-mute-btn" id="btnMuteSound" onclick="window.toggleMute()" title="Isključi/uključi zvuk">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="muteIcon">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+          </button>
+
+          <!-- Notification Bell -->
+          <div class="topbar-notif-wrap" style="position: relative;">
+            <button class="topbar-btn" id="notifBellBtn" onclick="window.toggleNotifCenter()" title="Obaveštenja">
+              <svg fill="none" height="17" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewBox="0 0 24 24" width="17">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <span class="notif-badge" id="notifBadge"></span>
+            </button>
+
+            <!-- Notifications Popover -->
+            <div class="notif-popover" id="notifPopover">
+              <div class="notif-popover-head">
+                <h4 class="notif-popover-title">
+                  <div class="notif-popover-icon">
+                    <svg fill="none" height="15" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" width="15">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                    </svg>
+                  </div>
+                  <span>Obaveštenja</span>
+                </h4>
+                <button class="notif-mark-read" onclick="window.markAllNotifsAsRead()" title="Pročitaj sve">
+                  <svg fill="none" height="11" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24" width="11">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <span>Pročitaj sve</span>
+                </button>
+              </div>
+              <div class="notif-tabs">
+                <button class="notif-tab active" id="notifTabObavestenja" onclick="window.switchNotifTab('obavestenja')">Obaveštenja</button>
+                <button class="notif-tab" id="notifTabChangelog" onclick="window.switchNotifTab('changelog')">Changelog</button>
+              </div>
+              <div class="notif-content-list" id="notifContentList">
+                <div class="notif-empty">Nema novih obaveštenja.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Refresh Button -->
+          <button class="topbar-btn topbar-refresh-btn" id="btnRefreshDb" onclick="window.refreshDatabase()" title="Osveži podešavanja i vidžet">
+            <svg class="refresh-icon" fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" width="16">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- Scrollable Main Container -->
+      <div class="main-scroll">
+
+        <!-- ── 1. HERO STRIP ── -->
+        <section class="main-hero" aria-label="Pregled Kickov Alert Studio">
+          <div class="hero-left">
+            <div class="hero-module-tag">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+              Ultimativni Alertovi i Donacije
+            </div>
+            <h1 class="hero-title">
+              <span class="hero-grad">Kickov</span> Alert Studio
+            </h1>
+            <p class="hero-subtitle">Podesi unikatne alertove u realnom vremenu, generiši OBS vidžete i prihvataj donacije 100% direktno na svoj PayPal bez provizije.</p>
+          </div>
+          <div class="hero-summary-cards">
+            <div class="hsc-card">
+              <span class="hsc-label">Aktivnih Alertova</span>
+              <strong class="hsc-val" id="statActiveCardsVal">6 / 6</strong>
+            </div>
+            <div class="hsc-card">
+              <span class="hsc-label">OBS Status</span>
+              <strong class="hsc-val" style="color:var(--ov-green);">Spremno</strong>
+            </div>
+            <div class="hsc-card">
+              <span class="hsc-label">Provizija</span>
+              <strong class="hsc-val" style="color:var(--ov-cyan);">0%</strong>
+            </div>
+            <div class="hsc-card">
+              <span class="hsc-label">Testova poslato</span>
+              <strong class="hsc-val" id="statTestCountVal">0</strong>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── 2. OBS QUICK CONNECT & DONATION LINKS DECK ── -->
+        <section class="obs-url-card" aria-label="OBS Browser Source Link">
+          <div class="obs-url-header">
+            <div class="obs-url-title-group">
+              <div class="obs-icon-circle">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--ov-green)" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div>
+                <h2>Tvoj Unikatni OBS Browser Source Link</h2>
+                <p style="font-size:0.84rem; color:var(--ov-muted); margin-top:2px;">Dodaj link u OBS Studio kao Browser Source za automatsko renderovanje alertova uživo.</p>
+              </div>
+            </div>
+            <div style="display:flex; gap:10px; flex-shrink:0;">
+              <button class="sc-btn sc-btn-export" id="btnToggleObsUrl" onclick="window.toggleObsLinkVisibility()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                <span id="btnToggleObsText">Prikaži Link</span>
+              </button>
+              <button class="sc-btn sc-btn-test-obs" id="btnCopyObsUrl" onclick="window.copyObsLink()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Kopiraj OBS Link</span>
+              </button>
+            </div>
+          </div>
+          <div class="obs-url-box">
+            <input type="text" id="obsUrlInput" class="obs-url-input" value=" " readonly data-visible="false">
+          </div>
+          <div class="obs-steps-container">
+            <div class="obs-step-chip">
+              <div class="obs-step-num">1</div>
+              <div class="obs-step-text">Kopiraj unikatni OBS link klikom na dugme iznad.</div>
+            </div>
+            <div class="obs-step-chip">
+              <div class="obs-step-num">2</div>
+              <div class="obs-step-text">U OBS Studiju dodaj novi izvor: <strong>Browser Source</strong> (1920x1080).</div>
+            </div>
+            <div class="obs-step-chip">
+              <div class="obs-step-num">3</div>
+              <div class="obs-step-text">Zalepi URL i uživaj u luksuznim real-time animacijama!</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── 3. ALERT STUDIO TABS BAR (6 Alert Types) ── -->
+        <nav class="kickov-tabs-bar" aria-label="Tipovi Alertova">
+          <button class="kickov-tab-btn active enabled" data-tab="follower" onclick="window.switchAlertTab('follower')">
+            <div class="tab-btn-content">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+              <span>Pratioci</span>
+            </div>
+            <span class="tab-badge-active-dot"></span>
+          </button>
+          <button class="kickov-tab-btn enabled" data-tab="sub" onclick="window.switchAlertTab('sub')">
+            <div class="tab-btn-content">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              <span>Subscriberi</span>
+            </div>
+            <span class="tab-badge-active-dot"></span>
+          </button>
+          <button class="kickov-tab-btn enabled" data-tab="gift_sub" onclick="window.switchAlertTab('gift_sub')">
+            <div class="tab-btn-content">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+              <span>Gifted Subs</span>
+            </div>
+            <span class="tab-badge-active-dot"></span>
+          </button>
+          <button class="kickov-tab-btn enabled" data-tab="host" onclick="window.switchAlertTab('host')">
+            <div class="tab-btn-content">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+              <span>Host & Raid</span>
+            </div>
+            <span class="tab-badge-active-dot"></span>
+          </button>
+          <button class="kickov-tab-btn enabled" data-tab="kicks" onclick="window.switchAlertTab('kicks')">
+            <div class="tab-btn-content">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>KICK-ovi</span>
+            </div>
+            <span class="tab-badge-active-dot"></span>
+          </button>
+          <button class="kickov-tab-btn enabled" data-tab="donation" onclick="window.switchAlertTab('donation')">
+            <div class="tab-btn-content">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              <span>Donacije & PayPal</span>
+            </div>
+            <span class="tab-badge-active-dot"></span>
+          </button>
+        </nav>
+
+        <!-- ── 4. LIVE PREVIEW STAGE & CONFIG FORM (2-Column Grid) ── -->
+        <div class="kickov-workspace-grid">
+
+          <!-- Left Column: Live Interactive Preview Stage -->
+          <div class="preview-stage-card">
+            <div class="stage-header">
+              <div class="stage-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ov-green)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                <span>Uživo Pregled Alerta (<span id="previewTabLabel">Pratioci</span>)</span>
+              </div>
+              <button class="sc-btn sc-btn-test-obs" style="height:36px; padding:0 14px; font-size:0.8rem;" onclick="window.triggerStagePreviewTest()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                <span>Testiraj Ovaj Alert</span>
+              </button>
+            </div>
+            <div class="preview-viewport" id="previewViewport">
+              <!-- Dynamically populated by JS -->
+            </div>
+            <div class="stage-footer-note">
+              <span>Animacija i izgled u realnom vremenu koji se šalju u OBS Browser Source</span>
+            </div>
+          </div>
+
+          <!-- Right Column: Dynamic Form Configurator -->
+          <div class="config-stage-card">
+            <div class="stage-header">
+              <div class="stage-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ov-cyan)" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span>Podešavanja Alerta</span>
+              </div>
+              <button class="sc-btn sc-btn-save-all" style="height:36px; padding:0 16px; font-size:0.8rem;" onclick="window.saveAllKickovSettings()">
+                <span>Sačuvaj izmene</span>
+              </button>
+            </div>
+
+            <!-- Dynamic Form Area -->
+            <div class="kickov-config-panel" id="tabConfigFormContainer">
+              <!-- Form dynamically rendered via kickov-dashboard.js -->
+            </div>
+          </div>
+
+        </div><!-- /kickov-workspace-grid -->
+
+        <!-- ── 5. RECENT ALERTS ACTIVITY LOG ── -->
+        <section class="feed-card" aria-label="Istorija primljenih alertova">
+          <div class="feed-header">
+            <div class="feed-title">
+              <span class="feed-live-dot"></span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ov-green)" stroke-width="2.5">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <span>Istorija Aktivnosti & Alertova</span>
+            </div>
+            <button class="sc-btn sc-btn-reset" style="height:30px; padding:0 10px; font-size:0.75rem;" onclick="window.clearAlertHistory()">
+              <span>Očisti Dnevnik</span>
             </button>
           </div>
-          <div class="preview-viewport" id="previewViewport">
-            <!-- Alert Preview Box renders dynamically via JS -->
+          <div class="feed-messages-container" id="recentAlertsContainer">
+            <div class="feed-empty-state">Nema nedavnih alertova. Pokrenite test ili povežite OBS vidžet.</div>
+          </div>
+        </section>
+
+      </div><!-- /main-scroll -->
+    </main><!-- /main -->
+  </div><!-- /app -->
+
+  <!-- ══════════ CUSTOM CHANNEL MODAL ══════════ -->
+  <div class="modal-backdrop" id="customChannelModal" onclick="window.handleModalBg(event, 'customChannelModal')" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ov-green)" stroke-width="2.5">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          <h3>Promena Kick Kanala</h3>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="window.closeModal('customChannelModal')" aria-label="Zatvori">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--ov-muted); font-size:0.9rem; line-height:1.6; margin-bottom:16px;">
+          Unesite Kick korisničko ime kanala za koji želite da generišete OBS alertove i povežete donacije.
+        </p>
+        <div class="sc-form-group" style="margin-bottom:18px;">
+          <label class="sc-label" for="customChannelInput">Kick Korisničko Ime (Username)</label>
+          <div style="position:relative; display:flex; align-items:center;">
+            <span style="position:absolute; left:12px; color:var(--ov-green); font-weight:700; font-family:'JetBrains Mono',monospace; font-size:0.85rem; pointer-events:none;">kick.com/</span>
+            <input type="text" id="customChannelInput" class="sc-input" placeholder="npr. stream_kanal" style="padding-left:92px;" maxlength="40" />
           </div>
         </div>
-
-        <!-- Dynamic Settings Form Container -->
-        <div class="kickov-config-panel" id="tabConfigFormContainer">
-          <!-- Form dynamically injected by kickov-dashboard.js -->
-        </div>
-        
-        <!-- Global Save Action Bar -->
-        <div style="display:flex; justify-content:flex-end; margin-top: 10px;">
-          <button class="btn-icon-text btn-primary-green" id="btnSaveAllSettings" style="padding: 16px 36px; font-size:1.1rem;">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-            Sačuvaj podešavanja
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="sc-btn sc-btn-reset" style="padding:9px 16px;" onclick="window.closeModal('customChannelModal')">
+            <span>Odustani</span>
+          </button>
+          <button type="button" class="sc-btn sc-btn-save-all" style="padding:9px 18px;" onclick="window.saveCustomChannel()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>Poveži kanal</span>
           </button>
         </div>
       </div>
-    </section>
+    </div>
+  </div>
 
-  </main>
+  <!-- ══════════ RESET CONFIRM MODAL ══════════ -->
+  <div class="modal-backdrop" id="resetAlertsModal" onclick="window.handleModalBg(event, 'resetAlertsModal')" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ov-red)" stroke-width="2.5">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <h3>Resetovanje Podešavanja Alerta</h3>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="window.closeModal('resetAlertsModal')" aria-label="Zatvori">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--ov-muted); font-size:0.9rem; line-height:1.6; margin-bottom:18px;">
+          Da li ste sigurni da želite da vratite podešavanja svih 6 tipova alertova na fabričke vrednosti?
+        </p>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+          <button type="button" class="sc-btn sc-btn-reset" style="padding:9px 16px;" onclick="window.closeModal('resetAlertsModal')">
+            <span>Odustani</span>
+          </button>
+          <button type="button" class="sc-btn danger-btn" style="padding:9px 18px;" onclick="window.confirmResetSettings()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M3 6h18"></path>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span>Da, Resetuj Sve</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <!-- Dashboard Script -->
+  <!-- ══════════ HELP MODAL ══════════ -->
+  <div class="modal-backdrop" id="helpModal" onclick="window.handleModalBg(event, 'helpModal')" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ov-green)" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <h3>Pomoć i Tehnička Podrška</h3>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="window.closeModal('helpModal')" aria-label="Zatvori">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--ov-muted); font-size:0.9rem; line-height:1.6;">Za sva pitanja, pomoć sa OBS Browser Source vidžetom ili podešavanjem PayPal donacija, naš tim podrške vam stoji na raspolaganju:</p>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+          <a href="mailto:contact@milanwebportal.com" class="sc-btn sc-btn-save-all" style="text-decoration:none; justify-content:center; font-weight:800; gap:8px;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+              <polyline points="22,6 12,13 2,6"/>
+            </svg>
+            <span>contact@milanwebportal.com</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
   <script src="js/kickov-dashboard.js" defer></script>
 </body>
 </html>
