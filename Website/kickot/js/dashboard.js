@@ -320,28 +320,24 @@ function togglePricing(type) {
 }
 window.openUpgradeModal = openUpgradeModal;
 
-// ── Paddle Billing Checkout & Referral Modal ────────────────
-const PADDLE_PRICE_IDS = {
-  pro: {
-    monthly: window.CONFIG?.PADDLE?.PRICE_IDS?.pro?.monthly || '',
-    yearly: window.CONFIG?.PADDLE?.PRICE_IDS?.pro?.yearly || ''
-  },
-  elite: {
-    monthly: window.CONFIG?.PADDLE?.PRICE_IDS?.elite?.monthly || '',
-    yearly: window.CONFIG?.PADDLE?.PRICE_IDS?.elite?.yearly || ''
-  }
-};
-
+// ── Fungies Billing Checkout & Referral Modal ────────────────
 let pendingCheckoutPlan = null;
 let pendingCheckoutPeriod = null;
 
 function openCheckout(plan, period) {
-  pendingCheckoutPlan = plan;
+  pendingCheckoutPlan = plan || 'pro';
   pendingCheckoutPeriod = period || currentPricingPeriod || 'monthly';
 
-  const userId = currentUser ? currentUser.id : null;
+  let userId = currentUser ? currentUser.id : null;
   if (!userId) {
-    showToast('warning', 'Morate biti ulogovani da biste se pretplatili.', '');
+    try {
+      const stored = JSON.parse(localStorage.getItem('kickbot-supabase-auth') || '{}');
+      if (stored && stored.user) userId = stored.user.id;
+    } catch (_) {}
+  }
+
+  if (!userId) {
+    showToast('warning', 'Morate biti ulogovani preko Kicka da biste se pretplatili.', '');
     return;
   }
 
@@ -365,19 +361,28 @@ function openCheckout(plan, period) {
   openModal('preCheckoutReferralModal');
 }
 
-async function proceedToPaddleCheckout() {
-  const plan = pendingCheckoutPlan;
-  const p = pendingCheckoutPeriod || 'monthly';
-  const planPrices = PADDLE_PRICE_IDS[plan];
-  const priceId = (planPrices && typeof planPrices === 'object') ? planPrices[p] || planPrices.monthly : planPrices;
+async function proceedToCheckout() {
+  const plan = pendingCheckoutPlan || 'pro';
+  const p = pendingCheckoutPeriod || currentPricingPeriod || 'monthly';
 
-  if (!priceId) {
-    console.warn('[Checkout] Nepoznat plan ili Paddle price ID:', plan, p);
-    return;
+  let userId = currentUser ? currentUser.id : null;
+  let userEmail = currentUser ? currentUser.email : null;
+
+  if (!userId) {
+    try {
+      const stored = JSON.parse(localStorage.getItem('kickbot-supabase-auth') || '{}');
+      if (stored && stored.user) {
+        userId = stored.user.id;
+        userEmail = stored.user.email;
+      }
+    } catch (_) {}
   }
 
-  const userId = currentUser ? currentUser.id : null;
-  if (!userId) return;
+  if (!userId) {
+    showToast('warning', 'Sesija je istekla ili niste ulogovani. Prijavite se ponovo.', '');
+    closeModal('preCheckoutReferralModal');
+    return;
+  }
 
   const refInput = document.getElementById('checkoutReferralCodeInput');
   const refCode = refInput ? refInput.value.trim().toUpperCase() : '';
@@ -386,27 +391,27 @@ async function proceedToPaddleCheckout() {
     localStorage.setItem('user_referral_code', refCode);
     sessionStorage.setItem('user_referral_code', refCode);
     try {
-      await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: refCode });
+      if (typeof sb !== 'undefined' && sb.rpc) {
+        await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: refCode });
+      }
     } catch (_) { }
   }
 
   closeModal('preCheckoutReferralModal');
 
-  if (typeof Paddle === 'undefined' || !Paddle.Checkout) {
-    console.error('[Paddle Checkout] Paddle SDK nije učitan.');
+  const checkoutUrl = window.CONFIG?.FUNGIES?.getCheckoutUrl(plan, p, userId, userEmail);
+  if (!checkoutUrl) {
+    console.error('[Fungies Checkout] Nije pronađen checkout URL za plan:', plan, p);
+    showToast('error', 'Greška pri generisanju linka za plaćanje. Pokušajte ponovo.', '');
     return;
   }
 
-  Paddle.Checkout.open({
-    items: [{ priceId, quantity: 1 }],
-    customData: {
-      user_id: userId,
-      ref_code: refCode || undefined
-    }
-  });
+  window.location.href = checkoutUrl;
 }
 
-window.proceedToPaddleCheckout = proceedToPaddleCheckout;
+window.proceedToCheckout = proceedToCheckout;
+window.proceedToPaddleCheckout = proceedToCheckout;
+window._realProceedToCheckout = proceedToCheckout;
 window.openCheckout = openCheckout;
 
 function applyPenaltySettingsRestrictions() {
@@ -6372,10 +6377,32 @@ async function renderSettingsSubscriptionPanel() {
     }
   }
 
+  function handleManageSubscription() {
+    const portalUrl = (currentUserProfileData && currentUserProfileData.customer_portal_url)
+      || window.CONFIG?.FUNGIES?.CUSTOMER_PORTAL_URL
+      || 'https://milanwebportal.app.fungies.io/portal';
+    window.open(portalUrl, '_blank', 'noopener');
+  }
+  window.handleManageSubscription = handleManageSubscription;
+
   if (btnPortal) {
-    const portalUrl = p.customer_portal_url || window.CONFIG?.PADDLE?.BILLING_PORTAL_URL || '';
-    btnPortal.href = portalUrl || '#';
-    btnPortal.style.display = (plan !== 'FREE' && portalUrl) ? 'inline-flex' : 'none';
+    const portalUrl = p.customer_portal_url || window.CONFIG?.FUNGIES?.CUSTOMER_PORTAL_URL || 'https://milanwebportal.app.fungies.io/portal';
+    btnPortal.href = portalUrl;
+    btnPortal.style.display = 'inline-flex';
+    if (plan === 'FREE') {
+      btnPortal.innerHTML = `<span>Aktiviraj PRO / ELITE Paket</span>`;
+      btnPortal.onclick = (e) => {
+        e.preventDefault();
+        closeSettingsModal();
+        openUpgradeModal('general');
+      };
+    } else {
+      btnPortal.innerHTML = `<svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="16"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" x2="21" y1="14" y2="3"></line></svg><span>Upravljaj Pretplatom / Otkaži</span>`;
+      btnPortal.onclick = (e) => {
+        e.preventDefault();
+        handleManageSubscription();
+      };
+    }
   }
 }
 

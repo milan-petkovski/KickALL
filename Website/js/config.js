@@ -59,24 +59,38 @@ window.CONFIG = {
     }
   },
 
-  // Paddle Billing Configuration
-  PADDLE: {
+  // Fungies.io Billing Configuration
+  FUNGIES: {
     ENABLED: true,
-    ENVIRONMENT: 'production',
-    CLIENT_TOKEN: '',
-    BILLING_PORTAL_URL: '',
-    PRICE_IDS: {
+    STORE_BASE_URL: 'https://milanwebportal.app.fungies.io',
+    CUSTOMER_PORTAL_URL: 'https://milanwebportal.app.fungies.io/portal',
+    OFFERS: {
       pro: {
-        monthly: '',
-        yearly: ''
+        monthly: 'bedbc1aa-e5ef-4402-9a6b-e7236823a40d',
+        yearly: '16459e35-8c70-4cdc-b158-d1f492e5628f'
       },
       elite: {
-        monthly: '',
-        yearly: ''
+        monthly: '6478510e-150f-4069-9ac4-7c918c97f676',
+        yearly: 'f66a25f4-53b5-4cd7-9012-5454f4761d47'
       }
     },
-    PRICE_TIER_MAP: {
-      '': 'free'
+    getCheckoutUrl(plan, period = 'monthly', userId = '', userEmail = '') {
+      const p = String(period || 'monthly').toLowerCase();
+      const planOffers = this.OFFERS[plan];
+      const offerId = (planOffers && typeof planOffers === 'object') ? (planOffers[p] || planOffers.monthly) : planOffers;
+      if (!offerId) return null;
+
+      const url = new URL(`${this.STORE_BASE_URL}/subscribe/${offerId}`);
+      if (userId) {
+        url.searchParams.set('client_reference_id', userId);
+      }
+      if (userEmail) {
+        url.searchParams.set('customer_email', userEmail);
+      }
+      const origin = window.location.origin || 'https://kickall.app';
+      url.searchParams.set('success_url', `${origin}/dashboard.html?billing=success`);
+      url.searchParams.set('cancel_url', `${origin}/pricing.html?billing=cancelled`);
+      return url.toString();
     }
   },
 
@@ -229,39 +243,8 @@ window.CONFIG = {
     } catch (e) {
       console.warn('[KickAuth] Cross-tab listener error:', e);
     }
-  },
-
-  initPaddle: () => {
-    try {
-      const paddleConfig = window.CONFIG?.PADDLE || {};
-      const clientToken = String(paddleConfig.CLIENT_TOKEN || '').trim();
-      if (!clientToken || !window.Paddle) return false;
-      if (window.__PADDLE_INITIALIZED__) return true;
-
-      if (window.Paddle.Environment && typeof window.Paddle.Environment.set === 'function') {
-        window.Paddle.Environment.set(String(paddleConfig.ENVIRONMENT || 'production'));
-      }
-
-      if (typeof window.Paddle.Initialize === 'function') {
-        window.Paddle.Initialize({ token: clientToken });
-      } else if (typeof window.Paddle.Setup === 'function') {
-        window.Paddle.Setup({ token: clientToken });
-      }
-
-      window.__PADDLE_INITIALIZED__ = true;
-      return true;
-    } catch (error) {
-      console.warn('[Paddle] Initialization failed:', error);
-      return false;
-    }
   }
 };
-
-if (document.readyState === 'complete') {
-  window.CONFIG.initPaddle();
-} else {
-  window.addEventListener('load', () => window.CONFIG.initPaddle(), { once: true });
-}
 
 // Adaptive Keep-Alive Ping for Render free tier (only runs when tab is visible)
 if (window.CONFIG.KEEP_ALIVE.ENABLED) {

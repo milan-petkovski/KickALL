@@ -29,7 +29,7 @@
 <link href="https://fonts.googleapis.com" rel="preconnect"/>
 <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
 <link crossorigin="" href="https://cdn.jsdelivr.net" rel="preconnect"/>
-<link crossorigin="" href="https://cdn.paddle.com" rel="preconnect"/>
+<link crossorigin="" href="https://milanwebportal.app.fungies.io" rel="preconnect"/>
 <link crossorigin="" href="https://rcukparptzzyssqdmydt.supabase.co" rel="preconnect"/>
 <!-- PWA Manifest -->
 <link href="../manifest.json" rel="manifest"/>
@@ -52,7 +52,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
 <!-- KickALL Root Configuration (seta window.CONFIG sa Supabase URL, ANON_KEY, OAuth itd.) -->
 <script src="../js/config.js"></script>
-<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 <!-- Dynamic Configuration (Kickot-specifican, seta window.KickotConfig) -->
 <script src="js/config.js"></script>
 <!-- Favicon i Stilovi -->
@@ -63,6 +62,16 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Avatar Cache Module (IndexedDB) -->
 <script src="js/avatar-cache.js"></script>
+<script>
+  window.proceedToCheckout = window.proceedToCheckout || function() {
+    if (window._realProceedToCheckout) return window._realProceedToCheckout();
+  };
+  window.proceedToPaddleCheckout = window.proceedToCheckout;
+  window.handleManageSubscription = window.handleManageSubscription || function() {
+    const portalUrl = window.CONFIG?.FUNGIES?.CUSTOMER_PORTAL_URL || 'https://milanwebportal.app.fungies.io/portal';
+    window.open(portalUrl, '_blank', 'noopener');
+  };
+</script>
 </head>
 <body>
 <!-- ══════════ MOBILE UNSUPPORTED OVERLAY (<=768px) ══════════ -->
@@ -4360,15 +4369,18 @@ Sledeća ›
 <span class="kx-435" id="subDateValue">-</span>
 </div>
 </div>
-<div class="kx-436">
-<a class="btn btn-primary kx-437" href="#" id="btnManageSubscription" rel="noopener" target="_blank">
+<div class="subscription-portal-info" style="margin-top: 14px; padding: 12px 14px; background: rgba(255,255,255,0.04); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+  <strong style="color: #fff;">Upravljanje i Otkazivanje:</strong> Za promenu kartice ili otkazivanje pretplate, kliknite na dugme ispod kako biste otvorili <strong>Fungies Portal</strong>. Unesite email adresu kojom ste izvršili uplatu i stići će vam jednokratni link za instant pristup i otkazivanje.
+</div>
+<div class="kx-436" style="margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;">
+<a class="btn btn-primary kx-437" href="https://milanwebportal.app.fungies.io/portal" id="btnManageSubscription" onclick="if(window.handleManageSubscription){event.preventDefault();window.handleManageSubscription();}" rel="noopener" target="_blank">
 <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="16">
 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
 <polyline points="15 3 21 3 21 9"></polyline>
 <line x1="10" x2="21" y1="14" y2="3"></line>
 </svg>
-              Upravljaj Pretplatom / Otkaži
-            </a>
+<span>Upravljaj Pretplatom / Otkaži</span>
+</a>
 <button class="btn btn-outline kx-438" onclick="closeSettingsModal(); openUpgradeModal('general');" type="button">
               Promeni / Nadogradi Paket
             </button>
@@ -4975,7 +4987,7 @@ Sledeća ›
 </div>
 <div class="kx-457">
 <button class="btn btn-outline" onclick="closeModal('preCheckoutReferralModal')" type="button">Otkaži</button>
-<button class="btn btn-primary kx-499" onclick="proceedToPaddleCheckout()" type="button">
+<button class="btn btn-primary kx-499" onclick="proceedToCheckout()" type="button">
 <span>Nastavi na Plaćanje</span>
 <svg fill="none" height="14" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="14">
 <line x1="5" x2="19" y1="12" y2="12"></line>
@@ -5028,7 +5040,7 @@ Podesite novo stanje poena za gledaoca.
 <div aria-atomic="true" aria-live="polite" class="toast-container" id="toastContainer"></div>
 <!-- YouTube Iframe API for Audio Player -->
 <script src="https://www.youtube.com/iframe_api"></script>
-<script src="js/dashboard.js?v=20260812"></script>
+<script src="js/dashboard.js?v=20260902-fungies-04"></script>
 <!-- KickALL Data Layer & Analytics -->
 <script src="../js/data-layer.js"></script>
 <script src="../js/route-tracking.js"></script>

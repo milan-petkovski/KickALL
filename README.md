@@ -14,7 +14,7 @@ flowchart TD
     subgraph Netlify Service Layer
         Netlify -->|Reverse Proxy / Auth| ApiProxy[api-proxy.js Header Whitelist]
         Netlify -->|OAuth Token Exchange| KickExchange[kick-exchange.js]
-        Netlify -->|Paddle Webhook Processing| PaddleWH[paddle-webhook.js]
+        Netlify -->|Fungies Webhook Processing| FungiesWH[fungies-webhook.js]
     end
     
     subgraph Render Bot Engine
@@ -26,7 +26,7 @@ flowchart TD
     KickExchange -->|X-Internal-Token Header| BotHttp
     
     BotEngine <-->|Real-time Supabase Client| Supabase[(Supabase PostgreSQL Baza)]
-    PaddleWH <-->|Patch Subscription & User Profile| Supabase
+    FungiesWH <-->|Patch Subscription & User Profile| Supabase
 ```
 
 ---
@@ -35,7 +35,7 @@ flowchart TD
 
 - **`bot_config`**: Konfiguracija bota po kanalu (channel_id, channel_name, bot_active, currency_name, xp_per_msg, points_per_msg, gamble_enabled, max_gamble_amount, prefix, etc.).
 - **`custom_commands`**: Prilagođene komande kanala (channel_id, command_name, response_text, user_level, cooldown_ms, is_active).
-- **`user_profiles`**: Korisnički nalozi i pretplate (id, username, plan, plan_period, subscription_status, paddle_subscription_id, paddle_customer_id).
+- **`user_profiles`**: Korisnički nalozi i pretplate (id, username, plan, plan_period, subscription_status).
 - **`leaderboard`**: Bodovi i XP gledalaca (channel_id, username, xp, level, points, watchtime).
 - **`rate_limits`**: Atomsko praćenje limita zahteva (key, request_count, window_start, updated_at).
 
@@ -45,7 +45,7 @@ flowchart TD
 
 - **Fail-Closed Shared Secret (`X-Internal-Token`)**: Bot HTTP API štiti sve operativne i administrativne rute (`/api/kick/test-ping`, `/api/kick/reload`, `/api/kick/logs`, `/api/kick/channel`, `/api/kick/check-moderator`, `/api/channels`, `/api/global-logout`). Ukoliko tajni ključ nije podešen ili se ne poklapa, zahtev se odmah odbija sa 401 Unauthorized.
 - **Proxy Header Whitelist**: Netlify proxy (`api-proxy.js`) filtrira zaglavlja klijenta prema strogoj beloj listi (`content-type`, `authorization`, `accept`, `accept-language`, `user-agent`) kako bi sprečio SSRF i zloupotrebu tajni.
-- **PII Protection**: Osetljivi korisnički podaci (poput email adresa u Paddle webhook logovima) se automatski maskiraju pre ispisa.
+- **PII Protection**: Osetljivi korisnički podaci (poput email adresa u Fungies webhook logovima) se automatski maskiraju pre ispisa.
 
 ---
 

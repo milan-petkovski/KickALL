@@ -8,7 +8,7 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://cdn.jsdelivr.net https://cdn.paddle.com https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob: https://i.ytimg.com; media-src 'self' data: https: blob:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://checkout.paddle.com https://sandbox-checkout.paddle.com; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://rcukparptzzyssqdmydt.supabase.co https://kickbot-ihzb.onrender.com https://id.kick.com https://kick.com https://api.kick.com https://*.kick.com https://www.youtube.com https://*.youtube.com https://*.googlevideo.com https://api.paddle.com https://sandbox-api.paddle.com https://cdn.paddle.com https://api.allorigins.win https://corsproxy.io https://api.codetabs.com wss:;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://cdn.jsdelivr.net https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob: https://i.ytimg.com; media-src 'self' data: https: blob:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://*.fungies.io; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://rcukparptzzyssqdmydt.supabase.co https://kickbot-ihzb.onrender.com https://id.kick.com https://kick.com https://api.kick.com https://*.kick.com https://www.youtube.com https://*.youtube.com https://*.googlevideo.com https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.fungies.io wss:;"
 
 # API i Auth preusmeravanja (najveći prioritet)
 [[redirects]]
@@ -60,8 +60,8 @@
   force = true
 
 [[redirects]]
-  from = "/api/paddle-webhook"
-  to = "/.netlify/functions/paddle-webhook"
+  from = "/api/fungies-webhook"
+  to = "/.netlify/functions/fungies-webhook"
   status = 200
   force = true
 

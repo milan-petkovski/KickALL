@@ -162,17 +162,17 @@ paths:
         '444':
           description: Nije pronađen video zapis za dati upit
 
-  /.netlify/functions/paddle-webhook:
+  /.netlify/functions/fungies-webhook:
     post:
-      summary: Prijem i obrada Paddle billing webhook događaja sa provere HMAC potpisa
-      operationId: netlifyPaddleWebhook
+      summary: Prijem i obrada Fungies.io billing webhook događaja sa proverom HMAC potpisa
+      operationId: netlifyFungiesWebhook
       parameters:
         - in: header
-          name: Paddle-Signature
+          name: x-fngs-signature
           required: true
           schema:
             type: string
-          description: Paddle HMAC sha256 potpis zahteva (ts=...;h1=...)
+          description: Fungies HMAC sha256 potpis zahteva (sha256_...)
       requestBody:
         required: true
         content:
@@ -180,7 +180,7 @@ paths:
             schema:
               type: object
               properties:
-                event_type:
+                event:
                   type: string
                 data:
                   type: object
@@ -188,9 +188,9 @@ paths:
         '200':
           description: Webhook uspešno primljen i obrađen
         '401':
-          description: Neispravan Paddle potpis
+          description: Neispravan Fungies potpis
         '500':
-          description: Nedostaje Paddle ili Supabase konfiguracija
+          description: Nedostaje Fungies ili Supabase konfiguracija
 
   # ─── BOT DIRECT / INTERNAL ENDPOINTS ─────────────────────────────────────────
 

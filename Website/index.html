@@ -35,7 +35,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-    <link rel="dns-prefetch" href="https://cdn.paddle.com">
+    <link rel="dns-prefetch" href="https://milanwebportal.app.fungies.io">
     <link rel="dns-prefetch" href="https://rcukparptzzyssqdmydt.supabase.co">
     <link rel="dns-prefetch" href="https://kickall.app">
 
@@ -1625,34 +1625,24 @@
         </section>
 
         <script>
-            // ── Paddle Billing Checkout ────────────────────────────
+            // ── Fungies Billing Checkout ────────────────────────────
             let currentPricingPeriod = 'monthly';
-
-            const PADDLE_PRICE_INDEX = {
-                pro: {
-                    monthly: window.CONFIG?.PADDLE?.PRICE_IDS?.pro?.monthly || '',
-                    yearly: window.CONFIG?.PADDLE?.PRICE_IDS?.pro?.yearly || ''
-                },
-                elite: {
-                    monthly: window.CONFIG?.PADDLE?.PRICE_IDS?.elite?.monthly || '',
-                    yearly: window.CONFIG?.PADDLE?.PRICE_IDS?.elite?.yearly || ''
-                }
-            };
 
             function openIndexCheckout(plan, period) {
                 const p = period || currentPricingPeriod || 'monthly';
-                const planPrices = PADDLE_PRICE_INDEX[plan];
-                const priceId = (planPrices && typeof planPrices === 'object') ? planPrices[p] || planPrices.monthly : planPrices;
-                if (!priceId) return;
 
                 // Proveri da li je korisnik ulogovan (Supabase sesija u localStorage)
                 let userId = null;
+                let userEmail = null;
                 try {
-                    const storageKey = 'kickbot-supabase-auth';
+                    const storageKey = window.CONFIG?.SUPABASE?.STORAGE_KEY || 'kickbot-supabase-auth';
                     const raw = localStorage.getItem(storageKey);
                     if (raw) {
                         const parsed = JSON.parse(raw);
-                        userId = parsed && parsed.user && parsed.user.id ? parsed.user.id : null;
+                        if (parsed && parsed.user) {
+                            userId = parsed.user.id || null;
+                            userEmail = parsed.user.email || null;
+                        }
                     }
                 } catch (_) { }
 
@@ -1667,15 +1657,13 @@
                     return;
                 }
 
-                if (typeof Paddle === 'undefined' || !Paddle.Checkout) {
-                    console.error('[Paddle Checkout] Paddle SDK nije učitan.');
+                const checkoutUrl = window.CONFIG?.FUNGIES?.getCheckoutUrl(plan, p, userId, userEmail);
+                if (!checkoutUrl) {
+                    console.error('[Fungies Checkout] Nije pronađen checkout URL za plan:', plan, p);
                     return;
                 }
 
-                Paddle.Checkout.open({
-                    items: [{ priceId, quantity: 1 }],
-                    customData: { user_id: userId }
-                });
+                window.location.href = checkoutUrl;
             }
 
             function setPricingPeriod(period) {
@@ -2163,7 +2151,6 @@
 
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
     <script src="js/config.js"></script>
     <script src="js/app.js"></script>
 
