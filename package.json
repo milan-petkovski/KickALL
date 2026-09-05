@@ -14,6 +14,6 @@
     "verify": "node scripts/build.js"
   },
   "devDependencies": {
-    "eslint": "^8.57.0"
+    "eslint": "^10.9.1"
   }
 }
