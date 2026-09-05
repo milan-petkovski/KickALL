@@ -321,6 +321,7 @@ exports.handler = async (event) => {
     clientReferenceId: clientReferenceId || null,
     customerEmail: maskEmail(customerEmail),
     offerId: offerId || null,
+    subscriptionId: subscriptionId || null,
     planTier,
     planPeriod,
     subscriptionStatus

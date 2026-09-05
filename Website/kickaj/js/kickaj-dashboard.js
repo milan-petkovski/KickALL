@@ -2695,11 +2695,9 @@
     const hasParticipants = participantsMap.size > 0;
     const drawBtn         = document.getElementById('btnDrawWinner');
     const resetBtn        = document.getElementById('btnResetGiveaway');
-    const startBtn        = document.getElementById('btnStartGiveaway');
 
     const wfoDrawBtn      = document.getElementById('wfoBtnDraw');
     const wfoResetBtn     = document.getElementById('wfoBtnReset');
-    const wfoStartBtn     = document.getElementById('wfoBtnStart');
 
     if (drawBtn)    drawBtn.disabled    = !hasParticipants || isSpinning;
     if (wfoDrawBtn) wfoDrawBtn.disabled = !hasParticipants || isSpinning;

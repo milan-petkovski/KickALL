@@ -1,4 +1,3 @@
-const config = require('./config');
 const state = require('./state');
 const { log, kickScrapingHeaders } = require('./utils');
 const kickAuth = require('./kickAuth');

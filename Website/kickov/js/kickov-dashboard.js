@@ -52,7 +52,7 @@
   let currentUserProfile = null;
   let userPlan           = 'free';
   let userChannels       = []; // [{id, username, avatar, chatroom_id, is_primary, is_managed, role, owner_id, owner_plan}]
-  let activeChannelObj   = null;
+  let _activeChannelObj  = null;
   let channelName        = '';
 
   let obsToken        = '';
@@ -392,7 +392,7 @@
       if (!candidate && userChannels.length > 0) candidate = userChannels.find(c => c.is_primary) || userChannels[0];
 
       if (candidate) {
-        activeChannelObj = candidate;
+        _activeChannelObj = candidate;
         username = candidate.username;
         if (candidate.avatar) avatarUrl = candidate.avatar;
       }
@@ -404,7 +404,7 @@
           id: null, username: channelName, avatar: avatarUrl || '', chatroom_id: null,
           is_primary: true, is_managed: false, role: 'owner', owner_id: currentUser?.id, owner_plan: userPlan
         });
-        activeChannelObj = userChannels[0];
+        _activeChannelObj = userChannels[0];
       }
 
       updateProfileUI(channelName, avatarUrl);
@@ -490,7 +490,7 @@
       } catch (_) {}
     }
 
-    channelName = targetName; activeChannelObj = targetObj;
+    channelName = targetName; _activeChannelObj = targetObj;
 
     /* Prilagodi plan za managed kanale */
     if (targetObj.role === 'managed' && targetObj.owner_plan) {

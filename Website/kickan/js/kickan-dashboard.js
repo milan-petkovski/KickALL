@@ -99,6 +99,7 @@
   ════════════════════════════════════════ */
   document.addEventListener('DOMContentLoaded', async () => {
     setupGlobalClickHandlers();
+    setupKeyboardShortcuts();
     initVisualizerCanvas();
     startVelocityTimer();
     loadNotifications();
