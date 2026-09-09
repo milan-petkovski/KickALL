@@ -549,7 +549,11 @@ function povezi() {
             }
 
             // Anti-spam filter (izuzimamo strimera)
-            if (userKey !== channelState.channelUsername.toLowerCase() && spam.spamFilter(chatroomId, username, poruka)) return;
+            if (userKey !== channelState.channelUsername.toLowerCase() && spam.spamFilter(chatroomId, username, poruka)) {
+                // Brišemo spam poruku iz čata (spamFilter je poslao upozorenje)
+                if (messageId) messenger.obrisiPoruku(chatroomId, messageId);
+                return;
+            }
 
             // Ako poruka počinje sa prefiksom i posle njega ima razmak (npr. "! komanda"), spoj ih
             let porukaSredjena = poruka;
@@ -719,6 +723,12 @@ function povezi() {
             }
 
             // ─── KOCKANJE & KAZINO ──────────────────────────────────────────
+            // Detekcija obrnutog redosleda: "200 !slot" → jasna poruka greške
+            if (/^\d+\s+!slots?$/.test(porukaNormalized)) {
+                messenger.posaljiPoruku(chatroomId, `@${username} Ispravna upotreba: !slot [iznos] (npr. !slot 200)`);
+                return;
+            }
+
             if (porukaNormalized.startsWith('!slots') || porukaNormalized.startsWith('!slot')) {
                 if (channelState.feature_games === false) return;
                 const amount = porukaNormalized.startsWith('!slots') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(5).trim();
@@ -740,10 +750,16 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!coinflip ') || porukaNormalized.startsWith('!piskoglava ') || porukaNormalized.startsWith('!gamble ') || porukaNormalized.startsWith('!kockaj ')) {
+            // Detekcija čestih tipfelera za coinflip — pre provere prave komande
+            if (porukaNormalized.startsWith('!coinsflip') || porukaNormalized.startsWith('!coinflipp') || porukaNormalized.startsWith('!coinfliip')) {
+                messenger.posaljiPoruku(chatroomId, `@${username} Da li si mislio/la: !coinflip [iznos]? (npr. !coinflip 100 glava)`);
+                return;
+            }
+
+            if (porukaNormalized.startsWith('!coinflip ') || porukaNormalized === '!coinflip' || porukaNormalized.startsWith('!piskoglava ') || porukaNormalized.startsWith('!gamble ') || porukaNormalized.startsWith('!kockaj ')) {
                 if (channelState.feature_games === false) return;
                 let rest = '';
-                if (porukaNormalized.startsWith('!coinflip ')) rest = porukaSredjena.slice(10).trim();
+                if (porukaNormalized.startsWith('!coinflip')) rest = porukaSredjena.slice(9).trim();
                 else if (porukaNormalized.startsWith('!piskoglava ')) rest = porukaSredjena.slice(12).trim();
                 else if (porukaNormalized.startsWith('!gamble ')) rest = porukaSredjena.slice(8).trim();
                 else rest = porukaSredjena.slice(8).trim();
@@ -1983,6 +1999,55 @@ async function handleHttpRequest(req, res) {
 
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ success: true, message: 'Test message sent' }));
+                } catch (err) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Failed to send message', detail: err.message }));
+                }
+            });
+            return;
+        }
+
+        if (parsedUrl.pathname === '/api/kick/send-message' && req.method === 'POST') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized access to send-message' }));
+                return;
+            }
+            let body = '';
+            req.on('data', chunk => { body += chunk.toString(); });
+            req.on('end', async () => {
+                try {
+                    let chatroomId = '';
+                    let channelUsername = '';
+                    let message = '';
+                    try {
+                        const json = JSON.parse(body);
+                        chatroomId = json.chatroom_id || json.channel_id;
+                        channelUsername = json.channel_username || json.username;
+                        message = json.message;
+                    } catch (_) {
+                        const params = new URLSearchParams(body);
+                        chatroomId = params.get('chatroom_id') || params.get('channel_id');
+                        channelUsername = params.get('channel_username') || params.get('username');
+                        message = params.get('message');
+                    }
+
+                    if (!chatroomId || !message) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Missing chatroom_id or message parameter' }));
+                        return;
+                    }
+
+                    const idStr = String(chatroomId);
+                    const channelState = state.getChannelState(idStr);
+                    if (channelState && channelUsername && !channelState.channelUsername) {
+                        channelState.channelUsername = channelUsername;
+                    }
+
+                    messenger.posaljiPoruku(idStr, String(message).trim());
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, message: 'Message queued for sending' }));
                 } catch (err) {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Failed to send message', detail: err.message }));

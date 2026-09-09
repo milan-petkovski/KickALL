@@ -28,12 +28,14 @@
   let isRunning        = false;
   let isConnecting     = false;
   let isSpinning       = false;
+  let currentSpinId    = 0;
   let toastIdCounter   = 0;
   let participantsMap  = new Map();
   let winnersList      = [];
   let wheelAngle       = 0;
   let audioCtx         = null;
-  let spinSoundNode    = null;
+  let masterGainNode   = null;
+  let spinSoundNodes   = [];
   let isSidebarOpen    = true;
 
   /* ── Settings ── */
@@ -50,7 +52,9 @@
     spinTime:        5,
     maxParticipants: 500,
     soundEnabled:    true,
-    volume:          0.5
+    volume:          0.5,
+    announceStart:   true,
+    announceWinner:  true
   };
 
   const PLAN_LIMITS = {
@@ -150,7 +154,8 @@
           initialConfirmSeconds: initSec,
           expiresAt: expiresAt,
           savedAt: w.savedAt || now,
-          isExpired: isExpired
+          isExpired: isExpired,
+          isConfirmed: !!w.isConfirmed
         };
       }),
       isRunning: !!isRunning,
@@ -195,6 +200,7 @@
           channel_id: channelId ? String(channelId) : null,
           chatroom_id: chatroomId ? parseInt(chatroomId, 10) : null,
           settings: dataToSave.settings,
+          participants: dataToSave.participants || [],
           winners: dataToSave.winners,
           updated_at: new Date().toISOString()
         };
@@ -239,6 +245,7 @@
             channel_id: kickajRow.channel_id,
             chatroom_id: kickajRow.chatroom_id,
             settings: kickajRow.settings,
+            participants: kickajRow.participants || [],
             winners: kickajRow.winners
           };
           if (kickajRow.chatroom_id && !chatroomId) {
@@ -319,14 +326,16 @@
           }
         }
 
+        const isConfirmed = !!w.isConfirmed;
         return {
           username: w.username,
           prize: w.prize || settings.prize || 'Misteriozna Nagrada',
-          confirmSeconds: isExpired ? 0 : currSec,
+          confirmSeconds: (isConfirmed || isExpired) ? 0 : currSec,
           initialConfirmSeconds: initSec,
           expiresAt: expiresAt,
           savedAt: now,
           isExpired: isExpired,
+          isConfirmed: isConfirmed,
           timerId: null
         };
       });
@@ -338,7 +347,7 @@
     restoreFormInputs();
     updateWinnersUI();
     winnersList.forEach(w => {
-      if (!w.isExpired && w.confirmSeconds > 0) {
+      if (!w.isConfirmed && !w.isExpired && w.confirmSeconds > 0) {
         startWinnerTimer(w);
       } else {
         updateSingleWinnerTimerUI(w);
@@ -355,9 +364,12 @@
     setVal('inputConfirmTime',    settings.confirmTime);
     setVal('inputMaxParticipants',settings.maxParticipants);
     setVal('inputSpinTime',       settings.spinTime);
+    setVal('inputSpinTimeNum',    settings.spinTime);
     setVal('inputVolume',         Math.round(settings.volume * 100));
     setChecked('toggleSubscribersOnly', settings.subscribersOnly);
     setChecked('toggleSound',          settings.soundEnabled);
+    setChecked('toggleAnnounceStart',  settings.announceStart !== false);
+    setChecked('toggleAnnounceWinner', settings.announceWinner !== false);
     selectAnimation(settings.animation);
     updateSpinTimeLabel();
     updateVolumeLabel();
@@ -1339,7 +1351,7 @@
     }, { maxLen: 25 });
 
     bindInput('inputNumWinners', 'change', (v) => {
-      settings.numWinners = Math.min(20, Math.max(1, parseInt(v, 10) || 1));
+      settings.numWinners = Math.min(50, Math.max(1, parseInt(v, 10) || 1));
       setVal('inputNumWinners', settings.numWinners);
       refreshAll();
     });
@@ -1398,21 +1410,65 @@
       });
     }
 
-    bindInput('inputVolume', 'input', (v) => {
-      settings.volume = parseInt(v, 10) / 100;
+    let volDebounce = null;
+    const handleVolumeChange = (v) => {
+      const val = Math.max(0, Math.min(100, parseInt(v, 10) || 0));
+      settings.volume = val / 100;
+      if (settings.volume > 0 && !settings.soundEnabled) {
+        settings.soundEnabled = true;
+        const toggleSound = document.getElementById('toggleSound');
+        if (toggleSound) toggleSound.checked = true;
+        const btnMute = document.getElementById('btnMuteSound');
+        if (btnMute) btnMute.classList.remove('is-muted');
+        updateMuteIcon();
+      } else if (settings.volume === 0 && settings.soundEnabled) {
+        settings.soundEnabled = false;
+        const toggleSound = document.getElementById('toggleSound');
+        if (toggleSound) toggleSound.checked = false;
+        const btnMute = document.getElementById('btnMuteSound');
+        if (btnMute) btnMute.classList.add('is-muted');
+        updateMuteIcon();
+      }
+      updateMasterVolume();
       updateVolumeLabel();
       saveState();
-    });
+      if (settings.soundEnabled && settings.volume > 0) {
+        clearTimeout(volDebounce);
+        volDebounce = setTimeout(() => { playVolumePreviewTone(); }, 40);
+      }
+    };
+
+    bindInput('inputVolume', 'input', handleVolumeChange);
+    bindInput('inputVolume', 'change', handleVolumeChange);
 
     const toggleSub = document.getElementById('toggleSubscribersOnly');
     if (toggleSub) toggleSub.addEventListener('change', (e) => { settings.subscribersOnly = e.target.checked; refreshAll(); });
+
+    const toggleAnnStart = document.getElementById('toggleAnnounceStart');
+    if (toggleAnnStart) toggleAnnStart.addEventListener('change', (e) => {
+      settings.announceStart = e.target.checked;
+      saveState();
+    });
+
+    const toggleAnnWinner = document.getElementById('toggleAnnounceWinner');
+    if (toggleAnnWinner) toggleAnnWinner.addEventListener('change', (e) => {
+      settings.announceWinner = e.target.checked;
+      saveState();
+    });
 
     const toggleSound = document.getElementById('toggleSound');
     if (toggleSound) toggleSound.addEventListener('change', (e) => {
       const limits = PLAN_LIMITS[userPlan];
       if (!limits.sound) { e.target.checked = false; showToast('Zvuk je dostupan na PRO ili ELITE planu.', 'warning'); return; }
       settings.soundEnabled = e.target.checked;
+      const btnMute = document.getElementById('btnMuteSound');
+      if (btnMute) btnMute.classList.toggle('is-muted', !settings.soundEnabled);
+      updateMasterVolume();
+      updateMuteIcon();
       saveState();
+      if (settings.soundEnabled && settings.volume > 0) {
+        playVolumePreviewTone();
+      }
     });
 
     const animSelect = document.getElementById('selectAnimation');
@@ -1434,8 +1490,14 @@
         document.querySelectorAll('#multiplierChipsContainer .sc-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         settings.subMultiplier = parseInt(chip.dataset.mult, 10) || 1;
+        participantsMap.forEach(p => {
+          if (p.isSub) p.mult = settings.subMultiplier;
+        });
         setText('statSubMultiplierDisplay', `${settings.subMultiplier}x`);
+        updateParticipantsUI();
+        drawVisualizerStage();
         refreshAll();
+        saveState();
       });
     });
 
@@ -1515,8 +1577,12 @@
       const toggleSound = document.getElementById('toggleSound');
       if (toggleSound) toggleSound.checked = settings.soundEnabled;
       btn.classList.toggle('is-muted', !settings.soundEnabled);
+      updateMasterVolume();
       updateMuteIcon();
       saveState();
+      if (settings.soundEnabled && settings.volume > 0) {
+        playVolumePreviewTone();
+      }
     });
     updateMuteIcon();
   }
@@ -1548,9 +1614,30 @@
     bindClick('wfoBtnReset', resetGiveaway);
 
     document.addEventListener('keydown', (e) => {
+      /* Esc closes the overlay (+ exits native FS) */
       if (e.key === 'Escape') {
         const ov = document.getElementById('wheelFullscreenOverlay');
         if (ov && ov.style.display !== 'none') closeFullscreen();
+        return;
+      }
+      /* F key toggles fullscreen — skip if user is typing in an input */
+      if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = (document.activeElement || {}).tagName || '';
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+        const ov = document.getElementById('wheelFullscreenOverlay');
+        if (ov && ov.style.display !== 'none') {
+          closeFullscreen();
+        } else {
+          openFullscreen();
+        }
+      }
+    });
+
+    /* If user presses browser's native Esc to exit fullscreen, also close our overlay */
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && nativeFSActive) {
+        nativeFSActive = false;
+        closeFullscreen();
       }
     });
   }
@@ -1594,6 +1681,9 @@
     window.location.href = '../index.html';
   };
 
+  /* Track whether native browser fullscreen is active */
+  let nativeFSActive = false;
+
   function openFullscreen() {
     const limits = PLAN_LIMITS[userPlan];
     if (!limits.fullscreen) { showToast('Fullscreen je dostupan na PRO ili ELITE planu.', 'warning'); return; }
@@ -1605,15 +1695,31 @@
     ov.classList.add('open');
     ov.removeAttribute('aria-hidden');
 
+    /* Request native browser fullscreen so the overlay takes the ENTIRE screen
+       (no address bar, taskbar, browser chrome) — perfect for stream overlays */
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => {
+        nativeFSActive = true;
+        ov.classList.add('native-fs');
+      }).catch(() => {
+        /* Browser blocked native FS (e.g. no user gesture on load) — overlay mode still works */
+        nativeFSActive = false;
+      });
+    }
+
     setText('wfoPrizeText',        settings.prize || 'Misteriozna Nagrada');
     setText('wfoChannelName',      channelName || 'Kanal');
     setText('wfoParticipantCount', participantsMap.size);
     setText('wfoWinnersCount',     winnersList.length);
 
     updateStageFrames();
-    if (settings.animation === 'wheel')          drawWheelOnCanvas('wheelCanvasFullscreen');
-    else if (settings.animation === 'slot')      drawSlotPreview();
-    else if (settings.animation === 'roulette')  drawRoulettePreview();
+    /* Re-init HiDPI canvas after layout is stable */
+    requestAnimationFrame(() => {
+      initHiDPICanvas('wheelCanvasFullscreen');
+      if (settings.animation === 'wheel')         drawWheelOnCanvas('wheelCanvasFullscreen');
+      else if (settings.animation === 'slot')     drawSlotPreview();
+      else if (settings.animation === 'roulette') drawRoulettePreview();
+    });
 
     updateFullscreenStateBadge();
     updateActionStates();
@@ -1623,11 +1729,17 @@
     const ov = document.getElementById('wheelFullscreenOverlay');
     if (ov) {
       ov.classList.remove('open');
+      ov.classList.remove('native-fs');
       ov.setAttribute('aria-hidden', 'true');
       setTimeout(() => {
         if (!ov.classList.contains('open')) ov.style.display = 'none';
       }, 300);
     }
+    /* Exit native browser fullscreen if we triggered it */
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+    nativeFSActive = false;
   }
 
   function updateFullscreenStateBadge() {
@@ -1639,19 +1751,129 @@
     else { badge.textContent = 'Standby'; }
   }
 
+  /* Init HiDPI (Retina / 4K) canvas — scales backing store by devicePixelRatio
+     so text and arcs render crisply on high-density screens */
+  function initHiDPICanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const dpr  = window.devicePixelRatio || 1;
+    const wrap = canvas.parentElement;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    const size = Math.round(Math.min(rect.width || 680, rect.height || 680));
+    /* Only resize if needed to avoid re-triggering expensive redraws on every call */
+    if (canvas.width !== size * dpr || canvas.height !== size * dpr) {
+      canvas.width  = size * dpr;
+      canvas.height = size * dpr;
+      canvas.style.width  = size + 'px';
+      canvas.style.height = size + 'px';
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.scale(dpr, dpr);
+    }
+  }
+
   /* ════════════════════════════════════════
-     WEB AUDIO — Sound System
+     WEB AUDIO — Sound System & Master Gain
   ════════════════════════════════════════ */
   function getAudioCtx() {
     if (!audioCtx) {
-      try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      } catch (e) {
+        return null;
+      }
     }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
     return audioCtx;
   }
 
+  function getMasterGain() {
+    const ctx = getAudioCtx();
+    if (!ctx) return null;
+    if (!masterGainNode) {
+      try {
+        masterGainNode = ctx.createGain();
+        masterGainNode.gain.setValueAtTime(getVolume(), ctx.currentTime);
+        masterGainNode.connect(ctx.destination);
+      } catch (e) {
+        return ctx.destination;
+      }
+    }
+    return masterGainNode;
+  }
+
+  function updateMasterVolume() {
+    const vol = getVolume();
+    const ctx = getAudioCtx();
+    if (masterGainNode && ctx) {
+      try {
+        masterGainNode.gain.cancelScheduledValues(ctx.currentTime);
+        masterGainNode.gain.setValueAtTime(vol, ctx.currentTime);
+      } catch (e) { /* */ }
+    }
+  }
+
+  // Automatsko otključavanje Web Audio konteksta na bilo koji korisnički unos
+  const unlockAudio = () => {
+    try {
+      const ctx = getAudioCtx();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    } catch (e) { /* */ }
+  };
+  ['pointerdown', 'touchstart', 'mousedown', 'keydown'].forEach(evt => {
+    window.addEventListener(evt, unlockAudio, { passive: true });
+  });
+
   function getVolume() {
-    return settings.soundEnabled ? Math.max(0, Math.min(1, settings.volume)) : 0;
+    return settings.soundEnabled ? Math.max(0, Math.min(1, typeof settings.volume === 'number' ? settings.volume : 0.5)) : 0;
+  }
+
+  function playVolumePreviewTone() {
+    if (!settings.soundEnabled || settings.volume <= 0) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+
+    const doPlay = () => {
+      try {
+        const now = ctx.currentTime;
+        const master = getMasterGain() || ctx.destination;
+        updateMasterVolume();
+
+        // Dva prijatna, jasna tona (C5 -> E5) sa čistom melodijom
+        const notes = [523.25, 659.25];
+        notes.forEach((freq, idx) => {
+          const t = now + idx * 0.08;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, t);
+
+          gain.gain.setValueAtTime(0, t);
+          gain.gain.linearRampToValueAtTime(0.35, t + 0.015);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+
+          osc.connect(gain);
+          gain.connect(master);
+
+          osc.start(t);
+          osc.stop(t + 0.25);
+        });
+      } catch (e) { /* */ }
+    };
+
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(doPlay).catch(() => {});
+    } else {
+      doPlay();
+    }
   }
 
   function playSoundSpin(durationMs) {
@@ -1660,26 +1882,98 @@
     if (!ctx) return;
 
     stopSpinSound();
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(getVolume() * 0.25, ctx.currentTime);
-    gain.connect(ctx.destination);
+    const now = ctx.currentTime;
+    const master = getMasterGain() || ctx.destination;
+    updateMasterVolume();
+    const durSec = durationMs / 1000;
 
-    const osc = ctx.createOscillator();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(400, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + durationMs / 1000);
-    gain.gain.setTargetAtTime(0, ctx.currentTime + durationMs / 1000 * 0.85, 0.1);
+    const nodes = [];
 
-    osc.connect(gain);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + durationMs / 1000 + 0.15);
-    spinSoundNode = osc;
+    // ── 1. Napeti sub-bass drone sa pulsom (filmska tenzija) ────────────
+    const droneGain = ctx.createGain();
+    droneGain.gain.setValueAtTime(0, now);
+    droneGain.gain.linearRampToValueAtTime(0.38, now + 0.3);
+    droneGain.gain.setValueAtTime(0.38, now + durSec * 0.65);
+    droneGain.gain.linearRampToValueAtTime(0.48, now + durSec * 0.88);
+    droneGain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
+    droneGain.connect(master);
+
+    // Dva detunirana sine talasa za prirodan napeti puls (beating)
+    const osc1 = ctx.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(62, now);
+    osc1.frequency.linearRampToValueAtTime(80, now + durSec);
+    osc1.connect(droneGain);
+    osc1.start(now);
+    osc1.stop(now + durSec + 0.1);
+    nodes.push(osc1);
+
+    const osc2 = ctx.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(64.5, now);
+    osc2.frequency.linearRampToValueAtTime(82.5, now + durSec);
+    osc2.connect(droneGain);
+    osc2.start(now);
+    osc2.stop(now + durSec + 0.1);
+    nodes.push(osc2);
+
+    // ── 2. Dramatični uzlazni tension riser (građenje neizvesnosti) ───────
+    const riserGain = ctx.createGain();
+    riserGain.gain.setValueAtTime(0, now);
+    riserGain.gain.linearRampToValueAtTime(0.12, now + durSec * 0.25);
+    riserGain.gain.linearRampToValueAtTime(0.35, now + durSec * 0.88);
+    riserGain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
+    riserGain.connect(master);
+
+    const riserFilter = ctx.createBiquadFilter();
+    riserFilter.type = 'lowpass';
+    riserFilter.Q.setValueAtTime(4.0, now);
+    riserFilter.frequency.setValueAtTime(200, now);
+    riserFilter.frequency.exponentialRampToValueAtTime(1600, now + durSec * 0.92);
+
+    const riserOsc = ctx.createOscillator();
+    riserOsc.type = 'sawtooth';
+    riserOsc.frequency.setValueAtTime(130.81, now);
+    riserOsc.frequency.exponentialRampToValueAtTime(349.23, now + durSec * 0.92);
+    riserOsc.connect(riserFilter);
+    riserFilter.connect(riserGain);
+    riserOsc.start(now);
+    riserOsc.stop(now + durSec + 0.1);
+    nodes.push(riserOsc);
+
+    // ── 3. Brzi napeti otkucaji / puls srca koji ubrzava ka kraju ────────
+    const pulseInterval = 0.38;
+    const pulseCount = Math.floor(durSec / pulseInterval);
+    for (let i = 0; i < pulseCount; i++) {
+      const pTime = now + (i * pulseInterval * (1 - (i / pulseCount) * 0.28));
+      if (pTime >= now + durSec - 0.1) break;
+
+      const pGain = ctx.createGain();
+      pGain.gain.setValueAtTime(0, pTime);
+      pGain.gain.linearRampToValueAtTime(0.22 * (0.55 + 0.45 * (i / pulseCount)), pTime + 0.015);
+      pGain.gain.exponentialRampToValueAtTime(0.0001, pTime + 0.12);
+      pGain.connect(master);
+
+      const pOsc = ctx.createOscillator();
+      pOsc.type = 'triangle';
+      pOsc.frequency.setValueAtTime(130, pTime);
+      pOsc.frequency.exponentialRampToValueAtTime(45, pTime + 0.12);
+      pOsc.connect(pGain);
+      pOsc.start(pTime);
+      pOsc.stop(pTime + 0.13);
+      nodes.push(pOsc);
+    }
+
+    spinSoundNodes = nodes;
   }
 
   function stopSpinSound() {
-    if (spinSoundNode) {
-      try { spinSoundNode.stop(); } catch (e) { /* */ }
-      spinSoundNode = null;
+    if (spinSoundNodes && spinSoundNodes.length > 0) {
+      spinSoundNodes.forEach(n => {
+        try { n.stop(); } catch (e) { /* */ }
+        try { n.disconnect(); } catch (e) { /* */ }
+      });
+      spinSoundNodes = [];
     }
   }
 
@@ -1687,21 +1981,52 @@
     if (!getVolume()) return;
     const ctx = getAudioCtx();
     if (!ctx) return;
+    updateMasterVolume();
+    const now = ctx.currentTime;
+    const master = getMasterGain() || ctx.destination;
 
-    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98];
-    notes.forEach((freq, i) => {
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.09);
-      gain.gain.linearRampToValueAtTime(getVolume() * 0.45, ctx.currentTime + i * 0.09 + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.09 + 0.7);
-      gain.connect(ctx.destination);
+    // ── Cinematic sub-bass boom ──────────────────────────────────────────
+    const boomGain = ctx.createGain();
+    boomGain.gain.setValueAtTime(0, now);
+    boomGain.gain.linearRampToValueAtTime(0.8, now + 0.03);
+    boomGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+    boomGain.connect(master);
+    const boom = ctx.createOscillator();
+    boom.type = 'sine';
+    boom.frequency.setValueAtTime(65, now);
+    boom.frequency.exponentialRampToValueAtTime(28, now + 1.2);
+    boom.connect(boomGain);
+    boom.start(now); boom.stop(now + 1.25);
 
-      const osc = ctx.createOscillator();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.09);
-      osc.connect(gain);
-      osc.start(ctx.currentTime + i * 0.09);
-      osc.stop(ctx.currentTime + i * 0.09 + 0.75);
+    // ── Harmonious victory fanfare (pure crystalline tones) ─────────────
+    const fanfare = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093];
+    fanfare.forEach((freq, i) => {
+      const delay = 0.12 + i * 0.07;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now + delay);
+      g.gain.linearRampToValueAtTime(0.3, now + delay + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.8);
+      g.connect(master);
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, now + delay);
+      o.connect(g);
+      o.start(now + delay); o.stop(now + delay + 0.85);
+    });
+
+    // ── Final chord shimmer ───────────────────────────────────────────────
+    [1046.5, 1318.51, 1567.98].forEach((freq, i) => {
+      const t = now + 0.75 + i * 0.04;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.22, t + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
+      g.connect(master);
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, t);
+      o.connect(g);
+      o.start(t); o.stop(t + 1.55);
     });
   }
 
@@ -1709,21 +2034,36 @@
     if (!getVolume()) return;
     const ctx = getAudioCtx();
     if (!ctx) return;
+    updateMasterVolume();
+    const now = ctx.currentTime;
+    const master = getMasterGain() || ctx.destination;
 
-    const notes = [523.25, 659.25, 783.99, 1046.5];
-    notes.forEach((freq, i) => {
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.12);
-      gain.gain.linearRampToValueAtTime(getVolume() * 0.35, ctx.currentTime + i * 0.12 + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.5);
-      gain.connect(ctx.destination);
+    // ── Clean soft sub-impact ────────────────────────────────────────────
+    const impGain = ctx.createGain();
+    impGain.gain.setValueAtTime(0.6, now);
+    impGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    impGain.connect(master);
+    const impOsc = ctx.createOscillator();
+    impOsc.type = 'sine';
+    impOsc.frequency.setValueAtTime(85, now);
+    impOsc.frequency.exponentialRampToValueAtTime(35, now + 0.35);
+    impOsc.connect(impGain);
+    impOsc.start(now); impOsc.stop(now + 0.4);
 
-      const osc = ctx.createOscillator();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
-      osc.connect(gain);
-      osc.start(ctx.currentTime + i * 0.12);
-      osc.stop(ctx.currentTime + i * 0.12 + 0.55);
+    // ── Clean crystalline win chord (C5, E5, G5, B5, D6) ──────────────────
+    const chord = [523.25, 659.25, 783.99, 987.77, 1174.66];
+    chord.forEach((freq, i) => {
+      const delay = 0.06 + i * 0.05;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, now + delay);
+      g.gain.linearRampToValueAtTime(0.28, now + delay + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + delay + 1.1);
+      g.connect(master);
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(freq, now + delay);
+      o.connect(g);
+      o.start(now + delay); o.stop(now + delay + 1.15);
     });
   }
 
@@ -1731,16 +2071,31 @@
     if (!settings.soundEnabled || !getVolume()) return;
     const ctx = getAudioCtx();
     if (!ctx) return;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(getVolume() * 0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.06);
-    gain.connect(ctx.destination);
+    const now = ctx.currentTime;
+    const master = getMasterGain() || ctx.destination;
+
+    // Čist mehanički klik iglice (peg flapper)
     const osc = ctx.createOscillator();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.connect(gain);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.07);
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1400, now);
+    filter.Q.setValueAtTime(3, now);
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(160, now + 0.035);
+
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+
+    osc.start(now);
+    osc.stop(now + 0.04);
   }
 
   /* ════════════════════════════════════════
@@ -1774,10 +2129,25 @@
 
   async function connectKickChat() {
     if (kickWebSocket) { try { kickWebSocket.close(); } catch (e) { /* */ } kickWebSocket = null; }
-    if (!channelName) { showToast('Nije izabran Kick kanal!', 'warning'); return false; }
+    if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+
+    if (!channelName) {
+      showToast('Nije izabran Kick kanal! Kliknite na "Kanal" u meniju.', 'warning');
+      return false;
+    }
+
+    const cleanChannel = channelName.trim().toLowerCase();
+    if (cleanChannel === 'demo' || cleanChannel === 'demokanal') {
+      chatroomId = 999999;
+      showToast(`Korišćenje demo režima za kanal: ${channelName}`, 'info');
+      return true;
+    }
 
     if (!chatroomId) await resolveKickChatroom(channelName);
-    if (!chatroomId) { showToast(`Nije pronađen Chatroom ID za "${channelName}".`, 'error'); return false; }
+    if (!chatroomId) {
+      showToast(`Nije pronađen Chatroom ID za kanal "${channelName}". Proverite naziv kanala.`, 'error');
+      return false;
+    }
 
     return new Promise((resolve) => {
       let resolved = false;
@@ -1786,13 +2156,19 @@
           resolved = true;
           try { kickWebSocket?.close(); } catch (e) { /* */ }
           kickWebSocket = null;
-          showToast('Konekcija sa Kick chatom je istekla.', 'error');
+          showToast('Konekcija sa Kick chatom je istekla (timeout).', 'error');
           resolve(false);
         }
       }, 10000);
 
-      try { kickWebSocket = new WebSocket('wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false'); }
-      catch (e) { clearTimeout(timeout); showToast('Greška pri kreiranju WebSocket konekcije.', 'error'); resolve(false); return; }
+      try {
+        kickWebSocket = new WebSocket('wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false');
+      } catch (e) {
+        clearTimeout(timeout);
+        showToast('Greška pri kreiranju WebSocket konekcije.', 'error');
+        resolve(false);
+        return;
+      }
 
       kickWebSocket.onopen = () => {
         if (resolved) return;
@@ -1808,12 +2184,27 @@
         resolve(true);
       };
 
-      kickWebSocket.onerror = () => { if (!resolved) { resolved = true; clearTimeout(timeout); showToast('Smetnje pri povezivanju sa Kick live chatom.', 'error'); resolve(false); } };
+      kickWebSocket.onerror = () => {
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          showToast('Smetnje pri povezivanju sa Kick live chatom.', 'error');
+          resolve(false);
+        }
+      };
 
       kickWebSocket.onclose = () => {
-        if (pingInterval) clearInterval(pingInterval);
-        if (!resolved) { resolved = true; clearTimeout(timeout); resolve(false); }
-        else if (isRunning) { isRunning = false; updateStartButtonUI(); refreshAll(); showToast('Veza sa Kick chatom je prekinuta.', 'warning'); }
+        if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          resolve(false);
+        } else if (isRunning) {
+          isRunning = false;
+          updateStartButtonUI();
+          refreshAll();
+          showToast('Veza sa Kick chatom je prekinuta.', 'warning');
+        }
       };
 
       kickWebSocket.onmessage = (event) => {
@@ -1825,8 +2216,27 @@
             const text    = payload?.content || payload?.message;
             if (sender && text) {
               const badges = payload?.sender?.identity?.badges || payload?.sender?.badges || payload?.badges || [];
-              const isSub  = Array.isArray(badges) && badges.some(b => { const t = (typeof b === 'string' ? b : b.type || '').toLowerCase(); return t.includes('sub') || t.includes('founder'); });
-              processChatMessage({ username: sender, isSub, message: text });
+              let isSub = false;
+              let subMonths = 0;
+              if (Array.isArray(badges)) {
+                for (const b of badges) {
+                  const t = (typeof b === 'string' ? b : b.type || '').toLowerCase();
+                  if (t.includes('sub') || t.includes('founder')) {
+                    isSub = true;
+                    if (typeof b.count === 'number') subMonths = Math.max(subMonths, b.count);
+                    else if (typeof b.months === 'number') subMonths = Math.max(subMonths, b.months);
+                    else if (typeof b.text === 'string') {
+                      const m = b.text.match(/(\d+)/);
+                      if (m) subMonths = Math.max(subMonths, parseInt(m[1], 10));
+                    }
+                    if (subMonths === 0) subMonths = 1;
+                  }
+                }
+              }
+              if (window.handleWinnerChatMessage) {
+                window.handleWinnerChatMessage(sender, text);
+              }
+              processChatMessage({ username: sender, isSub, subMonths, message: text });
             }
           }
         } catch (e) { /* */ }
@@ -1837,29 +2247,51 @@
   /* ════════════════════════════════════════
      GIVEAWAY CONTROL
   ════════════════════════════════════════ */
+  function setStartButtonsConnecting(loading) {
+    const startBtn    = document.getElementById('btnStartGiveaway');
+    const wfoStartBtn = document.getElementById('wfoBtnStart');
+    [startBtn, wfoStartBtn].forEach(btn => {
+      if (!btn) return;
+      btn.disabled = loading;
+      if (loading) {
+        btn.innerHTML = `<svg class="spinner-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10"/></svg><span>Povezivanje...</span>`;
+        btn.style.opacity = '0.75';
+      } else {
+        btn.style.opacity = '1';
+      }
+    });
+  }
+
   async function toggleStart() {
+    if (isSpinning) {
+      showToast('Izvlačenje je u toku, sačekajte da se završi.', 'warning');
+      return;
+    }
     if (isConnecting) return;
+
     if (isRunning) {
       isRunning = false;
       try { kickWebSocket?.close(); } catch (e) { /* */ }
       kickWebSocket = null;
+      if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
       updateStartButtonUI();
       showToast('Prijave iz chata su pauzirane.', 'info');
     } else {
       isConnecting = true;
-      const btn = document.getElementById('btnStartGiveaway');
-      if (btn) { btn.disabled = true; btn.innerHTML = '<span>Povezivanje...</span>'; }
+      setStartButtonsConnecting(true);
 
       const ok = await connectKickChat();
       isConnecting = false;
-      if (btn) btn.disabled = false;
+      setStartButtonsConnecting(false);
 
       if (ok) {
         isRunning = true;
-        showToast(`Giveaway počeo! Nagrada: ${settings.prize || 'Misteriozna Nagrada'}`, 'success');
+        showToast(`Giveaway je aktivan! Prijave iz chata su otvorene.`, 'success');
+        if (settings.announceStart) {
+          sendGiveawayStartAnnouncement();
+        }
       } else {
         isRunning = false;
-        showToast('Giveaway NIJE pokrenut jer chat nije povezan.', 'error');
       }
       updateStartButtonUI();
     }
@@ -1898,9 +2330,11 @@
     const names   = ['Gamer_SRB','KickMaster99','BalkanStreamer','Legendara','CoolViewer','Watcher_42','TopFan','LiveKing'];
     const name    = names[Math.floor(Math.random() * names.length)] + '_' + Math.floor(Math.random() * 90 + 10);
     const isSub   = Math.random() > 0.4;
+    const subMonths = isSub ? (settings.subDuration > 0 ? settings.subDuration + Math.floor(Math.random() * 5) : Math.floor(Math.random() * 12 + 1)) : 0;
+    const followDays = settings.followDuration > 0 ? settings.followDuration + Math.floor(Math.random() * 30) : Math.floor(Math.random() * 60);
     const kw      = settings.keyword ? settings.keyword + ' ' : '';
-    processChatMessage({ username: name, isSub, message: kw + 'test' }, true);
-    showToast(`Test prijava: ${name} (${isSub ? 'SUB' : 'FREE'})`, 'info');
+    processChatMessage({ username: name, isSub, subMonths, followDays, message: kw + 'test' }, true);
+    showToast(`Test prijava: ${name} (${isSub ? `SUB ${subMonths}m` : 'FREE'})`, 'info');
   }
 
   function processChatMessage(user, isTest = false) {
@@ -1908,6 +2342,8 @@
 
     if (settings.keyword && !user.message.toLowerCase().includes(settings.keyword.toLowerCase())) return;
     if (settings.subscribersOnly && !user.isSub) return;
+    if (settings.subDuration > 0 && (!user.isSub || (user.subMonths || 0) < settings.subDuration)) return;
+    if (settings.followDuration > 0 && typeof user.followDays === 'number' && user.followDays < settings.followDuration) return;
 
     const key = user.username.toLowerCase();
     if (participantsMap.has(key)) return;
@@ -1957,18 +2393,32 @@
   }
 
   function resetGiveaway() {
-    isRunning = false;
+    if (participantsMap.size > 0 || winnersList.length > 0 || isSpinning) {
+      if (!confirm('Da li ste sigurni da želite da resetujete celo giveaway izvlačenje? Ovo će obrisati sve prijavljene učesnike i pobednike.')) {
+        return;
+      }
+    }
+
+    currentSpinId++; // Momentalno prekida bilo koju animaciju izvlačenja u toku
     isSpinning = false;
+    isRunning  = false;
     stopSpinSound();
+
     try { kickWebSocket?.close(); } catch (e) { /* */ }
     kickWebSocket = null;
     if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+
     participantsMap.clear();
     winnersList.forEach(w => { if (w.timerId) clearInterval(w.timerId); });
     winnersList = [];
     wheelAngle  = 0;
-    settings.prize = '';
-    setVal('inputPrize', '');
+
+    // Reset visual stage components
+    drawSlotPreview();
+    drawRoulettePreview();
+    drawWheelOnCanvas('wheelCanvas');
+    drawWheelOnCanvas('wheelCanvasFullscreen');
+
     updateStartButtonUI();
     
     // Ukloni stanje za trenutni kanal
@@ -1981,7 +2431,7 @@
     updateWinnersUI();
     drawVisualizerStage();
     refreshAll();
-    showToast('Giveaway je uspešno resetovan.', 'success');
+    showToast('Giveaway je uspešno resetovan na početno stanje.', 'success');
   }
 
   /* ════════════════════════════════════════
@@ -2033,6 +2483,69 @@
   };
 
   /* ════════════════════════════════════════
+     KICKOT CHAT ANNOUNCEMENTS
+  ════════════════════════════════════════ */
+  async function sendKickChatMessage(messageText) {
+    if (!messageText || !chatroomId) return;
+    try {
+      const targetChatroomId = String(chatroomId);
+      const targetChannelName = String(channelName || '').trim();
+      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const payload = {
+        chatroom_id: targetChatroomId,
+        channel_username: targetChannelName,
+        message: messageText
+      };
+
+      if (isLocalhost) {
+        const kickApiBase = getBotApiBase();
+        const targetUrl = `${kickApiBase}/api/kick/send-message`;
+        const secret = localStorage.getItem('internal_api_secret') || '';
+        const headers = { 'Content-Type': 'application/json' };
+        if (secret) headers['x-internal-token'] = secret;
+        fetch(targetUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        }).catch(err => {
+          console.warn('[Kickaj] Chat announce local send error:', err);
+        });
+      } else {
+        fetch('/api/kick/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(err => {
+          console.warn('[Kickaj] Chat announce proxy send error:', err);
+        });
+      }
+    } catch (err) {
+      console.warn('[Kickaj] Failed to dispatch chat announcement:', err);
+    }
+  }
+
+  function sendGiveawayStartAnnouncement() {
+    const prizeText = (settings.prize && settings.prize.trim() && settings.prize !== 'Misteriozna Nagrada')
+      ? ` | Nagrada: ${settings.prize.trim()}`
+      : '';
+    const kwText = (settings.keyword && settings.keyword.trim())
+      ? `Upišite "${settings.keyword.trim()}" u chat za prijavu!`
+      : 'Napišite poruku u chat za učešće!';
+    const subOnlyText = settings.subscribersOnly ? ' (Samo za subskrajbere)' : '';
+    const msg = `[GIVEAWAY] Prijave su otvorene!${prizeText} ${kwText}${subOnlyText}`;
+    sendKickChatMessage(msg);
+    showToast('KickOT je poslao najavu početka giveaway-a u chat.', 'info');
+  }
+
+  function sendGiveawayWinnerAnnouncement(winnerName, prizeName, confirmSec) {
+    const cleanName = String(winnerName || '').trim().replace(/^@/, '');
+    const cleanPrize = (prizeName && prizeName !== 'Misteriozna Nagrada') ? ` za nagradu: ${prizeName}!` : '!';
+    const msg = `[POBEDNIK] Čestitamo @${cleanName}${cleanPrize} Javi se u chat u roku od ${confirmSec}s za potvrdu!`;
+    sendKickChatMessage(msg);
+    showToast(`KickOT je objavio pobednika @${cleanName} u chat.`, 'info');
+  }
+
+  /* ════════════════════════════════════════
      WINNERS UI & TIMER MANAGEMENT
   ════════════════════════════════════════ */
   function addWinner(username) {
@@ -2067,11 +2580,100 @@
     }
     
     showWinnerOverlay(username, prizeName, initSec, isTop5, isFinalChamp);
+
+    if (settings.announceWinner) {
+      sendGiveawayWinnerAnnouncement(username, prizeName, initSec);
+    }
   }
 
   /* ── Winner Reveal Overlay ── */
   let overlayTimerId = null;
   let particleAnimId = null;
+  let activeWinnerUsername = null;
+  let testMsgIndex = 0;
+  const sampleTestMsgs = [
+    'tu sam',
+    'hvala puno!',
+    'kad stize nagrada?',
+    'top giveaway brate!',
+    'gledam stream stalno'
+  ];
+
+  window.handleWinnerChatMessage = function (sender, text) {
+    if (!activeWinnerUsername) return;
+    const s1 = String(sender).trim().toLowerCase().replace(/^@/, '');
+    const s2 = String(activeWinnerUsername).trim().toLowerCase().replace(/^@/, '');
+    if (s1 === s2) {
+      // 1. Sakrij tajmer za potvrdu i zaustavi interval
+      const timerBar = document.getElementById('winnerRevealTimerBarWrap');
+      const lbl = document.getElementById('winnerRevealTimerLabel');
+      if (timerBar) timerBar.style.display = 'none';
+      if (lbl) lbl.style.display = 'none';
+      if (overlayTimerId) {
+        clearInterval(overlayTimerId);
+        overlayTimerId = null;
+      }
+
+      // Potvrdi pobednika i zaustavi tajmer u listi
+      const winObj = winnersList.find(w => String(w.username).toLowerCase().replace(/^@/, '') === s1);
+      if (winObj) {
+        winObj.isConfirmed = true;
+        if (winObj.timerId) {
+          clearInterval(winObj.timerId);
+          winObj.timerId = null;
+        }
+        updateWinnersUI();
+        saveState();
+      }
+
+      // 2. Potpuno skloni loading tačkice
+      const box = document.getElementById('winnerRevealChatlogBox');
+      const dots = document.getElementById('winnerChatlogDots');
+      const content = document.getElementById('winnerChatlogContent');
+      if (box) box.classList.add('has-messages');
+      if (dots) dots.style.setProperty('display', 'none', 'important');
+
+      // 3. Prikazuj sve poruke u listi sa skrolovanjem
+      if (content) {
+        content.style.setProperty('display', 'flex', 'important');
+        const row = document.createElement('div');
+        row.className = 'winner-chat-row';
+        row.innerHTML = `<span class="winner-chat-user">${escHtml(sender)}:</span> <span class="winner-chat-text">${escHtml(text)}</span>`;
+        content.appendChild(row);
+        content.scrollTop = content.scrollHeight;
+      }
+
+      showToast(`Pobednik @${sender} se javio u chatu!`, 'success');
+    }
+  };
+
+  window.testWinnerChat = function (customMsg) {
+    const msg = customMsg || sampleTestMsgs[testMsgIndex % sampleTestMsgs.length];
+    testMsgIndex++;
+    if (activeWinnerUsername) {
+      window.handleWinnerChatMessage(activeWinnerUsername, msg);
+    } else if (winnersList.length > 0) {
+      window.handleWinnerChatMessage(winnersList[0].username, msg);
+    }
+  };
+
+  window.confirmActiveWinner = function () {
+    if (activeWinnerUsername) {
+      const cleanTarget = activeWinnerUsername.toLowerCase().replace(/^@/, '');
+      const winObj = winnersList.find(w => String(w.username).toLowerCase().replace(/^@/, '') === cleanTarget);
+      if (winObj) {
+        winObj.isConfirmed = true;
+        if (winObj.timerId) {
+          clearInterval(winObj.timerId);
+          winObj.timerId = null;
+        }
+      }
+      showToast(`Pobednik @${activeWinnerUsername} je potvrđen!`, 'success');
+    }
+    window.closeWinnerOverlay();
+    updateWinnersUI();
+    saveState();
+  };
 
   function showWinnerOverlay(username, prize, confirmSec, isTop5, isFinalChamp) {
     const ov   = document.getElementById('winnerRevealOverlay');
@@ -2079,10 +2681,14 @@
     const pt   = document.getElementById('winnerRevealPrizeText');
     const fill = document.getElementById('winnerRevealTimerFill');
     const lbl  = document.getElementById('winnerRevealTimerLabel');
+    const timerBar = document.getElementById('winnerRevealTimerBarWrap');
     const top5Badge = document.getElementById('winnerTop5Badge');
     if (!ov) return;
 
     const winnerUser = (username || 'Pobednik').trim();
+    activeWinnerUsername = winnerUser.replace(/^@/, '');
+    testMsgIndex = 0;
+
     if (name) {
       name.textContent = winnerUser.startsWith('@') ? winnerUser : '@' + winnerUser;
       name.style.display = 'block';
@@ -2091,12 +2697,36 @@
       name.style.color = '#ffffff';
     }
     if (pt) pt.textContent = prize || 'Misteriozna Nagrada';
-    if (lbl) lbl.textContent = `${confirmSec}s za potvrdu`;
-    if (fill) fill.style.width = '100%';
+
+    // Prikazi i inicijalizuj tajmer
+    if (timerBar) timerBar.style.display = 'block';
+    if (lbl) {
+      lbl.style.display = 'block';
+      lbl.textContent = `${confirmSec}s za potvrdu`;
+    }
+
+    if (fill) {
+      fill.style.setProperty('transition', 'none', 'important');
+      fill.style.setProperty('width', '100%', 'important');
+      void fill.offsetWidth;
+      fill.style.setProperty('transition', 'width 0.1s linear', 'important');
+    }
+
+    // Resetuj chat box na pulsirajuće tačkice bez starih poruka
+    const box = document.getElementById('winnerRevealChatlogBox');
+    const dots = document.getElementById('winnerChatlogDots');
+    const content = document.getElementById('winnerChatlogContent');
+    if (box) box.classList.remove('has-messages');
+    if (dots) dots.style.setProperty('display', 'flex', 'important');
+    if (content) {
+      content.style.setProperty('display', 'none', 'important');
+      content.innerHTML = '';
+    }
 
     if (top5Badge) {
       if (isFinalChamp) top5Badge.textContent = 'KONAČNI ŠAMPION';
       else if (isTop5)  top5Badge.textContent = 'TOP 5 POBEDNIK';
+      else if (settings.numWinners > 1) top5Badge.textContent = `POBEDNIK (${winnersList.length} OD ${settings.numWinners})`;
       else              top5Badge.textContent = 'POBEDNIK GIVEAWAYA';
     }
 
@@ -2107,15 +2737,29 @@
     ov.classList.add('open');
 
     if (overlayTimerId) { clearInterval(overlayTimerId); overlayTimerId = null; }
-    let rem = confirmSec;
+    const startTs  = Date.now();
+    const totalMs  = confirmSec * 1000;
+    let   lastSec  = confirmSec;
+
     const tick = () => {
-      rem--;
-      const pct = Math.max(0, (rem / confirmSec) * 100);
-      if (fill) fill.style.width = pct + '%';
-      if (lbl)  lbl.textContent  = rem > 0 ? `${rem}s za potvrdu` : 'Vreme isteklo';
-      if (rem <= 0) { clearInterval(overlayTimerId); overlayTimerId = null; }
+      const remMs  = Math.max(0, totalMs - (Date.now() - startTs));
+      const pct    = Math.max(0, Math.min(100, (remMs / totalMs) * 100));
+      if (fill) fill.style.setProperty('width', pct + '%', 'important');
+
+      const remSec = Math.ceil(remMs / 1000);
+      if (remSec !== lastSec) {
+        lastSec = remSec;
+        if (lbl) lbl.textContent = remSec > 0 ? `${remSec}s za potvrdu` : 'Vreme isteklo';
+      }
+
+      if (remMs <= 0) {
+        clearInterval(overlayTimerId);
+        overlayTimerId = null;
+        if (fill) fill.style.setProperty('width', '0%', 'important');
+        if (lbl)  lbl.textContent  = 'Vreme isteklo';
+      }
     };
-    overlayTimerId = setInterval(tick, 1000);
+    overlayTimerId = setInterval(tick, 100);
 
     startParticles(isTop5, isFinalChamp);
 
@@ -2127,6 +2771,7 @@
     const ov = document.getElementById('winnerRevealOverlay');
     if (ov) { ov.classList.remove('open'); }
     if (overlayTimerId) { clearInterval(overlayTimerId); overlayTimerId = null; }
+    activeWinnerUsername = null;
     stopParticles();
   };
 
@@ -2263,27 +2908,37 @@
     if (count === 0) { container.innerHTML = '<div class="list-empty">Pobednici će se pojaviti ovde nakon izvlačenja.</div>'; return; }
 
     const trophySvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--aj-amber)" stroke-width="2.5"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>`;
-    const giftSvg   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--aj-green)" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`;
+    // Gift sa mašnom na vrhu
+    const giftSvg = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--aj-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="9" width="20" height="4" rx="1"/>
+      <rect x="4" y="13" width="16" height="9" rx="1"/>
+      <line x1="12" y1="9" x2="12" y2="22"/>
+      <path d="M12 9C12 9 9 5 7 5C5.3 5 4 6.3 4 8C4 9.7 6 9 8 8C10 7 12 9 12 9Z" fill="var(--aj-green)" fill-opacity="0.25"/>
+      <path d="M12 9C12 9 15 5 17 5C18.7 5 20 6.3 20 8C20 9.7 18 9 16 8C14 7 12 9 12 9Z" fill="var(--aj-green)" fill-opacity="0.25"/>
+    </svg>`;
 
     let html = '';
     winnersList.forEach((w, idx) => {
       const cleanId = String(w.username).replace(/[^a-zA-Z0-9_-]/g, '');
       const total = w.initialConfirmSeconds || settings.confirmTime || 60;
-      const isExp = !!w.isExpired || w.confirmSeconds <= 0;
-      const pct = isExp ? 0 : Math.max(0, (w.confirmSeconds / total) * 100);
+      const isConf = !!w.isConfirmed;
+      const isExp = !isConf && (!!w.isExpired || w.confirmSeconds <= 0);
+      const pct = isConf ? 100 : (isExp ? 0 : Math.max(0, (w.confirmSeconds / total) * 100));
+      const timerText = isConf ? 'Potvrdjeno' : (isExp ? 'Isteklo' : `${w.confirmSeconds}s`);
+      const timerClass = isConf ? 'winner-timer is-confirmed' : (isExp ? 'winner-timer is-expired' : 'winner-timer');
       html += `
-        <div class="winner-card-item">
+        <div class="winner-card-item${isConf ? ' is-winner-confirmed' : ''}">
           <div class="winner-name-row">
             <div class="winner-name">${trophySvg}<span>${escHtml(w.username)}</span></div>
             <div class="winner-name-right">
-              <span class="winner-timer ${isExp ? 'is-expired' : ''}" id="w-timer-${cleanId}">${isExp ? 'Isteklo' : `${w.confirmSeconds}s`}</span>
+              <span class="${timerClass}" id="w-timer-${cleanId}">${timerText}</span>
               <button type="button" class="winner-remove-btn" onclick="window.removeWinner(${idx})" title="Obriši ovog pobednika">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
           </div>
           <div class="winner-prize-tag">${giftSvg} <span>Nagrada: <strong>${escHtml(w.prize)}</strong></span></div>
-          <div class="timer-bar-wrap"><div class="timer-bar-fill ${isExp ? 'is-expired' : ''}" id="w-bar-${cleanId}" style="width:${pct}%;"></div></div>
+          <div class="timer-bar-wrap"><div class="timer-bar-fill ${isConf ? 'is-confirmed' : (isExp ? 'is-expired' : '')}" id="w-bar-${cleanId}" style="width:${pct}%;"></div></div>
         </div>`;
     });
     container.innerHTML = html;
@@ -2364,14 +3019,29 @@
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
     const ctx    = canvas.getContext('2d');
-    const W      = canvas.width;
-    const H      = canvas.height;
-    const cx     = W / 2;
-    const cy     = H / 2;
-    const r      = Math.min(W, H) / 2 - 10;
+    /* Always draw in CSS pixel space.
+       - If initHiDPICanvas was called, canvas.width = cssSize * dpr, ctx already has a cumulative scale.
+         We must NOT apply it again — just use cssSize directly.
+       - If initHiDPICanvas was NOT called (e.g. regular wheelCanvas on page load),
+         canvas.width === canvas.clientWidth (1:1), DPR doesn't matter.
+       Strategy: compute CSS display size from style/clientWidth, use that for all coords.  */
+    const cssW   = canvas.clientWidth  || canvas.width;
+    const cssH   = canvas.clientHeight || canvas.height;
+    /* Scale backing store once — idempotent: if canvas is already correctly sized, does nothing */
+    const dpr    = window.devicePixelRatio || 1;
+    const bsW    = Math.round(cssW * dpr);
+    const bsH    = Math.round(cssH * dpr);
+    if (canvas.width !== bsW || canvas.height !== bsH) {
+      canvas.width  = bsW;
+      canvas.height = bsH;
+    }
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, cssW, cssH);
+    const cx     = cssW / 2;
+    const cy     = cssH / 2;
+    const r      = Math.min(cssW, cssH) / 2 - 10;
     const pool   = getPoolList();
-
-    ctx.clearRect(0, 0, W, H);
 
     if (pool.length === 0) {
       ctx.beginPath();
@@ -2386,6 +3056,7 @@
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(isRunning ? 'Čekanje poruka iz chata...' : 'Pokreni giveaway...', cx, cy);
+      ctx.restore(); /* DPR scale restore — early return path */
       return;
     }
 
@@ -2443,50 +3114,109 @@
     ctx.fillText('IZVUCI', 0, 1);
     ctx.restore();
 
-    ctx.restore();
+    ctx.restore(); /* translate+rotate restore (inner save) */
+    ctx.restore(); /* DPR scale restore (outer save) */
   }
 
-  /* ── Slot Draw ── */
+  /* ── Slot Draw Preview ── */
   function drawSlotPreview(text = null) {
     const pool = getPoolList();
-    const reelSets = [
-      [document.getElementById('slotReel1'), document.getElementById('slotReel2'), document.getElementById('slotReel3'), document.getElementById('slotWinText')],
-      [document.getElementById('slotReel1Fullscreen'), document.getElementById('slotReel2Fullscreen'), document.getElementById('slotReel3Fullscreen'), document.getElementById('slotWinTextFullscreen')]
+    const reelContainers = [
+      { r1: document.getElementById('slotReel1'), r2: document.getElementById('slotReel2'), r3: document.getElementById('slotReel3'), wt: document.getElementById('slotWinText') },
+      { r1: document.getElementById('slotReel1Fullscreen'), r2: document.getElementById('slotReel2Fullscreen'), r3: document.getElementById('slotReel3Fullscreen'), wt: document.getElementById('slotWinTextFullscreen') }
     ];
 
-    reelSets.forEach(([r1, r2, r3, wt]) => {
+    reelContainers.forEach(({ r1, r2, r3, wt }) => {
+      const reels = [r1, r2, r3];
       if (pool.length === 0) {
-        [r1, r2, r3].forEach(r => { if (r) r.innerHTML = '<div class="slot-symbol">---</div>'; });
-        if (wt) wt.textContent = 'Čekanje učesnika...';
+        reels.forEach(r => {
+          if (!r) return;
+          r.classList.remove('reel-locked');
+          r.innerHTML = `
+            <div class="slot-reel-track" style="transform:translate3d(0,0,0);">
+              <div class="slot-symbol">---</div>
+              <div class="slot-symbol payline-active">Čekanje...</div>
+              <div class="slot-symbol">---</div>
+            </div>`;
+        });
+        if (wt) { wt.textContent = 'Čekanje učesnika...'; wt.className = 'slot-win-display'; }
         return;
       }
-      const sample = text || pool[0];
-      [r1, r2, r3].forEach(r => { if (r) r.innerHTML = `<div class="slot-symbol">${escHtml(sample)}</div>`; });
-      if (wt) wt.textContent = text ? `Izvučen: ${text}` : `Spremno (${pool.length} šanse)`;
+
+      if (text) {
+        reels.forEach((r, idx) => {
+          if (!r) return;
+          r.classList.add('reel-locked');
+          const above = pool[(idx * 2) % pool.length] || '---';
+          const below = pool[(idx * 2 + 1) % pool.length] || '---';
+          r.innerHTML = `
+            <div class="slot-reel-track" style="transform:translate3d(0,0,0);">
+              <div class="slot-symbol">${escHtml(above)}</div>
+              <div class="slot-symbol payline-active win-reel">${escHtml(text)}</div>
+              <div class="slot-symbol">${escHtml(below)}</div>
+            </div>`;
+        });
+        if (wt) { wt.textContent = `JACKPOT: ${text}!`; wt.className = 'slot-win-display is-jackpot'; }
+      } else {
+        reels.forEach((r, idx) => {
+          if (!r) return;
+          r.classList.remove('reel-locked');
+          const p1 = pool[(idx * 3) % pool.length];
+          const p2 = pool[(idx * 3 + 1) % pool.length];
+          const p3 = pool[(idx * 3 + 2) % pool.length];
+          r.innerHTML = `
+            <div class="slot-reel-track" style="transform:translate3d(0,0,0);">
+              <div class="slot-symbol">${escHtml(p1)}</div>
+              <div class="slot-symbol payline-active">${escHtml(p2)}</div>
+              <div class="slot-symbol">${escHtml(p3)}</div>
+            </div>`;
+        });
+        if (wt) { wt.textContent = `Spremno (${pool.length} šanse)`; wt.className = 'slot-win-display'; }
+      }
     });
   }
 
-  /* ── Roulette Draw ── */
+  /* ── Roulette Draw Preview ── */
   function drawRoulettePreview(highlightName = null) {
     const pool = getPoolList();
     const strips = [document.getElementById('rouletteStrip'), document.getElementById('rouletteStripFullscreen')];
 
     strips.forEach(strip => {
       if (!strip) return;
-      if (pool.length === 0) { strip.innerHTML = '<div class="roulette-card">Čekanje učesnika...</div>'; return; }
+      if (pool.length === 0) {
+        strip.style.transform = 'translate3d(0,0,0)';
+        strip.innerHTML = '<div class="roulette-card"><span class="roulette-card-name">Čekanje učesnika...</span></div>';
+        return;
+      }
 
-      const display = pool.slice(0, 24);
+      // Generate 24 cards for preview
+      let display = pool.slice(0, 32);
+      while (display.length < 24) display = [...display, ...pool].slice(0, 24);
+
       let html = '';
+      let highlightIdx = -1;
       display.forEach((name, i) => {
-        const isW  = highlightName && name === highlightName;
-        const col  = SLICE_COLORS[i % SLICE_COLORS.length];
-        html += `<div class="roulette-card ${isW ? 'winner-card-active' : ''}" style="border-top:3px solid ${col}"><span>${escHtml(name)}</span></div>`;
+        const isW = highlightName && name === highlightName && highlightIdx === -1;
+        if (isW) highlightIdx = i;
+        const col = SLICE_COLORS[i % SLICE_COLORS.length];
+        const initial = name.charAt(0).toUpperCase();
+        html += `
+          <div class="roulette-card${isW ? ' winner-card-active' : ''}">
+            <div class="roulette-card-bar" style="background:${col};"></div>
+            <div class="roulette-card-avatar" style="border-color:${col}; color:${col};">${escHtml(initial)}</div>
+            <span class="roulette-card-name">${escHtml(name)}</span>
+          </div>`;
       });
       strip.innerHTML = html;
 
-      if (highlightName) {
-        const winCard = strip.querySelector('.winner-card-active');
-        if (winCard) winCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      if (highlightIdx !== -1) {
+        const cardPitch = 152;
+        const viewportW = strip.parentElement.clientWidth || 600;
+        const cardCenter = highlightIdx * cardPitch + 70;
+        const targetX = Math.max(0, cardCenter - (viewportW / 2));
+        strip.style.transform = `translate3d(-${targetX}px,0,0)`;
+      } else {
+        strip.style.transform = 'translate3d(0,0,0)';
       }
     });
   }
@@ -2495,25 +3225,39 @@
      DRAW WINNER
   ════════════════════════════════════════ */
   function triggerDraw() {
-    const pool = getPoolList();
-    if (pool.length === 0) { showToast('Nema učesnika za izvlačenje!', 'error'); return; }
     if (isSpinning) return;
+
+    const pool = getPoolList();
+    if (pool.length === 0) {
+      showToast('Nema učesnika za izvlačenje! Sačekajte prijavu gledalaca iz chata.', 'warning');
+      return;
+    }
+
+    if (settings.numWinners > 0 && winnersList.length >= settings.numWinners) {
+      showToast(`Već je izvučeno svih ${settings.numWinners} pobednika! Povećajte "Broj pobednika" u podešavanjima ako želite još.`, 'warning');
+      return;
+    }
+
     isSpinning = true;
+    const spinId = ++currentSpinId;
     refreshAll();
 
     const durMs = settings.spinTime * 1000;
     playSoundSpin(durMs);
 
-    if (settings.animation === 'slot')          animateSlotDraw(pool, durMs);
-    else if (settings.animation === 'roulette') animateRouletteDraw(pool, durMs);
-    else                                         animateWheelDraw(pool, durMs);
+    if (settings.animation === 'slot')          animateSlotDraw(pool, durMs, spinId);
+    else if (settings.animation === 'roulette') animateRouletteDraw(pool, durMs, spinId);
+    else                                         animateWheelDraw(pool, durMs, spinId);
   }
 
-  function animateWheelDraw(pool, durMs) {
+  function animateWheelDraw(pool, durMs, spinId) {
     const extraSpins = 6 + Math.floor(Math.random() * 3);
     const sliceAngle = (Math.PI * 2) / pool.length;
     const winIdx = Math.floor(Math.random() * pool.length);
-    const targetOffset = (Math.PI * 1.5) - (winIdx + 0.5) * sliceAngle;
+    // Strelica staje na potpuno nasumičnoj poziciji od 4% do 96% unutar segmenta — može stati tik uz samu iglicu za maksimalnu tenziju!
+    const landOffset = 0.04 + Math.random() * 0.92;
+    const targetOffset = (Math.PI * 1.5) - (winIdx + landOffset) * sliceAngle;
+
     const finalNormalized = ((targetOffset % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
 
     const currentNorm = ((wheelAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -2527,14 +3271,10 @@
     let lastTick = 0;
 
     function frame(now) {
+      if (spinId !== currentSpinId || !isSpinning) return;
+
       const t = Math.min((now - startTime) / durMs, 1);
-      let ease;
-      if (t < 0.15) {
-        ease = 0.5 * Math.pow(t / 0.15, 2) * 0.15;
-      } else {
-        const t2 = (t - 0.15) / 0.85;
-        ease = 0.01125 + 0.98875 * (1 - Math.pow(1 - t2, 3.5));
-      }
+      const ease = 1 - Math.pow(1 - t, 4);
 
       wheelAngle = startAngle + (targetAngle - startAngle) * ease;
       drawWheelOnCanvas('wheelCanvas');
@@ -2548,6 +3288,7 @@
       if (t < 1) {
         requestAnimationFrame(frame);
       } else {
+        if (spinId !== currentSpinId || !isSpinning) return;
         wheelAngle = targetAngle;
         drawWheelOnCanvas('wheelCanvas');
         drawWheelOnCanvas('wheelCanvasFullscreen');
@@ -2565,34 +3306,132 @@
     requestAnimationFrame(frame);
   }
 
-  function animateSlotDraw(pool, durMs) {
-    const r1 = document.getElementById('slotReel1');
-    const r2 = document.getElementById('slotReel2');
-    const r3 = document.getElementById('slotReel3');
-    const wt = document.getElementById('slotWinText');
-    const winner    = pool[Math.floor(Math.random() * pool.length)];
+  /* ── Slot Machine Draw Animation ── */
+  function animateSlotDraw(pool, durMs, spinId) {
+    const winner = pool[Math.floor(Math.random() * pool.length)];
+    const reelGroups = [
+      { r1: document.getElementById('slotReel1'), r2: document.getElementById('slotReel2'), r3: document.getElementById('slotReel3'), wt: document.getElementById('slotWinText') },
+      { r1: document.getElementById('slotReel1Fullscreen'), r2: document.getElementById('slotReel2Fullscreen'), r3: document.getElementById('slotReel3Fullscreen'), wt: document.getElementById('slotWinTextFullscreen') }
+    ];
+
+    const pickOther = (exclude) => {
+      const candidates = pool.filter(p => p !== exclude);
+      return candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : pool[0];
+    };
+
+    // Dinamički broj rotacija po reel-u za svako pojedinačno izvlačenje
+    const stopIndices = [
+      22 + Math.floor(Math.random() * 8),
+      30 + Math.floor(Math.random() * 8),
+      38 + Math.floor(Math.random() * 8)
+    ];
+
+    // Organski mehanički offset za svaki reel (od -7px do +7px) da ne staju neprirodno u sterilni centar
+    const reelJitters = [
+      (Math.random() - 0.5) * 14,
+      (Math.random() - 0.5) * 14,
+      (Math.random() - 0.5) * 14
+    ];
+
+    const reelStripsData = stopIndices.map((targetIdx) => {
+      const items = [];
+      for (let i = 0; i < targetIdx - 1; i++) {
+        items.push(pool[Math.floor(Math.random() * pool.length)]);
+      }
+      items.push(pickOther(winner)); // targetIdx - 1 (iznad: zamalo!)
+      items.push(winner);            // targetIdx (pobednik na payline-u!)
+      items.push(pickOther(winner)); // targetIdx + 1 (ispod: zamalo!)
+      items.push(pool[Math.floor(Math.random() * pool.length)]);
+      items.push(pool[Math.floor(Math.random() * pool.length)]);
+      return { targetIdx, items };
+    });
+
+    const reelInstances = [];
+    reelGroups.forEach(({ r1, r2, r3, wt }) => {
+      if (wt) { wt.textContent = 'Slot se vrti...'; wt.className = 'slot-win-display'; }
+      [r1, r2, r3].forEach((r, idx) => {
+        if (!r) return;
+        r.classList.remove('reel-locked');
+        const data = reelStripsData[idx];
+        const html = data.items.map((name, i) => {
+          return `<div class="slot-symbol" data-idx="${i}">${escHtml(name)}</div>`;
+        }).join('');
+        r.innerHTML = `<div class="slot-reel-track" style="transform:translate3d(0,0,0);">${html}</div>`;
+        const track = r.querySelector('.slot-reel-track');
+        reelInstances.push({
+          reelEl: r,
+          trackEl: track,
+          targetIdx: data.targetIdx,
+          reelIdx: idx
+        });
+      });
+    });
+
+    const stopTimes = [durMs * 0.58, durMs * 0.78, durMs * 1.0];
+    const locked = [false, false, false];
+    const lastTick = [0, 0, 0];
     const startTime = performance.now();
 
     function frame(now) {
-      const t = Math.min((now - startTime) / durMs, 1);
-      if (t < 0.55) {
-        [r1, r2, r3].forEach(r => {
-          if (r) r.innerHTML = `<div class="slot-symbol spinning">${escHtml(pool[Math.floor(Math.random() * pool.length)])}</div>`;
-        });
-        if (wt) wt.textContent = 'Slot se vrti...';
-        playSoundTick();
-      } else if (t < 0.78) {
-        if (r1) r1.innerHTML = `<div class="slot-symbol win-reel">${escHtml(winner)}</div>`;
-        if (r2) r2.innerHTML = `<div class="slot-symbol win-reel">${escHtml(winner)}</div>`;
-        if (r3) r3.innerHTML = `<div class="slot-symbol spinning">${escHtml(pool[Math.floor(Math.random() * pool.length)])}</div>`;
-        if (wt) wt.textContent = 'Zaustavljanje...';
-      } else {
-        [r1, r2, r3].forEach(r => { if (r) r.innerHTML = `<div class="slot-symbol win-reel">${escHtml(winner)}</div>`; });
-        if (wt) wt.textContent = `POBEDA: ${winner}!`;
-      }
+      if (spinId !== currentSpinId || !isSpinning) return;
 
-      if (t < 1) requestAnimationFrame(frame);
-      else {
+      const elapsed = Math.min(now - startTime, durMs);
+
+      reelInstances.forEach(inst => {
+        const i = inst.reelIdx;
+        const stopTime = stopTimes[i];
+        const itemH = (inst.reelEl.clientHeight / 3) || 52;
+        const baseTargetY = -((inst.targetIdx - 1) * itemH);
+        const finalY = baseTargetY + reelJitters[i];
+
+        if (elapsed < stopTime) {
+          const progress = elapsed / stopTime;
+          const ease = 1 - Math.pow(1 - progress, 3.2);
+          const currentY = finalY * ease;
+          inst.trackEl.style.transform = `translate3d(0, ${currentY}px, 0)`;
+
+          const curRow = Math.floor(Math.abs(currentY) / itemH);
+          if (curRow !== lastTick[i]) {
+            playSoundTick();
+            lastTick[i] = curRow;
+          }
+        } else {
+          if (!locked[i]) {
+            locked[i] = true;
+            inst.reelEl.classList.add('reel-locked');
+            playSoundTick();
+            const syms = inst.trackEl.querySelectorAll('.slot-symbol');
+            if (syms[inst.targetIdx]) {
+              syms[inst.targetIdx].classList.add('payline-active', 'win-reel');
+            }
+          }
+
+          // Elastični mehanički trzaj opruge (spring recoil) 180ms nakon udara u kočnicu
+          const bounceElapsed = elapsed - stopTime;
+          if (bounceElapsed < 180) {
+            const bp = bounceElapsed / 180;
+            const bounce = Math.sin(bp * Math.PI) * 7 * (1 - bp);
+            inst.trackEl.style.transform = `translate3d(0, ${finalY + bounce}px, 0)`;
+          } else {
+            inst.trackEl.style.transform = `translate3d(0, ${finalY}px, 0)`;
+          }
+        }
+      });
+
+      reelGroups.forEach(({ wt }) => {
+        if (!wt) return;
+        if (locked[0] && !locked[1]) wt.textContent = 'Reel 1 zaključan...';
+        else if (locked[0] && locked[1] && !locked[2]) wt.textContent = 'Napetost raste... ko dobija?!';
+        else if (locked[2]) {
+          wt.textContent = `JACKPOT: ${winner}!`;
+          wt.className = 'slot-win-display is-jackpot';
+        }
+      });
+
+      if (elapsed < durMs) {
+        requestAnimationFrame(frame);
+      } else {
+        if (spinId !== currentSpinId || !isSpinning) return;
         stopSpinSound();
         isSpinning = false;
         addWinner(winner);
@@ -2604,21 +3443,93 @@
     requestAnimationFrame(frame);
   }
 
-  function animateRouletteDraw(pool, durMs) {
-    const winner    = pool[Math.floor(Math.random() * pool.length)];
+  /* ── CS:GO Case Opening Neon Roulette Animation ── */
+  function animateRouletteDraw(pool, durMs, spinId) {
+    const winner = pool[Math.floor(Math.random() * pool.length)];
+    const strips = [
+      document.getElementById('rouletteStrip'),
+      document.getElementById('rouletteStripFullscreen')
+    ].filter(Boolean);
+
+    const candidates = pool.filter(p => p !== winner);
+    const almostLeft = candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : pool[0];
+    const almostRight = candidates.length > 1 ? candidates[Math.floor(Math.random() * candidates.length)] : pool[0];
+
+    // Varijabilna dužina trake na svakom izvlačenju: WIN_INDEX se kreće od 42 do 57
+    const WIN_INDEX = 42 + Math.floor(Math.random() * 16);
+    const TOTAL_CARDS = WIN_INDEX + 18;
+    const cards = [];
+    for (let i = 0; i < TOTAL_CARDS; i++) {
+      if (i === WIN_INDEX) {
+        cards.push(winner);
+      } else if (i === WIN_INDEX - 1) {
+        cards.push(almostLeft); // Kartica tik levo od pobednika (zamalo!)
+      } else if (i === WIN_INDEX + 1) {
+        cards.push(almostRight); // Kartica tik desno od pobednika (zamalo!)
+      } else {
+        cards.push(pool[Math.floor(Math.random() * pool.length)]);
+      }
+    }
+
+    const cardPitch = 152; // 140px kartica + 12px razmak
+    const cardWidth = 140;
+
+    strips.forEach(strip => {
+      strip.style.transform = 'translate3d(0,0,0)';
+      strip.innerHTML = cards.map((name, i) => {
+        const col = SLICE_COLORS[i % SLICE_COLORS.length];
+        const initial = name.charAt(0).toUpperCase();
+        return `
+          <div class="roulette-card" data-idx="${i}">
+            <div class="roulette-card-bar" style="background:${col};"></div>
+            <div class="roulette-card-avatar" style="border-color:${col}; color:${col};">${escHtml(initial)}</div>
+            <span class="roulette-card-name">${escHtml(name)}</span>
+          </div>`;
+      }).join('');
+    });
+
+    // Tenziona nasumična pozicija zaustavljanja duž čitave širine kartice:
+    // Može stati na svega 8px od leve ivice (zamalo prethodni!) ili na 132px (zamalo sledeći!)
+    const landInCard = 8 + Math.random() * (cardWidth - 16);
+    const winnerCardX = WIN_INDEX * cardPitch + landInCard;
+
     const startTime = performance.now();
+    let lastCardIdx = -1;
 
     function frame(now) {
-      const t = Math.min((now - startTime) / durMs, 1);
-      if (t < 1) {
-        const rand = pool[Math.floor(Math.random() * pool.length)];
-        drawRoulettePreview(rand);
-        if (Math.random() < 0.3) playSoundTick();
+      if (spinId !== currentSpinId || !isSpinning) return;
+
+      const elapsed = Math.min(now - startTime, durMs);
+      const progress = elapsed / durMs;
+      const ease = 1 - Math.pow(1 - progress, 4.2);
+
+      strips.forEach(strip => {
+        const viewportW = strip.parentElement.clientWidth || 600;
+        const targetX = winnerCardX - (viewportW / 2);
+        const currentX = targetX * ease;
+        strip.style.transform = `translate3d(-${currentX}px, 0, 0)`;
+
+        const pointerInStrip = currentX + (viewportW / 2);
+        const curCardIdx = Math.floor(pointerInStrip / cardPitch);
+        if (curCardIdx !== lastCardIdx && curCardIdx >= 0) {
+          playSoundTick();
+          lastCardIdx = curCardIdx;
+          triggerRouletteTickerBounce();
+        }
+      });
+
+      if (progress < 1) {
         requestAnimationFrame(frame);
       } else {
+        if (spinId !== currentSpinId || !isSpinning) return;
         stopSpinSound();
         isSpinning = false;
-        drawRoulettePreview(winner);
+
+        strips.forEach(strip => {
+          const winCard = strip.querySelector(`.roulette-card[data-idx="${WIN_INDEX}"]`);
+          if (winCard) winCard.classList.add('winner-card-active');
+        });
+
         addWinner(winner);
         participantsMap.delete(winner.toLowerCase());
         updateParticipantsUI();
@@ -2626,6 +3537,15 @@
       }
     }
     requestAnimationFrame(frame);
+  }
+
+  function triggerRouletteTickerBounce() {
+    const tickers = document.querySelectorAll('.roulette-ticker-top, .roulette-ticker-bottom');
+    tickers.forEach(t => {
+      t.classList.remove('tick-bounce');
+      void t.offsetWidth;
+      t.classList.add('tick-bounce');
+    });
   }
 
   /* ════════════════════════════════════════
@@ -2693,18 +3613,34 @@
 
   function updateActionStates() {
     const hasParticipants = participantsMap.size > 0;
+    const isAtMaxWinners  = (settings.numWinners > 0 && winnersList.length >= settings.numWinners);
+    const cannotDraw      = !hasParticipants || isSpinning || isAtMaxWinners;
+
     const drawBtn         = document.getElementById('btnDrawWinner');
-    const resetBtn        = document.getElementById('btnResetGiveaway');
-
+    const stageDrawBtn    = document.getElementById('btnStageDraw');
     const wfoDrawBtn      = document.getElementById('wfoBtnDraw');
-    const wfoResetBtn     = document.getElementById('wfoBtnReset');
 
-    if (drawBtn)    drawBtn.disabled    = !hasParticipants || isSpinning;
-    if (wfoDrawBtn) wfoDrawBtn.disabled = !hasParticipants || isSpinning;
+    [drawBtn, stageDrawBtn, wfoDrawBtn].forEach(btn => {
+      if (!btn) return;
+      btn.disabled = cannotDraw;
+      if (isSpinning) {
+        btn.style.opacity = '0.6';
+        btn.style.pointerEvents = 'none';
+      } else {
+        btn.style.opacity = cannotDraw ? '0.5' : '1';
+        btn.style.pointerEvents = cannotDraw ? 'none' : 'auto';
+      }
+    });
 
-    const isResetDisabled = !isRunning && participantsMap.size === 0 && winnersList.length === 0;
-    if (resetBtn)    resetBtn.disabled    = isResetDisabled;
-    if (wfoResetBtn) wfoResetBtn.disabled = isResetDisabled;
+    const resetBtn    = document.getElementById('btnResetGiveaway');
+    const wfoResetBtn = document.getElementById('wfoBtnReset');
+    const isResetDisabled = !isRunning && participantsMap.size === 0 && winnersList.length === 0 && !isSpinning;
+    [resetBtn, wfoResetBtn].forEach(btn => {
+      if (!btn) return;
+      btn.disabled = isResetDisabled;
+      btn.style.opacity = isResetDisabled ? '0.5' : '1';
+      btn.style.pointerEvents = isResetDisabled ? 'none' : 'auto';
+    });
 
     updateStartButtonUI();
   }

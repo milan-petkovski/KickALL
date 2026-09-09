@@ -1,5 +1,6 @@
 // KickALL Service Worker for PWA functionality
-const CACHE_NAME = 'kickall-v4';
+const CACHE_NAME = 'kickall-v19';
+
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

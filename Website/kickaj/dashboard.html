@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="css/kickaj.css" />
+  <link rel="stylesheet" href="css/kickaj.css?v=20260910i" />
   <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon" />
 
   <!-- Supabase + Core -->
@@ -231,6 +231,41 @@
             <div class="sc-form-group" id="volumeGroup">
               <label class="sc-label" for="inputVolume">Jačina zvuka: <strong id="volumeLabelVal">50%</strong></label>
               <input type="range" id="inputVolume" class="sc-slider" min="0" max="100" value="50" step="5" />
+            </div>
+          </div>
+        </details>
+
+        <!-- Accordion 5: KickOT Chat Najave -->
+        <details class="sc-accordion" name="sidebar-accordion">
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--aj-cyan)" stroke-width="2.5">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span>KickOT Chat Najave</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <div class="sc-toggle-row">
+              <div>
+                <div class="sc-toggle-title">Objava početka u chat</div>
+                <div class="sc-toggle-sub">KickOT šalje najavu kad otvoriš prijave</div>
+              </div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleAnnounceStart" checked />
+                <span class="sc-toggle-slider"></span>
+              </label>
+            </div>
+            <div class="sc-toggle-row">
+              <div>
+                <div class="sc-toggle-title">Objava pobednika u chat</div>
+                <div class="sc-toggle-sub">KickOT čestita i taguje pobednika</div>
+              </div>
+              <label class="sc-toggle">
+                <input type="checkbox" id="toggleAnnounceWinner" checked />
+                <span class="sc-toggle-slider"></span>
+              </label>
             </div>
           </div>
         </details>
@@ -491,10 +526,27 @@
           <!-- Slot Stage -->
           <div class="slot-stage-frame" id="slotStageFrame" style="display:none;">
             <div class="slot-machine-box">
-              <div class="slot-reels-container">
-                <div class="slot-reel" id="slotReel1"><div class="slot-symbol">---</div></div>
-                <div class="slot-reel" id="slotReel2"><div class="slot-symbol">---</div></div>
-                <div class="slot-reel" id="slotReel3"><div class="slot-symbol">---</div></div>
+              <div class="slot-header-marquee">
+                <span class="slot-marquee-dot"></span>
+                <span class="slot-marquee-title">KICKAJ JACKPOT</span>
+                <span class="slot-marquee-dot"></span>
+              </div>
+              <div class="slot-reels-wrapper">
+                <div class="slot-payline-guide slot-payline-left">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 12 18 4 18 20 6 12"/></svg>
+                </div>
+                <div class="slot-reels-container">
+                  <div class="slot-reel" id="slotReel1"><div class="slot-symbol">---</div></div>
+                  <div class="slot-reel-divider"></div>
+                  <div class="slot-reel" id="slotReel2"><div class="slot-symbol">---</div></div>
+                  <div class="slot-reel-divider"></div>
+                  <div class="slot-reel" id="slotReel3"><div class="slot-symbol">---</div></div>
+                </div>
+                <div class="slot-payline-guide slot-payline-right">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="18 12 6 4 6 20 18 12"/></svg>
+                </div>
+                <div class="slot-cylinder-overlay"></div>
+                <div class="slot-payline-beam"></div>
               </div>
               <div class="slot-win-display" id="slotWinText">Čekanje izvlačenja...</div>
             </div>
@@ -503,9 +555,17 @@
           <!-- Roulette Stage -->
           <div class="roulette-stage-frame" id="rouletteStageFrame" style="display:none;">
             <div class="roulette-viewport">
+              <div class="roulette-ticker-top">
+                <svg width="16" height="14" viewBox="0 0 16 14" fill="#53fc18"><polygon points="8 14 0 0 16 0 8 14"/></svg>
+              </div>
+              <div class="roulette-ticker-bottom">
+                <svg width="16" height="14" viewBox="0 0 16 14" fill="#53fc18"><polygon points="8 0 0 14 16 14 8 0"/></svg>
+              </div>
               <div class="roulette-pointer-line"></div>
+              <div class="roulette-fade-left"></div>
+              <div class="roulette-fade-right"></div>
               <div class="roulette-strip" id="rouletteStrip">
-                <div class="roulette-card">Čekanje...</div>
+                <div class="roulette-card"><span class="roulette-card-name">Čekanje...</span></div>
               </div>
             </div>
           </div>
@@ -665,10 +725,27 @@
       <!-- Slot Masina -->
       <div class="slot-stage-frame wfo-slot-frame" id="wfoSlotFrame" style="display:none;">
         <div class="slot-machine-box">
-          <div class="slot-reels-container">
-            <div class="slot-reel" id="slotReel1Fullscreen"><div class="slot-symbol">---</div></div>
-            <div class="slot-reel" id="slotReel2Fullscreen"><div class="slot-symbol">---</div></div>
-            <div class="slot-reel" id="slotReel3Fullscreen"><div class="slot-symbol">---</div></div>
+          <div class="slot-header-marquee">
+            <span class="slot-marquee-dot"></span>
+            <span class="slot-marquee-title">KICKAJ JACKPOT</span>
+            <span class="slot-marquee-dot"></span>
+          </div>
+          <div class="slot-reels-wrapper">
+            <div class="slot-payline-guide slot-payline-left">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 12 18 4 18 20 6 12"/></svg>
+            </div>
+            <div class="slot-reels-container">
+              <div class="slot-reel" id="slotReel1Fullscreen"><div class="slot-symbol">---</div></div>
+              <div class="slot-reel-divider"></div>
+              <div class="slot-reel" id="slotReel2Fullscreen"><div class="slot-symbol">---</div></div>
+              <div class="slot-reel-divider"></div>
+              <div class="slot-reel" id="slotReel3Fullscreen"><div class="slot-symbol">---</div></div>
+            </div>
+            <div class="slot-payline-guide slot-payline-right">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="18 12 6 4 6 20 18 12"/></svg>
+            </div>
+            <div class="slot-cylinder-overlay"></div>
+            <div class="slot-payline-beam"></div>
           </div>
           <div class="slot-win-display" id="slotWinTextFullscreen">Čekanje izvlačenja...</div>
         </div>
@@ -677,9 +754,17 @@
       <!-- Neon Rulet -->
       <div class="roulette-stage-frame wfo-roulette-frame" id="wfoRouletteFrame" style="display:none;">
         <div class="roulette-viewport">
+          <div class="roulette-ticker-top">
+            <svg width="16" height="14" viewBox="0 0 16 14" fill="#53fc18"><polygon points="8 14 0 0 16 0 8 14"/></svg>
+          </div>
+          <div class="roulette-ticker-bottom">
+            <svg width="16" height="14" viewBox="0 0 16 14" fill="#53fc18"><polygon points="8 0 0 14 16 14 8 0"/></svg>
+          </div>
           <div class="roulette-pointer-line"></div>
+          <div class="roulette-fade-left"></div>
+          <div class="roulette-fade-right"></div>
           <div class="roulette-strip" id="rouletteStripFullscreen">
-            <div class="roulette-card">Čekanje...</div>
+            <div class="roulette-card"><span class="roulette-card-name">Čekanje...</span></div>
           </div>
         </div>
       </div>
@@ -689,7 +774,7 @@
     <!-- Footer: statistika + status -->
     <div class="wfo-footer">
       <div class="wfo-stat">
-        <span class="wfo-stat-label">Ucesnici</span>
+        <span class="wfo-stat-label">Učesnici</span>
         <strong id="wfoParticipantCount">0</strong>
       </div>
       <div class="wfo-state-badge" id="wfoStateBadge">Standby</div>
@@ -729,16 +814,31 @@
       <h2 class="winner-name-display" id="winnerRevealName">@Streamer</h2>
 
       <div class="winner-prize-pill">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5">
-          <path d="M20 12v10H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 12 20 22 4 22 4 12"></polyline>
+          <rect x="2" y="7" width="20" height="5"></rect>
+          <line x1="12" y1="22" x2="12" y2="7"></line>
+          <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+          <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
         </svg>
         <span id="winnerRevealPrizeText">Misteriozna Nagrada</span>
       </div>
 
-      <div class="winner-timer-bar-wrap">
+      <div class="winner-timer-bar-wrap" id="winnerRevealTimerBarWrap">
         <div class="winner-timer-fill" id="winnerRevealTimerFill"></div>
       </div>
       <div class="winner-timer-text" id="winnerRevealTimerLabel">60s za potvrdu</div>
+
+      <button type="button" class="winner-reveal-ok-btn" id="winnerRevealOkBtn" onclick="window.confirmActiveWinner()">
+        OK
+      </button>
+
+      <div class="winner-reveal-chatlog-box" id="winnerRevealChatlogBox" onclick="window.testWinnerChat()" title="Kliknite za test ako niste uživo">
+        <div class="winner-chatlog-dots" id="winnerChatlogDots">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="winner-chatlog-content" id="winnerChatlogContent" style="display:none;"></div>
+      </div>
     </div>
   </div>
 
@@ -819,6 +919,6 @@
     </div>
   </div>
 
-  <script src="js/kickaj-dashboard.js" defer></script>
+  <script src="js/kickaj-dashboard.js?v=20260910s" defer></script>
 </body>
 </html>

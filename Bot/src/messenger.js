@@ -123,23 +123,28 @@ async function obrisiPoruku(chatroomId, messageId) {
     const channelState = state.getChannelState(chatroomId);
     const channelName = channelState ? channelState.channelUsername : chatroomId;
     const sendRoomId = (channelState && channelState.realChatroomId) ? channelState.realChatroomId : chatroomId;
-    
+
     try {
-        const { gotScraping } = await import('got-scraping');
+        // Koristimo OAuth Bearer token umesto kolačića (gotScraping) —
+        // Kick vraća HTTP 403 "User is not authenticated" za cookie-based DELETE zahteve.
+        const accessToken = await kickAuth.getAccessToken();
         const url = `https://kick.com/api/v2/chatrooms/${sendRoomId}/messages/${messageId}`;
-        const res = await gotScraping({
-            url: url,
+        const res = await fetch(url, {
             method: 'DELETE',
-            headers: kickScrapingHeaders(),
-            retry: { limit: 0 }
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
         });
-        
-        if (res.statusCode >= 200 && res.statusCode < 300) {
+
+        if (res.ok) {
             log('INFO', `[${channelName}] Poruka ${messageId} uspešno obrisana sa lajva.`);
             return true;
         } else {
-            const bodyText = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
-            log('ERR', `[${channelName}] Neuspešno brisanje poruke ${messageId}: HTTP ${res.statusCode} - ${bodyText}`);
+            let bodyText = '';
+            try { bodyText = await res.text(); } catch (_) {}
+            log('ERR', `[${channelName}] Neuspešno brisanje poruke ${messageId}: HTTP ${res.status} - ${bodyText}`);
             return false;
         }
     } catch (err) {

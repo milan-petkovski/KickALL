@@ -351,12 +351,25 @@ function handleLove(chatroomId, sender, args) {
     let user1 = '';
     let user2 = '';
 
-    if (delovi.length === 1) {
+    // Filtriramo samo prave @mention tokene — ignoriše obične reči kao srpski veznik "i"
+    const mentions = delovi.filter(d => d.startsWith('@'));
+
+    if (mentions.length >= 2) {
+        // Dve @mention oznake — !love @user1 @user2 (ignorišemo sve između)
+        user1 = mentions[0];
+        user2 = mentions[1];
+    } else if (mentions.length === 1) {
+        // Jedna @mention — !love @user → sender voli user
+        user1 = sender;
+        user2 = mentions[0];
+    } else if (delovi.length === 1) {
+        // Bez @ — !love user → sender voli user
         user1 = sender;
         user2 = delovi[0];
     } else {
-        user1 = delovi[0];
-        user2 = delovi[1];
+        // Višestruke reči bez @, ne znamo ko je target
+        posaljiPoruku(chatroomId, 'Upotreba: !love @user1 @user2 ili !love @user');
+        return;
     }
 
     const u1 = user1.replace(/^@/, '').trim();

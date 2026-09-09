@@ -44,7 +44,7 @@ exports.handler = async (event) => {
     pathSuffix = '/api/channels';
   }
 
-  const ALLOWED_PATHS = ['/api/channels', '/api/kick/logs', '/api/kick/reload', '/api/kick/test-ping', '/api/kick/check-moderator', '/api/kick/channel', '/api/global-logout', '/api/check-logout'];
+  const ALLOWED_PATHS = ['/api/channels', '/api/kick/logs', '/api/kick/reload', '/api/kick/test-ping', '/api/kick/send-message', '/api/kick/check-moderator', '/api/kick/channel', '/api/global-logout', '/api/check-logout'];
   if (!ALLOWED_PATHS.includes(pathSuffix)) {
     return {
       statusCode: 404,
