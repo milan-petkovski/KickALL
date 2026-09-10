@@ -15,12 +15,16 @@ function getChannelState(chatroomId) {
             // In-memory data
             leaderboard: {},
             leaderboardDeltas: {},
+            leaderboardDaily: {},
+            leaderboardDailyDeltas: {},
             economy: {},          // Per-user ekonomija: { xp, level, coins, daily_claimed_at, daily_streak }
             economyDeltas: new Set(), // Usernames koji su se promenili od poslednjeg save-a
             loveModifiers: {},
             marriedCouples: {},
             watchtime: {},
             watchtimeDeltas: {},
+            watchtimeDaily: {},
+            watchtimeDailyDeltas: {},
             customCommands: {},
             autoAnnounces: [],
             botActive: false,
@@ -53,6 +57,7 @@ function getChannelState(chatroomId) {
             leaderboardDirty: false,
             loveDirty: false,
             tekuciMesecLeaderboarda: '',
+            tekuciDanLeaderboarda: '',
             isStreamLive: false,
             isFirstLiveCheck: true,
             manualGameName: '',

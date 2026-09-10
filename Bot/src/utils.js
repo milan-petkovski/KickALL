@@ -182,6 +182,17 @@ function dobijTrenutniMesec() {
 }
 
 /**
+ * Formatira trenutni datum kao ISO dan (npr. "2026-09-11")
+ */
+function dobijTrenutniDan() {
+    const d = new Date();
+    const godina = d.getFullYear();
+    const mesec = String(d.getMonth() + 1).padStart(2, '0');
+    const dan = String(d.getDate()).padStart(2, '0');
+    return `${godina}-${mesec}-${dan}`;
+}
+
+/**
  * Proverava i beleži cooldown za komandu
  */
 function proveraKulauna(chatroomId, kljuc, username, customCooldownMs) {
@@ -352,6 +363,7 @@ module.exports = {
     izvuciXsrfToken,
     izvuciSessionToken,
     dobijTrenutniMesec,
+    dobijTrenutniDan,
     proveraKulauna,
     prevediVreme,
     formatTemplateMessage,

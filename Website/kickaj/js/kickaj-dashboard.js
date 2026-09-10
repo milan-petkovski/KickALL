@@ -36,7 +36,10 @@
   let audioCtx         = null;
   let masterGainNode   = null;
   let spinSoundNodes   = [];
-  let isSidebarOpen    = true;
+  let wsReconnectAttempts = 0;
+  let wsReconnectTimer = null;
+  let particleResizeHandler = null;
+  let uiRefreshTimer   = null;
 
   /* ── Settings ── */
   let settings = {
@@ -47,6 +50,7 @@
     subMultiplier:   1,
     followDuration:  0,
     subscribersOnly: false,
+    blacklist:       '',
     confirmTime:     60,
     animation:       'wheel',
     spinTime:        5,
@@ -58,7 +62,7 @@
   };
 
   const PLAN_LIMITS = {
-    free:  { maxParticipants: 500,  animations: ['wheel'],                   sound: true,  fullscreen: true  },
+    free:  { maxParticipants: 500,  animations: ['wheel'],                   sound: false, fullscreen: true  },
     pro:   { maxParticipants: 0,    animations: ['wheel','slot','roulette'], sound: true,  fullscreen: true  },
     elite: { maxParticipants: 0,    animations: ['wheel','slot','roulette'], sound: true,  fullscreen: true  }
   };
@@ -105,7 +109,22 @@
   }
 
   function getBotApiBase() {
+    if (window.CONFIG && typeof window.CONFIG.getBackendApiBase === 'function') {
+      return window.CONFIG.getBackendApiBase();
+    }
     return window.KickotConfig ? window.KickotConfig.api.baseUrl : 'https://kickbot-ihzb.onrender.com';
+  }
+
+  function resolveApiUrl(path) {
+    const cleanPath = path.startsWith('/') ? path : '/' + path;
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    // Na lokalnom statičkom serveru (npr. VS Code Live Server na portu 5500), nema Netlify funkcija (/api/kick/*),
+    // pa zahteve šaljemo direktno na bot backend koji ima omogućen CORS za lokalne portove
+    if (isLocal && window.location.port !== '8888') {
+      const base = getBotApiBase().replace(/\/+$/, '');
+      return `${base}${cleanPath}`;
+    }
+    return cleanPath;
   }
 
   /* ════════════════════════════════════════
@@ -148,6 +167,7 @@
         let remSec = isExpired ? 0 : Math.max(0, Math.ceil((expiresAt - now) / 1000));
 
         return {
+          id: w.id || ('win_' + now + '_' + Math.random().toString(36).slice(2, 7)),
           username: w.username,
           prize: w.prize || settings.prize || 'Misteriozna Nagrada',
           confirmSeconds: isExpired ? 0 : remSec,
@@ -155,7 +175,8 @@
           expiresAt: expiresAt,
           savedAt: w.savedAt || now,
           isExpired: isExpired,
-          isConfirmed: !!w.isConfirmed
+          isConfirmed: !!w.isConfirmed,
+          followCheck: w.followCheck ? { ...w.followCheck } : null
         };
       }),
       isRunning: !!isRunning,
@@ -328,6 +349,7 @@
 
         const isConfirmed = !!w.isConfirmed;
         return {
+          id: w.id || ('win_' + now + '_' + Math.random().toString(36).slice(2, 7)),
           username: w.username,
           prize: w.prize || settings.prize || 'Misteriozna Nagrada',
           confirmSeconds: (isConfirmed || isExpired) ? 0 : currSec,
@@ -336,6 +358,7 @@
           savedAt: now,
           isExpired: isExpired,
           isConfirmed: isConfirmed,
+          followCheck: w.followCheck ? { ...w.followCheck } : null,
           timerId: null
         };
       });
@@ -345,6 +368,8 @@
     if (d.isRunning) isRunning = false; // safety
 
     restoreFormInputs();
+    updateParticipantsUI();
+    drawVisualizerStage();
     updateWinnersUI();
     winnersList.forEach(w => {
       if (!w.isConfirmed && !w.isExpired && w.confirmSeconds > 0) {
@@ -363,10 +388,12 @@
     setVal('inputFollowDuration', settings.followDuration);
     setVal('inputConfirmTime',    settings.confirmTime);
     setVal('inputMaxParticipants',settings.maxParticipants);
-    setVal('inputSpinTime',       settings.spinTime);
+    setVal('inputSpinTime',       secondsToSliderPos(settings.spinTime));
     setVal('inputSpinTimeNum',    settings.spinTime);
+    updateActiveSpinTick(settings.spinTime);
     setVal('inputVolume',         Math.round(settings.volume * 100));
     setChecked('toggleSubscribersOnly', settings.subscribersOnly);
+    setVal('inputBlacklist',      settings.blacklist || '');
     setChecked('toggleSound',          settings.soundEnabled);
     setChecked('toggleAnnounceStart',  settings.announceStart !== false);
     setChecked('toggleAnnounceWinner', settings.announceWinner !== false);
@@ -469,25 +496,6 @@
           const { data: p1 } = await sb.from('user_profiles')
             .select('*').eq('id', currentUser.id).maybeSingle();
           if (p1) profile = p1;
-        }
-        if (!profile && currentUser?.email) {
-          const { data: p2 } = await sb.from('user_profiles')
-            .select('*').eq('email', currentUser.email).maybeSingle();
-          if (p2) profile = p2;
-        }
-        if (!profile) {
-          const kName = cleanUsername(currentUser?.user_metadata?.kick_username || currentUser?.user_metadata?.preferred_username || currentUser?.user_metadata?.name || username);
-          if (kName && kName !== 'Kanal' && kName !== 'DemoKanal') {
-            const { data: p3 } = await sb.from('user_profiles')
-              .select('*').ilike('kick_username', kName).maybeSingle();
-            if (p3) {
-              profile = p3;
-            } else {
-              const { data: p4 } = await sb.from('user_profiles')
-                .select('*').ilike('display_name', kName).maybeSingle();
-              if (p4) profile = p4;
-            }
-          }
         }
 
         if (profile) {
@@ -706,7 +714,8 @@
     userChannels.forEach(ch => {
       const isActive = ch.username.toLowerCase() === (channelName || '').toLowerCase();
       const initial = ch.username.charAt(0).toUpperCase();
-      const avatarStyle = ch.avatar ? `background-image: url('${ch.avatar}'); background-size: cover; background-position: center;` : '';
+      const safeAvatar = ch.avatar && /^https?:\/\//i.test(ch.avatar) ? ch.avatar.replace(/["'<>]/g, '') : '';
+      const avatarStyle = safeAvatar ? `background-image: url('${escHtml(safeAvatar)}'); background-size: cover; background-position: center;` : '';
 
       let roleLabel = 'Vlasnik';
       let roleClass = 'cdm-role-owner';
@@ -719,9 +728,9 @@
       }
 
       html += `
-        <button type="button" class="cdm-item ${isActive ? 'active' : ''}" onclick="window.selectChannel('${escHtml(ch.username)}')">
+        <button type="button" class="cdm-item ${isActive ? 'active' : ''}" onclick="window.selectChannel(this.dataset.channel)" data-channel="${escHtml(ch.username)}">
           <div class="cdm-item-left">
-            <div class="cdm-avatar" style="${avatarStyle}">${ch.avatar ? '' : initial}</div>
+            <div class="cdm-avatar" style="${avatarStyle}">${safeAvatar ? '' : initial}</div>
             <div class="cdm-name-wrap">
               <span class="cdm-name">${escHtml(ch.username)}</span>
               <span class="cdm-role-badge ${roleClass}">${roleLabel}</span>
@@ -799,6 +808,8 @@
 
     // Ucitaj sacuvano stanje za ovaj specificni kanal iz localstorage
     loadState(channelName);
+    updateParticipantsUI();
+    drawVisualizerStage();
 
     // Razresi Chatroom ID za novi kanal
     await resolveKickChatroom(channelName);
@@ -967,16 +978,19 @@
     const soundToggleRow = document.getElementById('soundToggleRow');
     const volumeGroup = document.getElementById('volumeGroup');
     const toggleSound = document.getElementById('toggleSound');
+    const inputVolume = document.getElementById('inputVolume');
     if (soundLock) soundLock.style.display = limits.sound ? 'none' : 'inline-flex';
     if (!limits.sound) {
       settings.soundEnabled = false;
       if (soundToggleRow) soundToggleRow.style.opacity = '0.4';
       if (volumeGroup)    volumeGroup.style.opacity = '0.4';
       if (toggleSound) { toggleSound.checked = false; toggleSound.disabled = true; }
+      if (inputVolume) { inputVolume.disabled = true; }
     } else {
       if (soundToggleRow) soundToggleRow.style.opacity = '1';
       if (volumeGroup)    volumeGroup.style.opacity = '1';
       if (toggleSound) { toggleSound.disabled = false; }
+      if (inputVolume) { inputVolume.disabled = false; }
     }
 
     /* Fullscreen button */
@@ -1001,11 +1015,8 @@
   ════════════════════════════════════════ */
   function setupSidebar() {
     const sidebar = document.getElementById('sidebar');
-    const app = document.getElementById('app');
-    const btn = document.getElementById('btnSidebarToggle');
 
     bindClick('btnStartGiveaway', toggleStart);
-    bindClick('btnDrawWinner',    triggerDraw);
     bindClick('btnResetGiveaway', resetGiveaway);
     bindClick('btnStageDraw',     triggerDraw);
 
@@ -1023,25 +1034,17 @@
 
     const isNarrow = () => window.innerWidth <= 1024;
 
-    if (isNarrow()) {
-      sidebar.classList.remove('is-open');
-      isSidebarOpen = false;
+    const btnSidebarToggle = document.getElementById('btnSidebarToggle');
+    if (btnSidebarToggle && sidebar) {
+      btnSidebarToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sidebar.classList.toggle('is-open');
+      });
     }
 
-    if (btn) btn.addEventListener('click', () => {
-      isSidebarOpen = !isSidebarOpen;
-      if (isNarrow()) {
-        sidebar.classList.toggle('is-open', isSidebarOpen);
-      } else {
-        if (isSidebarOpen) {
-          app.style.gridTemplateColumns = 'var(--sidebar-w) 1fr';
-          sidebar.style.display = '';
-        } else {
-          app.style.gridTemplateColumns = '0 1fr';
-          sidebar.style.display = 'none';
-        }
-      }
-    });
+    if (isNarrow()) {
+      sidebar.classList.remove('is-open');
+    }
 
     const btnLogout = document.getElementById('btnLogout');
     if (btnLogout && sb) {
@@ -1057,6 +1060,11 @@
       const pill = document.getElementById('userPill');
       if (menu && pill && !pill.contains(e.target)) {
         menu.classList.remove('open');
+      }
+      if (isNarrow() && sidebar && sidebar.classList.contains('is-open')) {
+        if (!sidebar.contains(e.target) && (!btnSidebarToggle || !btnSidebarToggle.contains(e.target))) {
+          sidebar.classList.remove('is-open');
+        }
       }
     });
   }
@@ -1281,6 +1289,14 @@
   });
 
   window.refreshDatabase = async function() {
+    if (isRunning) {
+      const confirmSync = window.confirm('Giveaway je trenutno aktivan! Osvežavanje podataka iz baze će prekinuti trenutnu sesiju prijava. Želite li da nastavite?');
+      if (!confirmSync) return;
+      isRunning = false;
+      updateStartButtonUI();
+      if (kickWebSocket) { try { kickWebSocket.close(); } catch (e) { /* */ } kickWebSocket = null; }
+      if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+    }
     const btnEl = document.querySelector('.topbar-refresh-btn');
     const svgEl = btnEl ? btnEl.querySelector('svg') : null;
     if (svgEl) svgEl.style.animation = 'spin 1s linear infinite';
@@ -1369,7 +1385,7 @@
     });
 
     bindInput('inputConfirmTime', 'change', (v) => {
-      settings.confirmTime = Math.min(300, Math.max(5, parseInt(v, 10) || 30));
+      settings.confirmTime = Math.min(300, Math.max(5, parseInt(v, 10) || 60));
       setVal('inputConfirmTime', settings.confirmTime);
       refreshAll();
     });
@@ -1391,27 +1407,50 @@
     });
 
     const spinNum = document.getElementById('inputSpinTimeNum');
-    bindInput('inputSpinTime', 'input', (v) => {
-      settings.spinTime = Math.min(300, Math.max(1, parseInt(v, 10) || 5));
-      if (spinNum) spinNum.value = settings.spinTime;
+    const spinSlider = document.getElementById('inputSpinTime');
+
+    function syncSpinTime(sec, updateSlider = true, updateNum = true) {
+      const s = Math.min(300, Math.max(1, parseInt(sec, 10) || 5));
+      settings.spinTime = s;
+      if (updateSlider && spinSlider) spinSlider.value = secondsToSliderPos(s);
+      if (updateNum && spinNum) spinNum.value = s;
+      updateActiveSpinTick(s);
       updateSpinTimeLabel();
       setText('statSpinTime', formatSpinTime(settings.spinTime));
       saveState();
-    });
+    }
 
-    if (spinNum) {
-      spinNum.addEventListener('input', (e) => {
-        let val = Math.min(300, Math.max(1, parseInt(e.target.value, 10) || 1));
-        settings.spinTime = val;
-        setVal('inputSpinTime', val);
-        updateSpinTimeLabel();
-        setText('statSpinTime', formatSpinTime(settings.spinTime));
-        saveState();
+    if (spinSlider) {
+      spinSlider.addEventListener('input', (e) => {
+        const sec = sliderPosToSeconds(e.target.value);
+        syncSpinTime(sec, false, true);
       });
     }
 
+    if (spinNum) {
+      spinNum.addEventListener('input', (e) => {
+        const sec = parseInt(e.target.value, 10) || 1;
+        syncSpinTime(sec, true, false);
+      });
+    }
+
+    document.querySelectorAll('.sc-slider-ticks span').forEach(tick => {
+      tick.addEventListener('click', () => {
+        if (isSpinning) return;
+        const val = parseInt(tick.dataset.val, 10);
+        if (!isNaN(val)) syncSpinTime(val, true, true);
+      });
+    });
+
     let volDebounce = null;
     const handleVolumeChange = (v) => {
+      const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
+      if (!limits.sound) {
+        settings.soundEnabled = false;
+        const toggleSound = document.getElementById('toggleSound');
+        if (toggleSound) toggleSound.checked = false;
+        return;
+      }
       const val = Math.max(0, Math.min(100, parseInt(v, 10) || 0));
       settings.volume = val / 100;
       if (settings.volume > 0 && !settings.soundEnabled) {
@@ -1444,6 +1483,12 @@
     const toggleSub = document.getElementById('toggleSubscribersOnly');
     if (toggleSub) toggleSub.addEventListener('change', (e) => { settings.subscribersOnly = e.target.checked; refreshAll(); });
 
+    bindInput('inputBlacklist', 'input', (v) => {
+      settings.blacklist = v;
+      purgeBlacklistedParticipants();
+      saveState();
+    });
+
     const toggleAnnStart = document.getElementById('toggleAnnounceStart');
     if (toggleAnnStart) toggleAnnStart.addEventListener('change', (e) => {
       settings.announceStart = e.target.checked;
@@ -1456,44 +1501,10 @@
       saveState();
     });
 
-    const btnSaveSessionCookie = document.getElementById('btnSaveSessionCookie');
-    if (btnSaveSessionCookie) btnSaveSessionCookie.addEventListener('click', async () => {
-      const cookie = (document.getElementById('inputSessionCookie')?.value || '').trim();
-      const statusEl = document.getElementById('sessionCookieStatus');
-      if (!cookie || cookie.length < 10) {
-        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Unesi validan cookie string.</span>';
-        return;
-      }
-      btnSaveSessionCookie.disabled = true;
-      if (statusEl) statusEl.innerHTML = '<span style="opacity:0.6;">Cuvam...</span>';
-      try {
-        const apiBase = getBotApiBase();
-        const secret = window.__internalToken || localStorage.getItem('internal_token') || '';
-        const res = await fetch(`${apiBase}/api/kick/update-session`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Internal-Token': secret
-          },
-          body: JSON.stringify({ session_cookie: cookie })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          if (statusEl) statusEl.innerHTML = '<span style="color:#53fc18;">Sesija sacuvana! Bot ce je automatski koristiti.</span>';
-          document.getElementById('inputSessionCookie').value = '';
-        } else {
-          if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Greska: ${data.error || 'Nepoznata greska'}</span>`;
-        }
-      } catch (err) {
-        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Greska pri slanju: ${err.message}</span>`;
-      } finally {
-        btnSaveSessionCookie.disabled = false;
-      }
-    });
 
     const toggleSound = document.getElementById('toggleSound');
     if (toggleSound) toggleSound.addEventListener('change', (e) => {
-      const limits = PLAN_LIMITS[userPlan];
+      const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
       if (!limits.sound) { e.target.checked = false; showToast('Zvuk je dostupan na PRO ili ELITE planu.', 'warning'); return; }
       settings.soundEnabled = e.target.checked;
       const btnMute = document.getElementById('btnMuteSound');
@@ -1508,7 +1519,11 @@
 
     const animSelect = document.getElementById('selectAnimation');
     if (animSelect) animSelect.addEventListener('change', (e) => {
-      const limits = PLAN_LIMITS[userPlan];
+      if (isSpinning) {
+        e.target.value = settings.animation;
+        return;
+      }
+      const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
       if (!limits.animations.includes(e.target.value)) {
         e.target.value = settings.animation;
         showToast('Ova animacija nije dostupna na vašem planu.', 'warning');
@@ -1522,6 +1537,7 @@
     // Multiplier chips
     document.querySelectorAll('#multiplierChipsContainer .sc-chip').forEach(chip => {
       chip.addEventListener('click', () => {
+        if (isSpinning) return;
         document.querySelectorAll('#multiplierChipsContainer .sc-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         settings.subMultiplier = parseInt(chip.dataset.mult, 10) || 1;
@@ -1541,6 +1557,7 @@
   }
 
   function selectAnimation(anim) {
+    if (isSpinning) return;
     const select = document.getElementById('selectAnimation');
     if (select) select.value = anim;
     settings.animation = anim;
@@ -1548,9 +1565,31 @@
     drawVisualizerStage();
   }
 
+  function secondsToSliderPos(sec) {
+    const s = Math.min(300, Math.max(1, typeof sec === 'number' ? sec : (parseInt(sec, 10) || 5)));
+    if (s <= 30) return ((s - 1) / 29) * 25;
+    if (s <= 60) return 25 + ((s - 30) / 30) * 25;
+    if (s <= 180) return 50 + ((s - 60) / 120) * 25;
+    return 75 + ((s - 180) / 120) * 25;
+  }
+
+  function sliderPosToSeconds(pos) {
+    const p = Math.min(100, Math.max(0, typeof pos === 'number' ? pos : (parseFloat(pos) || 0)));
+    if (p <= 25) return Math.round(1 + (p / 25) * 29);
+    if (p <= 50) return Math.round(30 + ((p - 25) / 25) * 30);
+    if (p <= 75) return Math.round(60 + ((p - 50) / 25) * 120);
+    return Math.round(180 + ((p - 75) / 25) * 120);
+  }
+
+  function updateActiveSpinTick(sec) {
+    document.querySelectorAll('.sc-slider-ticks span').forEach(tick => {
+      const val = parseInt(tick.dataset.val, 10);
+      tick.classList.toggle('active', val === sec);
+    });
+  }
+
   function updateSpinTimeLabel() {
-    setText('spinTimeLabelVal', formatSpinTime(settings.spinTime));
-    setText('statSpinTime',    formatSpinTime(settings.spinTime));
+    setText('statSpinTime', formatSpinTime(settings.spinTime));
   }
 
   function updateVolumeLabel() {
@@ -1572,6 +1611,7 @@
     if (searchInput) searchInput.addEventListener('input', () => updateParticipantsUI());
 
     bindClick('btnClearParticipants', () => {
+      if (isSpinning) return;
       if (participantsMap.size === 0) return;
       if (!confirm('Da li ste sigurni da želite da obrišete sve učesnike?')) return;
       participantsMap.clear();
@@ -1582,6 +1622,7 @@
     });
 
     bindClick('btnClearWinners', () => {
+      if (isSpinning) return;
       if (winnersList.length === 0) return;
       if (!confirm('Da li ste sigurni da želite da obrišete sve pobednike?')) return;
       winnersList.forEach(w => { if (w.timerId) clearInterval(w.timerId); });
@@ -1594,10 +1635,17 @@
 
     bindClick('btnExportWinners', () => {
       if (winnersList.length === 0) { showToast('Nema pobednika za izvoz.', 'warning'); return; }
-      const text = winnersList.map((w, i) => `${i + 1}. ${w.username} — ${w.prize}`).join('\n');
+      // Ređaj hronološki (1. prvo izvučeni pobednik)
+      const chronological = [...winnersList].reverse();
+      const text = chronological.map((w, i) => {
+        const isConf = !!w.isConfirmed;
+        const isExp = !isConf && (!!w.isExpired || (typeof w.confirmSeconds === 'number' && w.confirmSeconds <= 0));
+        const status = isConf ? '[Potvrđeno]' : (isExp ? '[Nije potvrđeno]' : '[Čeka potvrdu]');
+        return `${i + 1}. ${w.username} — ${w.prize} ${status}`;
+      }).join('\n');
       navigator.clipboard.writeText(text)
         .then(() => showToast('Lista pobednika kopirana u clipboard!', 'success'))
-        .catch(() => showToast(`Pobednici: ${text}`, 'info'));
+        .catch(() => showToast(`Pobednici:\n${text}`, 'info'));
     });
   }
 
@@ -1608,6 +1656,11 @@
     const btn = document.getElementById('btnMuteSound');
     if (!btn) return;
     btn.addEventListener('click', () => {
+      const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
+      if (!limits.sound) {
+        showToast('Zvuk je dostupan na PRO ili ELITE planu.', 'warning');
+        return;
+      }
       settings.soundEnabled = !settings.soundEnabled;
       const toggleSound = document.getElementById('toggleSound');
       if (toggleSound) toggleSound.checked = settings.soundEnabled;
@@ -1649,8 +1702,15 @@
     bindClick('wfoBtnReset', resetGiveaway);
 
     document.addEventListener('keydown', (e) => {
-      /* Esc closes the overlay (+ exits native FS) */
+      /* Esc closes winner modal first if open, otherwise closes fullscreen overlay */
       if (e.key === 'Escape') {
+        const winnerOv = document.getElementById('winnerRevealOverlay');
+        if (winnerOv && (winnerOv.classList.contains('open') || winnerOv.style.display === 'flex')) {
+          if (typeof window.closeWinnerOverlay === 'function') {
+            window.closeWinnerOverlay();
+          }
+          return;
+        }
         const ov = document.getElementById('wheelFullscreenOverlay');
         if (ov && ov.style.display !== 'none') closeFullscreen();
         return;
@@ -1705,11 +1765,7 @@
     if (e.target === e.currentTarget) window.closeModal(id);
   };
 
-  window.openReferralModal = function () { window.openModal('referralModal'); };
-  window.openFeedbackModal = function () { window.openModal('feedbackModal'); };
   window.openHelpModal     = function () { window.openModal('helpModal'); };
-  window.openDocsModal     = function () { window.openModal('docsModal'); };
-  window.openSettingsModal = function () { window.openModal('settingsModal'); };
 
   window.handleSignOut = async function () {
     if (sb) { try { await sb.auth.signOut(); } catch (e) { /* */ } }
@@ -1720,7 +1776,7 @@
   let nativeFSActive = false;
 
   function openFullscreen() {
-    const limits = PLAN_LIMITS[userPlan];
+    const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
     if (!limits.fullscreen) { showToast('Fullscreen je dostupan na PRO ili ELITE planu.', 'warning'); return; }
 
     const ov = document.getElementById('wheelFullscreenOverlay');
@@ -1802,8 +1858,7 @@
       canvas.height = size * dpr;
       canvas.style.width  = size + 'px';
       canvas.style.height = size + 'px';
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.scale(dpr, dpr);
+      // Do not call ctx.scale(dpr, dpr) here because drawWheelOnCanvas scales within its own ctx.save()/ctx.restore() block
     }
   }
 
@@ -1867,7 +1922,9 @@
   });
 
   function getVolume() {
-    return settings.soundEnabled ? Math.max(0, Math.min(1, typeof settings.volume === 'number' ? settings.volume : 0.5)) : 0;
+    const soundAllowed = !!PLAN_LIMITS[userPlan]?.sound;
+    if (!soundAllowed || !settings.soundEnabled) return 0;
+    return Math.max(0, Math.min(1, typeof settings.volume === 'number' ? settings.volume : 0.5));
   }
 
   function playVolumePreviewTone() {
@@ -1932,6 +1989,7 @@
     droneGain.gain.linearRampToValueAtTime(0.48, now + durSec * 0.88);
     droneGain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
     droneGain.connect(master);
+    nodes.push(droneGain);
 
     // Dva detunirana sine talasa za prirodan napeti puls (beating)
     const osc1 = ctx.createOscillator();
@@ -1959,12 +2017,14 @@
     riserGain.gain.linearRampToValueAtTime(0.35, now + durSec * 0.88);
     riserGain.gain.exponentialRampToValueAtTime(0.0001, now + durSec);
     riserGain.connect(master);
+    nodes.push(riserGain);
 
     const riserFilter = ctx.createBiquadFilter();
     riserFilter.type = 'lowpass';
     riserFilter.Q.setValueAtTime(4.0, now);
     riserFilter.frequency.setValueAtTime(200, now);
     riserFilter.frequency.exponentialRampToValueAtTime(1600, now + durSec * 0.92);
+    nodes.push(riserFilter);
 
     const riserOsc = ctx.createOscillator();
     riserOsc.type = 'sawtooth';
@@ -1986,8 +2046,9 @@
       const pGain = ctx.createGain();
       pGain.gain.setValueAtTime(0, pTime);
       pGain.gain.linearRampToValueAtTime(0.22 * (0.55 + 0.45 * (i / pulseCount)), pTime + 0.015);
-      pGain.gain.exponentialRampToValueAtTime(0.0001, pTime + 0.12);
+      try { pGain.gain.exponentialRampToValueAtTime(0.0001, pTime + 0.12); } catch (_) {}
       pGain.connect(master);
+      nodes.push(pGain);
 
       const pOsc = ctx.createOscillator();
       pOsc.type = 'triangle';
@@ -2005,8 +2066,12 @@
   function stopSpinSound() {
     if (spinSoundNodes && spinSoundNodes.length > 0) {
       spinSoundNodes.forEach(n => {
-        try { n.stop(); } catch (e) { /* */ }
-        try { n.disconnect(); } catch (e) { /* */ }
+        if (typeof n.stop === 'function') {
+          try { n.stop(); } catch (e) { /* */ }
+        }
+        if (typeof n.disconnect === 'function') {
+          try { n.disconnect(); } catch (e) { /* */ }
+        }
       });
       spinSoundNodes = [];
     }
@@ -2141,24 +2206,21 @@
     let s = String(slug).trim().toLowerCase().replace(/^https?:\/\/(www\.)?kick\.com\//, '').replace(/\/$/, '');
     if (/^\d+$/.test(s)) { chatroomId = parseInt(s, 10); return; }
 
-    const proxies = [
-      `https://kick.com/api/v2/channels/${s}`,
-      `https://api.allorigins.win/get?url=${encodeURIComponent(`https://kick.com/api/v2/channels/${s}`)}`,
-      `https://corsproxy.io/?${encodeURIComponent(`https://kick.com/api/v2/channels/${s}`)}`
-    ];
-
-    for (const url of proxies) {
+    // Primarno i jedino: sopstveni Bot proxy endpoint (/api/kick/channel) sa retry mehanizmom
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const res  = await fetch(url, { headers: { 'Accept': 'application/json' } });
-        if (!res.ok) continue;
-        const text = await res.text();
-        let data   = null;
-        try { data = JSON.parse(text); if (data?.contents) data = JSON.parse(data.contents); } catch (e) { /* */ }
-        const id = data?.chatroom?.id || data?.chatroom_id;
-        if (id) { chatroomId = parseInt(id, 10); return; }
-        const m = text.match(/"chatroom":\s*\{\s*"id":\s*(\d+)/i) || text.match(/"chatroom_id":\s*(\d+)/i);
-        if (m?.[1]) { chatroomId = parseInt(m[1], 10); return; }
-      } catch (e) { /* */ }
+        const botRes = await fetch(resolveApiUrl(`/api/kick/channel?username=${encodeURIComponent(s)}`));
+        if (botRes.ok) {
+          const data = await botRes.json();
+          const id = data?.chatroom?.id || data?.chatroom_id;
+          if (id) { chatroomId = parseInt(id, 10); return; }
+        }
+      } catch (e) {
+        console.warn(`[Kickaj] Bot proxy channel lookup pokusaj ${attempt} neuspesan:`, e);
+      }
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 600 * attempt));
+      }
     }
   }
 
@@ -2206,11 +2268,12 @@
       }
 
       kickWebSocket.onopen = () => {
+        wsReconnectAttempts = 0;
+        if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
         if (resolved) return;
         resolved = true;
         clearTimeout(timeout);
         kickWebSocket.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `chatrooms.${chatroomId}.v2` } }));
-        kickWebSocket.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `chatrooms.${chatroomId}` } }));
         if (pingInterval) clearInterval(pingInterval);
         pingInterval = setInterval(() => {
           if (kickWebSocket?.readyState === WebSocket.OPEN) kickWebSocket.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
@@ -2235,13 +2298,26 @@
           clearTimeout(timeout);
           resolve(false);
         } else if (isRunning) {
-          isRunning = false;
-          updateStartButtonUI();
-          refreshAll();
-          showToast('Veza sa Kick chatom je prekinuta.', 'warning');
+          if (wsReconnectAttempts < 3) {
+            wsReconnectAttempts++;
+            showToast(`Veza sa Kick chatom je prekinuta. Pokušaj ponovnog povezivanja (${wsReconnectAttempts}/3)...`, 'warning');
+            clearTimeout(wsReconnectTimer);
+            wsReconnectTimer = setTimeout(() => {
+              if (isRunning) {
+                connectKickChat();
+              }
+            }, 2000 * wsReconnectAttempts);
+          } else {
+            wsReconnectAttempts = 0;
+            isRunning = false;
+            updateStartButtonUI();
+            refreshAll();
+            showToast('Veza sa Kick chatom je prekinuta nakon više pokušaja.', 'warning');
+          }
         }
       };
 
+      const processedMessageIds = new Set();
       kickWebSocket.onmessage = (event) => {
         try {
           const d = JSON.parse(event.data);
@@ -2250,6 +2326,14 @@
             const sender  = payload?.sender?.username || payload?.sender?.slug || payload?.username;
             const text    = payload?.content || payload?.message;
             if (sender && text) {
+              const msgId = payload?.id || payload?.message_id || `${sender}_${payload?.created_at || text}`;
+              if (processedMessageIds.has(msgId)) return;
+              processedMessageIds.add(msgId);
+              if (processedMessageIds.size > 200) {
+                const first = processedMessageIds.values().next().value;
+                processedMessageIds.delete(first);
+              }
+
               const badges = payload?.sender?.identity?.badges || payload?.sender?.badges || payload?.badges || [];
               let isSub = false;
               let subMonths = 0;
@@ -2306,6 +2390,8 @@
 
     if (isRunning) {
       isRunning = false;
+      wsReconnectAttempts = 0;
+      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
       try { kickWebSocket?.close(); } catch (e) { /* */ }
       kickWebSocket = null;
       if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
@@ -2364,12 +2450,54 @@
     }
     const names   = ['Gamer_SRB','KickMaster99','BalkanStreamer','Legendara','CoolViewer','Watcher_42','TopFan','LiveKing'];
     const name    = names[Math.floor(Math.random() * names.length)] + '_' + Math.floor(Math.random() * 90 + 10);
-    const isSub   = Math.random() > 0.4;
+    const isSub   = (settings.subscribersOnly || settings.subDuration > 0) ? true : (Math.random() > 0.4);
     const subMonths = isSub ? (settings.subDuration > 0 ? settings.subDuration + Math.floor(Math.random() * 5) : Math.floor(Math.random() * 12 + 1)) : 0;
     const followDays = settings.followDuration > 0 ? settings.followDuration + Math.floor(Math.random() * 30) : Math.floor(Math.random() * 60);
     const kw      = settings.keyword ? settings.keyword + ' ' : '';
     processChatMessage({ username: name, isSub, subMonths, followDays, message: kw + 'test' }, true);
     showToast(`Test prijava: ${name} (${isSub ? `SUB ${subMonths}m` : 'FREE'})`, 'info');
+  }
+
+  function scheduleUIRefresh() {
+    if (uiRefreshTimer) return;
+    uiRefreshTimer = setTimeout(() => {
+      uiRefreshTimer = null;
+      updateParticipantsUI();
+      drawVisualizerStage();
+      refreshAll();
+    }, 120);
+  }
+
+  function getBlacklistSet() {
+    if (!settings.blacklist) return new Set();
+    const raw = String(settings.blacklist);
+    const names = raw.split(/[\s,;]+/).map(s => s.toLowerCase().replace(/^@/, '').trim()).filter(Boolean);
+    return new Set(names);
+  }
+
+  function isUserBlacklisted(username) {
+    if (!username) return false;
+    const clean = String(username).toLowerCase().replace(/^@/, '').trim();
+    return getBlacklistSet().has(clean);
+  }
+
+  function purgeBlacklistedParticipants() {
+    const bSet = getBlacklistSet();
+    if (bSet.size === 0) return 0;
+    let removedCount = 0;
+    for (const key of participantsMap.keys()) {
+      if (bSet.has(key)) {
+        participantsMap.delete(key);
+        removedCount++;
+      }
+    }
+    if (removedCount > 0) {
+      updateParticipantsUI();
+      drawVisualizerStage();
+      refreshAll();
+      showToast(`Uklonjeno ${removedCount} korisnika sa crne liste iz učesnika.`, 'info');
+    }
+    return removedCount;
   }
 
   function processChatMessage(user, isTest = false) {
@@ -2380,8 +2508,14 @@
     if (settings.subDuration > 0 && (!user.isSub || (user.subMonths || 0) < settings.subDuration)) return;
     if (settings.followDuration > 0 && typeof user.followDays === 'number' && user.followDays < settings.followDuration) return;
 
-    const key = user.username.toLowerCase();
+    const key = user.username.toLowerCase().replace(/^@/, '');
+    if (isUserBlacklisted(key)) {
+      if (isTest) showToast(`Korisnik @${user.username} je na crnoj listi (blokiran).`, 'warning');
+      return;
+    }
     if (participantsMap.has(key)) return;
+    const isAlreadyWinner = winnersList.some(w => String(w.username).toLowerCase().replace(/^@/, '') === key);
+    if (isAlreadyWinner) return;
 
     /* Max participants check */
     const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
@@ -2400,10 +2534,14 @@
     }
 
     participantsMap.set(key, { username: user.username, isSub: user.isSub, mult: user.isSub ? settings.subMultiplier : 1 });
-    updateParticipantsUI();
-    drawVisualizerStage();
     triggerFullscreenParticipantPopin(user);
-    refreshAll();
+    if (isTest) {
+      updateParticipantsUI();
+      drawVisualizerStage();
+      refreshAll();
+    } else {
+      scheduleUIRefresh();
+    }
   }
 
   function triggerFullscreenParticipantPopin(user) {
@@ -2438,6 +2576,11 @@
     isSpinning = false;
     isRunning  = false;
     stopSpinSound();
+    stopParticles();
+    window.closeWinnerOverlay();
+    activeWinnerUsername = null;
+    wsReconnectAttempts = 0;
+    if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
 
     try { kickWebSocket?.close(); } catch (e) { /* */ }
     kickWebSocket = null;
@@ -2495,7 +2638,7 @@
           <div class="participant-badges">
             ${p.isSub ? '<span class="sub-badge">SUB</span>' : ''}
             <span class="mult-badge">${p.mult}x</span>
-            <button class="participant-remove-btn" onclick="window.removeParticipant('${escHtml(key)}')" title="Ukloni">
+            <button class="participant-remove-btn" onclick="window.removeParticipant(this.dataset.key)" data-key="${escHtml(key)}" title="Ukloni">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
@@ -2521,45 +2664,34 @@
      KICKOT CHAT ANNOUNCEMENTS
   ════════════════════════════════════════ */
   async function sendKickChatMessage(messageText) {
-    if (!messageText || !chatroomId) return;
+    if (!messageText || !chatroomId) return { success: false, error: 'Nedostaje chatroom ili poruka' };
     try {
       const targetChatroomId = String(chatroomId);
       const targetChannelName = String(channelName || '').trim();
-      const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
       const payload = {
         chatroom_id: targetChatroomId,
         channel_username: targetChannelName,
         message: messageText
       };
 
-      if (isLocalhost) {
-        const kickApiBase = getBotApiBase();
-        const targetUrl = `${kickApiBase}/api/kick/send-message`;
-        const secret = localStorage.getItem('internal_api_secret') || '';
-        const headers = { 'Content-Type': 'application/json' };
-        if (secret) headers['x-internal-token'] = secret;
-        fetch(targetUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(payload)
-        }).catch(err => {
-          console.warn('[Kickaj] Chat announce local send error:', err);
-        });
-      } else {
-        fetch('/api/kick/send-message', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        }).catch(err => {
-          console.warn('[Kickaj] Chat announce proxy send error:', err);
-        });
+      const res = await fetch(resolveApiUrl('/api/kick/send-message'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        return { success: true };
       }
+      return { success: false, error: data.error || `HTTP ${res.status}` };
     } catch (err) {
-      console.warn('[Kickaj] Failed to dispatch chat announcement:', err);
+      console.warn('[Kickaj] Greška pri slanju najave u chat:', err);
+      return { success: false, error: err.message };
     }
   }
 
-  function sendGiveawayStartAnnouncement() {
+  async function sendGiveawayStartAnnouncement() {
     const prizeText = (settings.prize && settings.prize.trim() && settings.prize !== 'Misteriozna Nagrada')
       ? ` | Nagrada: ${settings.prize.trim()}`
       : '';
@@ -2568,16 +2700,24 @@
       : 'Napišite poruku u chat za učešće!';
     const subOnlyText = settings.subscribersOnly ? ' (Samo za subskrajbere)' : '';
     const msg = `[GIVEAWAY] Prijave su otvorene!${prizeText} ${kwText}${subOnlyText}`;
-    sendKickChatMessage(msg);
-    showToast('KickOT je poslao najavu početka giveaway-a u chat.', 'info');
+    const result = await sendKickChatMessage(msg);
+    if (result.success) {
+      showToast('KickOT je poslao najavu početka giveaway-a u chat.', 'info');
+    } else {
+      showToast(`KickOT najava nije poslata u chat: ${result.error || 'greška autentifikacije bota'}.`, 'warning');
+    }
   }
 
-  function sendGiveawayWinnerAnnouncement(winnerName, prizeName, confirmSec) {
+  async function sendGiveawayWinnerAnnouncement(winnerName, prizeName, confirmSec) {
     const cleanName = String(winnerName || '').trim().replace(/^@/, '');
     const cleanPrize = (prizeName && prizeName !== 'Misteriozna Nagrada') ? ` za nagradu: ${prizeName}!` : '!';
     const msg = `[POBEDNIK] Čestitamo @${cleanName}${cleanPrize} Javi se u chat u roku od ${confirmSec}s za potvrdu!`;
-    sendKickChatMessage(msg);
-    showToast(`KickOT je objavio pobednika @${cleanName} u chat.`, 'info');
+    const result = await sendKickChatMessage(msg);
+    if (result.success) {
+      showToast(`KickOT je objavio pobednika @${cleanName} u chat.`, 'info');
+    } else {
+      showToast(`KickOT nije uspeo da objavi pobednika u chat: ${result.error || 'proverite bota'}.`, 'warning');
+    }
   }
 
   /* ════════════════════════════════════════
@@ -2585,15 +2725,19 @@
   ════════════════════════════════════════ */
   function addWinner(username) {
     const remainingBefore = participantsMap.size;
-    const isTop5 = remainingBefore <= 5;
-    const isFinalChamp = remainingBefore === 1;
+    const targetWinners = Math.max(1, parseInt(settings.numWinners, 10) || 1);
+    const isFinalChamp = (winnersList.length + 1 >= targetWinners) || (remainingBefore <= 1);
+    const isTop5 = remainingBefore <= 5 || isFinalChamp;
     
     const prizeName = settings.prize || 'Misteriozna Nagrada';
     const initSec = settings.confirmTime || 60;
     const now = Date.now();
     const expiresAt = now + (initSec * 1000);
+    const reqFollow = parseInt(settings.followDuration, 10) || 0;
+    const winnerId = 'win_' + now + '_' + Math.random().toString(36).slice(2, 7);
 
     const w = {
+      id: winnerId,
       username,
       prize: prizeName,
       confirmSeconds: initSec,
@@ -2601,7 +2745,14 @@
       expiresAt: expiresAt,
       savedAt: now,
       isExpired: false,
-      timerId: null
+      isConfirmed: false,
+      timerId: null,
+      followCheck: {
+        requiredDays: reqFollow,
+        status: reqFollow > 0 ? 'checking' : 'skipped',
+        followDays: null,
+        isFollowing: null
+      }
     };
     winnersList.unshift(w);
     updateWinnersUI();
@@ -2619,7 +2770,110 @@
     if (settings.announceWinner) {
       sendGiveawayWinnerAnnouncement(username, prizeName, initSec);
     }
+
+    if (reqFollow > 0) {
+      verifyWinnerFollow(w);
+    }
   }
+
+  async function verifyWinnerFollow(winObj) {
+    if (!winObj || !winObj.followCheck || winObj.followCheck.requiredDays <= 0) return;
+    const targetUser = winObj.username;
+    const ch = channelName || (activeChannelObj && activeChannelObj.username) || '';
+    if (!ch) {
+      winObj.followCheck.status = 'skipped';
+      updateWinnersUI();
+      return;
+    }
+    winObj.followCheck.status = 'checking';
+    updateWinnersUI();
+    try {
+      let isFollowing = false;
+      let followDays = 0;
+      let checkSuccess = false;
+
+      // 1. Primarna provera preko backend/proxy bota
+      try {
+        const res = await fetch(resolveApiUrl(`/api/kick/follow-check?channel=${encodeURIComponent(ch)}&username=${encodeURIComponent(targetUser)}`));
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.is_following) {
+            isFollowing = true;
+            followDays = typeof data.follow_days === 'number' ? data.follow_days : 0;
+            checkSuccess = true;
+          } else if (data && data.is_following === false && data.error === undefined) {
+            // Ako je eksplicitno false, zabeleži uspeh provere
+            checkSuccess = true;
+          }
+        }
+      } catch (e) {
+        console.warn('[Kickaj] Backend follow check network error:', e);
+      }
+
+      // 2. Ako backend nije potvrdio praćenje, izvrši direktnu proveru preko Kick v2 API-ja
+      if (!isFollowing) {
+        try {
+          const directKickUrl = `https://kick.com/api/v2/channels/${encodeURIComponent(ch)}/users/${encodeURIComponent(targetUser)}`;
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directKickUrl)}`;
+          const resProxy = await fetch(proxyUrl, { cache: 'no-store' });
+          if (resProxy.ok) {
+            const proxyData = await resProxy.json();
+            if (proxyData && proxyData.following_since) {
+              const fDate = new Date(proxyData.following_since);
+              if (!isNaN(fDate.getTime())) {
+                const diffTime = Math.max(0, Date.now() - fDate.getTime());
+                followDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                isFollowing = true;
+                checkSuccess = true;
+              }
+            } else if (proxyData && proxyData.following_since === null) {
+              isFollowing = false;
+              followDays = 0;
+              checkSuccess = true;
+            }
+          }
+        } catch (eProxy) {
+          console.warn('[Kickaj] Fallback follow check error:', eProxy);
+        }
+      }
+
+      if (checkSuccess || isFollowing) {
+        winObj.followCheck.isFollowing = isFollowing;
+        winObj.followCheck.followDays = followDays;
+        if (isFollowing && followDays >= winObj.followCheck.requiredDays) {
+          winObj.followCheck.status = 'passed';
+        } else {
+          winObj.followCheck.status = 'failed';
+          showToast(`Upozorenje: Pobednik @${winObj.username} ne ispunjava uslov praćenja (${followDays}/${winObj.followCheck.requiredDays} dana)!`, 'warning');
+        }
+      } else {
+        winObj.followCheck.status = 'error';
+      }
+    } catch (e) {
+      console.warn('[Kickaj] Follow check greska:', e);
+      winObj.followCheck.status = 'error';
+    }
+    updateWinnersUI();
+    const curActive = activeWinnerUsername ? String(activeWinnerUsername).trim().toLowerCase().replace(/^@/, '') : '';
+    if (curActive && curActive === String(winObj.username).trim().toLowerCase().replace(/^@/, '')) {
+      updateWinnerOverlayFollowAlert(winObj);
+    }
+    saveState();
+  }
+
+  window.verifyWinnerFollowAgain = function (index) {
+    const idx = parseInt(index, 10);
+    if (isNaN(idx) || idx < 0 || idx >= winnersList.length) return;
+    const w = winnersList[idx];
+    if (w) verifyWinnerFollow(w);
+  };
+
+  window.verifyWinnerFollowAgainByName = function (uName) {
+    if (!uName) return;
+    const clean = String(uName).toLowerCase().replace(/^@/, '');
+    const w = winnersList.find(item => String(item.username).toLowerCase().replace(/^@/, '') === clean);
+    if (w) verifyWinnerFollow(w);
+  };
 
   /* ── Winner Reveal Overlay ── */
   let overlayTimerId = null;
@@ -2635,30 +2889,36 @@
   ];
 
   window.handleWinnerChatMessage = function (sender, text) {
-    if (!activeWinnerUsername) return;
+    if (!sender) return;
     const s1 = String(sender).trim().toLowerCase().replace(/^@/, '');
-    const s2 = String(activeWinnerUsername).trim().toLowerCase().replace(/^@/, '');
+    const matchingWinner = winnersList.find(w => {
+      const uname = String(w.username).toLowerCase().replace(/^@/, '');
+      return uname === s1 && !w.isConfirmed && !w.isExpired && (typeof w.confirmSeconds !== 'number' || w.confirmSeconds > 0);
+    });
+    if (!matchingWinner) return;
+
+    // Potvrdi pobednika i zaustavi tajmer u listi
+    matchingWinner.isConfirmed = true;
+    if (matchingWinner.timerId) {
+      clearInterval(matchingWinner.timerId);
+      matchingWinner.timerId = null;
+    }
+    updateWinnersUI();
+    saveState();
+
+    const s2 = activeWinnerUsername ? String(activeWinnerUsername).trim().toLowerCase().replace(/^@/, '') : '';
     if (s1 === s2) {
       // 1. Sakrij tajmer za potvrdu i zaustavi interval
       const timerBar = document.getElementById('winnerRevealTimerBarWrap');
       const lbl = document.getElementById('winnerRevealTimerLabel');
       if (timerBar) timerBar.style.display = 'none';
-      if (lbl) lbl.style.display = 'none';
+      if (lbl) {
+        lbl.style.display = 'block';
+        lbl.textContent = 'Pobednik je potvrđen';
+      }
       if (overlayTimerId) {
         clearInterval(overlayTimerId);
         overlayTimerId = null;
-      }
-
-      // Potvrdi pobednika i zaustavi tajmer u listi
-      const winObj = winnersList.find(w => String(w.username).toLowerCase().replace(/^@/, '') === s1);
-      if (winObj) {
-        winObj.isConfirmed = true;
-        if (winObj.timerId) {
-          clearInterval(winObj.timerId);
-          winObj.timerId = null;
-        }
-        updateWinnersUI();
-        saveState();
       }
 
       // 2. Potpuno skloni loading tačkice
@@ -2677,9 +2937,47 @@
         content.appendChild(row);
         content.scrollTop = content.scrollHeight;
       }
-
-      showToast(`Pobednik @${sender} se javio u chatu!`, 'success');
     }
+
+    showToast(`Pobednik @${sender} se javio u chatu i potvrđen je!`, 'success');
+  };
+
+  window.confirmWinnerByIndex = function (index) {
+    const idx = parseInt(index, 10);
+    if (isNaN(idx) || idx < 0 || idx >= winnersList.length) return;
+    const winObj = winnersList[idx];
+    if (!winObj) return;
+    winObj.isConfirmed = true;
+    if (winObj.timerId) {
+      clearInterval(winObj.timerId);
+      winObj.timerId = null;
+    }
+    const cleanWinner = String(winObj.username).toLowerCase().replace(/^@/, '');
+    const cleanActive = activeWinnerUsername ? activeWinnerUsername.toLowerCase().replace(/^@/, '') : '';
+    if (cleanActive === cleanWinner) {
+      const timerBar = document.getElementById('winnerRevealTimerBarWrap');
+      const lbl = document.getElementById('winnerRevealTimerLabel');
+      if (timerBar) timerBar.style.display = 'none';
+      if (lbl) { lbl.style.display = 'block'; lbl.textContent = 'Pobednik je potvrđen'; }
+      if (overlayTimerId) { clearInterval(overlayTimerId); overlayTimerId = null; }
+    }
+    updateWinnersUI();
+    saveState();
+    showToast(`Pobednik @${winObj.username} je potvrđen!`, 'success');
+  };
+
+  window.reopenWinnerOverlay = function (index) {
+    const idx = parseInt(index, 10);
+    if (isNaN(idx) || idx < 0 || idx >= winnersList.length) return;
+    const w = winnersList[idx];
+    if (!w) return;
+    const isConf = !!w.isConfirmed;
+    const isExp = !isConf && (!!w.isExpired || (typeof w.confirmSeconds === 'number' && w.confirmSeconds <= 0));
+    const rem = (isConf || isExp) ? 0 : Math.max(0, w.confirmSeconds || 0);
+    const targetWinners = Math.max(1, parseInt(settings.numWinners, 10) || 1);
+    const isTop5 = idx < 5;
+    const isFinalChamp = idx === 0 && winnersList.length >= targetWinners;
+    showWinnerOverlay(w.username, w.prize, rem, isTop5, isFinalChamp);
   };
 
   window.testWinnerChat = function (customMsg) {
@@ -2687,8 +2985,13 @@
     testMsgIndex++;
     if (activeWinnerUsername) {
       window.handleWinnerChatMessage(activeWinnerUsername, msg);
-    } else if (winnersList.length > 0) {
-      window.handleWinnerChatMessage(winnersList[0].username, msg);
+    } else {
+      const unconf = winnersList.find(w => !w.isConfirmed && !w.isExpired && (typeof w.confirmSeconds !== 'number' || w.confirmSeconds > 0));
+      if (unconf) {
+        window.handleWinnerChatMessage(unconf.username, msg);
+      } else if (winnersList.length > 0) {
+        window.handleWinnerChatMessage(winnersList[0].username, msg);
+      }
     }
   };
 
@@ -2709,6 +3012,94 @@
     updateWinnersUI();
     saveState();
   };
+
+  window.redrawWinner = function (index) {
+    const idx = parseInt(index, 10);
+    if (isNaN(idx) || idx < 0 || idx >= winnersList.length) return;
+    const w = winnersList[idx];
+    const removedName = w ? w.username : '';
+    window.removeWinner(idx);
+    window.closeWinnerOverlay();
+    showToast(`Izvlačenje poništeno za @${removedName}. Započeto novo izvlačenje...`, 'info');
+    setTimeout(() => {
+      triggerDraw();
+    }, 250);
+  };
+
+  window.redrawActiveWinner = function () {
+    if (!activeWinnerUsername) return;
+    const cleanActive = String(activeWinnerUsername).trim().toLowerCase().replace(/^@/, '');
+    const idx = winnersList.findIndex(w => String(w.username).toLowerCase().replace(/^@/, '') === cleanActive);
+    if (idx !== -1) {
+      window.redrawWinner(idx);
+    }
+  };
+
+  function updateWinnerOverlayFollowAlert(winObj) {
+    const box = document.getElementById('winnerRevealFollowBox');
+    if (!box) return;
+    if (!winObj || !winObj.followCheck || winObj.followCheck.requiredDays <= 0) {
+      box.style.display = 'none';
+      box.innerHTML = '';
+      return;
+    }
+    const fc = winObj.followCheck;
+    if (fc.status === 'checking') {
+      box.style.display = 'flex';
+      box.className = 'winner-reveal-follow-box is-checking';
+      box.innerHTML = `
+        <svg class="spinner-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg>
+        <span>Provera dužine praćenja kanala...</span>
+      `;
+    } else if (fc.status === 'failed') {
+      box.style.display = 'flex';
+      box.className = 'winner-reveal-follow-box is-failed';
+      const fDays = fc.followDays || 0;
+      const rDays = fc.requiredDays;
+      const warnSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+      const reloadSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`;
+      box.innerHTML = `
+        <div class="follow-box-info">
+          ${warnSvg}
+          <div class="follow-box-text">
+            <strong>Nije ispunjen uslov praćenja!</strong>
+            <span>Prati: ${fDays} / Zahtevano: min. ${rDays} dana</span>
+          </div>
+        </div>
+        <button type="button" class="winner-overlay-redraw-btn" onclick="window.redrawActiveWinner()" title="Poništi ovog pobednika i ponovo izvuci">
+          ${reloadSvg} Ponovo izvuci
+        </button>
+      `;
+    } else if (fc.status === 'passed') {
+      box.style.display = 'flex';
+      box.className = 'winner-reveal-follow-box is-passed';
+      const checkSvg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+      box.innerHTML = `
+        ${checkSvg}
+        <span>Ispunjen uslov praćenja: prati kanal ${fc.followDays} dana (traženo ${fc.requiredDays}d)</span>
+      `;
+    } else if (fc.status === 'error') {
+      box.style.display = 'flex';
+      box.className = 'winner-reveal-follow-box is-error';
+      const warnSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--aj-amber)" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+      const reloadSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`;
+      box.innerHTML = `
+        <div class="follow-box-info">
+          ${warnSvg}
+          <div class="follow-box-text">
+            <strong>Greška pri proveri praćenja!</strong>
+            <span>Nije moguće proveriti dužinu praćenja u ovom trenutku.</span>
+          </div>
+        </div>
+        <button type="button" class="winner-overlay-redraw-btn" onclick="window.verifyWinnerFollowAgainByName(this.dataset.user)" data-user="${escHtml(winObj.username)}" title="Pokušaj proveru ponovo">
+          ${reloadSvg} Proveri ponovo
+        </button>
+      `;
+    } else {
+      box.style.display = 'none';
+      box.innerHTML = '';
+    }
+  }
 
   function showWinnerOverlay(username, prize, confirmSec, isTop5, isFinalChamp) {
     const ov   = document.getElementById('winnerRevealOverlay');
@@ -2733,29 +3124,92 @@
     }
     if (pt) pt.textContent = prize || 'Misteriozna Nagrada';
 
-    // Prikazi i inicijalizuj tajmer
-    if (timerBar) timerBar.style.display = 'block';
-    if (lbl) {
-      lbl.style.display = 'block';
-      lbl.textContent = `${confirmSec}s za potvrdu`;
+    const cleanWinner = winnerUser.replace(/^@/, '').toLowerCase();
+    const winObj = winnersList.find(w => String(w.username).toLowerCase().replace(/^@/, '') === cleanWinner);
+    updateWinnerOverlayFollowAlert(winObj);
+
+    if (overlayTimerId) { clearInterval(overlayTimerId); overlayTimerId = null; }
+
+    const isConf = winObj ? !!winObj.isConfirmed : false;
+    const isExp = winObj ? (!isConf && (!!winObj.isExpired || (typeof winObj.confirmSeconds === 'number' && winObj.confirmSeconds <= 0))) : false;
+
+    if (confirmSec <= 0 || isConf || isExp) {
+      if (timerBar) timerBar.style.display = 'none';
+      if (lbl) {
+        lbl.style.display = 'block';
+        lbl.textContent = isConf ? 'Potvrđeno (Prisutan u chatu)' : 'Nije potvrđeno (Vreme za javljanje je isteklo)';
+      }
+    } else {
+      if (timerBar) timerBar.style.display = 'block';
+      if (lbl) {
+        lbl.style.display = 'block';
+        lbl.textContent = `Čeka se potvrda (${confirmSec}s)`;
+      }
+
+      if (fill) {
+        fill.style.setProperty('transition', 'none', 'important');
+        fill.style.setProperty('width', '100%', 'important');
+        void fill.offsetWidth;
+        fill.style.setProperty('transition', 'width 0.1s linear', 'important');
+      }
+
+      const startTs  = Date.now();
+      const totalMs  = confirmSec * 1000;
+      let   lastSec  = confirmSec;
+
+      const tick = () => {
+        const remMs  = Math.max(0, totalMs - (Date.now() - startTs));
+        const pct    = Math.max(0, Math.min(100, (remMs / totalMs) * 100));
+        if (fill) fill.style.setProperty('width', pct + '%', 'important');
+
+        const remSec = Math.ceil(remMs / 1000);
+        if (remSec !== lastSec) {
+          lastSec = remSec;
+          if (lbl) lbl.textContent = remSec > 0 ? `Čeka se potvrda (${remSec}s)` : 'Nije potvrđeno (Vreme za javljanje je isteklo)';
+        }
+
+        if (remMs <= 0) {
+          clearInterval(overlayTimerId);
+          overlayTimerId = null;
+          if (fill) fill.style.setProperty('width', '0%', 'important');
+          if (lbl)  lbl.textContent  = 'Nije potvrđeno (Vreme za javljanje je isteklo)';
+          const dots = document.getElementById('winnerChatlogDots');
+          const content = document.getElementById('winnerChatlogContent');
+          if (dots) dots.style.setProperty('display', 'none', 'important');
+          if (content) {
+            content.style.setProperty('display', 'block', 'important');
+            content.innerHTML = '<div class="winner-chatlog-item is-expired"><span class="winner-chatlog-text">Pobednik se nije javio u zadatom vremenu. Nije potvrđeno.</span></div>';
+          }
+        }
+      };
+      overlayTimerId = setInterval(tick, 100);
     }
 
-    if (fill) {
-      fill.style.setProperty('transition', 'none', 'important');
-      fill.style.setProperty('width', '100%', 'important');
-      void fill.offsetWidth;
-      fill.style.setProperty('transition', 'width 0.1s linear', 'important');
-    }
-
-    // Resetuj chat box na pulsirajuće tačkice bez starih poruka
+    // Resetuj chat box na pulsirajuće tačkice ili poruku o potvrdi ako je već potvrđen
     const box = document.getElementById('winnerRevealChatlogBox');
     const dots = document.getElementById('winnerChatlogDots');
     const content = document.getElementById('winnerChatlogContent');
-    if (box) box.classList.remove('has-messages');
-    if (dots) dots.style.setProperty('display', 'flex', 'important');
-    if (content) {
-      content.style.setProperty('display', 'none', 'important');
-      content.innerHTML = '';
+    if (isConf) {
+      if (box) box.classList.add('has-messages');
+      if (dots) dots.style.setProperty('display', 'none', 'important');
+      if (content) {
+        content.style.setProperty('display', 'block', 'important');
+        content.innerHTML = '<div class="winner-chatlog-item"><span class="winner-chatlog-text">Pobednik se uspešno javio i potvrđen je.</span></div>';
+      }
+    } else if (isExp) {
+      if (box) box.classList.remove('has-messages');
+      if (dots) dots.style.setProperty('display', 'none', 'important');
+      if (content) {
+        content.style.setProperty('display', 'block', 'important');
+        content.innerHTML = '<div class="winner-chatlog-item is-expired"><span class="winner-chatlog-text">Pobednik se nije javio u zadatom vremenu. Nije potvrđeno.</span></div>';
+      }
+    } else {
+      if (box) box.classList.remove('has-messages');
+      if (dots) dots.style.setProperty('display', 'flex', 'important');
+      if (content) {
+        content.style.setProperty('display', 'none', 'important');
+        content.innerHTML = '';
+      }
     }
 
     if (top5Badge) {
@@ -2771,31 +3225,6 @@
     else if (isTop5)  ov.classList.add('is-top5');
     ov.classList.add('open');
 
-    if (overlayTimerId) { clearInterval(overlayTimerId); overlayTimerId = null; }
-    const startTs  = Date.now();
-    const totalMs  = confirmSec * 1000;
-    let   lastSec  = confirmSec;
-
-    const tick = () => {
-      const remMs  = Math.max(0, totalMs - (Date.now() - startTs));
-      const pct    = Math.max(0, Math.min(100, (remMs / totalMs) * 100));
-      if (fill) fill.style.setProperty('width', pct + '%', 'important');
-
-      const remSec = Math.ceil(remMs / 1000);
-      if (remSec !== lastSec) {
-        lastSec = remSec;
-        if (lbl) lbl.textContent = remSec > 0 ? `${remSec}s za potvrdu` : 'Vreme isteklo';
-      }
-
-      if (remMs <= 0) {
-        clearInterval(overlayTimerId);
-        overlayTimerId = null;
-        if (fill) fill.style.setProperty('width', '0%', 'important');
-        if (lbl)  lbl.textContent  = 'Vreme isteklo';
-      }
-    };
-    overlayTimerId = setInterval(tick, 100);
-
     startParticles(isTop5, isFinalChamp);
 
     const onKey = (e) => { if (e.key === 'Escape') { window.closeWinnerOverlay(); document.removeEventListener('keydown', onKey); } };
@@ -2806,6 +3235,8 @@
     const ov = document.getElementById('winnerRevealOverlay');
     if (ov) { ov.classList.remove('open'); }
     if (overlayTimerId) { clearInterval(overlayTimerId); overlayTimerId = null; }
+    const fbox = document.getElementById('winnerRevealFollowBox');
+    if (fbox) { fbox.style.display = 'none'; fbox.innerHTML = ''; }
     activeWinnerUsername = null;
     stopParticles();
   };
@@ -2817,9 +3248,14 @@
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
+    if (particleResizeHandler) {
+      window.removeEventListener('resize', particleResizeHandler);
+      particleResizeHandler = null;
+    }
     const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
     resize();
-    window.addEventListener('resize', resize);
+    particleResizeHandler = resize;
+    window.addEventListener('resize', particleResizeHandler);
 
     const colors = isFinalChamp
       ? ['#ffd700', '#ff8c00', '#ec4899', '#53fc18', '#06b6d4', '#ffffff', '#c084fc']
@@ -2876,8 +3312,15 @@
 
   function stopParticles() {
     if (particleAnimId) { cancelAnimationFrame(particleAnimId); particleAnimId = null; }
+    if (particleResizeHandler) {
+      window.removeEventListener('resize', particleResizeHandler);
+      particleResizeHandler = null;
+    }
     const canvas = document.getElementById('particleCanvas');
-    if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
   }
 
   /* ── Tajmer potvrde pobednika (Apsolutni expiresAt, nikad se ne resetuje) ── */
@@ -2906,7 +3349,7 @@
         w.isExpired = true;
         clearInterval(w.timerId);
         w.timerId = null;
-        updateSingleWinnerTimerUI(w);
+        updateWinnersUI();
         saveState();
       } else {
         updateSingleWinnerTimerUI(w);
@@ -2915,20 +3358,35 @@
   }
 
   function updateSingleWinnerTimerUI(w) {
-    const cleanId = String(w.username).replace(/[^a-zA-Z0-9_-]/g, '');
-    const timerEl = document.getElementById(`w-timer-${cleanId}`);
-    const barEl   = document.getElementById(`w-bar-${cleanId}`);
-    const isExp   = !!w.isExpired || w.confirmSeconds <= 0;
+    const winnerKey = w.id || String(w.username).replace(/[^a-zA-Z0-9_-]/g, '');
+    const timerEl = document.getElementById(`w-timer-${winnerKey}`);
+    const barEl   = document.getElementById(`w-bar-${winnerKey}`);
+    const cardEl  = document.getElementById(`w-card-${winnerKey}`);
+    const isConf  = !!w.isConfirmed;
+    const isExp   = !isConf && (!!w.isExpired || (typeof w.confirmSeconds === 'number' && w.confirmSeconds <= 0));
 
     if (timerEl) {
-      timerEl.textContent = isExp ? 'Isteklo' : `${w.confirmSeconds}s`;
-      timerEl.classList.toggle('is-expired', isExp);
+      if (isConf) {
+        timerEl.innerHTML = '<span class="status-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span> Potvrđeno';
+        timerEl.className = 'winner-timer is-confirmed';
+      } else if (isExp) {
+        timerEl.innerHTML = '<span class="status-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span> Nije potvrđeno';
+        timerEl.className = 'winner-timer is-expired';
+      } else {
+        timerEl.innerHTML = `<span class="status-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Čeka potvrdu (${w.confirmSeconds}s)`;
+        timerEl.className = 'winner-timer is-waiting';
+      }
     }
     if (barEl) {
       const total = w.initialConfirmSeconds || settings.confirmTime || 60;
-      const pct   = isExp ? 0 : Math.max(0, (w.confirmSeconds / total) * 100);
+      const pct   = isConf ? 100 : (isExp ? 0 : Math.max(0, (w.confirmSeconds / total) * 100));
       barEl.style.width = pct + '%';
       barEl.classList.toggle('is-expired', isExp);
+      barEl.classList.toggle('is-confirmed', isConf);
+    }
+    if (cardEl) {
+      cardEl.classList.toggle('is-winner-confirmed', isConf);
+      cardEl.classList.toggle('is-winner-expired', isExp);
     }
   }
 
@@ -2954,26 +3412,87 @@
 
     let html = '';
     winnersList.forEach((w, idx) => {
-      const cleanId = String(w.username).replace(/[^a-zA-Z0-9_-]/g, '');
+      const winnerKey = w.id || String(w.username).replace(/[^a-zA-Z0-9_-]/g, '') || ('win_' + idx);
       const total = w.initialConfirmSeconds || settings.confirmTime || 60;
       const isConf = !!w.isConfirmed;
       const isExp = !isConf && (!!w.isExpired || w.confirmSeconds <= 0);
       const pct = isConf ? 100 : (isExp ? 0 : Math.max(0, (w.confirmSeconds / total) * 100));
-      const timerText = isConf ? 'Potvrdjeno' : (isExp ? 'Isteklo' : `${w.confirmSeconds}s`);
-      const timerClass = isConf ? 'winner-timer is-confirmed' : (isExp ? 'winner-timer is-expired' : 'winner-timer');
+
+      let timerText = '';
+      let timerClass = 'winner-timer';
+      if (isConf) {
+        timerText = '<span class="status-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span> Potvrđeno';
+        timerClass = 'winner-timer is-confirmed';
+      } else if (isExp) {
+        timerText = '<span class="status-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span> Nije potvrđeno';
+        timerClass = 'winner-timer is-expired';
+      } else {
+        timerText = `<span class="status-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span> Čeka potvrdu (${w.confirmSeconds}s)`;
+        timerClass = 'winner-timer is-waiting';
+      }
+
+      const fc = w.followCheck;
+      let followBadgeHtml = '';
+      let isFollowFailed = false;
+      if (fc && fc.requiredDays > 0) {
+        if (fc.status === 'checking') {
+          followBadgeHtml = `<div class="winner-follow-row"><span class="winner-follow-badge checking">Provera praćenja...</span></div>`;
+        } else if (fc.status === 'failed') {
+          isFollowFailed = true;
+          const warnSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+          const reloadSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`;
+          followBadgeHtml = `
+            <div class="winner-follow-row">
+              <span class="winner-follow-badge failed" title="Ne ispunjava uslov praćenja (prati ${fc.followDays || 0}/${fc.requiredDays} dana)">
+                ${warnSvg} Nije follow (${fc.followDays || 0}/${fc.requiredDays}d)
+              </span>
+              <button type="button" class="winner-redraw-btn" onclick="window.redrawWinner(${idx})" title="Poništi i ponovo izvuci">
+                ${reloadSvg} Ponovi
+              </button>
+            </div>`;
+        } else if (fc.status === 'passed') {
+          const checkSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
+          followBadgeHtml = `<div class="winner-follow-row"><span class="winner-follow-badge passed" title="Prati kanal ${fc.followDays} dana (zahtevano ${fc.requiredDays}d)">${checkSvg} Prati ${fc.followDays}d</span></div>`;
+        } else if (fc.status === 'error') {
+          const warnSvg = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--aj-amber)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
+          const reloadSvg = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`;
+          followBadgeHtml = `
+            <div class="winner-follow-row">
+              <span class="winner-follow-badge error" title="Greška pri proveri praćenja">
+                ${warnSvg} Greška provere
+              </span>
+              <button type="button" class="winner-redraw-btn" onclick="window.verifyWinnerFollowAgain(${idx})" title="Pokušaj proveru ponovo">
+                ${reloadSvg} Ponovo
+              </button>
+            </div>`;
+        }
+      }
+
       html += `
-        <div class="winner-card-item${isConf ? ' is-winner-confirmed' : ''}">
+        <div class="winner-card-item${isConf ? ' is-winner-confirmed' : (isExp ? ' is-winner-expired' : '')}${isFollowFailed ? ' is-follow-failed' : ''}" id="w-card-${winnerKey}">
           <div class="winner-name-row">
-            <div class="winner-name">${trophySvg}<span>${escHtml(w.username)}</span></div>
+            <div class="winner-name" onclick="window.reopenWinnerOverlay(${idx})" style="cursor:pointer;" title="Kliknite za prikaz overlay-a">${trophySvg}<span>${escHtml(w.username)}</span></div>
             <div class="winner-name-right">
-              <span class="${timerClass}" id="w-timer-${cleanId}">${timerText}</span>
+              <span class="${timerClass}" id="w-timer-${winnerKey}">${timerText}</span>
+              ${!isConf ? `
+                <button type="button" class="winner-confirm-btn" onclick="window.confirmWinnerByIndex(${idx})" title="Potvrdi da je prisutan">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+              ` : ''}
+              ${isExp ? `
+                <button type="button" class="winner-redraw-btn" onclick="window.redrawWinner(${idx})" title="Nije se javio — ponovi izvlačenje">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                  <span>Ponovi</span>
+                </button>
+              ` : ''}
               <button type="button" class="winner-remove-btn" onclick="window.removeWinner(${idx})" title="Obriši ovog pobednika">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
           </div>
           <div class="winner-prize-tag">${giftSvg} <span>Nagrada: <strong>${escHtml(w.prize)}</strong></span></div>
-          <div class="timer-bar-wrap"><div class="timer-bar-fill ${isConf ? 'is-confirmed' : (isExp ? 'is-expired' : '')}" id="w-bar-${cleanId}" style="width:${pct}%;"></div></div>
+          ${followBadgeHtml}
+          <div class="timer-bar-wrap"><div class="timer-bar-fill ${isConf ? 'is-confirmed' : (isExp ? 'is-expired' : '')}" id="w-bar-${winnerKey}" style="width:${pct}%;"></div></div>
         </div>`;
     });
     container.innerHTML = html;
@@ -2997,10 +3516,25 @@
   /* ════════════════════════════════════════
      VISUALIZER
   ════════════════════════════════════════ */
+  const MAX_WHEEL_SLICES = 60;
+  let activeWheelDisplayPool = null;
+
   function getPoolList() {
     const pool = [];
     participantsMap.forEach(p => { for (let i = 0; i < p.mult; i++) pool.push(p.username); });
     return pool;
+  }
+
+  function getWheelDisplayPool() {
+    if (isSpinning && activeWheelDisplayPool) return activeWheelDisplayPool;
+    const pool = getPoolList();
+    if (pool.length <= MAX_WHEEL_SLICES) return pool;
+    const step = pool.length / MAX_WHEEL_SLICES;
+    const sampled = [];
+    for (let i = 0; i < MAX_WHEEL_SLICES; i++) {
+      sampled.push(pool[Math.floor(i * step)]);
+    }
+    return sampled;
   }
 
   function updateStageFrames() {
@@ -3076,7 +3610,7 @@
     const cx     = cssW / 2;
     const cy     = cssH / 2;
     const r      = Math.min(cssW, cssH) / 2 - 10;
-    const pool   = getPoolList();
+    const pool   = getWheelDisplayPool();
 
     if (pool.length === 0) {
       ctx.beginPath();
@@ -3286,10 +3820,31 @@
   }
 
   function animateWheelDraw(pool, durMs, spinId) {
+    let activePool = pool;
+    let winIdx = 0;
+    let winner = '';
+
+    if (pool.length > MAX_WHEEL_SLICES) {
+      const realWinIdx = Math.floor(Math.random() * pool.length);
+      winner = pool[realWinIdx];
+      const baseSampled = getWheelDisplayPool().slice();
+      const existingIdx = baseSampled.indexOf(winner);
+      if (existingIdx !== -1) {
+        winIdx = existingIdx;
+      } else {
+        winIdx = Math.floor(Math.random() * MAX_WHEEL_SLICES);
+        baseSampled[winIdx] = winner;
+      }
+      activePool = baseSampled;
+    } else {
+      winIdx = Math.floor(Math.random() * pool.length);
+      winner = pool[winIdx];
+    }
+
+    activeWheelDisplayPool = activePool;
     const extraSpins = 6 + Math.floor(Math.random() * 3);
-    const sliceAngle = (Math.PI * 2) / pool.length;
-    const winIdx = Math.floor(Math.random() * pool.length);
-    // Strelica staje na potpuno nasumičnoj poziciji od 4% do 96% unutar segmenta — može stati tik uz samu iglicu za maksimalnu tenziju!
+    const sliceAngle = (Math.PI * 2) / activePool.length;
+    // Strelica staje na potpuno nasumičnoj poziciji od 4% do 96% unutar segmenta
     const landOffset = 0.04 + Math.random() * 0.92;
     const targetOffset = (Math.PI * 1.5) - (winIdx + landOffset) * sliceAngle;
 
@@ -3306,7 +3861,10 @@
     let lastTick = 0;
 
     function frame(now) {
-      if (spinId !== currentSpinId || !isSpinning) return;
+      if (spinId !== currentSpinId || !isSpinning) {
+        activeWheelDisplayPool = null;
+        return;
+      }
 
       const t = Math.min((now - startTime) / durMs, 1);
       const ease = 1 - Math.pow(1 - t, 4);
@@ -3315,7 +3873,7 @@
       drawWheelOnCanvas('wheelCanvas');
       drawWheelOnCanvas('wheelCanvasFullscreen');
 
-      if (settings.animation === 'wheel' && pool.length > 1) {
+      if (settings.animation === 'wheel' && activePool.length > 1) {
         const tickIndex = Math.floor((((wheelAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / sliceAngle);
         if (tickIndex !== lastTick) { playSoundTick(); lastTick = tickIndex; }
       }
@@ -3323,16 +3881,19 @@
       if (t < 1) {
         requestAnimationFrame(frame);
       } else {
-        if (spinId !== currentSpinId || !isSpinning) return;
+        if (spinId !== currentSpinId || !isSpinning) {
+          activeWheelDisplayPool = null;
+          return;
+        }
         wheelAngle = targetAngle;
         drawWheelOnCanvas('wheelCanvas');
         drawWheelOnCanvas('wheelCanvasFullscreen');
         stopSpinSound();
         isSpinning = false;
+        activeWheelDisplayPool = null;
 
-        const winner = pool[winIdx];
         addWinner(winner);
-        participantsMap.delete(winner.toLowerCase());
+        participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
         updateParticipantsUI();
         drawVisualizerStage();
         refreshAll();
@@ -3373,9 +3934,14 @@
       for (let i = 0; i < targetIdx - 1; i++) {
         items.push(pool[Math.floor(Math.random() * pool.length)]);
       }
-      items.push(pickOther(winner)); // targetIdx - 1 (iznad: zamalo!)
+      const topOther = pickOther(winner);
+      const bottomCandidates = pool.filter(p => p !== winner && p !== topOther);
+      const bottomOther = bottomCandidates.length > 0
+        ? bottomCandidates[Math.floor(Math.random() * bottomCandidates.length)]
+        : pickOther(winner);
+      items.push(topOther);          // targetIdx - 1 (iznad: zamalo!)
       items.push(winner);            // targetIdx (pobednik na payline-u!)
-      items.push(pickOther(winner)); // targetIdx + 1 (ispod: zamalo!)
+      items.push(bottomOther);       // targetIdx + 1 (ispod: zamalo!)
       items.push(pool[Math.floor(Math.random() * pool.length)]);
       items.push(pool[Math.floor(Math.random() * pool.length)]);
       return { targetIdx, items };
@@ -3470,7 +4036,7 @@
         stopSpinSound();
         isSpinning = false;
         addWinner(winner);
-        participantsMap.delete(winner.toLowerCase());
+        participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
         updateParticipantsUI();
         refreshAll();
       }
@@ -3488,7 +4054,10 @@
 
     const candidates = pool.filter(p => p !== winner);
     const almostLeft = candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : pool[0];
-    const almostRight = candidates.length > 1 ? candidates[Math.floor(Math.random() * candidates.length)] : pool[0];
+    const rightCandidates = candidates.filter(p => p !== almostLeft);
+    const almostRight = rightCandidates.length > 0
+      ? rightCandidates[Math.floor(Math.random() * rightCandidates.length)]
+      : (candidates.length > 0 ? candidates[0] : pool[0]);
 
     // Varijabilna dužina trake na svakom izvlačenju: WIN_INDEX se kreće od 42 do 57
     const WIN_INDEX = 42 + Math.floor(Math.random() * 16);
@@ -3566,7 +4135,7 @@
         });
 
         addWinner(winner);
-        participantsMap.delete(winner.toLowerCase());
+        participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
         updateParticipantsUI();
         refreshAll();
       }
@@ -3597,10 +4166,8 @@
 
   function updateSummary() {
     setText('summaryPrize',     settings.prize || 'Misteriozna Nagrada');
-    setText('stagePrizeTitle',  settings.prize || 'Misteriozna Nagrada');
     setText('summaryKeyword',   settings.keyword || 'Sve poruke');
     setText('summaryAnimation', ANIM_LABELS[settings.animation] || ANIM_LABELS.wheel);
-    setText('stageAnimationLabel', ANIM_LABELS[settings.animation] || ANIM_LABELS.wheel);
     setText('stageEligibilityLabel', getEligibilitySummary());
     setText('wfoPrizeText', settings.prize || 'Misteriozna Nagrada');
 
@@ -3651,11 +4218,10 @@
     const isAtMaxWinners  = (settings.numWinners > 0 && winnersList.length >= settings.numWinners);
     const cannotDraw      = !hasParticipants || isSpinning || isAtMaxWinners;
 
-    const drawBtn         = document.getElementById('btnDrawWinner');
     const stageDrawBtn    = document.getElementById('btnStageDraw');
     const wfoDrawBtn      = document.getElementById('wfoBtnDraw');
 
-    [drawBtn, stageDrawBtn, wfoDrawBtn].forEach(btn => {
+    [stageDrawBtn, wfoDrawBtn].forEach(btn => {
       if (!btn) return;
       btn.disabled = cannotDraw;
       if (isSpinning) {
@@ -3676,6 +4242,26 @@
       btn.style.opacity = isResetDisabled ? '0.5' : '1';
       btn.style.pointerEvents = isResetDisabled ? 'none' : 'auto';
     });
+
+    const animSelect = document.getElementById('selectAnimation');
+    if (animSelect) animSelect.disabled = isSpinning;
+
+    const btnClearP = document.getElementById('btnClearParticipants');
+    if (btnClearP) {
+      btnClearP.disabled = isSpinning;
+      btnClearP.style.pointerEvents = isSpinning ? 'none' : 'auto';
+      btnClearP.style.opacity = isSpinning ? '0.5' : '1';
+    }
+
+    const btnTest = document.getElementById('btnTestMessage');
+    if (btnTest) {
+      btnTest.disabled = isSpinning;
+      btnTest.style.pointerEvents = isSpinning ? 'none' : 'auto';
+      btnTest.style.opacity = isSpinning ? '0.5' : '1';
+    }
+
+    const inputSpin = document.getElementById('inputSpinTime');
+    if (inputSpin) inputSpin.disabled = isSpinning;
 
     updateStartButtonUI();
   }
@@ -3745,6 +4331,18 @@
     warning: (m, d) => showToast(m, 'warning', d),
     info:    (m, d) => showToast(m, 'info', d)
   };
+
+  // Cross-tab sinhronizacija stanja
+  window.addEventListener('storage', (e) => {
+    if (isSpinning) return;
+    const currentChKey = channelName ? `${STATE_KEY}_${channelName.toLowerCase()}` : null;
+    if (e.key === STATE_KEY || (currentChKey && e.key === currentChKey)) {
+      loadState(channelName);
+      updateParticipantsUI();
+      drawVisualizerStage();
+      updateWinnersUI();
+    }
+  });
 
   /* ════════════════════════════════════════
      HELPERS

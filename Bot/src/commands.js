@@ -1,6 +1,6 @@
 const config = require('./config');
 const state = require('./state');
-const { log, isValidUsername, sanitizeInput, proveraKulauna, prevediVreme, dobijTrenutniMesec, fetchKickAPI } = require('./utils');
+const { log, isValidUsername, sanitizeInput, proveraKulauna, prevediVreme, dobijTrenutniMesec, dobijTrenutniDan, fetchKickAPI } = require('./utils');
 const { supabase, KORISTI_SUPABASE, osigurajCuvanjeLjubavi, sacuvajLeaderboard } = require('./database');
 const { posaljiPoruku } = require('./messenger');
 
@@ -141,66 +141,7 @@ function handleRoll(chatroomId, sender, targetRaw) {
     }
 }
 
-// ─── DUEL ────────────────────────────────────────────────────────────────────
-function handleDuel(chatroomId, sender, meta) {
-    const args = meta.split(/\s+/).filter(Boolean);
-    if (args.length === 0) {
-        posaljiPoruku(chatroomId, `${sender}, moraš tag-ovati nekoga za duel! ⚔️`);
-        return;
-    }
 
-    if (!isValidUsername(sender)) return;
-    const cleanSender = sanitizeInput(sender);
-
-    let challenger = '';
-    let opponent = '';
-
-    if (args.length === 1) {
-        challenger = cleanSender;
-        opponent = args[0].replace(/^@/, '').trim();
-    } else {
-        challenger = args[0].replace(/^@/, '').trim();
-        opponent = args[1].replace(/^@/, '').trim();
-    }
-
-    if (!isValidUsername(challenger) || !isValidUsername(opponent)) {
-        posaljiPoruku(chatroomId, '❌ Nevalidno korisničko ime.');
-        return;
-    }
-
-    const cleanChallenger = sanitizeInput(challenger);
-    const cleanOpponent = sanitizeInput(opponent);
-
-    if (!cleanOpponent || cleanChallenger.toLowerCase() === cleanOpponent.toLowerCase()) {
-        posaljiPoruku(chatroomId, `${cleanSender}, duel između iste osobe nije moguć! 😄`);
-        return;
-    }
-
-    const pobednik = Math.random() < 0.5 ? cleanChallenger : cleanOpponent;
-    const gubitnik = pobednik === cleanChallenger ? cleanOpponent : cleanChallenger;
-    const rezultati = [
-        `⚔️ ${cleanChallenger} vs ${cleanOpponent} — Pobednički skor 100-0 za korisnika ${pobednik}! ${gubitnik} ostaje bez poena. 💥`,
-        `🥊 ${cleanChallenger} vs ${cleanOpponent} — Nokaut u prvoj rundi! ${pobednik} slavi pobedu, ${gubitnik} pada na pod. 💥`,
-        `🎯 ${cleanChallenger} vs ${cleanOpponent} — Brzi headshot! ${pobednik} uzima rundu, ${gubitnik} ide na respawn od 30s. 💀`,
-        `🔫 ${cleanChallenger} vs ${cleanOpponent} — ${pobednik} odnosi pobedu uz FATALITY! ${gubitnik} — get rekt. 😈`,
-        `⚡ ${cleanChallenger} vs ${cleanOpponent} — Velika brzina igrača ${pobednik}! ${gubitnik} ne zna šta ga je snašlo! ⚡`,
-        `🛡️ ${cleanChallenger} vs ${cleanOpponent} — Mod odbrana igrača ${gubitnik} ne pomaže, ${pobednik} odnosi pobedu jednim udarcem! 🛡️`,
-        `💨 ${cleanChallenger} vs ${cleanOpponent} — ${gubitnik} beži sa megdana! Nova titula šampiona ide za igrača ${pobednik}! 🏃💨`,
-        `🧙‍♂️ ${cleanChallenger} vs ${cleanOpponent} — Magični trik! ${pobednik} pretvara igrača ${gubitnik} u žabu! 🐸`,
-        `🦴 ${cleanChallenger} vs ${cleanOpponent} — Potpuna dominacija! ${pobednik} nanosi težak poraz za ${gubitnik}! 🔥`,
-        `🍌 ${cleanChallenger} vs ${cleanOpponent} — Nesrećan pad! ${gubitnik} gubi duel zbog kore od banane, ${pobednik} slavi! 🍌`,
-        `🎮 ${cleanChallenger} vs ${cleanOpponent} — Korišćenje šifre! ${pobednik} uzima pobedu u sekundi! EZ PZ! 🎮`,
-        `🦖 ${cleanChallenger} vs ${cleanOpponent} — Prizivanje zveri! T-Rex u službi igrača ${pobednik} eliminiše igrača ${gubitnik}! 🦖`,
-        `🚌 ${cleanChallenger} vs ${cleanOpponent} — Svadbeni bus gazi sve pred sobom! ${pobednik} odnosi pobedu protiv ${gubitnik}! 🚌💨`,
-        `⌨️ ${cleanChallenger} vs ${cleanOpponent} — Tastatura leti kroz vazduh! ${pobednik} tera igrača ${gubitnik} na RAGE QUIT! ⌨️💥`,
-        `🤼 ${cleanChallenger} vs ${cleanOpponent} — RKO iz vedra neba! ${pobednik} pogađa, ${gubitnik} gubi ravnotežu! 🤼‍♂️💥`,
-        `👟 ${cleanChallenger} vs ${cleanOpponent} — Leteća patika! ${pobednik} pogađa metu, ${gubitnik} ide u aut! 👟🎯`,
-        `💤 ${cleanChallenger} vs ${cleanOpponent} — ${gubitnik} spava usred borbe! Lagana pobeda za igrača ${pobednik}! 💤`,
-        `🎵 ${cleanChallenger} vs ${cleanOpponent} — Koncert na mikrofonu! ${pobednik} peva narodnjake, ${gubitnik} predaje meč u suzama! 🎶😭`
-    ];
-    const poruka = rezultati[Math.floor(Math.random() * rezultati.length)];
-    posaljiPoruku(chatroomId, poruka);
-}
 
 // ─── RUSKI RULET ─────────────────────────────────────────────────────────────
 function handleRulet(chatroomId, sender) {
@@ -289,32 +230,37 @@ async function handleFollowage(chatroomId, sender, targetRaw) {
 
         let data = null;
 
-        // 1. Pokušaj preko zvaničnog Public API-ja (ako imamo token)
+        // 1. Primarno preko Kick v2 API /api/v2/channels/{channel}/users/{username}
         try {
-            const token = await kickAuth.getAccessToken();
-            if (token) {
-                const resAuth = await fetch(`https://api.kick.com/public/v1/channels/${channelUsername}/users/${cleanTarget}/follow-date`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
-                    }
-                });
-                if (resAuth.ok) {
-                    data = await resAuth.json();
-                }
+            const res = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}/users/${cleanTarget}`);
+            if (res && res.ok) {
+                data = await res.json();
             }
         } catch (_) { }
 
-        // 2. Ako 1 nije uspelo, probaj v2 API preko utils.fetchKickAPI
-        if (!data || !data.created_at) {
-            const res = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}/users/${cleanTarget}/follow-date`);
-            if (res.ok) {
-                data = await res.json();
-            }
+        // 2. Fallback preko zvaničnog Public API-ja (ako imamo token)
+        if (!data || !data.following_since) {
+            try {
+                const token = await kickAuth.getAccessToken();
+                if (token) {
+                    const resAuth = await fetch(`https://api.kick.com/public/v1/channels/${channelUsername}/users/${cleanTarget}`, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/json'
+                        }
+                    });
+                    if (resAuth.ok) {
+                        const authData = await resAuth.json();
+                        if (authData && (authData.following_since || authData.followed_at)) {
+                            data = { ...data, ...authData };
+                        }
+                    }
+                }
+            } catch (_) { }
         }
 
-        if (data && (data.created_at || data.followed_at)) {
-            const rawDate = data.created_at || data.followed_at;
+        const rawDate = data ? (data.following_since || data.followed_at || data.follow_date) : null;
+        if (rawDate) {
             const followDate = new Date(rawDate);
             if (!isNaN(followDate.getTime())) {
                 const diffTime = Math.abs(Date.now() - followDate.getTime());
@@ -416,6 +362,77 @@ function handleLove(chatroomId, sender, args) {
     }
 
     posaljiPoruku(chatroomId, `❤️ Ljubavni Kalkulator: @${cleanU1} + @${cleanU2} = ${procenat}% | Komentar: ${komentar}`);
+}
+
+// ─── KALKULATOR MRŽNJE (!mrzim) ──────────────────────────────────────────────
+function handleMrzim(chatroomId, sender, args) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const delovi = (args || '').split(/\s+/).filter(Boolean);
+    let user1 = '';
+    let user2 = '';
+
+    const mentions = delovi.filter(d => d.startsWith('@'));
+    if (mentions.length >= 2) {
+        user1 = mentions[0];
+        user2 = mentions[1];
+    } else if (mentions.length === 1) {
+        user1 = sender;
+        user2 = mentions[0];
+    } else if (delovi.length === 1) {
+        user1 = sender;
+        user2 = delovi[0];
+    } else {
+        posaljiPoruku(chatroomId, 'Upotreba: !mrzim @user ili !mrzim @user1 @user2');
+        return;
+    }
+
+    const u1 = user1.replace(/^@/, '').trim();
+    const u2 = user2.replace(/^@/, '').trim();
+
+    if (!u1 || !u2) {
+        posaljiPoruku(chatroomId, 'Upotreba: !mrzim @user ili !mrzim @user1 @user2');
+        return;
+    }
+
+    if (!isValidUsername(u1) || !isValidUsername(u2)) {
+        posaljiPoruku(chatroomId, '❌ Nevalidno korisničko ime.');
+        return;
+    }
+
+    const cleanU1 = sanitizeInput(u1);
+    const cleanU2 = sanitizeInput(u2);
+
+    if (cleanU1.toLowerCase() === cleanU2.toLowerCase()) {
+        posaljiPoruku(chatroomId, `🖤 Mržnja prema samom sebi? Nemoj tako @${cleanU1}, voli sebe! 🥰`);
+        return;
+    }
+
+    const kljucMod = [cleanU1.toLowerCase(), cleanU2.toLowerCase()].sort().join('::');
+    const baza = getDefaultLove(cleanU1, cleanU2);
+    const modifikator = channelState.loveModifiers ? (channelState.loveModifiers[kljucMod] || 0) : 0;
+    let procenatLjubavi = baza + modifikator;
+    procenatLjubavi = Math.max(-100, Math.min(100, procenatLjubavi));
+
+    // Inverzna formula za mržnju: kada je ljubav 100% -> mržnja 0%, kada je ljubav -100% -> mržnja 100%
+    let procenatMrznje = Math.round(((100 - procenatLjubavi) / 200) * 100);
+    procenatMrznje = Math.max(0, Math.min(100, procenatMrznje));
+
+    let komentar = '';
+    if (procenatMrznje < 15) {
+        komentar = 'Ovde nema ni trunke mržnje, čista harmonija i ljubav! ❤️✨';
+    } else if (procenatMrznje <= 40) {
+        komentar = 'Mala neslaganja, ali generalno se dobro podnosite. 🤝';
+    } else if (procenatMrznje <= 65) {
+        komentar = 'Netrpeljivost se oseća u vazduhu, varnice sevaju! ⚡👀';
+    } else if (procenatMrznje <= 85) {
+        komentar = 'Ozbiljan hejt! Bolje se zaobilazite u širokom luku! 🤺🔥';
+    } else {
+        komentar = 'Apsolutna toksičnost i neprijateljstvo veka! Krvni neprijatelji! ☠️💣';
+    }
+
+    posaljiPoruku(chatroomId, `🖤 Kalkulator Mržnje: @${cleanU1} i @${cleanU2} = ${procenatMrznje}% mržnje | Komentar: ${komentar}`);
 }
 
 function handleModifyLove(chatroomId, sender, targetRaw, amount) {
@@ -690,19 +707,59 @@ function handleTop(chatroomId, numRaw) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
-    let limit = 5;
-    if (numRaw) {
-        const parsed = parseInt(numRaw.trim(), 10);
-        if (!isNaN(parsed) && parsed > 0) {
-            limit = Math.min(15, parsed);
+    const rawStr = (numRaw || '').trim();
+    const lowerRaw = rawStr.toLowerCase();
+
+    // 1. Provera za pod-leaderboarde: watchtime, coins/poeni, nivoi/level
+    if (lowerRaw.startsWith('watchtime') || lowerRaw.startsWith('watch') || lowerRaw.startsWith('gledanje') || lowerRaw.startsWith('sati')) {
+        const remainingArg = rawStr.replace(/^(watchtime|watch|gledanje|sati)/i, '').trim();
+        const watchtimeMod = require('./watchtime');
+        if (channelState.feature_watchtime !== false) {
+            watchtimeMod.handleTopWatchtime(chatroomId, remainingArg);
+        } else {
+            posaljiPoruku(chatroomId, `⚠️ Watchtime sistem je trenutno isključen na ovom kanalu.`);
         }
+        return;
     }
 
-    const sortirani = Object.values(channelState.leaderboard)
+    if (lowerRaw.startsWith('coins') || lowerRaw.startsWith('coin') || lowerRaw.startsWith('poeni') || lowerRaw.startsWith('pare') || lowerRaw.startsWith('bal') || lowerRaw.startsWith('novac')) {
+        const remainingArg = rawStr.replace(/^(coins|coin|poeni|pare|bal|novac)/i, '').trim();
+        const economyMod = require('./economy');
+        economyMod.handleTopCoins(chatroomId, remainingArg);
+        return;
+    }
+
+    if (lowerRaw.startsWith('level') || lowerRaw.startsWith('xp') || lowerRaw.startsWith('nivo') || lowerRaw.startsWith('lvl')) {
+        const remainingArg = rawStr.replace(/^(level|xp|nivo|lvl)/i, '').trim();
+        const economyMod = require('./economy');
+        economyMod.handleTopLevel(chatroomId, remainingArg);
+        return;
+    }
+
+    // 2. Chatters / Poruke aktivnost (podrazumevano ili preko ključnih reči)
+    let cleanedArg = rawStr;
+    if (lowerRaw.startsWith('chatters') || lowerRaw.startsWith('chatter') || lowerRaw.startsWith('poruke') || lowerRaw.startsWith('poruka') || lowerRaw.startsWith('chat')) {
+        cleanedArg = rawStr.replace(/^(chatters|chatter|poruke|poruka|chat)/i, '').trim();
+    }
+
+    let limit = 5;
+    let isDaily = false;
+    const lowerCleaned = cleanedArg.toLowerCase();
+    if (lowerCleaned.includes('dan') || lowerCleaned.includes('today') || lowerCleaned.includes('dnevno')) {
+        isDaily = true;
+    }
+    const parsed = parseInt(cleanedArg.replace(/\D/g, ''), 10);
+    if (!isNaN(parsed) && parsed > 0) {
+        limit = Math.min(15, parsed);
+    }
+
+    const dataSource = isDaily ? (channelState.leaderboardDaily || {}) : (channelState.leaderboard || {});
+    const sortirani = Object.values(dataSource)
         .sort((a, b) => b.count - a.count);
 
     if (sortirani.length === 0) {
-        posaljiPoruku(chatroomId, '🏆 Leaderboard je trenutno prazan. Napišite nešto u chat i budite prvi!');
+        const periodText = isDaily ? 'danas' : 'ovaj mesec';
+        posaljiPoruku(chatroomId, `🏆 Leaderboard za ${periodText} je trenutno prazan. Napišite nešto u chat i budite prvi!`);
         return;
     }
 
@@ -710,8 +767,13 @@ function handleTop(chatroomId, numRaw) {
         .map((x, idx) => `${idx + 1}. @${x.username} (${x.count})`)
         .join(', ');
 
-    const trenutniMesec = dobijTrenutniMesec();
-    posaljiPoruku(chatroomId, `🏆 Aktivnost (${trenutniMesec}) - Top ${limit}: ${topList}`);
+    if (isDaily) {
+        const dan = channelState.tekuciDanLeaderboarda || dobijTrenutniDan();
+        posaljiPoruku(chatroomId, `🏆 Dnevna aktivnost (${dan}) - Top ${limit}: ${topList}`);
+    } else {
+        const trenutniMesec = dobijTrenutniMesec();
+        posaljiPoruku(chatroomId, `🏆 Aktivnost (${trenutniMesec}) - Top ${limit}: ${topList}`);
+    }
 }
 
 function handleMe(chatroomId, sender, targetRaw) {
@@ -752,8 +814,36 @@ function handleMe(chatroomId, sender, targetRaw) {
     posaljiPoruku(chatroomId, `📊 @${user} | Lvl ${nivo} (${titula}) | 🪙 ${coins.toLocaleString()} ${valuta} | 💬 ${msgCount.toLocaleString()} poruka (Rang ${rankPoruke}) | ⏱️ ${wtStr}`);
 }
 
-function handleAktivnost(chatroomId, user, targetRaw) {
-    handleMe(chatroomId, user, targetRaw);
+function handleAktivnost(chatroomId, sender, targetRaw) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : '';
+    let user = sanitizeInput(sender);
+    if (target && isValidUsername(target)) {
+        user = sanitizeInput(target);
+    }
+    if (!isValidUsername(user)) return;
+
+    const key = user.toLowerCase();
+
+    // 1. Dnevne poruke iz leaderboard_daily
+    const dailyCount = channelState.leaderboardDaily && channelState.leaderboardDaily[key]
+        ? (channelState.leaderboardDaily[key].count || 0)
+        : 0;
+
+    // 2. Mesečne poruke iz leaderboard
+    const msgCount = channelState.leaderboard && channelState.leaderboard[key]
+        ? (channelState.leaderboard[key].count || 0)
+        : 0;
+
+    // 3. Rang korisnika po mesečnim porukama
+    const sortiraniPoruke = Object.values(channelState.leaderboard || {})
+        .sort((a, b) => (b.count || 0) - (a.count || 0));
+    const rankPorukeIdx = sortiraniPoruke.findIndex(x => (x.username || '').toLowerCase() === key);
+    const rankPoruke = rankPorukeIdx !== -1 ? `#${rankPorukeIdx + 1}` : 'N/A';
+
+    posaljiPoruku(chatroomId, `💬 @${user} | Čet aktivnost: ${dailyCount.toLocaleString()} poruka danas | ${msgCount.toLocaleString()} ovog meseca (Rang ${rankPoruke})`);
 }
 
 async function handleResetLeaderboard(chatroomId, user, isAuthorized) {
@@ -1669,17 +1759,17 @@ function handleHelp(chatroomId, username) {
 
     // Zabava
     if (channelState.feature_games !== false) {
-        parts.push(`Zabava: ${prefix}iq, ${prefix}samar, ${prefix}roll, ${prefix}duel, ${prefix}rulet, ${prefix}alkotest`);
+        parts.push(`Zabava: ${prefix}iq, ${prefix}samar, ${prefix}roll, ${prefix}ruskirulet (${prefix}rr), ${prefix}alkotest, ${prefix}cinjenica`);
     }
 
     // Kockanje
     if (channelState.feature_games !== false && channelState.gamble_enabled !== false) {
-        parts.push(`Kazino: ${prefix}slots, ${prefix}rulet, ${prefix}coinflip, ${prefix}tocak`);
+        parts.push(`Kazino: ${prefix}slots, ${prefix}rulet, ${prefix}coinflip, ${prefix}tocak, ${prefix}duel`);
     }
 
     // Ekonomija & Stats
     if (channelState.feature_leaderboard !== false) {
-        parts.push(`Stats: ${prefix}rank, ${prefix}points, ${prefix}daily, ${prefix}top, ${prefix}toplevel, ${prefix}topcoins`);
+        parts.push(`Stats: ${prefix}chat, ${prefix}me, ${prefix}rank, ${prefix}points, ${prefix}daily, ${prefix}top, ${prefix}toplevel, ${prefix}topcoins`);
     }
 
     // Watchtime
@@ -1689,12 +1779,12 @@ function handleHelp(chatroomId, username) {
 
     // Ljubav & Brak
     if (channelState.feature_love !== false) {
-        parts.push(`Ljubav: ${prefix}love, ${prefix}vencaj, ${prefix}brakovi, ${prefix}razvod`);
+        parts.push(`Ljubav: ${prefix}love, ${prefix}mrzim, ${prefix}vencaj, ${prefix}brakovi, ${prefix}razvod`);
     }
 
     // Muzika & Store
     if (channelState.feature_songrequest) {
-        parts.push(`Muzika: ${prefix}pesma (${prefix}sr)`);
+        parts.push(`Muzika: ${prefix}pesma (${prefix}sr), ${prefix}songqueue, ${prefix}skipsong`);
     }
 
     const spisak = parts.join(' | ');
@@ -1748,12 +1838,12 @@ module.exports = {
     handleIq,
     handleSamar,
     handleRoll,
-    handleDuel,
     handleRulet,
     handleAlkotest,
     handleCinjenica,
     handleFollowage,
     handleLove,
+    handleMrzim,
     handleModifyLove,
     handleVencaj,
     handlePrihvatiBrak,

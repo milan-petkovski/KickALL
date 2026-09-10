@@ -93,19 +93,21 @@ const defaultBuiltinRanks = {
     'roll': 'everyone',
     'duel': 'everyone',
     'ruskirulet': 'everyone',
+    'rr': 'everyone',
     'alkotest': 'everyone',
     'cinjenica': 'everyone',
+    'fact': 'everyone',
     
     // Ljubav & Brak
     'love': 'everyone',
+    'mrzim': 'everyone',
+    'hate': 'everyone',
     'vencaj': 'everyone',
     'razvod': 'everyone',
     'brakovi': 'everyone',
     'brak': 'everyone',
     'vencani': 'everyone',
     'posaljiljubav': 'everyone',
-    'odbijljubav': 'everyone',
-    'mrzim': 'everyone',
     'bacihejt': 'everyone',
     'prihvati': 'everyone',
     'da': 'everyone',
@@ -113,6 +115,7 @@ const defaultBuiltinRanks = {
     'odbij': 'everyone',
     'ne': 'everyone',
     'odbijam': 'everyone',
+    'decline': 'everyone',
     'cooldown': 'everyone',
     'coldown': 'everyone',
     
@@ -146,10 +149,15 @@ const defaultBuiltinRanks = {
     'topwatchtime': 'everyone',
     'topwatch': 'everyone',
     'top': 'everyone',
+    'topchat': 'everyone',
+    'topchatters': 'everyone',
+    'topporuke': 'everyone',
     'leaderboard': 'everyone',
+    'chat': 'everyone',
     'aktivnost': 'everyone',
     'stats': 'everyone',
     'me': 'everyone',
+    'profil': 'everyone',
     'followage': 'everyone',
     'resetleaderboard': 'broadcaster',
     
@@ -194,7 +202,11 @@ const defaultBuiltinRanks = {
     // Muzika
     'pesma': 'everyone',
     'sr': 'everyone',
-    'song': 'everyone'
+    'song': 'everyone',
+    'songqueue': 'everyone',
+    'redpesama': 'everyone',
+    'skipsong': 'moderator',
+    'preskocipesmu': 'moderator'
 };
 
 function getUserRankLevel(username, senderObj, channelUsername) {
@@ -262,6 +274,14 @@ function pronadjiCustomKomandu(channelState, cmdImeRaw) {
             'addcom': 'dodajkomandu',
             'delcom': 'obrisikomandu',
             'leaderboard': 'top',
+            'topchat': 'top',
+            'topchatters': 'top',
+            'topchatter': 'top',
+            'topmessages': 'top',
+            'topporuke': 'top',
+            'sati': 'watchtime',
+            'poruke': 'chat',
+            'poruka': 'chat',
             'stats': 'me',
             'aktivnost': 'me',
             'level': 'rank',
@@ -651,9 +671,14 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!watchtime' || porukaNormalized.startsWith('!watchtime ')) {
+            if (porukaNormalized === '!watchtime' || porukaNormalized.startsWith('!watchtime ') || porukaNormalized === '!sati' || porukaNormalized.startsWith('!sati ')) {
                 if (channelState.feature_watchtime === false) return;
-                const args = porukaSredjena.slice(10).trim();
+                let args = '';
+                if (porukaNormalized.startsWith('!watchtime')) {
+                    args = porukaSredjena.slice(10).trim();
+                } else {
+                    args = porukaSredjena.slice(5).trim();
+                }
                 if (utils.proveraKulauna(chatroomId, '!watchtime', username)) return;
                 watchtime.handleWatchtime(chatroomId, username, args);
                 return;
@@ -791,15 +816,7 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!accept' || porukaNormalized === '!prihvati') {
-                gambling.handleAcceptDuel(chatroomId, username);
-                return;
-            }
 
-            if (porukaNormalized === '!odbij') {
-                gambling.handleDeclineDuel(chatroomId, username);
-                return;
-            }
 
             // ─── PRODAVNICA & NAGRADE ───────────────────────────────────────
             if (porukaNormalized === '!store' || porukaNormalized === '!prodavnica' || porukaNormalized === '!shop') {
@@ -1013,15 +1030,46 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!prihvati' || porukaNormalized === '!da' || porukaNormalized === '!pristajem') {
-                if (utils.proveraKulauna(chatroomId, '!prihvati', username)) return;
-                commands.handlePrihvatiBrak(chatroomId, username);
+            if (porukaNormalized.startsWith('!mrzim') || porukaNormalized.startsWith('!hate')) {
+                if (channelState.feature_love === false) return;
+                const args = porukaNormalized.startsWith('!mrzim') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(5).trim();
+                if (utils.proveraKulauna(chatroomId, '!mrzim', username)) return;
+                commands.handleMrzim(chatroomId, username, args);
                 return;
             }
 
-            if (porukaNormalized === '!odbij' || porukaNormalized === '!ne' || porukaNormalized === '!odbijam') {
-                if (utils.proveraKulauna(chatroomId, '!odbij', username)) return;
-                commands.handleOdbijBrak(chatroomId, username);
+            // ─── UNIFICIRANO PRIHVATANJE & ODBIJANJE (DVOBOJ & BRAK) ─────────
+            if (porukaNormalized === '!accept' || porukaNormalized === '!prihvati' || porukaNormalized === '!da' || porukaNormalized === '!pristajem') {
+                const userKey = username.toLowerCase();
+                if (channelState.pendingDuels && channelState.pendingDuels[userKey]) {
+                    gambling.handleAcceptDuel(chatroomId, username);
+                    return;
+                }
+                if (channelState.pendingProposals && channelState.pendingProposals[userKey]) {
+                    if (utils.proveraKulauna(chatroomId, '!prihvati', username)) return;
+                    commands.handlePrihvatiBrak(chatroomId, username);
+                    return;
+                }
+                if (porukaNormalized === '!accept') {
+                    gambling.handleAcceptDuel(chatroomId, username);
+                } else {
+                    messenger.posaljiPoruku(chatroomId, `❌ @${username}, nemaš aktivnih poziva za dvoboj niti predloga za brak.`);
+                }
+                return;
+            }
+
+            if (porukaNormalized === '!odbij' || porukaNormalized === '!ne' || porukaNormalized === '!odbijam' || porukaNormalized === '!decline') {
+                const userKey = username.toLowerCase();
+                if (channelState.pendingDuels && channelState.pendingDuels[userKey]) {
+                    gambling.handleDeclineDuel(chatroomId, username);
+                    return;
+                }
+                if (channelState.pendingProposals && channelState.pendingProposals[userKey]) {
+                    if (utils.proveraKulauna(chatroomId, '!odbij', username)) return;
+                    commands.handleOdbijBrak(chatroomId, username);
+                    return;
+                }
+                messenger.posaljiPoruku(chatroomId, `❌ @${username}, nemaš aktivnih poziva za dvoboj niti predloga za brak.`);
                 return;
             }
 
@@ -1062,12 +1110,26 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!me') || porukaNormalized.startsWith('!stats') || porukaNormalized.startsWith('!aktivnost')) {
+            // Čet aktivnost (!chat, !aktivnost, !poruke)
+            if (porukaNormalized.startsWith('!chat') || porukaNormalized.startsWith('!aktivnost') || porukaNormalized.startsWith('!poruke') || porukaNormalized.startsWith('!poruka')) {
+                if (channelState.feature_leaderboard === false) return;
+                let target = '';
+                if (porukaNormalized.startsWith('!chat')) target = porukaSredjena.slice(5).trim();
+                else if (porukaNormalized.startsWith('!aktivnost')) target = porukaSredjena.slice(10).trim();
+                else if (porukaNormalized.startsWith('!poruke')) target = porukaSredjena.slice(7).trim();
+                else target = porukaSredjena.slice(7).trim();
+                if (utils.proveraKulauna(chatroomId, '!chat', username)) return;
+                commands.handleAktivnost(chatroomId, username, target);
+                return;
+            }
+
+            // Korisnički profil i karton (!me, !stats, !profil)
+            if (porukaNormalized.startsWith('!me') || porukaNormalized.startsWith('!stats') || porukaNormalized.startsWith('!profil')) {
                 if (channelState.feature_leaderboard === false) return;
                 let target = '';
                 if (porukaNormalized.startsWith('!me')) target = porukaSredjena.slice(3).trim();
                 else if (porukaNormalized.startsWith('!stats')) target = porukaSredjena.slice(6).trim();
-                else target = porukaSredjena.slice(10).trim();
+                else target = porukaSredjena.slice(7).trim();
                 if (utils.proveraKulauna(chatroomId, '!me', username)) return;
                 commands.handleMe(chatroomId, username, target);
                 return;
@@ -1948,6 +2010,89 @@ async function handleHttpRequest(req, res) {
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ error: err.message }));
+            }
+            return;
+        }
+
+        if (parsedUrl.pathname === '/api/kick/follow-check' && req.method === 'GET') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized access to follow-check endpoint' }));
+                return;
+            }
+            const channel = parsedUrl.searchParams.get('channel') || parsedUrl.searchParams.get('channelUsername');
+            const username = parsedUrl.searchParams.get('username');
+            if (!channel || !username) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing channel or username parameter' }));
+                return;
+            }
+            const cleanChannel = String(channel).trim().toLowerCase().replace(/^@/, '');
+            const cleanTarget = String(username).trim().toLowerCase().replace(/^@/, '');
+
+            try {
+                let data = null;
+                // 1. Primarno: Kick v2 API /api/v2/channels/{channel}/users/{username}
+                try {
+                    const resV2 = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${cleanChannel}/users/${cleanTarget}`);
+                    if (resV2 && resV2.ok) {
+                        data = await resV2.json();
+                    }
+                } catch (_) { }
+
+                // 2. Fallback preko zvaničnog Public API-ja (ako imamo token)
+                if (!data || !data.following_since) {
+                    try {
+                        const token = await kickAuth.getAccessToken();
+                        if (token) {
+                            const resAuth = await fetch(`https://api.kick.com/public/v1/channels/${cleanChannel}/users/${cleanTarget}`, {
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Accept': 'application/json'
+                                }
+                            });
+                            if (resAuth.ok) {
+                                const authData = await resAuth.json();
+                                if (authData && (authData.following_since || authData.followed_at)) {
+                                    data = { ...data, ...authData };
+                                }
+                            }
+                        }
+                    } catch (_) { }
+                }
+
+                // 3. Kick v2 users API vraća following_since (ISO timestamp ili null ako ne prati)
+                const rawDate = data ? (data.following_since || data.followed_at || data.follow_date) : null;
+                if (rawDate) {
+                    const followDate = new Date(rawDate);
+                    if (!isNaN(followDate.getTime())) {
+                        const diffTime = Math.max(0, Date.now() - followDate.getTime());
+                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({
+                            is_following: true,
+                            follow_days: diffDays,
+                            follow_date: followDate.toISOString(),
+                            subscribed_months: typeof data.subscribed_for === 'number' ? data.subscribed_for : 0,
+                            username: cleanTarget,
+                            channel: cleanChannel
+                        }));
+                        return;
+                    }
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    is_following: false,
+                    follow_days: 0,
+                    follow_date: null,
+                    subscribed_months: (data && typeof data.subscribed_for === 'number') ? data.subscribed_for : 0,
+                    username: cleanTarget,
+                    channel: cleanChannel
+                }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message, is_following: false, follow_days: 0 }));
             }
             return;
         }

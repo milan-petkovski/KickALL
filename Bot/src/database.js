@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const config = require('./config');
 const state = require('./state');
-const { log, dobijTrenutniMesec, sanitizeInput, isValidUsername, runWithLeaderboardLock } = require('./utils');
+const { log, dobijTrenutniMesec, dobijTrenutniDan, sanitizeInput, isValidUsername, runWithLeaderboardLock } = require('./utils');
 
 // Inicijalizacija Supabase klijenta (fallback na dummy klijent tokom CI testiranja bez .env)
 const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY)
@@ -19,8 +19,9 @@ async function ucitajLeaderboard(chatroomId) {
         if (!channelState) return;
         const channelUsername = channelState.channelUsername || chatroomId;
         const trenutniMesec = dobijTrenutniMesec();
+        const trenutniDan = dobijTrenutniDan();
 
-        log('INFO', `[${channelUsername}] U\u010ditavam leaderboard sa Supabase baze...`);
+        log('INFO', `[${channelUsername}] Učitavam leaderboard sa Supabase baze...`);
         const { data, error } = await sbPanels
             .from('leaderboard')
             .select('username, display_name, chat')
@@ -42,14 +43,47 @@ async function ucitajLeaderboard(chatroomId) {
         channelState.leaderboardDeltas = {};
         channelState.tekuciMesecLeaderboarda = trenutniMesec;
         channelState.leaderboardDirty = false;
-        log('INFO', `[${channelUsername}] U\u010ditan Supabase leaderboard za mesec: ${trenutniMesec} (${Object.keys(podaci).length} aktivnih korisnika)`);
+        log('INFO', `[${channelUsername}] Učitan Supabase leaderboard za mesec: ${trenutniMesec} (${Object.keys(podaci).length} aktivnih korisnika)`);
+
+        // Učitavanje dnevnog leaderboard-a
+        try {
+            const { data: dailyData, error: dailyError } = await sbPanels
+                .from('leaderboard_daily')
+                .select('username, display_name, chat')
+                .eq('channel_id', chatroomId)
+                .eq('day', trenutniDan);
+
+            if (dailyError) throw dailyError;
+
+            const podaciDaily = {};
+            if (dailyData && dailyData.length > 0) {
+                dailyData.forEach(row => {
+                    podaciDaily[row.username.toLowerCase()] = {
+                        username: row.display_name,
+                        count: row.chat || 0
+                    };
+                });
+            }
+            channelState.leaderboardDaily = podaciDaily;
+            channelState.leaderboardDailyDeltas = {};
+            channelState.tekuciDanLeaderboarda = trenutniDan;
+            log('INFO', `[${channelUsername}] Učitan dnevni leaderboard za datum: ${trenutniDan} (${Object.keys(podaciDaily).length} korisnika)`);
+        } catch (dailyErr) {
+            log('WARN', `Dnevni leaderboard nije uspeo da se učita za ${chatroomId}: ${dailyErr.message}`);
+            channelState.leaderboardDaily = {};
+            channelState.leaderboardDailyDeltas = {};
+            channelState.tekuciDanLeaderboarda = trenutniDan;
+        }
     } catch (err) {
-        log('ERR', `Gre\u0161ka pri u\u010ditavanju leaderboarda za ${chatroomId}: ${err.message}`);
+        log('ERR', `Greška pri učitavanju leaderboarda za ${chatroomId}: ${err.message}`);
         const channelState = state.getChannelState(chatroomId);
         if (channelState) {
             channelState.leaderboard = {};
             channelState.leaderboardDeltas = {};
             channelState.tekuciMesecLeaderboarda = dobijTrenutniMesec();
+            channelState.leaderboardDaily = {};
+            channelState.leaderboardDailyDeltas = {};
+            channelState.tekuciDanLeaderboarda = dobijTrenutniDan();
         }
     }
 }
@@ -60,73 +94,145 @@ async function sacuvajLeaderboard(chatroomId) {
     return runWithLeaderboardLock(channelState, async () => {
         try {
             const trenutniMesec = dobijTrenutniMesec();
+            const trenutniDan = dobijTrenutniDan();
             const dirtyKeys = Object.keys(channelState.leaderboardDeltas).filter(k => channelState.leaderboardDeltas[k] !== 0);
+            const dailyDirtyKeys = Object.keys(channelState.leaderboardDailyDeltas || {}).filter(k => channelState.leaderboardDailyDeltas[k] !== 0);
 
-            if (dirtyKeys.length === 0) {
+            if (dirtyKeys.length === 0 && dailyDirtyKeys.length === 0) {
                 channelState.leaderboardDirty = false;
                 return;
             }
 
-            const { data, error: fetchError } = await sbPanels
-                .from('leaderboard')
-                .select('username, chat, watchtime_minutes')
-                .eq('channel_id', chatroomId)
-                .eq('month', channelState.tekuciMesecLeaderboarda)
-                .in('username', dirtyKeys);
+            // 1. Čuvanje mesečnog leaderboard-a
+            if (dirtyKeys.length > 0) {
+                const { data, error: fetchError } = await sbPanels
+                    .from('leaderboard')
+                    .select('username, chat, watchtime_minutes')
+                    .eq('channel_id', chatroomId)
+                    .eq('month', channelState.tekuciMesecLeaderboarda)
+                    .in('username', dirtyKeys);
 
-            if (fetchError) throw fetchError;
+                if (fetchError) throw fetchError;
 
-            const dbMap = {};
-            if (data) {
-                data.forEach(row => {
-                    dbMap[row.username.toLowerCase()] = row;
+                const dbMap = {};
+                if (data) {
+                    data.forEach(row => {
+                        dbMap[row.username.toLowerCase()] = row;
+                    });
+                }
+
+                const rowsToUpsert = dirtyKeys.map(key => {
+                    const existing = dbMap[key];
+                    const dbChat = existing && existing.chat !== undefined ? existing.chat : 0;
+                    const dbWatchtime = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : ((channelState.watchtime && channelState.watchtime[key]) ? channelState.watchtime[key].minutes : 0);
+                    const delta = channelState.leaderboardDeltas[key];
+                    const newChat = Math.max(0, dbChat + delta);
+                    const mesecStr = channelState.tekuciMesecLeaderboarda || trenutniMesec;
+                    const godinaStr = mesecStr.includes('-') ? mesecStr.split('-')[1] : String(new Date().getFullYear());
+
+                    return {
+                        channel_id: chatroomId,
+                        username: key,
+                        display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].display_name) || (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
+                        chat: newChat,
+                        watchtime_minutes: dbWatchtime,
+                        month: mesecStr,
+                        year: godinaStr,
+                        updated_at: new Date().toISOString(),
+                        _newChat: newChat
+                    };
+                });
+
+                const rowsClean = rowsToUpsert.map(({ _newChat, ...r }) => r);
+                const { error: upsertError } = await sbPanels
+                    .from('leaderboard')
+                    .upsert(rowsClean, { onConflict: 'channel_id,username,month' });
+
+                if (upsertError) throw upsertError;
+
+                rowsToUpsert.forEach(row => {
+                    const key = row.username;
+                    if (channelState.leaderboard[key]) {
+                        channelState.leaderboard[key].count = row._newChat;
+                    } else {
+                        channelState.leaderboard[key] = {
+                            username: row.display_name,
+                            count: row._newChat
+                        };
+                    }
+                    delete channelState.leaderboardDeltas[key];
                 });
             }
 
-            const rowsToUpsert = dirtyKeys.map(key => {
-                const existing = dbMap[key];
-                const dbChat = existing && existing.chat !== undefined ? existing.chat : 0;
-                const dbWatchtime = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : ((channelState.watchtime && channelState.watchtime[key]) ? channelState.watchtime[key].minutes : 0);
-                const delta = channelState.leaderboardDeltas[key];
-                const newChat = Math.max(0, dbChat + delta);
+            // 2. Čuvanje dnevnog leaderboard-a
+            if (dailyDirtyKeys.length > 0) {
+                const danStr = channelState.tekuciDanLeaderboarda || trenutniDan;
                 const mesecStr = channelState.tekuciMesecLeaderboarda || trenutniMesec;
                 const godinaStr = mesecStr.includes('-') ? mesecStr.split('-')[1] : String(new Date().getFullYear());
 
-                return {
-                    channel_id: chatroomId,
-                    username: key,
-                    display_name: (channelState.leaderboard[key] && channelState.leaderboard[key].display_name) || (channelState.leaderboard[key] && channelState.leaderboard[key].username) || key,
-                    chat: newChat,
-                    watchtime_minutes: dbWatchtime,
-                    month: mesecStr,
-                    year: godinaStr,
-                    updated_at: new Date().toISOString(),
-                    _newChat: newChat
-                };
-            });
+                const { data: dailyDbData, error: dailyFetchError } = await sbPanels
+                    .from('leaderboard_daily')
+                    .select('username, chat, watchtime_minutes')
+                    .eq('channel_id', chatroomId)
+                    .eq('day', danStr)
+                    .in('username', dailyDirtyKeys);
 
-            const rowsClean = rowsToUpsert.map(({ _newChat, ...r }) => r);
-            const { error: upsertError } = await sbPanels
-                .from('leaderboard')
-                .upsert(rowsClean, { onConflict: 'channel_id,username,month' });
+                if (!dailyFetchError) {
+                    const dailyDbMap = {};
+                    if (dailyDbData) {
+                        dailyDbData.forEach(row => {
+                            dailyDbMap[row.username.toLowerCase()] = row;
+                        });
+                    }
 
-            if (upsertError) throw upsertError;
+                    const dailyRowsToUpsert = dailyDirtyKeys.map(key => {
+                        const existing = dailyDbMap[key];
+                        const dbChat = existing && existing.chat !== undefined ? existing.chat : 0;
+                        const dbWatchtime = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : ((channelState.watchtimeDaily && channelState.watchtimeDaily[key]) ? channelState.watchtimeDaily[key].minutes : 0);
+                        const delta = channelState.leaderboardDailyDeltas[key];
+                        const newChat = Math.max(0, dbChat + delta);
 
-            rowsToUpsert.forEach(row => {
-                const key = row.username;
-                if (channelState.leaderboard[key]) {
-                    channelState.leaderboard[key].count = row._newChat;
-                } else {
-                    channelState.leaderboard[key] = {
-                        username: row.display_name,
-                        count: row._newChat
-                    };
+                        return {
+                            channel_id: chatroomId,
+                            username: key,
+                            display_name: (channelState.leaderboardDaily && channelState.leaderboardDaily[key] && channelState.leaderboardDaily[key].username) || (channelState.leaderboard[key] && channelState.leaderboard[key].display_name) || key,
+                            chat: newChat,
+                            watchtime_minutes: dbWatchtime,
+                            day: danStr,
+                            month: mesecStr,
+                            year: godinaStr,
+                            updated_at: new Date().toISOString(),
+                            _newChat: newChat
+                        };
+                    });
+
+                    const dailyRowsClean = dailyRowsToUpsert.map(({ _newChat, ...r }) => r);
+                    const { error: dailyUpsertError } = await sbPanels
+                        .from('leaderboard_daily')
+                        .upsert(dailyRowsClean, { onConflict: 'channel_id,username,day' });
+
+                    if (!dailyUpsertError) {
+                        dailyRowsToUpsert.forEach(row => {
+                            const key = row.username;
+                            if (channelState.leaderboardDaily && channelState.leaderboardDaily[key]) {
+                                channelState.leaderboardDaily[key].count = row._newChat;
+                            } else {
+                                channelState.leaderboardDaily = channelState.leaderboardDaily || {};
+                                channelState.leaderboardDaily[key] = {
+                                    username: row.display_name,
+                                    count: row._newChat
+                                };
+                            }
+                            delete channelState.leaderboardDailyDeltas[key];
+                        });
+                    } else {
+                        log('WARN', `Greška pri upisu u leaderboard_daily za ${chatroomId}: ${dailyUpsertError.message}`);
+                    }
                 }
-                delete channelState.leaderboardDeltas[key];
-            });
+            }
 
             channelState.leaderboardDirty = false;
-            log('INFO', `[${channelState.channelUsername || chatroomId}] Leaderboard uspešno sačuvan na Supabase (${rowsClean.length} korisnika).`);
+            log('INFO', `[${channelState.channelUsername || chatroomId}] Leaderboard uspešno sačuvan na Supabase.`);
         } catch (err) {
             log('ERR', `Greška pri čuvanju leaderboarda za ${chatroomId}: ${err.message}`);
         }
@@ -139,12 +245,30 @@ function proveriIResetujMesec(chatroomId) {
     const trenutniMesec = dobijTrenutniMesec();
     if (channelState.tekuciMesecLeaderboarda && channelState.tekuciMesecLeaderboarda !== trenutniMesec) {
         const stariMesec = channelState.tekuciMesecLeaderboarda;
-        log('INFO', `[${channelState.channelUsername || chatroomId}] Novi mesec detektovan tokom rada bota (${stariMesec} -> ${trenutniMesec}). Resetujem leaderboard.`);
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Novi mesec detektovan tokom rada bota (${stariMesec} -> ${trenutniMesec}). Resetujem mesečni leaderboard.`);
 
         channelState.leaderboard = {};
         channelState.leaderboardDeltas = {};
         channelState.tekuciMesecLeaderboarda = trenutniMesec;
         channelState.leaderboardDirty = false;
+    }
+}
+
+function proveriIResetujDan(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    const trenutniDan = dobijTrenutniDan();
+    if (!channelState.tekuciDanLeaderboarda) {
+        channelState.tekuciDanLeaderboarda = trenutniDan;
+        channelState.leaderboardDaily = channelState.leaderboardDaily || {};
+        channelState.leaderboardDailyDeltas = channelState.leaderboardDailyDeltas || {};
+    } else if (channelState.tekuciDanLeaderboarda !== trenutniDan) {
+        const stariDan = channelState.tekuciDanLeaderboarda;
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Novi dan detektovan tokom rada bota (${stariDan} -> ${trenutniDan}). Resetujem dnevni leaderboard.`);
+
+        channelState.leaderboardDaily = {};
+        channelState.leaderboardDailyDeltas = {};
+        channelState.tekuciDanLeaderboarda = trenutniDan;
     }
 }
 
@@ -167,7 +291,9 @@ function evidentirajPoruku(chatroomId, username, poruka) {
     }
 
     proveriIResetujMesec(chatroomId);
+    proveriIResetujDan(chatroomId);
 
+    // 1. Mesečni brojač
     if (!channelState.leaderboard[key]) {
         channelState.leaderboard[key] = {
             username: cleanUsername,
@@ -176,6 +302,18 @@ function evidentirajPoruku(chatroomId, username, poruka) {
     }
     channelState.leaderboard[key].count++;
     channelState.leaderboard[key].username = cleanUsername;
+
+    // 2. Dnevni brojač
+    channelState.leaderboardDaily = channelState.leaderboardDaily || {};
+    channelState.leaderboardDailyDeltas = channelState.leaderboardDailyDeltas || {};
+    if (!channelState.leaderboardDaily[key]) {
+        channelState.leaderboardDaily[key] = {
+            username: cleanUsername,
+            count: 0
+        };
+    }
+    channelState.leaderboardDaily[key].count++;
+    channelState.leaderboardDaily[key].username = cleanUsername;
 
     // Dodaj XP i Poene preko economy modula
     const xpPerMsg = channelState.xp_per_msg || 15;
@@ -189,6 +327,7 @@ function evidentirajPoruku(chatroomId, username, poruka) {
     }
 
     channelState.leaderboardDeltas[key] = (channelState.leaderboardDeltas[key] || 0) + 1;
+    channelState.leaderboardDailyDeltas[key] = (channelState.leaderboardDailyDeltas[key] || 0) + 1;
     channelState.leaderboardDirty = true;
     channelState.lastPointEarned[key] = sada;
 
@@ -215,15 +354,21 @@ function smanjiPoruku(chatroomId, username, iznos) {
         channelState.leaderboard[key].username = cleanUsername;
         channelState.leaderboardDeltas[key] = (channelState.leaderboardDeltas[key] || 0) - iznos;
         channelState.leaderboardDirty = true;
+    }
+    if (channelState.leaderboardDaily && channelState.leaderboardDaily[key]) {
+        channelState.leaderboardDaily[key].count = Math.max(0, channelState.leaderboardDaily[key].count - iznos);
+        channelState.leaderboardDaily[key].username = cleanUsername;
+        channelState.leaderboardDailyDeltas[key] = (channelState.leaderboardDailyDeltas[key] || 0) - iznos;
+        channelState.leaderboardDirty = true;
+    }
 
-        if (!channelState.leaderboardSaveTimer) {
-            channelState.leaderboardSaveTimer = setTimeout(() => {
-                sacuvajLeaderboard(chatroomId);
-                channelState.leaderboardSaveTimer = null;
-            }, config.LEADERBOARD_SAVE_INTERVAL_MS);
-            if (channelState.leaderboardSaveTimer && typeof channelState.leaderboardSaveTimer.unref === 'function') {
-                channelState.leaderboardSaveTimer.unref();
-            }
+    if (channelState.leaderboardDirty && !channelState.leaderboardSaveTimer) {
+        channelState.leaderboardSaveTimer = setTimeout(() => {
+            sacuvajLeaderboard(chatroomId);
+            channelState.leaderboardSaveTimer = null;
+        }, config.LEADERBOARD_SAVE_INTERVAL_MS);
+        if (channelState.leaderboardSaveTimer && typeof channelState.leaderboardSaveTimer.unref === 'function') {
+            channelState.leaderboardSaveTimer.unref();
         }
     }
 }
@@ -831,6 +976,7 @@ module.exports = {
     osigurajCuvanjeLjubavi,
     sacuvajLeaderboard,
     proveriIResetujMesec,
+    proveriIResetujDan,
     evidentirajPoruku,
     smanjiPoruku,
     ucitajCustomKomande,

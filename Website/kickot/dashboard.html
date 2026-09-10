@@ -662,7 +662,8 @@
 </div>
 <div class="panel-actions kx-60">
 <select class="select-input kx-61" id="lbPeriodSelect" onchange="onLeaderboardPeriodChange()">
-<option value="monthly">Mesečno</option>
+<option value="daily">Dnevno</option>
+<option selected="" value="monthly">Mesečno</option>
 <option value="yearly">Godišnje</option>
 <option value="alltime">Sve vreme</option>
 </select>
@@ -912,36 +913,130 @@
 </div>
 <span>Ugrađene komande</span>
 </h1>
-<p class="panel-desc">Sve ugrađene podrazumevane komande koje bot podržava. Klikni na olovku da promeniš
-                cooldown ili dozvolu ranka.</p>
+<p class="panel-desc">Sve ugrađene podrazumevane komande koje bot podržava. Lako upravljaj dozvolama ranga, podesi cooldown ili isključi pojedinačne komande po želji.</p>
 </div>
 </div>
-<div class="table-toolbar kx-77">
-<div class="search-wrap">
-<svg class="search-icon" fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14">
-<circle cx="11" cy="11" r="8"></circle>
-<path d="M21 21l-4.35-4.35"></path>
-</svg>
-<input class="search-input" id="builtinCmdSearchInput" oninput="filterBuiltinCommands(this.value)" placeholder="Pretraži ugrađene komande..." type="text"/>
+
+<!-- Stat Kartice za pregled ugrađenih komandi -->
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 1.25rem;">
+  <div class="stat-card">
+    <div class="stat-icon stat-purple">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+    </div>
+    <div>
+      <div class="stat-value" id="builtinTotalCount">0</div>
+      <div class="stat-label">Ukupno ugrađenih komandi</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon stat-green">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--kick-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </div>
+    <div>
+      <div class="stat-value" id="builtinEnabledCount" style="color: var(--kick-green);">0</div>
+      <div class="stat-label">Aktivne komande</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon stat-pink">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+    </div>
+    <div>
+      <div class="stat-value" id="builtinDisabledCount" style="color: var(--text-muted);">0</div>
+      <div class="stat-label">Isključene komande</div>
+    </div>
+  </div>
 </div>
-<div class="table-meta" id="builtinCmdTableMeta">0 ugrađenih komandi</div>
+
+<!-- Toolbar sa Pretragom, Filterima i Grupnim Akcijama -->
+<div class="builtin-toolbar-wrap">
+  <div class="builtin-filter-group">
+    <div class="search-wrap" style="flex: 1; min-width: 220px; max-width: 380px;">
+      <svg class="search-icon" fill="none" height="14" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="14">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="M21 21l-4.35-4.35"></path>
+      </svg>
+      <input class="search-input" id="builtinCmdSearchInput" oninput="filterBuiltinCommands()" placeholder="Pretraži po nazivu, alijasu ili opisu..." type="text"/>
+    </div>
+    <select class="form-input" id="builtinCategoryFilter" onchange="filterBuiltinCategoryFromSelect(this.value)" style="width: auto; height: 38px; padding: 0 12px; font-size: 0.82rem; border-radius: 8px;">
+      <option value="all">Sve namene</option>
+      <option value="Leaderboard">Leaderboard</option>
+      <option value="Ljubav i brakovi">Ljubav i brakovi</option>
+      <option value="Mini igre">Mini igre</option>
+      <option value="Song request">Song request</option>
+      <option value="Ranking">Ranking</option>
+      <option value="Moderacija">Moderacija</option>
+      <option value="Ostalo">Ostalo</option>
+    </select>
+    <select class="form-input" id="builtinStatusFilter" onchange="filterBuiltinCommands()" style="width: auto; height: 38px; padding: 0 12px; font-size: 0.82rem; border-radius: 8px;">
+      <option value="all">Svi statusi</option>
+      <option value="enabled">Samo aktivne</option>
+      <option value="disabled">Samo isključene</option>
+    </select>
+    <select class="form-input" id="builtinRoleFilter" onchange="filterBuiltinCommands()" style="width: auto; height: 38px; padding: 0 12px; font-size: 0.82rem; border-radius: 8px;">
+      <option value="all">Svi rangovi</option>
+      <option value="everyone">Svi (everyone)</option>
+      <option value="moderator">Moderatori (moderator)</option>
+      <option value="broadcaster">Strimer (broadcaster)</option>
+    </select>
+  </div>
+  <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+    <button class="btn btn-sm btn-secondary" onclick="batchToggleBuiltins(true)" title="Uključi sve komande u prikazanom filteru" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      Uključi sve
+    </button>
+    <button class="btn btn-sm btn-secondary" onclick="batchToggleBuiltins(false)" title="Isključi sve komande u prikazanom filteru" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
+      Isključi sve
+    </button>
+    <div class="table-meta" id="builtinCmdTableMeta" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-left: 4px;">0 ugrađenih komandi</div>
+  </div>
 </div>
-<!-- Tabovi Kategorija -->
-<div class="builtin-categories-tabs kx-78" id="builtinCategoryTabs">
-<button class="btn btn-sm btn-category active" onclick="filterBuiltinCategory('all', this)">Sve
-              komande</button>
-<button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Zabava', this)">Zabava</button>
-<button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Ljubav &amp; Brak', this)">Ljubav &amp;
-              Brak</button>
-<button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Statistika', this)">Statistika</button>
-<button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Strim Info', this)">Strim
-              Info</button>
-<button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Moderacija', this)">Moderacija</button>
-<button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Ekonomija', this)">Ekonomija</button>
-<button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Kockanje', this)">Kockanje</button>
-<button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Prodavnica', this)">Prodavnica</button>
-<button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Muzika', this)">Muzika</button>
+
+<!-- Tabovi Filteri po Nameni sa Ikonama i Brojačima -->
+<div class="builtin-categories-tabs" id="builtinCategoryTabs">
+  <button class="btn btn-sm btn-category active" onclick="filterBuiltinCategory('all', this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+    <span>Sve komande</span>
+    <span class="cat-pill" id="cat-count-all">0</span>
+  </button>
+  <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Leaderboard', this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+    <span>Leaderboard</span>
+    <span class="cat-pill" id="cat-count-Leaderboard">0</span>
+  </button>
+  <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Ljubav i brakovi', this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>
+    <span>Ljubav i brakovi</span>
+    <span class="cat-pill" id="cat-count-Ljubav-i-brakovi">0</span>
+  </button>
+  <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Mini igre', this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="12" x2="10" y2="12"></line><line x1="8" y1="10" x2="8" y2="14"></line><line x1="15" y1="13" x2="15.01" y2="13"></line><line x1="18" y1="11" x2="18.01" y2="11"></line><rect x="2" y="6" width="20" height="12" rx="2"></rect></svg>
+    <span>Mini igre</span>
+    <span class="cat-pill" id="cat-count-Mini-igre">0</span>
+  </button>
+  <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Song request', this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+    <span>Song request</span>
+    <span class="cat-pill" id="cat-count-Song-request">0</span>
+  </button>
+  <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Ranking', this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+    <span>Ranking</span>
+    <span class="cat-pill" id="cat-count-Ranking">0</span>
+  </button>
+  <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Moderacija', this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+    <span>Moderacija</span>
+    <span class="cat-pill" id="cat-count-Moderacija">0</span>
+  </button>
+  <button class="btn btn-sm btn-category" onclick="filterBuiltinCategory('Ostalo', this)">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+    <span>Ostalo</span>
+    <span class="cat-pill" id="cat-count-Ostalo">0</span>
+  </button>
 </div>
+
 <div class="builtin-commands-grid kx-79" id="builtinCommandsGrid">
 <!-- Dinamički učitano -->
 </div>
@@ -3631,6 +3726,14 @@ Sledeća ›
 </button>
 </div>
 <div class="modal-body kx-337">
+<!-- Builtin notice -->
+<div id="builtinCmdNotice" style="display:none; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 10px; padding: 12px 14px; font-size: 0.82rem; color: #E2E8F0; margin-bottom: 16px; line-height: 1.45;">
+  <div style="font-weight: 700; color: var(--app-primary); margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+    Ugrađena sistemska komanda
+  </div>
+  Naziv i logika komande su fabrički definisani. Ovde možeš prilagoditi dozvoljeni rang (ko sme da je koristi), vreme čekanja (cooldown) i status uključeno/isključeno.
+</div>
 <!-- Command Input -->
 <div class="form-group kx-338">
 <label class="form-label kx-339">Komanda i aliasi</label>
@@ -3654,6 +3757,14 @@ Sledeća ›
 <span class="kx-348">ms</span>
 </input></div>
 <span class="config-hint" id="cooldownSecondsLabel">5 sekundi čekanja</span>
+<div class="cooldown-presets">
+  <button type="button" class="btn-preset" onclick="setCooldownPreset(3000)">3s</button>
+  <button type="button" class="btn-preset" onclick="setCooldownPreset(5000)">5s</button>
+  <button type="button" class="btn-preset" onclick="setCooldownPreset(10000)">10s</button>
+  <button type="button" class="btn-preset" onclick="setCooldownPreset(15000)">15s</button>
+  <button type="button" class="btn-preset" onclick="setCooldownPreset(30000)">30s</button>
+  <button type="button" class="btn-preset" onclick="setCooldownPreset(60000)">60s</button>
+</div>
 </div>
 <!-- Permission Rank -->
 <div class="form-group">

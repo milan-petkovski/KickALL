@@ -135,7 +135,12 @@
               <input type="number" id="inputSubDuration" class="sc-input" min="0" max="60" value="0" placeholder="0" />
             </div>
             <div class="sc-form-group">
-              <label class="sc-label" for="inputFollowDuration">Min. Follow (dani)</label>
+              <label class="sc-label" for="inputFollowDuration">
+                Verifikacija praćenja (dani)
+                <span class="sc-plan-lock-icon" title="Automatska provera dužine praćenja kanala pri izvlačenju pobednika (0 = bez provere).">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                </span>
+              </label>
               <input type="number" id="inputFollowDuration" class="sc-input" min="0" max="365" value="0" placeholder="0" />
             </div>
             <div class="sc-toggle-row">
@@ -153,6 +158,15 @@
                 <div class="sc-chip" data-mult="3">3x</div>
                 <div class="sc-chip" data-mult="5">5x</div>
               </div>
+            </div>
+            <div class="sc-form-group">
+              <label class="sc-label" for="inputBlacklist">
+                Crna lista (Blacklist)
+                <span class="sc-plan-lock-icon" title="Korisnici koji ne smeju učestvovati u giveaway-u (odvojeni zarezom, razmakom ili novim redom)">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                </span>
+              </label>
+              <textarea id="inputBlacklist" class="sc-input sc-textarea" rows="2" placeholder="npr. bot1, @spamer, moderatorkorisnik"></textarea>
             </div>
           </div>
         </details>
@@ -187,9 +201,13 @@
                 <label class="sc-label" for="inputSpinTime">Trajanje vrtenja (s)</label>
                 <input type="number" id="inputSpinTimeNum" class="sc-input-num" min="1" max="300" value="5" title="Unesi sekunde od 1 do 300 (max 5 min)" />
               </div>
-              <input type="range" id="inputSpinTime" class="sc-slider" min="1" max="300" value="5" step="1" />
+              <input type="range" id="inputSpinTime" class="sc-slider" min="0" max="100" value="3.4" step="0.1" />
               <div class="sc-slider-ticks">
-                <span>1s</span><span>30s</span><span>1min</span><span>3min</span><span>5min</span>
+                <span data-val="1" title="1 sekunda">1s</span>
+                <span data-val="30" title="30 sekundi">30s</span>
+                <span data-val="60" title="1 minut">1min</span>
+                <span data-val="180" title="3 minuta">3min</span>
+                <span data-val="300" title="5 minuta">5min</span>
               </div>
             </div>
             <div class="sc-form-group">
@@ -270,34 +288,7 @@
           </div>
         </details>
 
-        <!-- Accordion 6: Kick Sesija (Session Cookie) -->
-        <details class="sc-accordion" name="sidebar-accordion">
-          <summary class="sc-accordion-head">
-            <div class="sc-accordion-title">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--aj-cyan)" stroke-width="2.5">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
-              <span>Kick Sesija (Cookie)</span>
-            </div>
-            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-          </summary>
-          <div class="sc-accordion-body">
-            <div class="sc-toggle-sub" style="margin-bottom:10px;line-height:1.5;">
-              Zalijepi svez <strong>cookie</strong> iz Kick browser sesije.<br>
-              <span style="opacity:0.6;font-size:11px;">DevTools (F12) &rarr; Network &rarr; bilo koji /api/v2/ request &rarr; Request Headers &rarr; <code>cookie</code></span>
-            </div>
-            <div class="sc-form-group">
-              <label class="sc-label" for="inputSessionCookie">Session Cookie</label>
-              <textarea id="inputSessionCookie" class="sc-input" rows="3" placeholder="kick_session=...; XSRF-TOKEN=...;" style="resize:vertical;font-size:11px;font-family:monospace;"></textarea>
-            </div>
-            <button class="sc-btn sc-btn-start" id="btnSaveSessionCookie" style="width:100%;margin-top:4px;">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-              <span>Sacuvaj u Supabase</span>
-            </button>
-            <div id="sessionCookieStatus" style="margin-top:8px;font-size:12px;text-align:center;min-height:18px;"></div>
-          </div>
-        </details>
+
 
       </div><!-- /sidebar-config -->
 
@@ -309,21 +300,6 @@
           </svg>
           <span>Pokreni giveaway</span>
         </button>
-        <div class="sc-btn-row">
-          <button class="sc-btn sc-btn-draw" id="btnDrawWinner">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-            </svg>
-            <span>Izvuci</span>
-          </button>
-          <button class="sc-btn sc-btn-reset" id="btnResetGiveaway">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-              <path d="M3 3v5h5"/>
-            </svg>
-            <span>Reset</span>
-          </button>
-        </div>
       </div>
 
       <!-- Sidebar Footer — identican sa kickot -->
@@ -338,14 +314,14 @@
           </div>
           <!-- Popup dropdown — gore -->
           <div class="user-menu-sm" id="userMenuSm">
-            <div class="dropdown-notice-item">
+            <button class="dropdown-item" onclick="event.stopPropagation(); document.getElementById('sidebarConfig')?.scrollIntoView({ behavior: 'smooth' });">
               <svg class="dropdown-icon" fill="none" height="14" stroke="#06b6d4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="12" y1="16" x2="12" y2="12"/>
                 <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
-              <span>Podešavanja se rade u Kickot delu</span>
-            </div>
+              <span>Podešavanja giveaway-a</span>
+            </button>
             <div class="dropdown-divider"></div>
             <button class="dropdown-item" onclick="event.stopPropagation(); window.openHelpModal()">
               <svg class="dropdown-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14">
@@ -372,6 +348,13 @@
       <!-- Top Bar -->
       <header class="main-topbar" role="banner">
         <div class="topbar-left">
+          <button class="topbar-btn topbar-sidebar-toggle" id="btnSidebarToggle" type="button" title="Podešavanja giveaway-a" aria-label="Meni">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
           <div class="topbar-channel-wrap">
             <button class="topbar-channel-pill" id="channelStatusPill" onclick="window.toggleChannelDropdown(event)" title="Izaberi ili promeni Kick kanal" aria-haspopup="true" aria-expanded="false">
               <span class="channel-dot" id="channelDot"></span>
@@ -485,6 +468,7 @@
             </div>
             <h1 class="hero-title">
               <span class="hero-grad">Kickaj</span> Giveaway Studio
+              <span id="heroPlanBadge" class="hero-plan-badge is-free">FREE</span>
             </h1>
             <p class="hero-subtitle">Izvlačenje pobednika iz live chata uz animacije, točak i bonus šanse za pretplatnike.</p>
           </div>
@@ -533,9 +517,16 @@
                 <strong id="stageEligibilityLabel">Otvoreno za sve</strong>
               </div>
             </div>
-            <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
               <div class="stage-state-badge" id="stageStateBadge">Standby</div>
-              <button class="stage-fullscreen-btn" id="btnOpenFullscreen" onclick="window.openFullscreen()" title="Fullscreen prikaz točka za stream">
+              <button class="stage-reset-btn" id="btnResetGiveaway" onclick="window.resetGiveaway()" title="Resetuj giveaway i učesnike" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                  <path d="M3 3v5h5"/>
+                </svg>
+                <span>Reset</span>
+              </button>
+              <button class="stage-fullscreen-btn" id="btnOpenFullscreen" onclick="window.openFullscreen()" title="Fullscreen prikaz točka za stream" type="button">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
                 </svg>
@@ -704,7 +695,7 @@
       <div class="wfo-channel-center">
         <div class="topbar-channel-pill" id="wfoChannelPill">
           <span class="channel-dot" id="wfoChannelDot"></span>
-          <strong id="wfoChannelName">Milan_567</strong>
+          <strong id="wfoChannelName">-</strong>
         </div>
       </div>
 
@@ -853,6 +844,8 @@
         </svg>
         <span id="winnerRevealPrizeText">Misteriozna Nagrada</span>
       </div>
+
+      <div class="winner-reveal-follow-box" id="winnerRevealFollowBox" style="display:none;"></div>
 
       <div class="winner-timer-bar-wrap" id="winnerRevealTimerBarWrap">
         <div class="winner-timer-fill" id="winnerRevealTimerFill"></div>

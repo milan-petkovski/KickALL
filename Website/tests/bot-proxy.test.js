@@ -73,3 +73,35 @@ test('Bot Proxy - Dozvoljena putanja uspešno prosleđuje zahtev upstream servis
         if (originalSecret) process.env.INTERNAL_API_SECRET = originalSecret;
     }
 });
+
+test('Bot Proxy - Dozvoljena putanja /api/kick/follow-check se uspešno prosleđuje', async () => {
+    process.env.INTERNAL_API_SECRET = 'test_secret_123';
+
+    const origFetch = global.fetch;
+    global.fetch = async (targetUrl, options) => {
+        assert.ok(targetUrl.includes('/api/kick/follow-check'));
+        assert.equal(options.headers['X-Internal-Token'], 'test_secret_123');
+        return {
+            status: 200,
+            headers: new Map([['content-type', 'application/json']]),
+            text: async () => JSON.stringify({ is_following: true, follow_days: 120 })
+        };
+    };
+
+    try {
+        const res = await handler({
+            httpMethod: 'GET',
+            path: '/.netlify/functions/bot-proxy/api/kick/follow-check',
+            rawQuery: 'channel=testchannel&username=winner123',
+            headers: { 'x-nf-client-connection-ip': '1.2.3.7' }
+        });
+
+        assert.equal(res.statusCode, 200);
+        const body = JSON.parse(res.body);
+        assert.equal(body.is_following, true);
+        assert.equal(body.follow_days, 120);
+    } finally {
+        global.fetch = origFetch;
+        if (originalSecret) process.env.INTERNAL_API_SECRET = originalSecret;
+    }
+});

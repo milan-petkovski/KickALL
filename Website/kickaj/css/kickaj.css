@@ -855,6 +855,12 @@ body.kickaj-body {
   cursor: not-allowed;
 }
 
+.sc-textarea {
+  resize: vertical;
+  min-height: 54px;
+  line-height: 1.45;
+}
+
 .sc-select {
   appearance: none;
   -webkit-appearance: none;
@@ -998,11 +1004,40 @@ body.kickaj-body {
 }
 
 .sc-slider-ticks {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  width: 100%;
+  height: 18px;
+  margin-top: 6px;
+}
+
+.sc-slider-ticks span {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
   font-size: 0.72rem;
   color: var(--aj-muted2);
-  margin-top: 4px;
+  cursor: pointer;
+  user-select: none;
+  padding: 1px 3px;
+  border-radius: 3px;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.sc-slider-ticks span:nth-child(1) { left: 9px; }
+.sc-slider-ticks span:nth-child(2) { left: calc(9px + 0.25 * (100% - 18px)); }
+.sc-slider-ticks span:nth-child(3) { left: 50%; }
+.sc-slider-ticks span:nth-child(4) { left: calc(9px + 0.75 * (100% - 18px)); }
+.sc-slider-ticks span:nth-child(5) { left: calc(100% - 9px); }
+
+.sc-slider-ticks span:hover {
+  color: var(--aj-green);
+  background: rgba(83, 252, 24, 0.08);
+}
+
+.sc-slider-ticks span.active {
+  color: var(--aj-green);
+  font-weight: 800;
 }
 
 /* Spin Time Custom Input Number */
@@ -1645,6 +1680,24 @@ body.kickaj-body {
   background: rgba(239, 68, 68, 0.15);
 }
 
+.winner-confirm-btn {
+  background: transparent;
+  border: none;
+  color: var(--aj-muted2);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--aj-ease);
+}
+
+.winner-confirm-btn:hover {
+  color: #53fc18;
+  background: rgba(83, 252, 24, 0.15);
+}
+
 .topbar-btn {
   background: rgba(255,255,255,0.05);
   border: 1px solid var(--aj-border);
@@ -1657,6 +1710,10 @@ body.kickaj-body {
   justify-content: center;
   transition: var(--aj-ease);
   position: relative;
+}
+
+.topbar-sidebar-toggle {
+  display: none;
 }
 
 .topbar-btn:hover { 
@@ -2071,6 +2128,36 @@ body.kickaj-body {
 .stage-state-badge.is-live    { background: rgba(83,252,24,0.14); border-color: rgba(83,252,24,0.4); color: var(--aj-green); }
 .stage-state-badge.is-paused  { background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.4); color: var(--aj-amber); }
 .stage-state-badge.is-spinning { background: rgba(147,51,234,0.18); border-color: rgba(147,51,234,0.5); color: #c084fc; }
+
+.stage-reset-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  border-radius: var(--aj-r-xs);
+  padding: 6px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition: var(--aj-ease);
+}
+
+.stage-reset-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.2);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.stage-reset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 .stage-fullscreen-btn {
   background: rgba(83,252,24,0.1);
@@ -2819,12 +2906,50 @@ body.kickaj-body {
 
 .timer-bar-fill.is-expired { background: rgba(239, 68, 68, 0.6); }
 .timer-bar-fill.is-confirmed { background: linear-gradient(90deg, #53fc18, #3de810); }
-.winner-timer.is-expired { color: #ef4444; }
-.winner-timer.is-confirmed { color: #53fc18; font-weight: 900; }
+
+.winner-timer {
+  font-size: 0.78rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  flex-shrink: 0;
+  color: var(--aj-muted);
+}
+.winner-timer .status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.winner-timer.is-confirmed {
+  color: #53fc18;
+  background: rgba(83, 252, 24, 0.12);
+  border: 1px solid rgba(83, 252, 24, 0.35);
+  font-weight: 800;
+}
+.winner-timer.is-waiting {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+.winner-timer.is-expired {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  font-weight: 800;
+}
 
 .winner-card-item.is-winner-confirmed {
   border-color: rgba(83, 252, 24, 0.6);
   background: linear-gradient(135deg, rgba(83,252,24,0.12), rgba(147,51,234,0.08));
+}
+.winner-card-item.is-winner-expired {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.09), rgba(147, 51, 234, 0.04));
 }
 
 .winner-name-right {
@@ -2931,6 +3056,8 @@ body.kickaj-body {
 
 @media (max-width: 1024px) {
   .app { grid-template-columns: 1fr; }
+
+  .topbar-sidebar-toggle { display: flex; }
 
   .sidebar {
     position: fixed;
@@ -3753,4 +3880,159 @@ body.kickaj-body {
   font-family: 'JetBrains Mono', monospace;
   padding: 8px 12px;
   border-radius: 10px;
+}
+
+/* ── Post-draw Follow Check Verification ── */
+.winner-follow-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.winner-follow-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.winner-follow-badge.checking {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--aj-muted);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.winner-follow-badge.passed {
+  background: rgba(83, 252, 24, 0.1);
+  color: #53fc18;
+  border: 1px solid rgba(83, 252, 24, 0.3);
+}
+
+.winner-follow-badge.failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.winner-follow-badge.error {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.winner-redraw-btn {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #f87171;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.winner-redraw-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #ffffff;
+}
+
+.winner-card-item.is-follow-failed {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(147,51,234,0.06));
+}
+
+.winner-reveal-follow-box {
+  width: 100%;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+  animation: fadeSlideIn 0.3s ease;
+}
+
+.winner-reveal-follow-box.is-checking {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--aj-muted);
+  justify-content: center;
+}
+
+.winner-reveal-follow-box.is-passed {
+  background: rgba(83, 252, 24, 0.1);
+  border: 1px solid rgba(83, 252, 24, 0.3);
+  color: #53fc18;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.winner-reveal-follow-box.is-failed {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ffffff;
+}
+
+.winner-reveal-follow-box.is-error {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #ffffff;
+}
+
+.winner-reveal-follow-box.is-error strong {
+  color: #fbbf24;
+}
+
+.follow-box-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.follow-box-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.follow-box-text strong {
+  color: #f87171;
+  font-size: 0.88rem;
+}
+
+.follow-box-text span {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.78rem;
+}
+
+.winner-overlay-redraw-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  border: none;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(239, 68, 68, 0.4);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.winner-overlay-redraw-btn:hover {
+  transform: scale(1.03);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.6);
 }

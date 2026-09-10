@@ -1844,7 +1844,7 @@ function setupRealtimeSongQueueSubscription(channelId) {
     })
     .subscribe();
 
-  // Pretplata na bazu u realnom vremenu (Realtime izmene u leaderboard tabeli za ovaj kanal)
+  // Pretplata na bazu u realnom vremenu (Realtime izmene u leaderboard i leaderboard_daily tabelama za ovaj kanal)
   activeLeaderboardSubscription = sb.channel(`leaderboard_realtime_${channelId}`)
     .on('postgres_changes', {
       event: '*',
@@ -1852,7 +1852,16 @@ function setupRealtimeSongQueueSubscription(channelId) {
       table: 'leaderboard',
       filter: `channel_id=eq.${channelId}`
     }, () => {
-      // Čim bot upiše nove minute ili poruke u bazu, automatski osveži prikaz
+      if (typeof loadLeaderboard === 'function') {
+        loadLeaderboard();
+      }
+    })
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'leaderboard_daily',
+      filter: `channel_id=eq.${channelId}`
+    }, () => {
       if (typeof loadLeaderboard === 'function') {
         loadLeaderboard();
       }
@@ -2392,81 +2401,73 @@ async function refreshAllData() {
 // ── Ugrađene Komande Bota ───────────────────────────────────
 // Svaka ugrađena komanda ima definisan rang (Svi, Moderatori, Strimere) i podesivi cooldown.
 const defaultBuiltinCommands = [
-  // Zabava
-  { id: 'builtin-iq', command: 'iq, iq @user', response: 'Prikazuje inteligenciju (IQ) korisnika ili ciljanog člana četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'iq', category: 'Zabava' },
-  { id: 'builtin-samar', command: 'samar @user', response: 'Šalje zabavan šamar odabranom korisniku sa nasumičnim predmetom u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'samar', category: 'Zabava' },
-  { id: 'builtin-roll', command: 'roll @user', response: 'Pokreće roll dvoboj (kockice 1-100) protiv drugog člana četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'roll', category: 'Zabava' },
-  { id: 'builtin-rulet', command: 'ruskirulet, rr', response: 'Igraj ruski rulet sa botom — 1 u 6 šansa za privremeni timeout.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'ruskirulet', category: 'Zabava' },
-  { id: 'builtin-alkotest', command: 'alkotest [@user]', response: 'Izračunava količinu promila u krvi i opisuje stanje korisnika.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'alkotest', category: 'Zabava' },
-  { id: 'builtin-cinjenica', command: 'cinjenica', response: 'Ispisuje nasumičnu zanimljivu činjenicu u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'cinjenica', category: 'Zabava' },
+  // Leaderboard
+  { id: 'builtin-topchat', command: 'top [opcija/broj], leaderboard [opcija/broj]', example: '!top 5, !top watchtime ili !top coins', response: 'Glavni leaderboard bota (poruke, watchtime, coins ili nivoe) za danas ili ovaj mesec.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'top', category: 'Leaderboard' },
+  { id: 'builtin-topchatters', command: 'topchat [broj], topchatters [broj], topporuke [broj]', example: '!topchat 5 ili !topchatters', response: 'Prikazuje rang listu najaktivnijih gledalaca po broju poslatih poruka u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'topchat', category: 'Leaderboard' },
+  { id: 'builtin-topwatchtime', command: 'topwatchtime [broj], topwatch [broj]', example: '!topwatchtime 5', response: 'Prikazuje top listu gledalaca sa najviše provedenih sati na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'topwatchtime', category: 'Leaderboard' },
+  { id: 'builtin-topcoins', command: 'topcoins [broj], toppoeni [broj]', example: '!topcoins 10', response: 'Prikazuje top listu najbogatijih korisnika po broju poena / koina.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'topcoins', category: 'Leaderboard' },
+  { id: 'builtin-toplevel', command: 'toplevel [broj], topxp [broj]', example: '!toplevel 10', response: 'Prikazuje top listu korisnika sa najvećim nivoima i iskustvom.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'toplevel', category: 'Leaderboard' },
+  { id: 'builtin-watchtime', command: 'watchtime [@user], sati [@user]', example: '!watchtime ili !sati @user', response: 'Prikazuje lično ili tuđe usaglašeno vreme gledanja strima.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'watchtime', category: 'Leaderboard' },
+  { id: 'builtin-chat', command: 'chat [@user], aktivnost [@user], poruke [@user]', example: '!chat ili !poruke @user', response: 'Prikazuje tačan broj poslatih poruka u četu danas i ovog meseca, kao i rang aktivnosti.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'chat', category: 'Leaderboard' },
+  { id: 'builtin-followage', command: 'followage [@user]', example: '!followage ili !followage @user', response: 'Prikazuje tačno koliko dana/meseci prate vaš kanal.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'followage', category: 'Leaderboard' },
+  { id: 'builtin-resetleaderboard', command: 'resetleaderboard', example: '!resetleaderboard', response: 'Komanda za strimera: resetuje tabele aktivnosti i poena za novi mesec.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'resetleaderboard', category: 'Leaderboard' },
 
-  // Ljubav & Brak
-  { id: 'builtin-love', command: 'love @user, love @user @user', response: 'Izračunaj ljubavnu kompatibilnost sa drugim korisnikom.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'love', category: 'Ljubav & Brak' },
-  { id: 'builtin-marry', command: 'vencaj @user', response: 'Pošalji bračnu ponudu drugom članu četa za ulazak u virtuelni brak.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'vencaj', category: 'Ljubav & Brak' },
-  { id: 'builtin-razvod', command: 'razvod @user', response: 'Razvedi se od trenutnog bračnog partnera na kanalu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'razvod', category: 'Ljubav & Brak' },
-  { id: 'builtin-brakovi', command: 'brakovi, brak, vencani', response: 'Prikazuje spisak svih aktivnih venčanih parova na ovom kanalu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'brakovi', category: 'Ljubav & Brak' },
-  { id: 'builtin-posaljiljubav', command: 'posaljiljubav @user', response: 'Pošalji ljubavnu ponudu korisniku (povećava procenat ljubavi).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'posaljiljubav', category: 'Ljubav & Brak' },
-  { id: 'builtin-odbijljubav', command: 'odbijljubav @user', response: 'Odbij primljenu ljubavnu ponudu od nekog korisnika.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'odbijljubav', category: 'Ljubav & Brak' },
-  { id: 'builtin-mrzim', command: 'mrzim @user', response: 'Izračunaj procenat mržnje prema drugom članu četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'mrzim', category: 'Ljubav & Brak' },
-  { id: 'builtin-bacihejt', command: 'bacihejt @user', response: 'Smanji nivo ljubavi prema odabranom korisniku u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'bacihejt', category: 'Ljubav & Brak' },
-  { id: 'builtin-prihvati', command: 'prihvati, da, pristajem', response: 'Prihvati bračnu ponudu, ponudu za ljubav ili poziv na dvoboj.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'prihvati', category: 'Ljubav & Brak' },
-  { id: 'builtin-odbij', command: 'odbij, ne, odbijam', response: 'Odbij bračnu ponudu, ponudu za ljubav ili poziv na dvoboj.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'odbij', category: 'Ljubav & Brak' },
-  { id: 'builtin-cooldown', command: 'cooldown, coldown', response: 'Proveri cooldown za ljubavne akcije (posaljiljubav, bacihejt).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'cooldown', category: 'Ljubav & Brak' },
+  // Ljubav i brakovi
+  { id: 'builtin-love', command: 'love @user, love @user @user', example: '!love @user', response: 'Izračunaj ljubavnu kompatibilnost sa drugim korisnikom.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'love', category: 'Ljubav i brakovi' },
+  { id: 'builtin-mrzim', command: 'mrzim @user, hate @user', example: '!mrzim @user', response: 'Izračunaj procenat mržnje prema drugom članu četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'mrzim', category: 'Ljubav i brakovi' },
+  { id: 'builtin-marry', command: 'vencaj @user', example: '!vencaj @user', response: 'Pošalji bračnu ponudu drugom članu četa za ulazak u virtuelni brak.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'vencaj', category: 'Ljubav i brakovi' },
+  { id: 'builtin-razvod', command: 'razvod @user', example: '!razvod', response: 'Razvedi se od trenutnog bračnog partnera na kanalu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'razvod', category: 'Ljubav i brakovi' },
+  { id: 'builtin-brakovi', command: 'brakovi, brak, vencani', example: '!brakovi', response: 'Prikazuje spisak svih aktivnih venčanih parova na ovom kanalu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'brakovi', category: 'Ljubav i brakovi' },
+  { id: 'builtin-posaljiljubav', command: 'posaljiljubav @user', example: '!posaljiljubav @user', response: 'Pošalji ljubav korisniku (povećava procenat ljubavi za +2%).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'posaljiljubav', category: 'Ljubav i brakovi' },
+  { id: 'builtin-bacihejt', command: 'bacihejt @user', example: '!bacihejt @user', response: 'Smanji nivo ljubavi prema odabranom korisniku u četu za -5%.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'bacihejt', category: 'Ljubav i brakovi' },
+  { id: 'builtin-prihvati', command: 'prihvati, da, pristajem', example: '!prihvati ili !da', response: 'Prihvati bračnu ponudu ili poziv na dvoboj.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'prihvati', category: 'Ljubav i brakovi' },
+  { id: 'builtin-odbij', command: 'odbij, ne, odbijam, decline', example: '!odbij ili !ne', response: 'Odbij bračnu ponudu ili poziv na dvoboj.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'odbij', category: 'Ljubav i brakovi' },
+  { id: 'builtin-cooldown', command: 'cooldown, coldown', example: '!cooldown', response: 'Proveri cooldown za ljubavne akcije (posaljiljubav, bacihejt).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'cooldown', category: 'Ljubav i brakovi' },
 
-  // Strim Info
-  { id: 'builtin-komande', command: 'komande, help, pomoc, commands', response: 'Prikazuje spisak svih ugrađenih komandi bota prilagođenih ovom kanalu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'komande', category: 'Strim Info' },
-  { id: 'builtin-igra', command: 'igra', response: 'Prikazuje trenutnu igru ili kategoriju na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'igra', category: 'Strim Info' },
-  { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje tačno vreme koliko je strim aktivan uživo.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'uptime', category: 'Strim Info' },
-  { id: 'builtin-vreme', command: 'vreme [grad], vrijeme [grad]', response: 'Prikazuje trenutnu vremensku prognozu i temperaturu za uneti grad.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'vreme', category: 'Strim Info' },
-  // Strim Info
-  { id: 'builtin-komande', command: 'komande, help, pomoc, commands', response: 'Prikazuje spisak svih ugrađenih komandi bota prilagođenih ovom kanalu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'komande', category: 'Strim Info' },
-  { id: 'builtin-igra', command: 'igra', response: 'Prikazuje trenutnu igru ili kategoriju na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'igra', category: 'Strim Info' },
-  { id: 'builtin-uptime', command: 'uptime, up', response: 'Prikazuje tačno vreme koliko je strim aktivan uživo.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'uptime', category: 'Strim Info' },
-  { id: 'builtin-vreme', command: 'vreme [grad], vrijeme [grad]', response: 'Prikazuje trenutnu vremensku prognozu i temperaturu za uneti grad.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'vreme', category: 'Strim Info' },
-  { id: 'builtin-info', command: 'info', response: 'Prikazuje osnovne informacije o botu i link ka oficijelnom sajtu https://kickall.app.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'info', category: 'Strim Info' },
+  // Mini igre
+  { id: 'builtin-slots', command: 'slots, slot [iznos]', example: '!slots 100', response: 'Igraj slot mašinu sa poenima i osvoji do 10x nagrade.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'slots', category: 'Mini igre' },
+  { id: 'builtin-roulette', command: 'roulette, rulet [opcija] [iznos]', example: '!rulet crvena 100 ili !rulet 7 50', response: 'Igraj rulet (crvena, crna, zelena ili broj) i uvećaj poene.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'roulette', category: 'Mini igre' },
+  { id: 'builtin-coinflip', command: 'coinflip, piskoglava, gamble, kockaj [pismo/glava] [iznos]', example: '!coinflip glava 100', response: 'Baci novčić (pismo/glava) za duplo ili ništa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'coinflip', category: 'Mini igre' },
+  { id: 'builtin-wheel', command: 'tocak, wheel [iznos]', example: '!tocak 100', response: 'Zavrti točak sreće za nasumične multiplikatore poena.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'tocak', category: 'Mini igre' },
+  { id: 'builtin-duelgamble', command: 'duel @user [iznos], dvoboj @user [iznos]', example: '!duel @user 200', response: 'Izazovi drugog člana na kockaški dvoboj u poene.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'duel', category: 'Mini igre' },
+  { id: 'builtin-acceptgamble', command: 'accept', example: '!accept', response: 'Prihvati poziv na kockaški dvoboj za poene.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'accept', category: 'Mini igre' },
+  { id: 'builtin-samar', command: 'samar @user', example: '!samar @user', response: 'Šalje zabavan šamar odabranom korisniku sa nasumičnim predmetom u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'samar', category: 'Mini igre' },
+  { id: 'builtin-roll', command: 'roll @user', example: '!roll @user ili !roll 100', response: 'Pokreće roll dvoboj (kockice 1-100) protiv drugog člana četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'roll', category: 'Mini igre' },
+  { id: 'builtin-rulet', command: 'ruskirulet, rr', example: '!ruskirulet ili !rr', response: 'Igraj ruski rulet sa botom — 1 u 6 šansa za privremeni timeout.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'ruskirulet', category: 'Mini igre' },
+  { id: 'builtin-alkotest', command: 'alkotest [@user]', example: '!alkotest ili !alkotest @user', response: 'Izračunava količinu promila u krvi i opisuje stanje korisnika.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'alkotest', category: 'Mini igre' },
+
+  // Song request
+  { id: 'builtin-pesma', command: 'pesma [naziv], sr [naziv], song [naziv]', example: '!pesma Pesma od Izvodjaca ili YouTube link', response: 'Zatraži puštanje pesme na strimu po nazivu ili linku.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'pesma', category: 'Song request' },
+  { id: 'builtin-songqueue', command: 'songqueue, redpesama', example: '!songqueue', response: 'Prikazuje trenutnu listu pesama koje čekaju u redu za puštanje.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'songqueue', category: 'Song request' },
+  { id: 'builtin-skipsong', command: 'skipsong, preskocipesmu', example: '!skipsong', response: 'Preskače trenutnu pesmu i pušta sledeću u redu.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'skipsong', category: 'Song request' },
+
+  // Ranking
+  { id: 'builtin-rank', command: 'rank [@user], level [@user], xp [@user]', example: '!rank ili !rank @user', response: 'Prikazuje tvoj nivo ili nivo ciljanog korisnika, skupljeni XP i trenutnu titulu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'rank', category: 'Ranking' },
+  { id: 'builtin-points-eco', command: 'points [@user], poeni [@user], bal [@user], coins [@user]', example: '!points ili !poeni @user', response: 'Prikazuje stanje poena/zlatnika u ekonomiji kanala za tebe ili tagovanog korisnika.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'points', category: 'Ranking' },
+  { id: 'builtin-me', command: 'me [@user], stats [@user], profil [@user]', example: '!me ili !profil @user', response: 'Prikazuje kompletan lični karton: nivo, titulu, poene, sate gledanja i broj poruka.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'me', category: 'Ranking' },
+  { id: 'builtin-daily', command: 'daily', example: '!daily', response: 'Preuzmi svoj besplatni dnevni bonus poena i iskustva (jednom u 24h).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'daily', category: 'Ranking' },
+  { id: 'builtin-givepoints', command: 'givepoints @user [iznos], dajpoene @user [iznos], pay @user [iznos]', example: '!givepoints @user 500', response: 'Prenosi poene drugom članu četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'givepoints', category: 'Ranking' },
+  { id: 'builtin-store', command: 'store, prodavnica, shop', example: '!store ili !prodavnica', response: 'Prikazuje spisak svih dostupnih nagrada u prodavnici kanala.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'store', category: 'Ranking' },
+  { id: 'builtin-redeem', command: 'redeem [naziv], kupi [naziv]', example: '!redeem VIP 1 Mesec', response: 'Kupi željenu nagradu iz prodavnice menjajući poene.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'redeem', category: 'Ranking' },
 
   // Moderacija
-  { id: 'builtin-permit', command: 'permit @user, dozvoli @user', response: 'Dozvoljava izabranom korisniku slanje 1 linka u četu bez brisanja.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'permit', category: 'Moderacija' },
-  { id: 'builtin-addcom', command: 'dodajkomandu !naziv Odgovor, addcom !naziv Odgovor', response: 'Kratica za moderatore: dodaje novu komandu direktno iz četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'addcom', category: 'Moderacija' },
-  { id: 'builtin-delcom', command: 'obrisikomandu !naziv, delcom !naziv', response: 'Kratica za moderatore: briše komandu direktno iz četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'delcom', category: 'Moderacija' },
-  { id: 'builtin-osvezi', command: 'osvezi', response: 'Osvežava sve postavke, komande i podatke kanala iz baze.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'osvezi', category: 'Moderacija' },
-  { id: 'builtin-pin', command: 'pin [tekst]', response: 'Pinuje unetu ili podrazumevanu istaknutu poruku na vrhu četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'pin', category: 'Moderacija' },
-  { id: 'builtin-unpin', command: 'unpin', response: 'Uklanja trenutno pinovanu poruku iz četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'unpin', category: 'Moderacija' },
-  { id: 'builtin-setlive', command: 'setlive [true/false]', response: 'Ručno postavlja status strima na live (uključeno) ili offline.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'setlive', category: 'Moderacija' },
-  { id: 'builtin-setgame', command: 'setgame [naziv]', response: 'Ručno postavlja naziv igre koja se prikazuje u informacijama strima.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'setgame', category: 'Moderacija' },
+  { id: 'builtin-permit', command: 'permit @user, dozvoli @user', example: '!permit @user', response: 'Dozvoljava izabranom korisniku slanje 1 linka u četu bez brisanja.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'permit', category: 'Moderacija' },
+  { id: 'builtin-addcom', command: 'dodajkomandu !naziv Odgovor, addcom !naziv Odgovor', example: '!addcom !discord Pridruži se discord.gg/...', response: 'Kratica za moderatore: dodaje novu komandu direktno iz četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'addcom', category: 'Moderacija' },
+  { id: 'builtin-delcom', command: 'obrisikomandu !naziv, delcom !naziv', example: '!delcom !discord', response: 'Kratica za moderatore: briše komandu direktno iz četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'delcom', category: 'Moderacija' },
+  { id: 'builtin-osvezi', command: 'osvezi', example: '!osvezi', response: 'Osvežava sve postavke, komande i podatke kanala iz baze.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'osvezi', category: 'Moderacija' },
+  { id: 'builtin-pin', command: 'pin [tekst]', example: '!pin Dobrodošli na strim!', response: 'Pinuje unetu ili podrazumevanu istaknutu poruku na vrhu četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'pin', category: 'Moderacija' },
+  { id: 'builtin-unpin', command: 'unpin', example: '!unpin', response: 'Uklanja trenutno pinovanu poruku iz četa.', cooldown: 5000, min_rank: 'moderator', enabled: true, is_default: true, usage: 0, db_match_key: 'unpin', category: 'Moderacija' },
+  { id: 'builtin-setlive', command: 'setlive [true/false]', example: '!setlive true', response: 'Ručno postavlja status strima na live (uključeno) ili offline.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'setlive', category: 'Moderacija' },
+  { id: 'builtin-setgame', command: 'setgame [naziv]', example: '!setgame GTA V', response: 'Ručno postavlja naziv igre koja se prikazuje u informacijama strima.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'setgame', category: 'Moderacija' },
 
-  // Statistika
-  { id: 'builtin-topwatchtime', command: 'topwatchtime [broj], topwatch [broj]', response: 'Prikazuje top listu gledalaca sa najviše provedenih sati na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'topwatchtime', category: 'Statistika' },
-  { id: 'builtin-topchat', command: 'top [broj], leaderboard [broj]', response: 'Prikazuje rang listu najaktivnijih korisnika po broju poruka u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'top', category: 'Statistika' },
-  { id: 'builtin-watchtime', command: 'watchtime [@user]', response: 'Prikazuje lično ili tuđe usaglašeno vreme gledanja strima.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'watchtime', category: 'Statistika' },
-  { id: 'builtin-chat', command: 'chat, aktivnost, stats', response: 'Prikazuje tačan broj poslatih poruka u četu i aktivnost.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'aktivnost', category: 'Statistika' },
-  { id: 'builtin-me', command: 'me', response: 'Prikazuje tvoj lični karton: sate gledanja, broj poruka i nivo.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'me', category: 'Statistika' },
-  { id: 'builtin-followage', command: 'followage', response: 'Prikazuje tačno koliko dana/meseci prate vaš kanal.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'followage', category: 'Statistika' },
-  { id: 'builtin-resetleaderboard', command: 'resetleaderboard', response: 'Komanda za strimera: resetuje tabele aktivnosti i poena za novi mesec.', cooldown: 5000, min_rank: 'broadcaster', enabled: true, is_default: true, usage: 0, db_match_key: 'resetleaderboard', category: 'Statistika' },
-  { id: 'builtin-leaderboard', command: 'leaderboard [broj]', response: 'Prikazuje top listu najaktivnijih korisnika po broju poruka (alternativa za !top).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'leaderboard', category: 'Statistika' },
-
-  // Ekonomija
-  { id: 'builtin-rank', command: 'rank [@user], level [@user], xp [@user]', response: 'Prikazuje tvoj nivo ili nivo ciljanog korisnika, skupljeni XP i trenutnu titulu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'rank', category: 'Ekonomija' },
-  { id: 'builtin-points-eco', command: 'points [@user], poeni [@user], bal [@user], coins [@user]', response: 'Prikazuje stanje poena/zlatnika u ekonomiji kanala za tebe ili tagovanog korisnika.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'points', category: 'Ekonomija' },
-  { id: 'builtin-daily', command: 'daily', response: 'Preuzmi svoj besplatni dnevni bonus poena i iskustva (jednom u 24h).', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'daily', category: 'Ekonomija' },
-  { id: 'builtin-givepoints', command: 'givepoints @user [iznos], dajpoene @user [iznos], pay @user [iznos]', response: 'Prenosi poene drugom članu četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'givepoints', category: 'Ekonomija' },
-  { id: 'builtin-toplevel', command: 'toplevel [broj], topxp [broj]', response: 'Prikazuje top listu korisnika sa najvećim nivoima i iskustvom.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'toplevel', category: 'Ekonomija' },
-  { id: 'builtin-topcoins', command: 'topcoins [broj], toppoeni [broj]', response: 'Prikazuje top listu najbogatijih korisnika po broju poena.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'topcoins', category: 'Ekonomija' },
-
-  // Kockanje
-  { id: 'builtin-slots', command: 'slots, slot [iznos]', response: 'Igraj slot mašinu sa poenima i osvoji do 10x nagrade.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'slots', category: 'Kockanje' },
-  { id: 'builtin-roulette', command: 'roulette, rulet [opcija] [iznos]', response: 'Igraj rulet (crvena, crna, zelena ili broj) i uvećaj poene.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'roulette', category: 'Kockanje' },
-  { id: 'builtin-coinflip', command: 'coinflip, piskoglava, gamble, kockaj [pismo/glava] [iznos]', response: 'Baci novčić (pismo/glava) za duplo ili ništa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'coinflip', category: 'Kockanje' },
-  { id: 'builtin-wheel', command: 'tocak, wheel [iznos]', response: 'Zavrti točak sreće za nasumične multiplikatore poena.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'tocak', category: 'Kockanje' },
-  { id: 'builtin-duelgamble', command: 'duel, dvoboj @user [iznos]', response: 'Izazovi drugog člana na kockaški dvoboj u poene.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'duel', category: 'Kockanje' },
-  { id: 'builtin-acceptgamble', command: 'accept', response: 'Prihvati poziv na kockaški dvoboj za poene.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'accept', category: 'Kockanje' },
-
-  // Prodavnica
-  { id: 'builtin-store', command: 'store, prodavnica, shop', response: 'Prikazuje spisak svih dostupnih nagrada u prodavnici kanala.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'store', category: 'Prodavnica' },
-  { id: 'builtin-redeem', command: 'redeem, kupi [naziv]', response: 'Kupi željenu nagradu iz prodavnice menjajući poene.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'redeem', category: 'Prodavnica' },
-
-  // Muzika
-  { id: 'builtin-pesma', command: 'pesma [naziv], sr [naziv], song [naziv]', response: 'Zatraži puštanje pesme na strimu po nazivu ili linku.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'pesma', category: 'Muzika' }
+  // Ostalo
+  { id: 'builtin-komande', command: 'komande, help, pomoc, commands', example: '!komande ili !pomoc', response: 'Prikazuje spisak svih ugrađenih komandi bota prilagođenih ovom kanalu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'komande', category: 'Ostalo' },
+  { id: 'builtin-igra', command: 'igra', example: '!igra', response: 'Prikazuje trenutnu igru ili kategoriju na strimu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'igra', category: 'Ostalo' },
+  { id: 'builtin-uptime', command: 'uptime, up', example: '!uptime', response: 'Prikazuje tačno vreme koliko je strim aktivan uživo.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'uptime', category: 'Ostalo' },
+  { id: 'builtin-vreme', command: 'vreme [grad], vrijeme [grad]', example: '!vreme Beograd ili !vreme Sarajevo', response: 'Prikazuje trenutnu vremensku prognozu i temperaturu za uneti grad.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'vreme', category: 'Ostalo' },
+  { id: 'builtin-info', command: 'info', example: '!info', response: 'Prikazuje osnovne informacije o botu i link ka oficijelnom sajtu https://kickall.app.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'info', category: 'Ostalo' },
+  { id: 'builtin-iq', command: 'iq, iq @user', example: '!iq ili !iq @user', response: 'Prikazuje inteligenciju (IQ) korisnika ili ciljanog člana četa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'iq', category: 'Ostalo' },
+  { id: 'builtin-cinjenica', command: 'cinjenica, fact', example: '!cinjenica ili !fact', response: 'Ispisuje nasumičnu zanimljivu činjenicu u četu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'cinjenica', category: 'Ostalo' }
 ];
 
 let activeBuiltinCategory = 'all';
@@ -2476,9 +2477,27 @@ function filterBuiltinCategory(cat, btnEl) {
 
   const tabs = document.querySelectorAll('#builtinCategoryTabs .btn-category');
   tabs.forEach(t => t.classList.remove('active'));
-  if (btnEl) btnEl.classList.add('active');
+  if (btnEl) {
+    btnEl.classList.add('active');
+  } else {
+    tabs.forEach(t => {
+      const fn = t.getAttribute('onclick') || '';
+      if (fn.includes(`'${cat}'`)) {
+        t.classList.add('active');
+      }
+    });
+  }
+
+  const select = document.getElementById('builtinCategoryFilter');
+  if (select && select.value !== cat) {
+    select.value = cat;
+  }
 
   renderBuiltinCommandsGrid();
+}
+
+function filterBuiltinCategoryFromSelect(cat) {
+  filterBuiltinCategory(cat, null);
 }
 
 const RANK_LABELS = {
@@ -2780,33 +2799,87 @@ function updateCmdTableMeta(n) {
 
 function renderBuiltinCommandsGrid() {
   const grid = document.getElementById('builtinCommandsGrid');
-  const meta = document.getElementById('builtinCmdTableMeta');
   if (!grid) return;
 
-  const query = (document.getElementById('builtinCmdSearchInput')?.value || '').trim().replace(/^!/, '').toLowerCase();
+  const allBuiltins = allCommands.filter(c => c.is_default);
 
-  let builtins = allCommands.filter(c => c.is_default);
+  // Global Statistics counters
+  const totalCount = allBuiltins.length;
+  const enabledCount = allBuiltins.filter(c => c.enabled !== false).length;
+  const disabledCount = allBuiltins.filter(c => c.enabled === false).length;
 
-  // Filtriranje po izabranoj kategoriji
+  const totalEl = document.getElementById('builtinTotalCount');
+  const enabledEl = document.getElementById('builtinEnabledCount');
+  const disabledEl = document.getElementById('builtinDisabledCount');
+  if (totalEl) totalEl.textContent = totalCount;
+  if (enabledEl) enabledEl.textContent = enabledCount;
+  if (disabledEl) disabledEl.textContent = disabledCount;
+
+  // Category counts
+  const categoryCounts = {
+    'all': totalCount,
+    'Leaderboard': allBuiltins.filter(c => c.category === 'Leaderboard').length,
+    'Ljubav-i-brakovi': allBuiltins.filter(c => c.category === 'Ljubav i brakovi').length,
+    'Mini-igre': allBuiltins.filter(c => c.category === 'Mini igre').length,
+    'Song-request': allBuiltins.filter(c => c.category === 'Song request').length,
+    'Ranking': allBuiltins.filter(c => c.category === 'Ranking').length,
+    'Moderacija': allBuiltins.filter(c => c.category === 'Moderacija').length,
+    'Ostalo': allBuiltins.filter(c => c.category === 'Ostalo').length
+  };
+
+  Object.entries(categoryCounts).forEach(([catKey, cnt]) => {
+    const pill = document.getElementById(`cat-count-${catKey}`);
+    if (pill) pill.textContent = cnt;
+  });
+
+  // Filter list
+  let builtins = [...allBuiltins];
+
+  // 1. Filtriranje po kategoriji
   if (activeBuiltinCategory && activeBuiltinCategory !== 'all') {
     builtins = builtins.filter(c => c.category === activeBuiltinCategory);
   }
 
-  // Filtriranje po tekstu pretrage
+  // 2. Filtriranje po statusu (aktivno / isključeno)
+  const statusFilter = document.getElementById('builtinStatusFilter')?.value || 'all';
+  if (statusFilter === 'enabled') {
+    builtins = builtins.filter(c => c.enabled !== false);
+  } else if (statusFilter === 'disabled') {
+    builtins = builtins.filter(c => c.enabled === false);
+  }
+
+  // 3. Filtriranje po rangu
+  const roleFilter = document.getElementById('builtinRoleFilter')?.value || 'all';
+  if (roleFilter !== 'all') {
+    builtins = builtins.filter(c => (c.min_rank || 'everyone') === roleFilter);
+  }
+
+  // 4. Filtriranje po tekstu pretrage
+  const query = (document.getElementById('builtinCmdSearchInput')?.value || '').trim().toLowerCase();
   if (query) {
+    const cleanQ = query.replace(/^!/, '');
     builtins = builtins.filter(c =>
-      c.command.toLowerCase().includes(query) ||
+      c.command.toLowerCase().includes(cleanQ) ||
       (c.response || '').toLowerCase().includes(query) ||
+      (c.example || '').toLowerCase().includes(query) ||
       (c.category && c.category.toLowerCase().includes(query))
     );
   }
 
+  // Meta count label
+  const meta = document.getElementById('builtinCmdTableMeta');
   if (meta) {
     meta.textContent = getSerbianPlural(builtins.length, 'ugrađena komanda', 'ugrađene komande', 'ugrađenih komandi');
   }
 
   if (builtins.length === 0) {
-    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 2.5rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px;">Nema pronađenih ugrađenih komandi u ovoj kategoriji.</div>';
+    grid.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; color: var(--text-muted); padding: 3.5rem 1.5rem; background: var(--bg-surface); border: 1px dashed var(--border-subtle); border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span style="font-size: 0.95rem; font-weight: 500;">Nijedna ugrađena komanda ne odgovara zadatim filterima.</span>
+        <button class="btn btn-sm btn-secondary" onclick="resetBuiltinFilters()" style="margin-top: 4px; font-size: 0.78rem;">Poništi filtere</button>
+      </div>
+    `;
     return;
   }
 
@@ -2815,50 +2888,95 @@ function renderBuiltinCommandsGrid() {
     const rankLabel = RANK_LABELS[rKey] || 'Svi';
     const rankColor = RANK_COLORS[rKey] || '#94A3B8';
     const catLabel = cmd.category || 'Opšte';
+    const isEnabled = cmd.enabled !== false;
 
-    const toggleIcon = cmd.enabled
+    // Trigger aliases: show primary alias chip, and +N badge with hover dropdown if multiple
+    const aliases = (cmd.command || '').split(',').map(a => a.trim()).filter(Boolean);
+    const firstAlias = aliases[0] || '';
+    const firstDisplay = firstAlias.startsWith('!') ? firstAlias : `!${firstAlias}`;
+    const firstWord = firstDisplay.split(/\s+/)[0];
+
+    let aliasesHtml = `
+      <div class="cmd-triggers-row">
+        <span class="cmd-trigger-chip" onclick="copyCommandBadge('${escapeHtml(firstWord)}', this)" title="Klikni da kopiraš komandu ${escapeHtml(firstWord)}">
+          ${escapeHtml(firstDisplay)}
+        </span>
+    `;
+
+    if (aliases.length > 1) {
+      const remaining = aliases.slice(1);
+      const moreChips = remaining.map(a => {
+        const d = a.startsWith('!') ? a : `!${a}`;
+        const w = d.split(/\s+/)[0];
+        return `<span class="cmd-trigger-chip-sm" onclick="copyCommandBadge('${escapeHtml(w)}', this)">${escapeHtml(d)}</span>`;
+      }).join('');
+
+      aliasesHtml += `
+        <div class="cmd-more-wrap">
+          <span class="cmd-more-pill">+${remaining.length}</span>
+          <div class="cmd-more-dropdown">
+            <div class="cmd-more-title">Ostali alijasi:</div>
+            <div class="cmd-more-list">${moreChips}</div>
+          </div>
+        </div>
+      `;
+    }
+    aliasesHtml += `</div>`;
+
+    const toggleIcon = isEnabled
       ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></svg>`
       : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>`;
 
-    return `
-      <div class="builtin-card" style="position: relative; background: var(--bg-surface); border: 1px solid ${cmd.enabled ? 'var(--border-subtle)' : 'rgba(255,255,255,0.04)'}; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; height: 100%; box-sizing: border-box; opacity: ${cmd.enabled ? '1' : '0.55'}; transition: all 0.22s ease;">
-        <!-- Action Buttons Pinned strictly to top-right -->
-        <div style="position: absolute; top: 16px; right: 16px; display: flex; gap: 6px; z-index: 2;">
-          <button class="action-btn" onclick="toggleCommand('${cmd.id}', ${cmd.enabled}, true)" title="${cmd.enabled ? 'Isključi komandu' : 'Uključi komandu'}" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: ${cmd.enabled ? 'rgba(83, 252, 24, 0.08)' : 'rgba(255,255,255,0.03)'}; border: 1px solid ${cmd.enabled ? 'rgba(83, 252, 24, 0.25)' : 'var(--border-subtle)'}; color: ${cmd.enabled ? 'var(--kick-green)' : 'var(--text-muted)'}; cursor: pointer; transition: all 0.2s ease;">
-            ${toggleIcon}
-          </button>
-          <button class="action-btn" onclick="editCommand('${cmd.id}')" title="Izmeni podešavanja" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); color: var(--text-main); cursor: pointer; transition: all 0.2s ease;" onmouseover="this.style.background='var(--app-primary-dim)'; this.style.color='var(--app-primary)'; this.style.borderColor='var(--app-primary-dim)';" onmouseout="this.style.background='rgba(255,255,255,0.03)'; this.style.color='var(--text-main)'; this.style.borderColor='var(--border-subtle)';">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-          </button>
-        </div>
+    const syntaxHtml = cmd.example ? `
+      <div class="builtin-syntax-box" title="Primer upotrebe komande">
+        <span><strong style="color:var(--text-main); font-weight:600;">Primer:</strong> ${escapeHtml(cmd.example)}</span>
+        <button type="button" class="syntax-copy-btn" onclick="copyCommandBadge('${escapeHtml(cmd.example)}', this)" title="Kopiraj primer">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
+      </div>
+    ` : '';
 
-        <!-- Top Section (Category, Title, Description) -->
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <!-- Category Badge (Left) -->
-          <div style="padding-right: 80px;">
-            <span style="background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.25); color: var(--app-primary); font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 6px; display: inline-flex; align-items: center;">
+    return `
+      <div class="builtin-card ${!isEnabled ? 'is-disabled' : ''}">
+        <!-- Top Row: Category (Left), Action Buttons (Right) -->
+        <div class="builtin-card-head">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.28); color: var(--app-primary); font-size: 0.72rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; display: inline-flex; align-items: center;">
               ${escapeHtml(catLabel)}
             </span>
           </div>
-          
-          <!-- Command Trigger Name -->
-          <div style="font-family: var(--font-mono); color: #fff; font-weight: 700; font-size: 1.02rem; letter-spacing: -0.2px; word-break: break-word; line-height: 1.35; margin-top: 2px;">
-            ${cmd.command.split(',').map(alias => `!${escapeHtml(alias.trim())}`).join(', ')}
+
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button class="action-btn" onclick="toggleCommand('${cmd.id}', ${isEnabled}, true)" title="${isEnabled ? 'Isključi komandu' : 'Uključi komandu'}" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: ${isEnabled ? 'rgba(83, 252, 24, 0.08)' : 'rgba(255,255,255,0.03)'}; border: 1px solid ${isEnabled ? 'rgba(83, 252, 24, 0.25)' : 'var(--border-subtle)'}; color: ${isEnabled ? 'var(--kick-green)' : 'var(--text-muted)'}; cursor: pointer; transition: all 0.2s ease;">
+              ${toggleIcon}
+            </button>
+            <button class="action-btn" onclick="editCommand('${cmd.id}')" title="Izmeni rang i cooldown" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); color: var(--text-main); cursor: pointer; transition: all 0.2s ease;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
           </div>
-          
+        </div>
+
+        <!-- Body Section (Aliases in single row, Description, Syntax Example) -->
+        <div style="display: flex; flex-direction: column; gap: 9px;">
+          <!-- Aliases Row -->
+          ${aliasesHtml}
+
           <!-- Description -->
           <div style="font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;">
             ${escapeHtml(cmd.response)}
           </div>
+
+          <!-- Syntax Example Box -->
+          ${syntaxHtml}
         </div>
-        
-        <!-- Bottom Row: Cooldown (Left) & Rank (Right) -->
+
+        <!-- Bottom Row: Cooldown & Rank Badge -->
         <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px; margin-top: auto;">
           <span style="display: inline-flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 0.74rem; font-weight: 500;">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             ${(cmd.cooldown / 1000).toFixed(0)}s cooldown
           </span>
-          <span style="background: rgba(255,255,255,0.03); border: 1px solid ${rankColor}44; color: ${rankColor}; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+          <span style="background: rgba(255,255,255,0.03); border: 1px solid ${rankColor}44; color: ${rankColor}; font-size: 0.72rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;" title="Dozvoljeni rang: ${rankLabel}">
             ${rankLabel}
           </span>
         </div>
@@ -2871,12 +2989,169 @@ function filterBuiltinCommands() {
   renderBuiltinCommandsGrid();
 }
 
+function resetBuiltinFilters() {
+  const searchInput = document.getElementById('builtinCmdSearchInput');
+  const catFilter = document.getElementById('builtinCategoryFilter');
+  const statusFilter = document.getElementById('builtinStatusFilter');
+  const roleFilter = document.getElementById('builtinRoleFilter');
+  if (searchInput) searchInput.value = '';
+  if (catFilter) catFilter.value = 'all';
+  if (statusFilter) statusFilter.value = 'all';
+  if (roleFilter) roleFilter.value = 'all';
+  activeBuiltinCategory = 'all';
+  const tabs = document.querySelectorAll('#builtinCategoryTabs .btn-category');
+  tabs.forEach((t, i) => {
+    if (i === 0) t.classList.add('active');
+    else t.classList.remove('active');
+  });
+  renderBuiltinCommandsGrid();
+}
+
+function copyCommandBadge(cmdText, btn) {
+  if (!cmdText) return;
+  const doCopyFeedback = () => {
+    showToast('info', `Kopirano: ${cmdText}`, 'check');
+    if (btn && btn.classList) {
+      btn.classList.add('copied');
+      setTimeout(() => btn.classList.remove('copied'), 1200);
+    }
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(cmdText).then(doCopyFeedback).catch(() => {
+      fallbackCopyText(cmdText);
+      doCopyFeedback();
+    });
+  } else {
+    fallbackCopyText(cmdText);
+    doCopyFeedback();
+  }
+}
+
+function fallbackCopyText(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (_) {}
+  document.body.removeChild(ta);
+}
+
+function setCooldownPreset(ms) {
+  const input = document.getElementById('cmdCooldown');
+  if (input) {
+    input.value = ms;
+    updateCooldownLabel();
+  }
+}
+
+async function batchToggleBuiltins(enable) {
+  if (!activeChannel) {
+    showToast('warning', 'Nema izabranog aktivnog kanala.');
+    return;
+  }
+
+  const allBuiltins = allCommands.filter(c => c.is_default);
+  let targets = [...allBuiltins];
+
+  // Primeni trenutne filtere
+  if (activeBuiltinCategory && activeBuiltinCategory !== 'all') {
+    targets = targets.filter(c => c.category === activeBuiltinCategory);
+  }
+
+  const statusFilter = document.getElementById('builtinStatusFilter')?.value || 'all';
+  if (statusFilter === 'enabled') {
+    targets = targets.filter(c => c.enabled !== false);
+  } else if (statusFilter === 'disabled') {
+    targets = targets.filter(c => c.enabled === false);
+  }
+
+  const roleFilter = document.getElementById('builtinRoleFilter')?.value || 'all';
+  if (roleFilter !== 'all') {
+    targets = targets.filter(c => (c.min_rank || 'everyone') === roleFilter);
+  }
+
+  const query = (document.getElementById('builtinCmdSearchInput')?.value || '').trim().toLowerCase();
+  if (query) {
+    const cleanQ = query.replace(/^!/, '');
+    targets = targets.filter(c =>
+      c.command.toLowerCase().includes(cleanQ) ||
+      (c.response || '').toLowerCase().includes(query) ||
+      (c.example || '').toLowerCase().includes(query) ||
+      (c.category && c.category.toLowerCase().includes(query))
+    );
+  }
+
+  // Filtriraj samo one kojima se menja stanje
+  const toChange = targets.filter(c => (c.enabled !== false) !== enable);
+
+  if (toChange.length === 0) {
+    showToast('info', `Sve prikazane komande su već ${enable ? 'aktivne' : 'isključene'}.`);
+    return;
+  }
+
+  showToast('info', `${enable ? 'Uključujem' : 'Isključujem'} ${toChange.length} komandi...`, 'pause');
+
+  try {
+    for (const cmdObj of toChange) {
+      const payload = {
+        user_id: getChannelOwnerId(),
+        channel_id: activeChannel.id,
+        command: extractBuiltinAliasKeys(cmdObj.command),
+        response: cmdObj.response,
+        cooldown: cmdObj.cooldown,
+        min_rank: cmdObj.min_rank || 'everyone',
+        enabled: enable,
+        is_default: true,
+        updated_at: new Date().toISOString()
+      };
+
+      if (cmdObj.db_exists) {
+        await sb.from('custom_commands')
+          .update({ enabled: enable, updated_at: new Date().toISOString() })
+          .eq('id', cmdObj.id);
+      } else {
+        await sb.from('custom_commands').insert({
+          ...payload,
+          created_at: new Date().toISOString()
+        });
+      }
+    }
+
+    showToast('success', `${enable ? 'Uključeno' : 'Isključeno'} ${toChange.length} komandi!`, 'check');
+    notifyBotToReload();
+    await loadCommands();
+  } catch (err) {
+    showToast('error', 'Greška tokom grupne izmene komandi');
+  }
+}
+
 // ── Leaderboard Helpers ────────────────────────────────────
 function getCurrentMonth() {
   const d = new Date();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const y = d.getFullYear();
   return `${m}-${y}`;
+}
+
+function getCurrentDay() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatDisplayDay(dayStr) {
+  if (!dayStr) return '—';
+  // Ako je YYYY-MM-DD format
+  const parts = dayStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  }
+  return dayStr;
 }
 
 function rankColor(index) {
@@ -2902,7 +3177,7 @@ function aggregateLeaderboardRows(rows) {
   const periodSel = document.getElementById('lbPeriodSelect');
   const sel = document.getElementById('lbMonthSelect');
   const periodMode = periodSel?.value || 'monthly';
-  if (periodMode === 'monthly') return [...list];
+  if (periodMode === 'monthly' || periodMode === 'daily') return [...list];
 
   const selectedVal = sel?.value || (periodMode === 'yearly' ? String(new Date().getFullYear()) : getCurrentMonth());
   const periodLabel = periodMode === 'alltime' ? 'Sve vreme' : selectedVal;
@@ -3009,6 +3284,28 @@ function populateMonthSelector() {
       years.push({ value: String(y), label: `${y}` });
     }
     sel.innerHTML = years.map(y => `<option value="${y.value}">${y.label}</option>`).join('');
+  } else if (periodMode === 'daily') {
+    sel.style.display = 'inline-block';
+    const days = [];
+    const daniUNedelji = ['Ned', 'Pon', 'Uto', 'Sre', 'Čet', 'Pet', 'Sub'];
+    for (let i = 0; i < 60; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const val = `${y}-${m}-${day}`;
+      let label = `${day}.${m}.${y}`;
+      if (i === 0) {
+        label = `Danas (${day}.${m}.${y})`;
+      } else if (i === 1) {
+        label = `Juče (${day}.${m}.${y})`;
+      } else {
+        const danIme = daniUNedelji[d.getDay()];
+        label = `${day}.${m}.${y} (${danIme})`;
+      }
+      days.push({ value: val, label });
+    }
+    sel.innerHTML = days.map(d => `<option value="${d.value}">${d.label}</option>`).join('');
   } else {
     sel.style.display = 'inline-block';
     const months = [];
@@ -3187,13 +3484,20 @@ async function loadLeaderboard() {
   const periodSel = document.getElementById('lbPeriodSelect');
   const sel = document.getElementById('lbMonthSelect');
   const periodMode = periodSel?.value || 'monthly';
-  const selectedVal = sel?.value || (periodMode === 'yearly' ? String(new Date().getFullYear()) : getCurrentMonth());
+  const selectedVal = sel?.value || (
+    periodMode === 'daily' ? getCurrentDay() :
+    periodMode === 'yearly' ? String(new Date().getFullYear()) :
+    getCurrentMonth()
+  );
 
-  let query = sb.from('leaderboard')
+  const targetTable = periodMode === 'daily' ? 'leaderboard_daily' : 'leaderboard';
+  let query = sb.from(targetTable)
     .select('*')
     .eq('channel_id', String(activeChannel.id));
 
-  if (periodMode === 'alltime') {
+  if (periodMode === 'daily') {
+    query = query.eq('day', selectedVal);
+  } else if (periodMode === 'alltime') {
     // Svo vreme - bez filtera
   } else if (periodMode === 'yearly') {
     query = query.or(`year.eq.${selectedVal},month.ilike.%-${selectedVal}`);
@@ -3202,12 +3506,12 @@ async function loadLeaderboard() {
   }
 
   // Za yearly/alltime period gde se uzima vise meseci po korisniku, povecavamo limit na 2500
-  const fetchLimit = periodMode === 'monthly' ? 500 : 2500;
+  const fetchLimit = (periodMode === 'monthly' || periodMode === 'daily') ? 500 : 2500;
   let { data, error } = await query.order('chat', { ascending: false }).limit(fetchLimit);
 
   if (error) {
-    console.warn('Leaderboard query with chat ordering returned error, attempting fallback:', error);
-    const fallbackRes = await sb.from('leaderboard')
+    console.warn(`Leaderboard query on ${targetTable} with chat ordering returned error, attempting fallback:`, error);
+    const fallbackRes = await sb.from(targetTable)
       .select('*')
       .eq('channel_id', String(activeChannel.id))
       .limit(fetchLimit);
@@ -3438,7 +3742,7 @@ function renderUnifiedLeaderboard(customRows = null) {
           <td>${rankDisplay}</td>
           <td>${userCol}</td>
           <td class="td-num" style="color:var(--app-primary); font-weight:600;">${porukeStr}</td>
-          <td style="color:var(--text-muted)">${escapeHtml(row.month || '—')}</td>
+          <td style="color:var(--text-muted)">${escapeHtml(row.day ? formatDisplayDay(row.day) : (row.month || '—'))}</td>
           <td style="color:var(--text-muted);font-size:0.8rem">${fmtDate(row.updated_at)}</td>
         </tr>
       `;
@@ -3622,14 +3926,19 @@ function exportLeaderboard() {
   }
 
   const channelName = activeChannel?.username || 'kanal';
+  const periodSel = document.getElementById('lbPeriodSelect');
+  const sel = document.getElementById('lbMonthSelect');
+  const periodMode = periodSel?.value || 'monthly';
+  const periodSuffix = (sel?.value || periodMode).replace(/[^a-zA-Z0-9_-]/g, '_');
+  const periodColTitle = periodMode === 'daily' ? 'Dan' : (periodMode === 'yearly' ? 'Godina' : (periodMode === 'alltime' ? 'Period' : 'Mesec'));
 
   if (type === 'chatters') {
-    const csv = ['Rank,Username,Poruke,Month,Updated']
+    const csv = [`Rank,Username,Poruke,${periodColTitle},Updated`]
       .concat(sortedRows.map((r, i) =>
-        `${i + 1},${escapeCsvField(r.display_name || r.username)},${r.chat !== undefined ? r.chat : (r.points || 0)},${escapeCsvField(r.month || '')},${escapeCsvField(fmtDate(r.updated_at))}`
+        `${i + 1},${escapeCsvField(r.display_name || r.username)},${r.chat !== undefined ? r.chat : (r.points || 0)},${escapeCsvField(r.day ? formatDisplayDay(r.day) : (r.month || ''))},${escapeCsvField(fmtDate(r.updated_at))}`
       ))
       .join('\n');
-    downloadCsv(csv, `leaderboard_chatters_${channelName}_${getCurrentMonth()}.csv`);
+    downloadCsv(csv, `leaderboard_chatters_${channelName}_${periodSuffix}.csv`);
   } else if (type === 'watchtime') {
     const csv = ['Rank,Username,Minutes,Hours,Updated']
       .concat(sortedRows.map((r, i) => {
@@ -5267,6 +5576,9 @@ function openNewCmdModal() {
   }
 
   editingCmdId = null;
+  const notice = document.getElementById('builtinCmdNotice');
+  if (notice) notice.style.display = 'none';
+
   document.getElementById('cmdModalTitle').textContent = 'Nova komanda';
   document.getElementById('cmdName').value = '';
   document.getElementById('cmdName').disabled = false;
@@ -5297,6 +5609,10 @@ function editCommand(id) {
 
   editingCmdId = id;
   const isBuiltin = id.startsWith('builtin-') || !!cmd.is_default;
+
+  const notice = document.getElementById('builtinCmdNotice');
+  if (notice) notice.style.display = isBuiltin ? 'block' : 'none';
+
   if (cmd.is_default) {
     document.getElementById('cmdModalTitle').textContent = 'Izmeni ugrađenu komandu';
     document.getElementById('cmdName').disabled = true;
