@@ -1,5 +1,7 @@
 const config = require('./config');
 const state = require('./state');
+// kickAuth se uvozi lazy unutar kickScrapingHeaders da bi se izbegao circular dependency
+// (utils.js <- kickAuth.js <- utils.js)
 
 /**
  * Logovanje sa vremenskom oznakom i bojom
@@ -71,17 +73,68 @@ function izvuciXsrfToken(cookieString) {
 }
 
 /**
+ * Izvlaci session_token iz kolacica i URL-dekodira ga.
+ * Kick v2 interni API koristi Laravel Sanctum — session_token kolacic
+ * je ujedno i Bearer token (format: userId|token).
+ */
+function izvuciSessionToken(cookieString) {
+    if (!cookieString || typeof cookieString !== 'string') return null;
+    const match = cookieString.match(/(?:^|;\s*)session_token=([^;]+)/);
+    if (!match) return null;
+    try {
+        return decodeURIComponent(match[1]);
+    } catch (_) {
+        return match[1];
+    }
+}
+
+/**
  * Vraća standardni set headera za autentikovane zahteve ka Kick-ovom
  * internom (v2) API-ju preko got-scraping (cookie + bearer + XSRF).
+ * Koristi OAuth Bearer token (automatski osvežavan) i session_cookie iz Supabase.
  */
-function kickScrapingHeaders(extra = {}) {
-    const xsrfToken = izvuciXsrfToken(config.BOT_COOKIE);
+async function kickScrapingHeaders(extra = {}) {
+    // Lazy require da bi se izbegao circular dependency (utils -> kickAuth -> utils)
+    const kickAuth = require('./kickAuth');
+
+    let sessionCookie = await kickAuth.getSessionCookie();
+    const xsrfToken = izvuciXsrfToken(sessionCookie);
+
+    // Pokupi session_token iz kolacica — to je Sanctum Bearer token za v2 API
+    const sessionToken = izvuciSessionToken(sessionCookie);
+
+    let bearerToken;
+    if (sessionToken) {
+        // session_token iz kolacica je pravi Bearer za kick.com/api/v2/*
+        bearerToken = `Bearer ${sessionToken}`;
+    } else {
+        // Fallback na OAuth token ili staticki BEARER_TOKEN iz .env
+        try {
+            const token = await kickAuth.getAccessToken();
+            bearerToken = token ? `Bearer ${token}` : config.BEARER_TOKEN;
+        } catch (_) {
+            bearerToken = config.BEARER_TOKEN;
+        }
+    }
+
     const headers = {
-        'accept':        'application/json',
-        'authorization': config.BEARER_TOKEN,
-        'cookie':        config.BOT_COOKIE,
+        'accept':                    'application/json, text/plain, */*',
+        'accept-language':           'en-US,en;q=0.9',
+        'authorization':             bearerToken,
+        'origin':                    'https://kick.com',
+        'referer':                   'https://kick.com/',
+        'sec-ch-ua':                 '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+        'sec-ch-ua-mobile':          '?0',
+        'sec-ch-ua-platform':        '"Windows"',
+        'sec-fetch-dest':            'empty',
+        'sec-fetch-mode':            'cors',
+        'sec-fetch-site':            'same-origin',
+        'user-agent':                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
         ...extra
     };
+    if (sessionCookie) {
+        headers['cookie'] = sessionCookie;
+    }
     if (xsrfToken) {
         headers['x-xsrf-token'] = xsrfToken;
     }
@@ -97,7 +150,7 @@ async function fetchKickAPI(url) {
         const response = await gotScraping({
             url: url,
             responseType: 'json',
-            headers: kickScrapingHeaders(),
+            headers: await kickScrapingHeaders(),
             retry: { limit: 0 }
         });
         
@@ -297,6 +350,7 @@ module.exports = {
     fetchKickAPI,
     kickScrapingHeaders,
     izvuciXsrfToken,
+    izvuciSessionToken,
     dobijTrenutniMesec,
     proveraKulauna,
     prevediVreme,

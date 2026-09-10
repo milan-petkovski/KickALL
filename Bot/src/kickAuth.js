@@ -10,6 +10,7 @@ const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY)
     : createClient('https://dummy.supabase.co', 'dummy_key');
 
 let keshTokeni = null;       // { access_token, refresh_token, expires_at }
+let keshSesija = null;       // session_cookie string (keš)
 let refreshTimer = null;
 let broadcasterIdCache = {}; // username -> user_id
 
@@ -19,7 +20,7 @@ async function ucitajTokene() {
     try {
         const { data, error } = await supabase
             .from(TABELA)
-            .select('access_token, refresh_token, expires_at')
+            .select('access_token, refresh_token, expires_at, session_cookie')
             .eq('id', RED_ID)
             .maybeSingle();
 
@@ -31,6 +32,10 @@ async function ucitajTokene() {
                 refresh_token: data.refresh_token,
                 expires_at: new Date(data.expires_at).getTime()
             };
+            // Keširaj sesijski kolačić ako postoji
+            if (data.session_cookie) {
+                keshSesija = data.session_cookie;
+            }
             return keshTokeni;
         }
 
@@ -203,12 +208,53 @@ async function proveriKonfiguraciju() {
     return !!(t && t.refresh_token);
 }
 
+/**
+ * Vraća sesijski kolačić iz keša ili Supabase-a.
+ */
+async function getSessionCookie() {
+    if (keshSesija) return keshSesija;
+    // Učitaj tokene (koji sada uključuju i session_cookie)
+    await ucitajTokene();
+    return keshSesija || config.BOT_COOKIE || null;
+}
+
+/**
+ * Sačuvaj novi sesijski kolačić u Supabase i keš.
+ */
+async function saveSessionCookie(cookie) {
+    keshSesija = cookie;
+    try {
+        const { error } = await supabase
+            .from(TABELA)
+            .upsert({
+                id: RED_ID,
+                session_cookie: cookie,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'id', ignoreDuplicates: false });
+        if (error) throw error;
+        log('INFO', '[AUTH] Sesijski kolačić uspešno sačuvan u Supabase.');
+        return true;
+    } catch (err) {
+        log('ERR', `[AUTH] Greška pri čuvanju sesijskog kolačića: ${err.message}`);
+        return false;
+    }
+}
+
+/**
+ * Briše keš sesijskog kolačića (npr. kad se detektuje 401).
+ */
+function obrisiKeshSesije() {
+    keshSesija = null;
+}
+
 module.exports = {
     getAccessToken,
     getBroadcasterUserId,
     zakaziAutoOsvezavanje,
     jeKonfigurisano,
     proveriKonfiguraciju,
-    posaljiPrekoZvanicnogApija
+    posaljiPrekoZvanicnogApija,
+    getSessionCookie,
+    saveSessionCookie,
+    obrisiKeshSesije
 };
-

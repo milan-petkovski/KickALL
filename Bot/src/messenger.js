@@ -72,13 +72,11 @@ async function pinujPoruku(chatroomId, messageId) {
         const { gotScraping } = await import('got-scraping');
         const url = `https://kick.com/api/v2/channels/${channelUsername}/pinned-message`;
         const res = await gotScraping({
-            url: url,
+            url,
             method: 'POST',
-            headers: kickScrapingHeaders(),
+            headers: await kickScrapingHeaders(),
             json: {
-                message: {
-                    id: messageId
-                },
+                message: { id: messageId },
                 duration: 20
             },
             retry: { limit: 0 }
@@ -102,9 +100,9 @@ async function odpinujPoruku(chatroomId) {
         const { gotScraping } = await import('got-scraping');
         const url = `https://kick.com/api/v2/channels/${channelUsername}/pinned-message`;
         const res = await gotScraping({
-            url: url,
+            url,
             method: 'DELETE',
-            headers: kickScrapingHeaders(),
+            headers: await kickScrapingHeaders(),
             retry: { limit: 0 }
         });
 

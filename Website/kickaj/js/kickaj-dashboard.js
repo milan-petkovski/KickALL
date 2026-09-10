@@ -1456,6 +1456,41 @@
       saveState();
     });
 
+    const btnSaveSessionCookie = document.getElementById('btnSaveSessionCookie');
+    if (btnSaveSessionCookie) btnSaveSessionCookie.addEventListener('click', async () => {
+      const cookie = (document.getElementById('inputSessionCookie')?.value || '').trim();
+      const statusEl = document.getElementById('sessionCookieStatus');
+      if (!cookie || cookie.length < 10) {
+        if (statusEl) statusEl.innerHTML = '<span style="color:#f87171;">Unesi validan cookie string.</span>';
+        return;
+      }
+      btnSaveSessionCookie.disabled = true;
+      if (statusEl) statusEl.innerHTML = '<span style="opacity:0.6;">Cuvam...</span>';
+      try {
+        const apiBase = getBotApiBase();
+        const secret = window.__internalToken || localStorage.getItem('internal_token') || '';
+        const res = await fetch(`${apiBase}/api/kick/update-session`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Token': secret
+          },
+          body: JSON.stringify({ session_cookie: cookie })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (statusEl) statusEl.innerHTML = '<span style="color:#53fc18;">Sesija sacuvana! Bot ce je automatski koristiti.</span>';
+          document.getElementById('inputSessionCookie').value = '';
+        } else {
+          if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Greska: ${data.error || 'Nepoznata greska'}</span>`;
+        }
+      } catch (err) {
+        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171;">Greska pri slanju: ${err.message}</span>`;
+      } finally {
+        btnSaveSessionCookie.disabled = false;
+      }
+    });
+
     const toggleSound = document.getElementById('toggleSound');
     if (toggleSound) toggleSound.addEventListener('change', (e) => {
       const limits = PLAN_LIMITS[userPlan];

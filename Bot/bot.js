@@ -2056,6 +2056,39 @@ async function handleHttpRequest(req, res) {
             return;
         }
 
+        if (parsedUrl.pathname === '/api/kick/update-session' && req.method === 'POST') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized' }));
+                return;
+            }
+            let body = '';
+            req.on('data', chunk => { body += chunk.toString(); });
+            req.on('end', async () => {
+                try {
+                    const json = JSON.parse(body);
+                    const cookie = json.session_cookie || json.cookie;
+                    if (!cookie || typeof cookie !== 'string' || cookie.trim().length < 10) {
+                        res.writeHead(400, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Missing or invalid session_cookie' }));
+                        return;
+                    }
+                    const ok = await kickAuth.saveSessionCookie(cookie.trim());
+                    if (ok) {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ success: true, message: 'Sesijski kolačić uspešno sačuvan u Supabase.' }));
+                    } else {
+                        res.writeHead(500, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify({ error: 'Greška pri čuvanju sesijskog kolačića u Supabase.' }));
+                    }
+                } catch (err) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Interna greška', detail: err.message }));
+                }
+            });
+            return;
+        }
+
         if (parsedUrl.pathname === '/api/kick/reload') {
             if (!verifyInternalToken(req)) {
                 res.writeHead(401, { 'Content-Type': 'application/json' });

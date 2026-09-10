@@ -269,6 +269,36 @@
             </div>
           </div>
         </details>
+
+        <!-- Accordion 6: Kick Sesija (Session Cookie) -->
+        <details class="sc-accordion" name="sidebar-accordion">
+          <summary class="sc-accordion-head">
+            <div class="sc-accordion-title">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--aj-cyan)" stroke-width="2.5">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <span>Kick Sesija (Cookie)</span>
+            </div>
+            <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="sc-accordion-body">
+            <div class="sc-toggle-sub" style="margin-bottom:10px;line-height:1.5;">
+              Zalijepi svez <strong>cookie</strong> iz Kick browser sesije.<br>
+              <span style="opacity:0.6;font-size:11px;">DevTools (F12) &rarr; Network &rarr; bilo koji /api/v2/ request &rarr; Request Headers &rarr; <code>cookie</code></span>
+            </div>
+            <div class="sc-form-group">
+              <label class="sc-label" for="inputSessionCookie">Session Cookie</label>
+              <textarea id="inputSessionCookie" class="sc-input" rows="3" placeholder="kick_session=...; XSRF-TOKEN=...;" style="resize:vertical;font-size:11px;font-family:monospace;"></textarea>
+            </div>
+            <button class="sc-btn sc-btn-start" id="btnSaveSessionCookie" style="width:100%;margin-top:4px;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <span>Sacuvaj u Supabase</span>
+            </button>
+            <div id="sessionCookieStatus" style="margin-top:8px;font-size:12px;text-align:center;min-height:18px;"></div>
+          </div>
+        </details>
+
       </div><!-- /sidebar-config -->
 
       <!-- Akcije (Uvek fiksirane skroz dole) -->
