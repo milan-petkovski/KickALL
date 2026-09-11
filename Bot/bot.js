@@ -170,6 +170,7 @@ const defaultBuiltinRanks = {
     'top': 'everyone',
     'topchat': 'everyone',
     'topchatters': 'everyone',
+    'topchaters': 'everyone',
     'topporuke': 'everyone',
     'topmessages': 'everyone',
     'topcoins': 'everyone',
@@ -448,11 +449,16 @@ function povezi() {
             return;
         }
 
-        // Ostali događaji sa kanala (Subscription, Gifted Subscription, Follower)
+        // Ostali događaji sa kanala (Subscription, Gifted Subscription, Follower, Host/Raid, KICKs)
         if (
             response.event === 'App\\Events\\SubscriptionEvent' ||
             response.event === 'App\\Events\\GiftedSubscriptionsEvent' ||
-            response.event === 'App\\Events\\FollowersUpdateEvent'
+            response.event === 'App\\Events\\FollowersUpdateEvent' ||
+            response.event === 'App\\Events\\StreamHostEvent' ||
+            response.event === 'StreamHostEvent' ||
+            response.event === 'App\\Events\\KicksGiftedEvent' ||
+            response.event === 'KicksGiftedEvent' ||
+            (typeof response.event === 'string' && (response.event.includes('StreamHost') || response.event.includes('KicksGifted') || response.event.includes('RaidEvent')))
         ) {
             let evtData;
             try {
@@ -471,13 +477,13 @@ function povezi() {
 
                 const channelState = state.getChannelState(chatroomId);
                 if (channelState && channelState.isStreamLive) {
-                    const activeUser = evtData.username || evtData.follower?.username || evtData.subscriber?.username || evtData.user?.username;
+                    const activeUser = evtData.username || evtData.follower?.username || evtData.subscriber?.username || evtData.user?.username || evtData.host_username;
                     if (activeUser && activeUser.toLowerCase() !== channelState.channelUsername.toLowerCase()) {
                         watchtime.registrujAktivnogGledaoca(chatroomId, activeUser);
                     }
                 }
 
-                // Chat alertovi (Follow / Sub / Resub / Giftsub) — poštuju master toggle "Bot interakcija"
+                // Chat alertovi (Follow / Sub / Resub / Giftsub / KICKs / Host) — poštuju master toggle "Bot interakcija"
                 // i pojedinačni switch za svaki alert iz panela.
                 if (channelState && channelState.feature_autoresponse !== false) {
                     const alerts = channelState.alerts_settings || {};
@@ -521,6 +527,36 @@ function povezi() {
                                 name: gifterName,
                                 amount,
                                 fallback: `Hvala na poklonjenoj pretplati @${gifterName}!`
+                            });
+                            if (msg) messenger.posaljiPoruku(chatroomId, msg);
+                        }
+                    }
+
+                    // Host / Raid alert
+                    if (typeof response.event === 'string' && (response.event.includes('StreamHost') || response.event.includes('RaidEvent'))) {
+                        const hostName = evtData.host_username || evtData.username || evtData.channel?.username || evtData.user?.username;
+                        const viewers = Number(evtData.number_of_viewers || evtData.viewers || evtData.viewers_count || 0);
+                        const minViewers = Number(alerts.host_min_viewers) || 0;
+                        if (hostName && alerts.host_enabled && viewers >= minViewers) {
+                            const msg = utils.formatAlertMessage(alerts.host_message, {
+                                name: hostName,
+                                viewers,
+                                fallback: `@${hostName} Hvala na raid-u sa ${viewers} gledalaca!`
+                            });
+                            if (msg) messenger.posaljiPoruku(chatroomId, msg);
+                        }
+                    }
+
+                    // KICKs donacija alert
+                    if (typeof response.event === 'string' && (response.event.includes('KicksGifted') || response.event.includes('KicksEvent') || response.event.includes('GiftsEvent'))) {
+                        const senderName = evtData.sender?.username || evtData.username || evtData.user?.username || evtData.gifter_username;
+                        const amount = Number(evtData.amount || evtData.kicks || evtData.quantity || 0);
+                        const minAmount = Number(alerts.kicks_min_amount) || 0;
+                        if (senderName && alerts.kicks_enabled && amount >= minAmount) {
+                            const msg = utils.formatAlertMessage(alerts.kicks_message, {
+                                name: senderName,
+                                amount,
+                                fallback: `@${senderName} Hvala na ${amount} KICKs donaciji!`
                             });
                             if (msg) messenger.posaljiPoruku(chatroomId, msg);
                         }
@@ -660,7 +696,7 @@ function povezi() {
             }
 
             // Normalizujemo poruku da uvek interno počinje sa '!' radi kompatibilnosti sa ugrađenim komandama
-            let normalizovanaPoruka = '!' + porukaSredjena.slice(prefix.length);
+            let normalizovanaPoruka = '!' + porukaSredjena.slice(prefix.length).trim();
             const porukaLower = normalizovanaPoruka.toLowerCase();
             const porukaNormalized = ukloniSrpskeDijakritike(porukaLower);
 
@@ -717,11 +753,11 @@ function povezi() {
                 if (channelState.feature_watchtime === false) return;
                 let args = '';
                 if (porukaNormalized.startsWith('!watchtime')) {
-                    args = porukaSredjena.slice(10).trim();
+                    args = normalizovanaPoruka.slice(10).trim();
                 } else if (porukaNormalized.startsWith('!time')) {
-                    args = porukaSredjena.slice(5).trim();
+                    args = normalizovanaPoruka.slice(5).trim();
                 } else {
-                    args = porukaSredjena.slice(5).trim();
+                    args = normalizovanaPoruka.slice(5).trim();
                 }
                 if (utils.proveraKulauna(chatroomId, '!watchtime', username)) return;
                 watchtime.handleWatchtime(chatroomId, username, args);
@@ -731,9 +767,9 @@ function povezi() {
             if (porukaNormalized.startsWith('!topwatchtime') || porukaNormalized.startsWith('!topwatch') || porukaNormalized.startsWith('!toptime')) {
                 if (channelState.feature_watchtime === false) return;
                 let limit = '';
-                if (porukaNormalized.startsWith('!topwatchtime')) limit = porukaSredjena.slice(13).trim();
-                else if (porukaNormalized.startsWith('!toptime')) limit = porukaSredjena.slice(8).trim();
-                else limit = porukaSredjena.slice(9).trim();
+                if (porukaNormalized.startsWith('!topwatchtime')) limit = normalizovanaPoruka.slice(13).trim();
+                else if (porukaNormalized.startsWith('!toptime')) limit = normalizovanaPoruka.slice(8).trim();
+                else limit = normalizovanaPoruka.slice(9).trim();
                 if (utils.proveraKulauna(chatroomId, '!topwatchtime', username)) return;
                 watchtime.handleTopWatchtime(chatroomId, limit);
                 return;
@@ -1166,9 +1202,9 @@ function povezi() {
                 if (channelState.feature_leaderboard === false) return;
                 let limitStr = '';
                 if (porukaNormalized.startsWith('!top')) {
-                    limitStr = porukaSredjena.slice(4).trim();
+                    limitStr = normalizovanaPoruka.slice(4).trim();
                 } else {
-                    limitStr = porukaSredjena.slice(12).trim();
+                    limitStr = normalizovanaPoruka.slice(12).trim();
                 }
                 if (utils.proveraKulauna(chatroomId, '!top', username)) return;
                 commands.handleTop(chatroomId, limitStr);
@@ -1179,11 +1215,11 @@ function povezi() {
             if (porukaNormalized.startsWith('!chat') || porukaNormalized.startsWith('!aktivnost') || porukaNormalized.startsWith('!poruke') || porukaNormalized.startsWith('!poruka') || porukaNormalized.startsWith('!messages')) {
                 if (channelState.feature_leaderboard === false) return;
                 let target = '';
-                if (porukaNormalized.startsWith('!chat')) target = porukaSredjena.slice(5).trim();
-                else if (porukaNormalized.startsWith('!aktivnost')) target = porukaSredjena.slice(10).trim();
-                else if (porukaNormalized.startsWith('!messages')) target = porukaSredjena.slice(9).trim();
-                else if (porukaNormalized.startsWith('!poruke')) target = porukaSredjena.slice(7).trim();
-                else target = porukaSredjena.slice(7).trim();
+                if (porukaNormalized.startsWith('!chat')) target = normalizovanaPoruka.slice(5).trim();
+                else if (porukaNormalized.startsWith('!aktivnost')) target = normalizovanaPoruka.slice(10).trim();
+                else if (porukaNormalized.startsWith('!messages')) target = normalizovanaPoruka.slice(9).trim();
+                else if (porukaNormalized.startsWith('!poruke')) target = normalizovanaPoruka.slice(7).trim();
+                else target = normalizovanaPoruka.slice(7).trim();
                 if (utils.proveraKulauna(chatroomId, '!chat', username)) return;
                 commands.handleAktivnost(chatroomId, username, target);
                 return;
@@ -2465,6 +2501,15 @@ async function start() {
         // 5. Pokreni periodicnu proaktivnu proveru live statusa
         setInterval(proveriDaLiSuLiveSvi, 2 * 60 * 1000).unref();
 
+        // 5b. Pokreni periodičnu normalizaciju ljubavnih modifikatora ka 0% (svakih 1h po 1%)
+        setInterval(() => {
+            try {
+                database.normalizujLjubavKaNuli();
+            } catch (err) {
+                utils.log('ERR', `Greška pri normalizaciji ljubavi: ${err.message}`);
+            }
+        }, 60 * 60 * 1000).unref();
+
         // 6. Osluškuj izmene konfiguracije u realnom vremenu
         const lastUpdateLogs = new Map();
         function logDebouncedUpdate(key, msg) {
@@ -2476,60 +2521,71 @@ async function start() {
             }
         }
 
+        const realtimeBotConfigDebounceTimers = new Map();
+
         database.supabase.channel('public:bot_config')
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
                 table: 'bot_config'
-            }, async (payload) => {
+            }, (payload) => {
                 const { eventType, new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (!row || !row.channel_id) return;
+                const chatroomId = String(row.channel_id);
 
-                if (eventType === 'DELETE') {
-                    const chatroomId = String(oldRow.channel_id);
-                    if (state.channels[chatroomId]) {
-                        utils.log('INFO', `🔴 Kanal @${oldRow.channel_name} je uklonjen iz bot konfiguracije.`);
-                        await zaustaviKanal(chatroomId);
-                    }
-                } else {
-                    const chatroomId = String(newRow.channel_id);
-                    const channelUsername = newRow.channel_name || 'Nepoznat';
-                    const botActive = newRow.bot_active || false;
+                if (realtimeBotConfigDebounceTimers.has(chatroomId)) {
+                    clearTimeout(realtimeBotConfigDebounceTimers.get(chatroomId));
+                }
 
-                    if (botActive) {
-                        if (!state.channels[chatroomId] && !pendingChannelOps.has(chatroomId)) {
-                            utils.log('INFO', `🟢 Bot je uspešno aktiviran za kanal @${channelUsername}!`);
-                            await pokreniKanal(chatroomId, channelUsername, newRow);
-                        } else if (state.channels[chatroomId]) {
-                            const cs = state.getChannelState(chatroomId);
-                            logDebouncedUpdate(`config::${chatroomId}`, `⚙️ [PRO Plan] Podešavanja i komande sinhronizovane za @${channelUsername}.`);
+                const timer = setTimeout(async () => {
+                    realtimeBotConfigDebounceTimers.delete(chatroomId);
+                    try {
+                        if (eventType === 'DELETE') {
+                            if (state.channels[chatroomId]) {
+                                utils.log('INFO', `🔴 Kanal @${oldRow.channel_name || chatroomId} je uklonjen iz bot konfiguracije.`);
+                                await zaustaviKanal(chatroomId);
+                            }
+                        } else {
+                            const channelUsername = newRow.channel_name || 'Nepoznat';
+                            const botActive = newRow.bot_active || false;
 
-                            // Restartujemo auto-announce tajmer SAMO ako su se promenila polja koja ga se
-                            // stvarno tiču (interval ili time_enabled), ili ako tajmer trenutno i ne radi.
-                            // U suprotnom bi SVAKA izmena bilo kog podešavanja na dashboardu (ekonomija,
-                            // moderacija, prefiks, itd.) resetovala odbrojavanje na nulu, pa bi automatska
-                            // poruka na vreme mogla da kasni unedogled ako se streamer često petlja po
-                            // podešavanjima dok je interval podešen na duže vreme.
-                            const noviInterval = newRow.announce_interval_mins ?? 15;
-                            const noviTimeEnabled = newRow.announce_time_enabled ?? true;
-                            const relevantnoPromenjeno = (
-                                cs.announce_interval_mins !== noviInterval ||
-                                cs.announce_time_enabled !== noviTimeEnabled ||
-                                !cs.autoAnnounceTimer
-                            );
+                            if (botActive) {
+                                if (!state.channels[chatroomId] && !pendingChannelOps.has(chatroomId)) {
+                                    utils.log('INFO', `🟢 Bot je uspešno aktiviran za kanal @${channelUsername}!`);
+                                    await pokreniKanal(chatroomId, channelUsername, newRow);
+                                } else if (state.channels[chatroomId]) {
+                                    const cs = state.getChannelState(chatroomId);
+                                    logDebouncedUpdate(`config::${chatroomId}`, `⚙️ [PRO Plan] Podešavanja i komande sinhronizovane za @${channelUsername}.`);
 
-                            await azurirajKonfiguracijuKanala(cs, newRow);
+                                    const noviInterval = newRow.announce_interval_mins ?? 15;
+                                    const noviTimeEnabled = newRow.announce_time_enabled ?? true;
+                                    const relevantnoPromenjeno = (
+                                        cs.announce_interval_mins !== noviInterval ||
+                                        cs.announce_time_enabled !== noviTimeEnabled ||
+                                        !cs.autoAnnounceTimer
+                                    );
 
-                            if (relevantnoPromenjeno) {
-                                pokreniAutoAnnounceTajmer(chatroomId);
+                                    await azurirajKonfiguracijuKanala(cs, newRow);
+
+                                    if (relevantnoPromenjeno) {
+                                        pokreniAutoAnnounceTajmer(chatroomId);
+                                    }
+                                }
+                            } else {
+                                if (state.channels[chatroomId] && !pendingChannelOps.has(chatroomId)) {
+                                    utils.log('INFO', `⚪ Bot je zaustavljen za kanal @${channelUsername}.`);
+                                    await zaustaviKanal(chatroomId);
+                                }
                             }
                         }
-                    } else {
-                        if (state.channels[chatroomId] && !pendingChannelOps.has(chatroomId)) {
-                            utils.log('INFO', `⚪ Bot je zaustavljen za kanal @${channelUsername}.`);
-                            await zaustaviKanal(chatroomId);
-                        }
+                    } catch (err) {
+                        utils.log('ERR', `Greška pri primeni bot_config promene za ${chatroomId}: ${err.message}`);
                     }
-                }
+                }, 1500);
+
+                if (timer && typeof timer.unref === 'function') timer.unref();
+                realtimeBotConfigDebounceTimers.set(chatroomId, timer);
             })
             .subscribe();
 
@@ -2552,8 +2608,23 @@ async function start() {
             })
             .subscribe();
 
-        // 7b. Osluškuj izmene na auto-najavama (auto_announces) u realnom vremenu
-        database.supabase.channel('public:auto_announces')
+        // 7b. Osluškuj izmene na auto-najavama u realnom vremenu (tabela auto_messages, uz fallback na auto_announces)
+        database.supabase.channel('public:auto_messages')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'auto_messages'
+            }, async (payload) => {
+                const { new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (row) {
+                    const chatroomId = String(row.channel_id);
+                    if (state.channels[chatroomId]) {
+                        logDebouncedUpdate(`auto_messages::${chatroomId}`, `📢 Auto-najave osvežene za kanal.`);
+                        await database.ucitajAutoAnnounces(chatroomId);
+                    }
+                }
+            })
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
@@ -2571,8 +2642,23 @@ async function start() {
             })
             .subscribe();
 
-        // 7c. Osluškuj izmene na alertovima (chat_alerts) u realnom vremenu
-        database.supabase.channel('public:chat_alerts')
+        // 7c. Osluškuj izmene na alertovima u realnom vremenu (tabela bot_interaction, uz fallback na chat_alerts)
+        database.supabase.channel('public:bot_interaction_alerts')
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'bot_interaction'
+            }, async (payload) => {
+                const { new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (row) {
+                    const chatroomId = String(row.channel_id);
+                    if (state.channels[chatroomId]) {
+                        logDebouncedUpdate(`bot_interaction::${chatroomId}`, `🔔 Alertovi osveženi za kanal.`);
+                        await database.ucitajAlerts(chatroomId);
+                    }
+                }
+            })
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',

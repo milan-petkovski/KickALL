@@ -359,74 +359,248 @@ function formatWatchtime(ukupnoMinuta) {
     return delovi.join(' ');
 }
 
-// ─── KOMANDA: !watchtime [@user] ─────────────────────────────────────────────
-function handleWatchtime(chatroomId, sender, targetRaw) {
+// ─── KOMANDA: !watchtime [@user] [period] ─────────────────────────────────────
+async function handleWatchtime(chatroomId, sender, rawArgs) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
-    const target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : '';
+    const tokens = (rawArgs || '').trim().split(/\s+/).filter(Boolean);
+    let targetUser = '';
+    let requestedPeriod = 'month'; // default je mesec
 
-    let user;
-    if (target && isValidUsername(target)) {
-        user = sanitizeInput(target);
-    } else if (!target) {
-        user = sender;
-    } else {
-        posaljiPoruku(chatroomId, '❌ Nevalidno korisničko ime.');
+    for (const token of tokens) {
+        const tLower = token.toLowerCase();
+        if (['dan', 'danas', 'dnevno', 'today', 'day', 'daily'].includes(tLower)) {
+            requestedPeriod = 'day';
+        } else if (['mesec', 'mesecno', 'ovajmesec', 'month', 'monthly'].includes(tLower)) {
+            requestedPeriod = 'month';
+        } else if (['godina', 'godisnje', 'year', 'yearly'].includes(tLower)) {
+            requestedPeriod = 'year';
+        } else if (['sve', 'ukupno', 'svevreme', 'all', 'alltime', 'total'].includes(tLower)) {
+            requestedPeriod = 'alltime';
+        } else {
+            const cleanCandidate = token.replace(/^@/, '').trim();
+            if (isValidUsername(cleanCandidate)) {
+                targetUser = cleanCandidate;
+            }
+        }
+    }
+
+    let user = targetUser || sender;
+    const cleanUser = sanitizeInput(user);
+    const key = cleanUser.toLowerCase();
+
+    // 1. Dnevni watchtime
+    if (requestedPeriod === 'day') {
+        const podaci = (channelState.watchtimeDaily || {})[key];
+        const minutes = podaci ? podaci.minutes : 0;
+        if (!minutes || minutes === 0) {
+            posaljiPoruku(chatroomId, `⏱️ @${cleanUser} danas još uvek nema zabeleženog watchtime-a.`);
+            return;
+        }
+        posaljiPoruku(chatroomId, `⏱️ @${cleanUser} (Danas): ${formatWatchtime(minutes)}`);
         return;
     }
 
-    const key = user.toLowerCase();
-    const podaci = channelState.watchtime[key];
-
-    if (!podaci || podaci.minutes === 0) {
-        posaljiPoruku(chatroomId, `⏱️ @${user} još uvek nema zabeleženog watchtime-a na ovom kanalu.`);
+    // 2. Mesečni watchtime (DEFAULT)
+    if (requestedPeriod === 'month') {
+        const podaci = (channelState.watchtime || {})[key];
+        const minutes = podaci ? podaci.minutes : 0;
+        if (!minutes || minutes === 0) {
+            posaljiPoruku(chatroomId, `⏱️ @${cleanUser} nema zabeleženog watchtime-a za ovaj mesec.`);
+            return;
+        }
+        const { dobijTrenutniMesec } = require('./utils');
+        const mesecStr = channelState.tekuciMesecLeaderboarda || dobijTrenutniMesec();
+        posaljiPoruku(chatroomId, `⏱️ @${cleanUser} (${mesecStr}): ${formatWatchtime(minutes)}`);
         return;
     }
 
-    const tekst = formatWatchtime(podaci.minutes);
-    posaljiPoruku(chatroomId, `⏱️ @${user} je gledao strim ukupno: ${tekst}`);
+    // 3. Godišnji ili Svevreme (All-time) iz Supabase
+    if (requestedPeriod === 'year' || requestedPeriod === 'alltime') {
+        if (!KORISTI_SUPABASE) {
+            const podaci = (channelState.watchtime || {})[key];
+            const minutes = podaci ? podaci.minutes : 0;
+            posaljiPoruku(chatroomId, `⏱️ @${cleanUser} (ukupno): ${formatWatchtime(minutes)}`);
+            return;
+        }
+
+        try {
+            const currentYear = String(new Date().getFullYear());
+            let query = supabase
+                .from('leaderboard')
+                .select('watchtime_minutes')
+                .eq('channel_id', chatroomId)
+                .eq('username', key);
+
+            if (requestedPeriod === 'year') {
+                query = query.eq('year', currentYear);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            let totalMinutes = 0;
+            if (data && data.length > 0) {
+                totalMinutes = data.reduce((acc, row) => acc + (Number(row.watchtime_minutes) || 0), 0);
+            }
+
+            // Ako za tekući mesec ima delta koja još nije flushovana, dodaj je
+            const delta = (channelState.watchtimeDeltas && channelState.watchtimeDeltas[key]) || 0;
+            totalMinutes += delta;
+
+            if (totalMinutes === 0) {
+                const label = requestedPeriod === 'year' ? `za ${currentYear}. godinu` : 'sve vreme';
+                posaljiPoruku(chatroomId, `⏱️ @${cleanUser} nema zabeleženog watchtime-a za ${label}.`);
+                return;
+            }
+
+            const label = requestedPeriod === 'year' ? `${currentYear}. godina` : 'Sve vreme';
+            posaljiPoruku(chatroomId, `⏱️ @${cleanUser} (${label}): ${formatWatchtime(totalMinutes)}`);
+        } catch (err) {
+            log('ERR', `Greška pri čitanju watchtime-a (${requestedPeriod}): ${err.message}`);
+            const podaci = (channelState.watchtime || {})[key];
+            const minutes = podaci ? podaci.minutes : 0;
+            posaljiPoruku(chatroomId, `⏱️ @${cleanUser}: ${formatWatchtime(minutes)}`);
+        }
+    }
 }
 
-// ─── KOMANDA: !topwatchtime [broj] ───────────────────────────────────────────
-function handleTopWatchtime(chatroomId, numRaw) {
+// ─── KOMANDA: !topwatchtime [period] [broj] ───────────────────────────────────
+async function handleTopWatchtime(chatroomId, numRaw) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
+    const rawStr = (numRaw || '').trim();
+    const tokens = rawStr.split(/\s+/).filter(Boolean);
     let limit = 5;
-    let isDaily = false;
-    if (numRaw) {
-        const lowerRaw = numRaw.toLowerCase().trim();
-        if (lowerRaw.includes('dan') || lowerRaw.includes('today')) {
-            isDaily = true;
-        }
-        const parsed = parseInt(numRaw.replace(/\D/g, ''), 10);
-        if (!isNaN(parsed) && parsed > 0) {
-            limit = Math.min(15, parsed);
+    let period = 'month'; // default: ovaj mesec
+
+    for (const token of tokens) {
+        const tLower = token.toLowerCase();
+        if (['dan', 'danas', 'dnevno', 'today', 'day', 'daily'].includes(tLower)) {
+            period = 'day';
+        } else if (['mesec', 'mesecno', 'ovajmesec', 'month', 'monthly'].includes(tLower)) {
+            period = 'month';
+        } else if (['godina', 'godisnje', 'year', 'yearly'].includes(tLower)) {
+            period = 'year';
+        } else if (['sve', 'ukupno', 'svevreme', 'all', 'alltime', 'total'].includes(tLower)) {
+            period = 'alltime';
+        } else {
+            const parsed = parseInt(token.replace(/\D/g, ''), 10);
+            if (!isNaN(parsed) && parsed > 0) {
+                limit = Math.min(15, parsed);
+            }
         }
     }
 
-    const dataSource = isDaily ? (channelState.watchtimeDaily || {}) : (channelState.watchtime || {});
-    const sortirani = Object.values(dataSource)
-        .sort((a, b) => b.minutes - a.minutes)
-        .filter(x => x.minutes > 0);
+    // 1. Danas
+    if (period === 'day') {
+        const dataSource = channelState.watchtimeDaily || {};
+        const sortirani = Object.values(dataSource)
+            .sort((a, b) => b.minutes - a.minutes)
+            .filter(x => x.minutes > 0);
 
-    if (sortirani.length === 0) {
-        const periodText = isDaily ? 'danas' : 'ovaj kanal';
-        posaljiPoruku(chatroomId, `⏱️ Još nema watchtime podataka za ${periodText}!`);
-        return;
-    }
-
-    const lista = sortirani.slice(0, limit)
-        .map((x, idx) => `${idx + 1}. @${x.display_name} (${formatWatchtime(x.minutes)})`)
-        .join(', ');
-
-    if (isDaily) {
+        if (sortirani.length === 0) {
+            posaljiPoruku(chatroomId, `⏱️ Još nema watchtime podataka za danas!`);
+            return;
+        }
+        const lista = sortirani.slice(0, limit)
+            .map((x, idx) => `${idx + 1}. @${x.display_name} (${formatWatchtime(x.minutes)})`)
+            .join(', ');
         const { dobijTrenutniDan } = require('./utils');
         const dan = channelState.tekuciDanLeaderboarda || dobijTrenutniDan();
         posaljiPoruku(chatroomId, `⏱️ Dnevni Top ${limit} Watchtime (${dan}): ${lista}`);
-    } else {
-        posaljiPoruku(chatroomId, `⏱️ Top ${limit} Watchtime: ${lista}`);
+        return;
+    }
+
+    // 2. Ovaj mesec (DEFAULT)
+    if (period === 'month') {
+        const dataSource = channelState.watchtime || {};
+        const sortirani = Object.values(dataSource)
+            .sort((a, b) => b.minutes - a.minutes)
+            .filter(x => x.minutes > 0);
+
+        if (sortirani.length === 0) {
+            posaljiPoruku(chatroomId, `⏱️ Još nema watchtime podataka za ovaj mesec!`);
+            return;
+        }
+        const lista = sortirani.slice(0, limit)
+            .map((x, idx) => `${idx + 1}. @${x.display_name} (${formatWatchtime(x.minutes)})`)
+            .join(', ');
+        const { dobijTrenutniMesec } = require('./utils');
+        const mesecStr = channelState.tekuciMesecLeaderboarda || dobijTrenutniMesec();
+        posaljiPoruku(chatroomId, `⏱️ Mesečni Top ${limit} Watchtime (${mesecStr}): ${lista}`);
+        return;
+    }
+
+    // 3. Godišnji ili Sve vreme (All-time)
+    if (period === 'year' || period === 'alltime') {
+        if (!KORISTI_SUPABASE) {
+            const dataSource = channelState.watchtime || {};
+            const sortirani = Object.values(dataSource).sort((a, b) => b.minutes - a.minutes).filter(x => x.minutes > 0);
+            const lista = sortirani.slice(0, limit).map((x, idx) => `${idx + 1}. @${x.display_name} (${formatWatchtime(x.minutes)})`).join(', ');
+            posaljiPoruku(chatroomId, `⏱️ Top ${limit} Watchtime: ${lista}`);
+            return;
+        }
+
+        try {
+            const currentYear = String(new Date().getFullYear());
+            let query = supabase
+                .from('leaderboard')
+                .select('username, display_name, watchtime_minutes')
+                .eq('channel_id', chatroomId);
+
+            if (period === 'year') {
+                query = query.eq('year', currentYear);
+            }
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            // Agregacija po korisniku (sumiramo mesece)
+            const mapAgg = new Map();
+            (data || []).forEach(row => {
+                const uKey = (row.username || '').toLowerCase();
+                if (!uKey) return;
+                const prev = mapAgg.get(uKey) || { display_name: row.display_name || row.username, minutes: 0 };
+                prev.minutes += Number(row.watchtime_minutes) || 0;
+                if (row.display_name) prev.display_name = row.display_name;
+                mapAgg.set(uKey, prev);
+            });
+
+            // Dodaj trenutne neflushovane delte
+            if (channelState.watchtimeDeltas) {
+                for (const uKey in channelState.watchtimeDeltas) {
+                    const delta = channelState.watchtimeDeltas[uKey] || 0;
+                    if (delta > 0) {
+                        const prev = mapAgg.get(uKey) || { display_name: uKey, minutes: 0 };
+                        prev.minutes += delta;
+                        mapAgg.set(uKey, prev);
+                    }
+                }
+            }
+
+            const sortirani = Array.from(mapAgg.values())
+                .sort((a, b) => b.minutes - a.minutes)
+                .filter(x => x.minutes > 0);
+
+            if (sortirani.length === 0) {
+                const periodText = period === 'year' ? `${currentYear}. godinu` : 'sve vreme';
+                posaljiPoruku(chatroomId, `⏱️ Još nema watchtime podataka za ${periodText}!`);
+                return;
+            }
+
+            const lista = sortirani.slice(0, limit)
+                .map((x, idx) => `${idx + 1}. @${x.display_name} (${formatWatchtime(x.minutes)})`)
+                .join(', ');
+
+            const periodLabel = period === 'year' ? `Godina ${currentYear}` : 'Sve vreme';
+            posaljiPoruku(chatroomId, `⏱️ Top ${limit} Watchtime (${periodLabel}): ${lista}`);
+        } catch (err) {
+            log('ERR', `Greška pri dohvatanju Top Watchtime (${period}): ${err.message}`);
+            posaljiPoruku(chatroomId, `❌ Greška pri učitavanju top watchtime podataka.`);
+        }
     }
 }
 

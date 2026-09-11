@@ -424,11 +424,13 @@ async function sacuvajLjubav(chatroomId) {
         const rows = Array.from(keys).map(key => {
             const [u1, u2] = key.split('::');
             const isMarried = !!channelState.marriedCouples[key];
+            const rawMod = channelState.loveModifiers[key] ?? 0;
+            const clampedMod = Math.max(-100, Math.min(100, Number(rawMod) || 0));
             return {
                 channel_id: chatroomId,
-                user1: u1,
-                user2: u2,
-                modifier: channelState.loveModifiers[key] ?? 0,
+                user1: (u1 || '').toLowerCase(),
+                user2: (u2 || '').toLowerCase(),
+                modifier: clampedMod,
                 is_married: isMarried,
                 married_at: isMarried ? new Date().toISOString() : null,
                 updated_at: new Date().toISOString()
@@ -459,6 +461,37 @@ function osigurajCuvanjeLjubavi(chatroomId) {
         }, config.LOVE_SAVE_INTERVAL_MS);
         if (channelState.loveSaveTimer && typeof channelState.loveSaveTimer.unref === 'function') {
             channelState.loveSaveTimer.unref();
+        }
+    }
+}
+
+/**
+ * Periodični oporavak/normalizacija ljubavi ka 0% (svakih 1h pomera modifikator za 1% bliže nuli)
+ * - Ako je modifikator pozitivan (>0): smanjuje se za 1%
+ * - Ako je modifikator negativan (<0): povećava se za 1% ka nuli
+ */
+function normalizujLjubavKaNuli() {
+    for (const chatroomId of Object.keys(state.channels)) {
+        const channelState = state.channels[chatroomId];
+        if (!channelState || !channelState.loveModifiers) continue;
+
+        let dirty = false;
+        for (const kljuc in channelState.loveModifiers) {
+            const val = channelState.loveModifiers[kljuc];
+            if (typeof val !== 'number' || val === 0) continue;
+
+            if (val > 0) {
+                channelState.loveModifiers[kljuc] = Math.max(0, val - 1);
+                dirty = true;
+            } else if (val < 0) {
+                channelState.loveModifiers[kljuc] = Math.min(0, val + 1);
+                dirty = true;
+            }
+        }
+
+        if (dirty) {
+            channelState.loveDirty = true;
+            osigurajCuvanjeLjubavi(chatroomId);
         }
     }
 }
@@ -696,11 +729,14 @@ async function ucitajAlerts(chatroomId) {
         const alerts = {};
         (data || []).forEach(row => {
             alerts[`${row.alert_type}_enabled`] = row.enabled;
-            if (row.message !== null) alerts[`${row.alert_type}_message`] = row.message;
+            if (row.message !== null && row.message !== undefined) alerts[`${row.alert_type}_message`] = row.message;
             if (row.alert_type === 'kicks') alerts.kicks_min_amount = row.min_amount ?? 0;
             if (row.alert_type === 'host') alerts.host_min_viewers = row.min_viewers ?? 0;
         });
         channelState.alerts_settings = alerts;
+        if (alerts.welcome_message) {
+            channelState.welcome_message = alerts.welcome_message;
+        }
     } catch (err) {
         log('ERR', `Greška pri učitavanju alertova za ${chatroomId}: ${err.message}`);
     }
@@ -722,7 +758,7 @@ async function ucitajAutoAnnounces(chatroomId) {
         if (error) throw error;
 
         const limits = channelState.planLimits || config.PLAN_LIMITS.free;
-        const maxAnnounces = limits.maxAutoAnnounces || 2;
+        const maxAnnounces = limits.maxAutoAnnounces !== undefined ? limits.maxAutoAnnounces : 5;
         const rows = Array.isArray(data) ? data : [];
         channelState.autoAnnounces = rows.slice(0, maxAnnounces).map(row => row.message);
     } catch (err) {
@@ -1064,6 +1100,8 @@ let realtimeChannel = null;
  * Kada strimer izmeni podešavanje na web-u, bot u realnom vremenu automatski
  * osvežava konfiguraciju tog kanala u memoriji bez ručnog osvežavanja.
  */
+const realtimeConfigDebounceTimers = new Map();
+
 function postaviRealtimeSlusalac() {
     if (!KORISTI_SUPABASE || !supabase || realtimeChannel) return;
 
@@ -1073,11 +1111,20 @@ function postaviRealtimeSlusalac() {
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'bot_config' },
-                async (payload) => {
+                (payload) => {
                     const chatroomId = payload?.new?.channel_id || payload?.old?.channel_id;
                     if (chatroomId) {
-                        log('INFO', `[REALTIME] Detektovana izmena u bot_config za chatroomId ${chatroomId}. Sinhronizujem u realnom vremenu...`);
-                        await ucitajBotConfig(chatroomId);
+                        // Debounce od 1.5 sekundi kako uzastopni autosave-ovi ne bi spamovali reload
+                        if (realtimeConfigDebounceTimers.has(chatroomId)) {
+                            clearTimeout(realtimeConfigDebounceTimers.get(chatroomId));
+                        }
+                        const timer = setTimeout(async () => {
+                            realtimeConfigDebounceTimers.delete(chatroomId);
+                            log('INFO', `[REALTIME] Detektovana izmena u bot_config za chatroomId ${chatroomId}. Sinhronizujem u realnom vremenu...`);
+                            await ucitajBotConfig(chatroomId);
+                        }, 1500);
+                        if (timer && typeof timer.unref === 'function') timer.unref();
+                        realtimeConfigDebounceTimers.set(chatroomId, timer);
                     }
                 }
             )
@@ -1116,7 +1163,8 @@ module.exports = {
     ucitajSveAktivneKanale,
     posaljiKickovAlert,
     syncChatroomId,
-    postaviRealtimeSlusalac
+    postaviRealtimeSlusalac,
+    normalizujLjubavKaNuli
 };
 
 

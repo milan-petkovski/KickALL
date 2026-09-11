@@ -2502,6 +2502,11 @@ function filterBuiltinCategoryFromSelect(cat) {
   filterBuiltinCategory(cat, null);
 }
 
+function goToBuiltinCategory(catName) {
+  switchPanel('builtin-commands');
+  filterBuiltinCategory(catName);
+}
+
 const RANK_LABELS = {
   'everyone': 'Svi',
   'subscriber': 'Subovi',
@@ -4099,7 +4104,17 @@ async function loadMarriages() {
     .order('married_at', { ascending: false });
 
   if (error) { return; }
-  allMarriages = data || [];
+  
+  // Normalizuj i dedupliciraj brakove po paru korisnika (case-insensitive)
+  const uniqueMarriagesMap = new Map();
+  (data || []).forEach(row => {
+    const pairKey = [String(row.user1 || '').toLowerCase(), String(row.user2 || '').toLowerCase()].sort().join('::');
+    if (!uniqueMarriagesMap.has(pairKey)) {
+      uniqueMarriagesMap.set(pairKey, row);
+    }
+  });
+
+  allMarriages = Array.from(uniqueMarriagesMap.values());
   filterMarriages(marriagesQuery);
 
   const limits = getPlanLimits();
@@ -4128,7 +4143,17 @@ async function loadLoveStatuses() {
     .limit(200);
 
   if (error) { return; }
-  allLoveStatuses = data || [];
+
+  // Normalizuj i dedupliciraj ljubavne statuse po paru korisnika (case-insensitive)
+  const uniqueStatusMap = new Map();
+  (data || []).forEach(row => {
+    const pairKey = [String(row.user1 || '').toLowerCase(), String(row.user2 || '').toLowerCase()].sort().join('::');
+    if (!uniqueStatusMap.has(pairKey)) {
+      uniqueStatusMap.set(pairKey, row);
+    }
+  });
+
+  allLoveStatuses = Array.from(uniqueStatusMap.values());
   filterLoveStatuses(loveStatusesQuery);
 
   const meta = document.getElementById('loveStatusMeta');
@@ -4303,7 +4328,8 @@ function renderLoveStatuses(rows) {
   const heartSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F472B6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"></path></svg>`;
 
   let html = pageRows.map(row => {
-    const modifier = Number(row.modifier || 0);
+    const rawMod = Number(row.modifier || 0);
+    const modifier = Math.max(-100, Math.min(100, rawMod));
     const statusObj = getLoveStatusLabel(modifier);
     const displayModifier = modifier >= 0 ? `+${modifier}%` : `${modifier}%`;
 
@@ -5168,16 +5194,62 @@ function applyGlobalPenaltyToAll() {
   showToast('success', 'Globalna kazna je automatski primenjena na sve filtere i sačuvana!');
 }
 
+function handleAnnounceInputChange(val) {
+  const errEl = document.getElementById('newAnnounceInputError');
+  const countEl = document.getElementById('newAnnounceCharCount');
+  const addBtn = document.getElementById('btnAddAnnounce');
+  const inputEl = document.getElementById('newAnnounceInput');
+  const len = (val || '').length;
+
+  if (countEl) countEl.textContent = `${len} / 500`;
+
+  const trimmed = (val || '').trim();
+  const limits = getPlanLimits();
+
+  if (!trimmed) {
+    if (errEl) errEl.style.display = 'none';
+    if (inputEl) inputEl.style.borderColor = '';
+    return;
+  }
+
+  if (localAnnounces.includes(trimmed)) {
+    if (errEl) {
+      errEl.textContent = 'Ova poruka već postoji u listi.';
+      errEl.style.display = 'block';
+    }
+    if (inputEl) inputEl.style.borderColor = '#EF4444';
+  } else if (limits.maxAutoAnnounces !== Infinity && localAnnounces.length >= limits.maxAutoAnnounces) {
+    if (errEl) {
+      errEl.textContent = `Dostignut je limit od ${limits.maxAutoAnnounces} poruka za ${limits.name} paket.`;
+      errEl.style.display = 'block';
+    }
+    if (inputEl) inputEl.style.borderColor = '#EF4444';
+  } else {
+    if (errEl) errEl.style.display = 'none';
+    if (inputEl) inputEl.style.borderColor = '';
+  }
+}
+
+function copyAlertVar(variableName) {
+  if (!variableName) return;
+  navigator.clipboard.writeText(variableName).then(() => {
+    showToast('info', `Kopirano u clipboard: ${variableName}`);
+  }).catch(() => {
+    showToast('info', `Varijabla: ${variableName}`);
+  });
+}
+
 function renderAnnounceList() {
   const el = document.getElementById('announceList');
   const addBtn = document.getElementById('btnAddAnnounce');
   if (!el) return;
 
   const limits = getPlanLimits();
+  const isLimitReached = limits.maxAutoAnnounces !== Infinity && localAnnounces.length >= limits.maxAutoAnnounces;
 
   // Disable add button if limit reached
   if (addBtn) {
-    if (limits.maxAutoAnnounces !== Infinity && localAnnounces.length >= limits.maxAutoAnnounces) {
+    if (isLimitReached) {
       addBtn.disabled = true;
       addBtn.style.opacity = '0.5';
       addBtn.style.cursor = 'not-allowed';
@@ -5191,7 +5263,7 @@ function renderAnnounceList() {
   }
 
   if (localAnnounces.length === 0) {
-    el.innerHTML = '<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.015); border: 1px dashed var(--border-subtle); border-radius: var(--radius-md); font-size: 0.85rem;">Nema automatskih poruka. Unesi novu poruku iznad.</div>';
+    el.innerHTML = '<div style="padding: 1.5rem; text-align: center; color: var(--text-muted); background: rgba(255,255,255,0.015); border: 1px dashed var(--border-subtle); border-radius: var(--radius-md); font-size: 0.85rem;">Nema automatskih poruka. Unesi novu poruku iznad i klikni Dodaj.</div>';
     return;
   }
 
@@ -5200,6 +5272,7 @@ function renderAnnounceList() {
 
     if (isLocked) {
       return `
+        <div style="border: 1px solid rgba(239, 68, 68, 0.35); padding: 12px 16px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 12px; background: rgba(239, 68, 68, 0.04); transition: all 0.2s ease;">
           <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0;">
             <span style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; font-size: 0.72rem; font-weight: 800; padding: 3px 9px; border-radius: 6px; flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
@@ -5211,7 +5284,7 @@ function renderAnnounceList() {
           </div>
           <div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
             <span style="font-size: 0.72rem; color: #EF4444; font-weight: 700; background: rgba(239, 68, 68, 0.1); padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.2);">Bot ne šalje</span>
-            <button type="button" class="action-btn danger" onclick="deleteAnnounceMessage(${i})" style="width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #EF4444; cursor: pointer; transition: all 0.2s ease;" title="Obriši poruku">
+            <button type="button" class="action-btn danger" onclick="deleteAnnounceMessage(${i})" style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #EF4444; cursor: pointer; transition: all 0.2s ease;" title="Obriši poruku">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
             </button>
           </div>
@@ -5229,7 +5302,7 @@ function renderAnnounceList() {
             ${escapeHtml(msg)}
           </span>
         </div>
-        <button type="button" class="action-btn danger" onclick="deleteAnnounceMessage(${i})" style="flex-shrink: 0; width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #EF4444; cursor: pointer; transition: all 0.2s ease;" title="Obriši poruku">
+        <button type="button" class="action-btn danger" onclick="deleteAnnounceMessage(${i})" style="flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #EF4444; cursor: pointer; transition: all 0.2s ease;" title="Obriši poruku">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
         </button>
       </div>
@@ -5239,15 +5312,28 @@ function renderAnnounceList() {
 
 function addAnnounceMessage() {
   const input = document.getElementById('newAnnounceInput');
+  const errEl = document.getElementById('newAnnounceInputError');
   if (!input) return;
   const msg = input.value.trim();
 
   if (!msg) {
+    if (errEl) {
+      errEl.textContent = 'Poruka ne može biti prazna.';
+      errEl.style.display = 'block';
+    }
+    input.style.borderColor = '#EF4444';
+    input.focus();
     showToast('error', 'Poruka ne može biti prazna.');
     return;
   }
 
   if (localAnnounces.includes(msg)) {
+    if (errEl) {
+      errEl.textContent = 'Ova poruka već postoji u listi.';
+      errEl.style.display = 'block';
+    }
+    input.style.borderColor = '#EF4444';
+    input.focus();
     showToast('error', 'Ova poruka već postoji.');
     return;
   }
@@ -5255,15 +5341,26 @@ function addAnnounceMessage() {
   // Check plan limits for auto announces
   const limits = getPlanLimits();
   if (limits.maxAutoAnnounces !== Infinity && localAnnounces.length >= limits.maxAutoAnnounces) {
+    if (errEl) {
+      errEl.textContent = `Dostignut je limit od ${limits.maxAutoAnnounces} automatskih poruka za ${limits.name} paket.`;
+      errEl.style.display = 'block';
+    }
+    input.style.borderColor = '#EF4444';
+    showToast('warning', `Dostignut je limit od ${limits.maxAutoAnnounces} poruka za ${limits.name} paket.`);
     openUpgradeModal('announces');
     return;
   }
 
+  if (errEl) errEl.style.display = 'none';
+  input.style.borderColor = '';
+
   localAnnounces.push(msg);
   input.value = '';
+  handleAnnounceInputChange('');
   renderAnnounceList();
   renderPlanLimitBanners(); // Update the announce banner
   saveBotConfig(true); // Instant tihi autosave u bazu
+  showToast('success', 'Automatska poruka uspešno dodata i sačuvana!');
 }
 
 let announceSaveTimer = null;
@@ -5271,6 +5368,7 @@ function debouncedAutoSaveAnnounces() {
   clearTimeout(announceSaveTimer);
   announceSaveTimer = setTimeout(() => {
     saveBotConfig(true);
+    showToast('success', 'Podešavanja pravila slanja poruka automatski sačuvana!');
   }, 400);
 }
 
@@ -5279,14 +5377,44 @@ function debouncedAutoSaveConfig() {
   clearTimeout(botConfigSaveTimer);
   botConfigSaveTimer = setTimeout(() => {
     saveBotConfig(true);
+    showToast('success', 'Podešavanje chat alerta automatski sačuvano!');
   }, 400);
 }
 
+function flushPendingBotConfigSaves() {
+  if (announceSaveTimer || botConfigSaveTimer) {
+    if (announceSaveTimer) {
+      clearTimeout(announceSaveTimer);
+      announceSaveTimer = null;
+    }
+    if (botConfigSaveTimer) {
+      clearTimeout(botConfigSaveTimer);
+      botConfigSaveTimer = null;
+    }
+    saveBotConfig(true);
+  }
+}
+
+window.addEventListener('beforeunload', () => {
+  flushPendingBotConfigSaves();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    flushPendingBotConfigSaves();
+  }
+});
+
+
 function deleteAnnounceMessage(i) {
+  if (i < 0 || i >= localAnnounces.length) return;
+  const removedMsg = localAnnounces[i];
   localAnnounces.splice(i, 1);
   renderAnnounceList();
   renderPlanLimitBanners(); // Update the announce banner
+  handleAnnounceInputChange(document.getElementById('newAnnounceInput')?.value || '');
   saveBotConfig(true); // Instant tihi autosave u bazu
+  showToast('info', 'Automatska poruka je uklonjena.');
 }
 
 async function loadBotStatus() {
@@ -6296,8 +6424,13 @@ function switchPanel(panelId, resetTab = false) {
 
   if (panelId === 'overview') {
     updateOverviewModulesUI();
-    if (typeof refreshMiniPanels === 'function' && Array.isArray(allLeaderboard)) {
+    if (typeof refreshMiniPanels === 'function' && Array.isArray(allLeaderboard) && allLeaderboard.length > 0) {
       refreshMiniPanels(allLeaderboard);
+    } else if (typeof loadLeaderboard === 'function') {
+      loadLeaderboard();
+    }
+    if (!liveFeedInterval && typeof startLiveActivityFeed === 'function') {
+      startLiveActivityFeed();
     }
   }
   if (panelId === 'commands') { loadCommands(); }
@@ -11055,5 +11188,9 @@ window.switchBotrixTab = switchBotrixTab;
 window.handleBotrixFileUpload = handleBotrixFileUpload;
 window.parseBotrixInput = parseBotrixInput;
 window.executeBotrixImport = executeBotrixImport;
+window.copyAlertVar = copyAlertVar;
+window.handleAnnounceInputChange = handleAnnounceInputChange;
+window.addAnnounceMessage = addAnnounceMessage;
+window.deleteAnnounceMessage = deleteAnnounceMessage;
 
 initAuth();
