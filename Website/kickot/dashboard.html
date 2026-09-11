@@ -828,12 +828,8 @@
 <strong class="kx-73">Upravljanje komandama direktno iz Chata:</strong> Moderatori i strimer mogu
               upravljati custom komandama tokom lajva:
               <ul class="kx-74">
-<li><strong>Dodavanje komande:</strong> <code class="kx-75">!dodajkomandu !komanda Odgovor</code>
-                  ili <code class="kx-75">!addcom !komanda Odgovor</code>
-</li>
-<li><strong>Brisanje komande:</strong> <code class="kx-76">!obrisikomandu !komanda</code>
-                  ili <code class="kx-76">!delcom !komanda</code>
-</li>
+<li><strong>Dodavanje komande:</strong> <code class="kx-75">!addcom !komanda Odgovor</code></li>
+<li><strong>Brisanje komande:</strong> <code class="kx-76">!delcom !komanda</code></li>
 </ul>
 </div>
 </div>
@@ -883,9 +879,9 @@
 <div class="pagination-bar__left">
 <span class="pagination-bar__label">Prikaži:</span>
 <select class="select-input select-input-sm" id="cmdLimitSelect" onchange="changeCommandsLimit(this.value)">
-<option value="10">10</option>
-<option value="25">25</option>
+<option selected="" value="25">25</option>
 <option value="50">50</option>
+<option value="100">100</option>
 </select>
 </div>
 <div class="pagination-bar__center">
@@ -988,6 +984,10 @@
     <button class="btn btn-sm btn-secondary" onclick="batchToggleBuiltins(false)" title="Isključi sve komande u prikazanom filteru" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
       Isključi sve
+    </button>
+    <button class="btn btn-sm btn-secondary" onclick="resetBuiltinUsageConfirm()" title="Resetuj brojač korišćenja za sve ugrađene komande" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Resetuj korišćenje
     </button>
     <div class="table-meta" id="builtinCmdTableMeta" style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-left: 4px;">0 ugrađenih komandi</div>
   </div>
@@ -3739,15 +3739,17 @@ Sledeća ›
 <label class="form-label kx-339">Komanda i aliasi</label>
 <div class="cmd-input-wrap kx-340">
 <span class="cmd-prefix-badge" id="cmdPrefixBadge">!</span>
-<input aria-describedby="cmdModalError" class="form-input kx-341" id="cmdName" oninput="updateModalPreview()" placeholder="npr. instagram, insta, ig" type="text">
+<input aria-describedby="cmdNameError" class="form-input kx-341" id="cmdName" oninput="updateModalPreview()" placeholder="npr. instagram, insta, ig" type="text">
 </input></div>
 <span class="config-hint kx-218" id="cmdNameHint">Možeš uneti više aliasa odvojenih zarezom</span>
+<div class="field-error-msg" id="cmdNameError" style="display: none; color: #EF4444; font-size: 0.8rem; margin-top: 6px; font-weight: 500;"></div>
 </div>
 <!-- Response -->
 <div class="form-group kx-342">
 <label class="form-label kx-339">Odgovor bota</label>
-<textarea aria-describedby="cmdModalError" class="form-input form-textarea kx-343" id="cmdResponse" maxlength="500" oninput="updateModalPreview()" placeholder="Bot će poslati ovaj tekst kada neko ukuca komandu..." rows="4"></textarea>
+<textarea aria-describedby="cmdResponseError" class="form-input form-textarea kx-343" id="cmdResponse" maxlength="500" oninput="updateModalPreview()" placeholder="Bot će poslati ovaj tekst kada neko ukuca komandu..." rows="4"></textarea>
 <div class="char-count kx-344"><span id="cmdCharCount">0</span>/500</div>
+<div class="field-error-msg" id="cmdResponseError" style="display: none; color: #EF4444; font-size: 0.8rem; margin-top: 6px; font-weight: 500;"></div>
 </div>
 <!-- Cooldown -->
 <div class="form-group">

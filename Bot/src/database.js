@@ -520,7 +520,7 @@ async function ucitajCustomKomande(chatroomId) {
 
         const { data, error } = await sbPanels
             .from('custom_commands')
-            .select('command, response, cooldown, enabled, min_rank, is_default')
+            .select('id, command, response, cooldown, enabled, min_rank, is_default, usage')
             .eq('channel_id', chatroomId);
 
         if (error) throw error;
@@ -537,6 +537,8 @@ async function ucitajCustomKomande(chatroomId) {
                     if (alias) {
                         const minCd = channelState.planLimits?.minCooldownMs || 1000;
                         channelState.customCommands[alias] = {
+                            id: row.id,
+                            usage: row.usage || 0,
                             response: row.response,
                             cooldown: Math.max(row.cooldown || 5000, minCd),
                             min_rank: row.min_rank || 'everyone',
@@ -549,6 +551,132 @@ async function ucitajCustomKomande(chatroomId) {
         }
     } catch (err) {
         log('ERR', `Greška pri učitavanju custom komandi za ${chatroomId}: ${err.message}`);
+    }
+}
+
+// Mapiranje svih aliasa ugrađenih komandi na njihov glavni identifikator u bazi (db_match_key)
+const BUILTIN_CMD_TO_DB_KEY = {
+    // Leaderboard
+    'top': 'top', 'leaderboard': 'top',
+    'topchat': 'topchat', 'topchatters': 'topchat', 'topporuke': 'topchat', 'topmessages': 'topchat',
+    'topwatchtime': 'topwatchtime', 'topwatch': 'topwatchtime', 'toptime': 'topwatchtime',
+    'topcoins': 'topcoins', 'toppoeni': 'topcoins', 'toppoints': 'topcoins',
+    'toplevel': 'toplevel', 'topxp': 'toplevel',
+    'watchtime': 'watchtime', 'sati': 'watchtime', 'time': 'watchtime',
+    'chat': 'chat', 'aktivnost': 'chat', 'poruke': 'chat', 'poruka': 'chat', 'messages': 'chat',
+    'points': 'points', 'coins': 'points', 'poeni': 'points', 'bal': 'points',
+    'me': 'me', 'stats': 'me', 'profil': 'me', 'profile': 'me',
+    'resetleaderboard': 'resetleaderboard', 'resetlb': 'resetleaderboard',
+
+    // Ljubav i brakovi
+    'love': 'love', 'mrzim': 'love', 'hate': 'love',
+    'posaljiljubav': 'posaljiljubav', 'sendlove': 'posaljiljubav',
+    'bacihejt': 'bacihejt', 'sendhate': 'bacihejt',
+    'vencaj': 'vencaj', 'marry': 'vencaj', 'propose': 'vencaj',
+    'razvod': 'razvod', 'divorce': 'razvod',
+    'brakovi': 'brakovi', 'brak': 'brakovi', 'vencani': 'brakovi', 'marriages': 'brakovi', 'couples': 'brakovi',
+    'prihvati': 'prihvati', 'accept': 'prihvati', 'da': 'prihvati', 'daaa': 'prihvati', 'prihvatam': 'prihvati', 'pristajem': 'prihvati', 'yes': 'prihvati',
+    'odbij': 'odbij', 'decline': 'odbij', 'ne': 'odbij', 'odbijam': 'odbij', 'no': 'odbij',
+    'cooldown': 'cooldown', 'coldown': 'cooldown', 'cd': 'cooldown',
+
+    // Mini igre
+    'duel': 'duel', 'dvoboj': 'duel',
+    'roll': 'roll', 'dice': 'roll',
+    'iq': 'iq',
+    'samar': 'samar', 'slap': 'samar',
+    'ruskirulet': 'ruskirulet', 'rr': 'ruskirulet', 'russianroulette': 'ruskirulet',
+    'alkotest': 'alkotest', 'alcohol': 'alkotest', 'bac': 'alkotest',
+    'rulet': 'roulette', 'roulette': 'roulette',
+    'slot': 'slots', 'slots': 'slots',
+    'coinflip': 'coinflip', 'piskoglava': 'coinflip', 'gamble': 'coinflip', 'kockaj': 'coinflip', 'flip': 'coinflip',
+    'tocak': 'tocak', 'wheel': 'tocak', 'spin': 'tocak',
+
+    // Song request
+    'pesma': 'pesma', 'sr': 'pesma', 'song': 'pesma',
+    'queue': 'queue', 'songqueue': 'queue', 'redpesama': 'queue',
+    'skip': 'skip', 'skipsong': 'skip', 'preskocipesmu': 'skip',
+
+    // Ranking & Ekonomija
+    'rank': 'rank', 'level': 'rank', 'xp': 'rank',
+    'daily': 'daily', 'dnevna': 'daily',
+    'give': 'give', 'dajpoene': 'give', 'givepoints': 'give',
+    'store': 'store', 'shop': 'store', 'prodavnica': 'store',
+    'redeem': 'redeem', 'kupi': 'redeem', 'buy': 'redeem',
+
+    // Moderacija
+    'permit': 'permit', 'dozvoli': 'permit',
+    'addcom': 'addcom', 'dodajkomandu': 'addcom',
+    'delcom': 'delcom', 'obrisikomandu': 'delcom',
+    'pin': 'pin',
+    'unpin': 'unpin',
+    'setgame': 'setgame',
+    'setlive': 'setlive',
+    'osvezi': 'osvezi', 'reload': 'osvezi',
+
+    // Ostalo
+    'komande': 'komande', 'help': 'komande', 'pomoc': 'komande', 'commands': 'komande',
+    'uptime': 'uptime', 'up': 'uptime',
+    'followage': 'followage', 'pratim': 'followage',
+    'igra': 'igra', 'game': 'igra',
+    'info': 'info',
+    'cinjenica': 'cinjenica', 'fact': 'cinjenica',
+    'vreme': 'vreme', 'vrijeme': 'vreme', 'weather': 'vreme'
+};
+
+async function evidentirajKoriscenjeKomande(chatroomId, rawCmdName) {
+    try {
+        if (!KORISTI_SUPABASE) return;
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+
+        const cleanCmd = (rawCmdName || '').toLowerCase().replace(/^!/, '').trim();
+        if (!cleanCmd) return;
+
+        const matchKey = BUILTIN_CMD_TO_DB_KEY[cleanCmd] || cleanCmd;
+
+        // Potraži da li u custom_commands tabeli već postoji red za ovu komandu
+        const { data: existingRows, error: searchErr } = await sbPanels
+            .from('custom_commands')
+            .select('id, usage, command')
+            .eq('channel_id', chatroomId);
+
+        if (searchErr) throw searchErr;
+
+        let targetRow = null;
+        if (existingRows && existingRows.length > 0) {
+            targetRow = existingRows.find(r => {
+                const names = r.command.split(',').map(n => n.trim().toLowerCase());
+                return names.some(n => n === matchKey || n === cleanCmd);
+            });
+        }
+
+        if (targetRow) {
+            const currentUsage = (targetRow.usage || 0) + 1;
+            await sbPanels
+                .from('custom_commands')
+                .update({ usage: currentUsage, updated_at: new Date().toISOString() })
+                .eq('id', targetRow.id);
+        } else {
+            // Ako red još ne postoji u bazi, kreiramo inicijalni red sa is_default: true i usage: 1
+            const userId = channelState.userId || null;
+            await sbPanels
+                .from('custom_commands')
+                .insert({
+                    channel_id: chatroomId,
+                    user_id: userId,
+                    command: matchKey,
+                    response: '',
+                    cooldown: 5000,
+                    min_rank: 'everyone',
+                    enabled: true,
+                    is_default: true,
+                    usage: 1,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                });
+        }
+    } catch (err) {
+        log('WARN', `Greška pri evidentiranju korišćenja komande '${rawCmdName}' za ${chatroomId}: ${err.message}`);
     }
 }
 
@@ -980,6 +1108,7 @@ module.exports = {
     evidentirajPoruku,
     smanjiPoruku,
     ucitajCustomKomande,
+    evidentirajKoriscenjeKomande,
     ucitajAutoAnnounces,
     ucitajAlerts,
     ucitajBotConfig,

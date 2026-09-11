@@ -1784,7 +1784,7 @@ function handleHelp(chatroomId, username) {
 
     // Muzika & Store
     if (channelState.feature_songrequest) {
-        parts.push(`Muzika: ${prefix}pesma (${prefix}sr), ${prefix}songqueue, ${prefix}skipsong`);
+        parts.push(`Muzika: ${prefix}pesma (${prefix}sr), ${prefix}queue, ${prefix}skip`);
     }
 
     const spisak = parts.join(' | ');

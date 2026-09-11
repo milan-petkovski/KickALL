@@ -90,11 +90,16 @@ const defaultBuiltinRanks = {
     // Zabava
     'iq': 'everyone',
     'samar': 'everyone',
+    'slap': 'everyone',
     'roll': 'everyone',
+    'dice': 'everyone',
     'duel': 'everyone',
     'ruskirulet': 'everyone',
     'rr': 'everyone',
+    'russianroulette': 'everyone',
     'alkotest': 'everyone',
+    'alcohol': 'everyone',
+    'bac': 'everyone',
     'cinjenica': 'everyone',
     'fact': 'everyone',
     
@@ -103,21 +108,31 @@ const defaultBuiltinRanks = {
     'mrzim': 'everyone',
     'hate': 'everyone',
     'vencaj': 'everyone',
+    'marry': 'everyone',
+    'propose': 'everyone',
     'razvod': 'everyone',
+    'divorce': 'everyone',
     'brakovi': 'everyone',
     'brak': 'everyone',
     'vencani': 'everyone',
+    'marriages': 'everyone',
+    'couples': 'everyone',
     'posaljiljubav': 'everyone',
+    'sendlove': 'everyone',
     'bacihejt': 'everyone',
+    'sendhate': 'everyone',
     'prihvati': 'everyone',
     'da': 'everyone',
+    'yes': 'everyone',
     'pristajem': 'everyone',
     'odbij': 'everyone',
     'ne': 'everyone',
+    'no': 'everyone',
     'odbijam': 'everyone',
     'decline': 'everyone',
     'cooldown': 'everyone',
     'coldown': 'everyone',
+    'cd': 'everyone',
     
     // Strim Info
     'komande': 'everyone',
@@ -126,9 +141,11 @@ const defaultBuiltinRanks = {
     'commands': 'everyone',
     'vreme': 'everyone',
     'vrijeme': 'everyone',
+    'weather': 'everyone',
     'uptime': 'everyone',
     'up': 'everyone',
     'igra': 'everyone',
+    'game': 'everyone',
     'info': 'everyone',
     
     // Moderacija
@@ -139,6 +156,7 @@ const defaultBuiltinRanks = {
     'delcom': 'moderator',
     'obrisikomandu': 'moderator',
     'osvezi': 'broadcaster',
+    'reload': 'broadcaster',
     'pin': 'moderator',
     'unpin': 'broadcaster',
     'setlive': 'broadcaster',
@@ -148,18 +166,30 @@ const defaultBuiltinRanks = {
     'watchtime': 'everyone',
     'topwatchtime': 'everyone',
     'topwatch': 'everyone',
+    'toptime': 'everyone',
     'top': 'everyone',
     'topchat': 'everyone',
     'topchatters': 'everyone',
     'topporuke': 'everyone',
+    'topmessages': 'everyone',
+    'topcoins': 'everyone',
+    'toppoeni': 'everyone',
+    'toppoints': 'everyone',
     'leaderboard': 'everyone',
     'chat': 'everyone',
     'aktivnost': 'everyone',
+    'poruke': 'everyone',
+    'messages': 'everyone',
+    'time': 'everyone',
+    'sati': 'everyone',
     'stats': 'everyone',
     'me': 'everyone',
     'profil': 'everyone',
+    'profile': 'everyone',
     'followage': 'everyone',
+    'pratim': 'everyone',
     'resetleaderboard': 'broadcaster',
+    'resetlb': 'broadcaster',
     
     // Ekonomija
     'rank': 'everyone',
@@ -170,13 +200,12 @@ const defaultBuiltinRanks = {
     'bal': 'everyone',
     'coins': 'everyone',
     'daily': 'everyone',
+    'dnevna': 'everyone',
+    'give': 'everyone',
     'givepoints': 'everyone',
     'dajpoene': 'everyone',
-    'pay': 'everyone',
     'toplevel': 'everyone',
     'topxp': 'everyone',
-    'topcoins': 'everyone',
-    'toppoeni': 'everyone',
     
     // Kockanje
     'slots': 'everyone',
@@ -184,11 +213,13 @@ const defaultBuiltinRanks = {
     'roulette': 'everyone',
     'rulet': 'everyone',
     'coinflip': 'everyone',
+    'flip': 'everyone',
     'piskoglava': 'everyone',
     'gamble': 'everyone',
     'kockaj': 'everyone',
     'tocak': 'everyone',
     'wheel': 'everyone',
+    'spin': 'everyone',
     'dvoboj': 'everyone',
     'accept': 'everyone',
     
@@ -198,13 +229,16 @@ const defaultBuiltinRanks = {
     'shop': 'everyone',
     'redeem': 'everyone',
     'kupi': 'everyone',
+    'buy': 'everyone',
     
     // Muzika
     'pesma': 'everyone',
     'sr': 'everyone',
     'song': 'everyone',
+    'queue': 'everyone',
     'songqueue': 'everyone',
     'redpesama': 'everyone',
+    'skip': 'moderator',
     'skipsong': 'moderator',
     'preskocipesmu': 'moderator'
 };
@@ -349,16 +383,18 @@ async function obradiCustomKomandu(chatroomId, username, porukaNormalized, chann
 
     if (utils.proveraKulauna(chatroomId, 'custom_' + cmdIme, username, customCmd.cooldown)) return true;
 
-    // Inkrementiraj uses_count u bazi
-    if (database.KORISTI_SUPABASE && database.supabase) {
+    // Inkrementiraj usage brojač u bazi za custom komandu
+    if (database.KORISTI_SUPABASE && database.sbPanels && customCmd.id) {
         (async () => {
             try {
-                await database.supabase.rpc('increment_command_uses', {
-                    p_channel_id: chatroomId,
-                    p_command: cmdIme
-                });
+                const nextUsage = (customCmd.usage || 0) + 1;
+                customCmd.usage = nextUsage;
+                await database.sbPanels
+                    .from('custom_commands')
+                    .update({ usage: nextUsage, updated_at: new Date().toISOString() })
+                    .eq('id', customCmd.id);
             } catch (e) {
-                utils.log('WARN', `[CMDS] Greška pri inkrementiranju uses za komandu ${cmdIme}: ${e.message}`);
+                utils.log('WARN', `[CMDS] Greška pri inkrementiranju usage za komandu ${cmdIme}: ${e.message}`);
             }
         })();
     }
@@ -643,17 +679,23 @@ function povezi() {
                     }
                     return;
                 }
+                // Evidentiraj korišćenje ugrađene komande u bazi podataka za dashboard brojač
+                database.evidentirajKoriscenjeKomande(chatroomId, cmdName);
             }
 
             // Dinamičke komande
-            if (porukaNormalized.startsWith('!vreme') || porukaNormalized.startsWith('!vrijeme')) {
+            if (porukaNormalized.startsWith('!vreme') || porukaNormalized.startsWith('!vrijeme') || porukaNormalized.startsWith('!weather')) {
                 const isVreme = porukaNormalized.startsWith('!vreme');
-                const grad = isVreme ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(8).trim();
+                const isWeather = porukaNormalized.startsWith('!weather');
+                let grad = '';
+                if (isVreme) grad = porukaSredjena.slice(6).trim();
+                else if (isWeather) grad = porukaSredjena.slice(8).trim();
+                else grad = porukaSredjena.slice(8).trim();
                 if (grad) {
                     if (utils.proveraKulauna(chatroomId, '!vreme', username)) return;
                     commands.handleVreme(chatroomId, grad);
                 } else {
-                    messenger.posaljiPoruku(chatroomId, `Upotreba: ${isVreme ? '!vreme' : '!vrijeme'} <naziv grada> — npr. !vreme Beograd`);
+                    messenger.posaljiPoruku(chatroomId, `Upotreba: !vreme <naziv grada> (ili !weather <city>) — npr. !vreme Beograd`);
                 }
                 return;
             }
@@ -664,18 +706,20 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!igra') {
+            if (porukaNormalized === '!igra' || porukaNormalized === '!game') {
                 if (channelState.feature_games === false) return;
                 if (utils.proveraKulauna(chatroomId, '!igra', username)) return;
                 commands.handleIgra(chatroomId);
                 return;
             }
 
-            if (porukaNormalized === '!watchtime' || porukaNormalized.startsWith('!watchtime ') || porukaNormalized === '!sati' || porukaNormalized.startsWith('!sati ')) {
+            if (porukaNormalized === '!watchtime' || porukaNormalized.startsWith('!watchtime ') || porukaNormalized === '!sati' || porukaNormalized.startsWith('!sati ') || porukaNormalized === '!time' || porukaNormalized.startsWith('!time ')) {
                 if (channelState.feature_watchtime === false) return;
                 let args = '';
                 if (porukaNormalized.startsWith('!watchtime')) {
                     args = porukaSredjena.slice(10).trim();
+                } else if (porukaNormalized.startsWith('!time')) {
+                    args = porukaSredjena.slice(5).trim();
                 } else {
                     args = porukaSredjena.slice(5).trim();
                 }
@@ -684,9 +728,12 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!topwatchtime') || porukaNormalized.startsWith('!topwatch')) {
+            if (porukaNormalized.startsWith('!topwatchtime') || porukaNormalized.startsWith('!topwatch') || porukaNormalized.startsWith('!toptime')) {
                 if (channelState.feature_watchtime === false) return;
-                const limit = porukaNormalized.startsWith('!topwatchtime') ? porukaSredjena.slice(13).trim() : porukaSredjena.slice(9).trim();
+                let limit = '';
+                if (porukaNormalized.startsWith('!topwatchtime')) limit = porukaSredjena.slice(13).trim();
+                else if (porukaNormalized.startsWith('!toptime')) limit = porukaSredjena.slice(8).trim();
+                else limit = porukaSredjena.slice(9).trim();
                 if (utils.proveraKulauna(chatroomId, '!topwatchtime', username)) return;
                 watchtime.handleTopWatchtime(chatroomId, limit);
                 return;
@@ -714,21 +761,21 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!daily') {
+            if (porukaNormalized === '!daily' || porukaNormalized === '!dnevna') {
                 if (utils.proveraKulauna(chatroomId, '!daily', username)) return;
                 economy.handleDaily(chatroomId, username);
                 return;
             }
 
-            if (porukaNormalized.startsWith('!givepoints ') || porukaNormalized.startsWith('!dajpoene ') || porukaNormalized.startsWith('!pay ')) {
+            if (porukaNormalized.startsWith('!give ') || porukaNormalized.startsWith('!dajpoene ') || porukaNormalized.startsWith('!givepoints ')) {
                 let rest = '';
-                if (porukaNormalized.startsWith('!givepoints ')) rest = porukaSredjena.slice(12).trim();
+                if (porukaNormalized.startsWith('!give ')) rest = porukaSredjena.slice(6).trim();
                 else if (porukaNormalized.startsWith('!dajpoene ')) rest = porukaSredjena.slice(10).trim();
-                else rest = porukaSredjena.slice(5).trim();
+                else rest = porukaSredjena.slice(12).trim();
                 const parts = rest.split(/\s+/);
                 const target = parts[0] || '';
                 const amount = parts[1] || '';
-                if (utils.proveraKulauna(chatroomId, '!givepoints', username)) return;
+                if (utils.proveraKulauna(chatroomId, '!give', username)) return;
                 economy.handleGivePoints(chatroomId, username, target, amount);
                 return;
             }
@@ -740,8 +787,11 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!topcoins') || porukaNormalized.startsWith('!toppoeni')) {
-                const limit = porukaNormalized.startsWith('!topcoins') ? porukaSredjena.slice(9).trim() : porukaSredjena.slice(9).trim();
+            if (porukaNormalized.startsWith('!topcoins') || porukaNormalized.startsWith('!toppoeni') || porukaNormalized.startsWith('!toppoints')) {
+                let limit = '';
+                if (porukaNormalized.startsWith('!topcoins')) limit = porukaSredjena.slice(9).trim();
+                else if (porukaNormalized.startsWith('!toppoints')) limit = porukaSredjena.slice(10).trim();
+                else limit = porukaSredjena.slice(9).trim();
                 if (utils.proveraKulauna(chatroomId, '!topcoins', username)) return;
                 economy.handleTopCoins(chatroomId, limit);
                 return;
@@ -781,10 +831,11 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!coinflip ') || porukaNormalized === '!coinflip' || porukaNormalized.startsWith('!piskoglava ') || porukaNormalized.startsWith('!gamble ') || porukaNormalized.startsWith('!kockaj ')) {
+            if (porukaNormalized.startsWith('!coinflip ') || porukaNormalized === '!coinflip' || porukaNormalized.startsWith('!piskoglava ') || porukaNormalized.startsWith('!gamble ') || porukaNormalized.startsWith('!kockaj ') || porukaNormalized.startsWith('!flip ') || porukaNormalized === '!flip') {
                 if (channelState.feature_games === false) return;
                 let rest = '';
                 if (porukaNormalized.startsWith('!coinflip')) rest = porukaSredjena.slice(9).trim();
+                else if (porukaNormalized.startsWith('!flip')) rest = porukaSredjena.slice(5).trim();
                 else if (porukaNormalized.startsWith('!piskoglava ')) rest = porukaSredjena.slice(12).trim();
                 else if (porukaNormalized.startsWith('!gamble ')) rest = porukaSredjena.slice(8).trim();
                 else rest = porukaSredjena.slice(8).trim();
@@ -797,9 +848,12 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!tocak') || porukaNormalized.startsWith('!wheel')) {
+            if (porukaNormalized.startsWith('!tocak') || porukaNormalized.startsWith('!wheel') || porukaNormalized.startsWith('!spin')) {
                 if (channelState.feature_games === false) return;
-                const amount = porukaNormalized.startsWith('!tocak') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(6).trim();
+                let amount = '';
+                if (porukaNormalized.startsWith('!tocak')) amount = porukaSredjena.slice(6).trim();
+                else if (porukaNormalized.startsWith('!wheel')) amount = porukaSredjena.slice(6).trim();
+                else amount = porukaSredjena.slice(5).trim();
                 if (utils.proveraKulauna(chatroomId, '!wheel', username)) return;
                 gambling.handleWheel(chatroomId, username, amount);
                 return;
@@ -825,16 +879,19 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!redeem ') || porukaNormalized.startsWith('!kupi ')) {
-                const query = porukaNormalized.startsWith('!redeem ') ? porukaSredjena.slice(8).trim() : porukaSredjena.slice(6).trim();
+            if (porukaNormalized.startsWith('!redeem ') || porukaNormalized.startsWith('!kupi ') || porukaNormalized.startsWith('!buy ')) {
+                let query = '';
+                if (porukaNormalized.startsWith('!redeem ')) query = porukaSredjena.slice(8).trim();
+                else if (porukaNormalized.startsWith('!kupi ')) query = porukaSredjena.slice(6).trim();
+                else query = porukaSredjena.slice(5).trim();
                 if (utils.proveraKulauna(chatroomId, '!redeem', username)) return;
                 commands.handleRedeemStore(chatroomId, username, query);
                 return;
             }
 
-            if (porukaNormalized.startsWith('!roll')) {
+            if (porukaNormalized.startsWith('!roll') || porukaNormalized.startsWith('!dice')) {
                 if (channelState.feature_games === false) return;
-                const target = porukaSredjena.slice(5).trim();
+                const target = porukaNormalized.startsWith('!roll') ? porukaSredjena.slice(5).trim() : porukaSredjena.slice(5).trim();
                 if (utils.proveraKulauna(chatroomId, '!roll', username)) return;
                 commands.handleRoll(chatroomId, username, target);
                 return;
@@ -848,24 +905,27 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!samar')) {
+            if (porukaNormalized.startsWith('!samar') || porukaNormalized.startsWith('!slap')) {
                 if (channelState.feature_games === false) return;
-                const target = porukaSredjena.slice(6).trim();
+                const target = porukaNormalized.startsWith('!samar') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(5).trim();
                 if (utils.proveraKulauna(chatroomId, '!samar', username)) return;
                 commands.handleSamar(chatroomId, username, target);
                 return;
             }
 
-            if (porukaNormalized.startsWith('!ruskirulet') || porukaNormalized.startsWith('!rr')) {
+            if (porukaNormalized.startsWith('!ruskirulet') || porukaNormalized.startsWith('!rr') || porukaNormalized.startsWith('!russianroulette')) {
                 if (channelState.feature_games === false) return;
                 if (utils.proveraKulauna(chatroomId, '!ruskirulet', username)) return;
                 commands.handleRulet(chatroomId, username);
                 return;
             }
 
-            if (porukaNormalized.startsWith('!alkotest')) {
+            if (porukaNormalized.startsWith('!alkotest') || porukaNormalized.startsWith('!alcohol') || porukaNormalized.startsWith('!bac')) {
                 if (channelState.feature_games === false) return;
-                const target = porukaSredjena.slice(9).trim();
+                let target = '';
+                if (porukaNormalized.startsWith('!alkotest')) target = porukaSredjena.slice(9).trim();
+                else if (porukaNormalized.startsWith('!alcohol')) target = porukaSredjena.slice(8).trim();
+                else target = porukaSredjena.slice(4).trim();
                 if (utils.proveraKulauna(chatroomId, '!alkotest', username)) return;
                 commands.handleAlkotest(chatroomId, username, target);
                 return;
@@ -878,8 +938,8 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!followage')) {
-                const target = porukaSredjena.slice(10).trim();
+            if (porukaNormalized.startsWith('!followage') || porukaNormalized.startsWith('!pratim')) {
+                const target = porukaNormalized.startsWith('!followage') ? porukaSredjena.slice(10).trim() : porukaSredjena.slice(7).trim();
                 if (utils.proveraKulauna(chatroomId, '!followage', username)) return;
                 commands.handleFollowage(chatroomId, username, target);
                 return;
@@ -898,14 +958,14 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!songqueue' || porukaNormalized === '!redpesama') {
+            if (porukaNormalized === '!queue' || porukaNormalized === '!songqueue' || porukaNormalized === '!redpesama') {
                 if (channelState.feature_songrequest === false) return;
-                if (utils.proveraKulauna(chatroomId, '!songqueue', username)) return;
+                if (utils.proveraKulauna(chatroomId, '!queue', username)) return;
                 commands.handleSongQueue(chatroomId);
                 return;
             }
 
-            if (porukaNormalized === '!skipsong' || porukaNormalized === '!preskocipesmu') {
+            if (porukaNormalized === '!skip' || porukaNormalized === '!skipsong' || porukaNormalized === '!preskocipesmu') {
                 if (channelState.feature_songrequest === false) return;
                 commands.handleSkipSong(chatroomId, username, chatData.sender);
                 return;
@@ -937,12 +997,13 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!posaljiljubav')) {
+            if (porukaNormalized.startsWith('!posaljiljubav') || porukaNormalized.startsWith('!sendlove')) {
                 if (channelState.feature_love === false) return;
-                const targetRaw = porukaSredjena.slice(14).trim();
+                const isPl = porukaNormalized.startsWith('!posaljiljubav');
+                const targetRaw = isPl ? porukaSredjena.slice(14).trim() : porukaSredjena.slice(9).trim();
                 const targetClean = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
                 if (!targetClean) {
-                    messenger.posaljiPoruku(chatroomId, `@${username}, upotreba: !posaljiljubav @user`);
+                    messenger.posaljiPoruku(chatroomId, `@${username}, upotreba: !posaljiljubav @user (ili !sendlove @user)`);
                     return;
                 }
 
@@ -972,12 +1033,13 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!bacihejt')) {
+            if (porukaNormalized.startsWith('!bacihejt') || porukaNormalized.startsWith('!sendhate')) {
                 if (channelState.feature_love === false) return;
-                const targetRaw = porukaSredjena.slice(9).trim();
+                const isBh = porukaNormalized.startsWith('!bacihejt');
+                const targetRaw = isBh ? porukaSredjena.slice(9).trim() : porukaSredjena.slice(9).trim();
                 const targetClean = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
                 if (!targetClean) {
-                    messenger.posaljiPoruku(chatroomId, `@${username}, upotreba: !bacihejt @user`);
+                    messenger.posaljiPoruku(chatroomId, `@${username}, upotreba: !bacihejt @user (ili !sendhate @user)`);
                     return;
                 }
 
@@ -1007,7 +1069,7 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!cooldown' || porukaNormalized === '!coldown') {
+            if (porukaNormalized === '!cooldown' || porukaNormalized === '!coldown' || porukaNormalized === '!cd') {
                 const userKey = username.toLowerCase();
                 const sada = Date.now();
                 const zadnji = channelState.loveHateCooldowns[userKey] || 0;
@@ -1039,7 +1101,7 @@ function povezi() {
             }
 
             // ─── UNIFICIRANO PRIHVATANJE & ODBIJANJE (DVOBOJ & BRAK) ─────────
-            if (porukaNormalized === '!accept' || porukaNormalized === '!prihvati' || porukaNormalized === '!da' || porukaNormalized === '!pristajem') {
+            if (porukaNormalized === '!accept' || porukaNormalized === '!prihvati' || porukaNormalized === '!da' || porukaNormalized === '!pristajem' || porukaNormalized === '!yes') {
                 const userKey = username.toLowerCase();
                 if (channelState.pendingDuels && channelState.pendingDuels[userKey]) {
                     gambling.handleAcceptDuel(chatroomId, username);
@@ -1058,7 +1120,7 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized === '!odbij' || porukaNormalized === '!ne' || porukaNormalized === '!odbijam' || porukaNormalized === '!decline') {
+            if (porukaNormalized === '!odbij' || porukaNormalized === '!ne' || porukaNormalized === '!odbijam' || porukaNormalized === '!decline' || porukaNormalized === '!no') {
                 const userKey = username.toLowerCase();
                 if (channelState.pendingDuels && channelState.pendingDuels[userKey]) {
                     gambling.handleDeclineDuel(chatroomId, username);
@@ -1073,23 +1135,26 @@ function povezi() {
                 return;
             }
 
-            if (porukaNormalized.startsWith('!vencaj')) {
+            if (porukaNormalized.startsWith('!vencaj') || porukaNormalized.startsWith('!marry') || porukaNormalized.startsWith('!propose')) {
                 if (channelState.feature_love === false) return;
-                const targetRaw = porukaSredjena.slice(7).trim();
+                let targetRaw = '';
+                if (porukaNormalized.startsWith('!vencaj')) targetRaw = porukaSredjena.slice(7).trim();
+                else if (porukaNormalized.startsWith('!marry')) targetRaw = porukaSredjena.slice(6).trim();
+                else targetRaw = porukaSredjena.slice(8).trim();
                 if (utils.proveraKulauna(chatroomId, '!vencaj', username)) return;
                 commands.handleVencaj(chatroomId, username, targetRaw);
                 return;
             }
 
-            if (porukaNormalized.startsWith('!razvod')) {
+            if (porukaNormalized.startsWith('!razvod') || porukaNormalized.startsWith('!divorce')) {
                 if (channelState.feature_love === false) return;
-                const target = porukaSredjena.slice(7).trim();
+                const target = porukaNormalized.startsWith('!razvod') ? porukaSredjena.slice(7).trim() : porukaSredjena.slice(8).trim();
                 if (utils.proveraKulauna(chatroomId, '!razvod', username)) return;
                 commands.handleRazvod(chatroomId, username, target);
                 return;
             }
 
-            if (porukaNormalized === '!brakovi' || porukaNormalized === '!brak' || porukaNormalized === '!vencani') {
+            if (porukaNormalized === '!brakovi' || porukaNormalized === '!brak' || porukaNormalized === '!vencani' || porukaNormalized === '!marriages' || porukaNormalized === '!couples') {
                 if (channelState.feature_love === false) return;
                 if (utils.proveraKulauna(chatroomId, '!brakovi', username)) return;
                 commands.handleBrakovi(chatroomId);
@@ -1110,12 +1175,13 @@ function povezi() {
                 return;
             }
 
-            // Čet aktivnost (!chat, !aktivnost, !poruke)
-            if (porukaNormalized.startsWith('!chat') || porukaNormalized.startsWith('!aktivnost') || porukaNormalized.startsWith('!poruke') || porukaNormalized.startsWith('!poruka')) {
+            // Čet aktivnost (!chat, !aktivnost, !poruke, !messages)
+            if (porukaNormalized.startsWith('!chat') || porukaNormalized.startsWith('!aktivnost') || porukaNormalized.startsWith('!poruke') || porukaNormalized.startsWith('!poruka') || porukaNormalized.startsWith('!messages')) {
                 if (channelState.feature_leaderboard === false) return;
                 let target = '';
                 if (porukaNormalized.startsWith('!chat')) target = porukaSredjena.slice(5).trim();
                 else if (porukaNormalized.startsWith('!aktivnost')) target = porukaSredjena.slice(10).trim();
+                else if (porukaNormalized.startsWith('!messages')) target = porukaSredjena.slice(9).trim();
                 else if (porukaNormalized.startsWith('!poruke')) target = porukaSredjena.slice(7).trim();
                 else target = porukaSredjena.slice(7).trim();
                 if (utils.proveraKulauna(chatroomId, '!chat', username)) return;
@@ -1123,12 +1189,13 @@ function povezi() {
                 return;
             }
 
-            // Korisnički profil i karton (!me, !stats, !profil)
-            if (porukaNormalized.startsWith('!me') || porukaNormalized.startsWith('!stats') || porukaNormalized.startsWith('!profil')) {
+            // Korisnički profil i karton (!me, !stats, !profil, !profile)
+            if (porukaNormalized.startsWith('!me') || porukaNormalized.startsWith('!stats') || porukaNormalized.startsWith('!profil') || porukaNormalized.startsWith('!profile')) {
                 if (channelState.feature_leaderboard === false) return;
                 let target = '';
                 if (porukaNormalized.startsWith('!me')) target = porukaSredjena.slice(3).trim();
                 else if (porukaNormalized.startsWith('!stats')) target = porukaSredjena.slice(6).trim();
+                else if (porukaNormalized.startsWith('!profile')) target = porukaSredjena.slice(8).trim();
                 else target = porukaSredjena.slice(7).trim();
                 if (utils.proveraKulauna(chatroomId, '!me', username)) return;
                 commands.handleMe(chatroomId, username, target);
@@ -1147,12 +1214,12 @@ function povezi() {
                     chatData.sender.identity.badges &&
                     chatData.sender.identity.badges.some(b => b.type === 'moderator'));
 
-            if (porukaNormalized === '!resetleaderboard') {
+            if (porukaNormalized === '!resetleaderboard' || porukaNormalized === '!resetlb') {
                 commands.handleResetLeaderboard(chatroomId, username, isAuthorized);
                 return;
             }
 
-            if (porukaNormalized === '!osvezi') {
+            if (porukaNormalized === '!osvezi' || porukaNormalized === '!reload') {
                 commands.handleOsvezi(chatroomId, username, isAuthorized);
                 return;
             }

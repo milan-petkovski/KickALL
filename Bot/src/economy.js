@@ -282,7 +282,7 @@ function handleGivePoints(chatroomId, sender, targetRaw, amountRaw) {
 
     const target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : '';
     if (!target || !isValidUsername(target)) {
-        posaljiPoruku(chatroomId, `❌ Upotreba: !givepoints @korisnik <iznos>`);
+        posaljiPoruku(chatroomId, `❌ Upotreba: !give @korisnik <iznos>`);
         return;
     }
 
