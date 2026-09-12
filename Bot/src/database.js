@@ -272,7 +272,7 @@ function proveriIResetujDan(chatroomId) {
     }
 }
 
-function evidentirajPoruku(chatroomId, username, poruka) {
+function evidentirajPoruku(chatroomId, username, poruka, isSub = false) {
     if (!poruka || poruka.trim().length < 3) return;
     if (!isValidUsername(username)) {
         log('WARN', `Blokirano evidentiranje poruke za nevalidno korisničko ime: ${username}`);
@@ -315,12 +315,12 @@ function evidentirajPoruku(chatroomId, username, poruka) {
     channelState.leaderboardDaily[key].count++;
     channelState.leaderboardDaily[key].username = cleanUsername;
 
-    // Dodaj XP i Poene preko economy modula
+    // Dodaj XP i Poene preko economy modula (sa poštovanjem podešavanja, sub statusa i anti-spam validacije)
     const xpPerMsg = channelState.xp_per_msg || 15;
     const pointsPerMsg = channelState.points_per_msg || 5;
     try {
         const economy = require('./economy');
-        economy.dodajXP(chatroomId, cleanUsername, xpPerMsg, pointsPerMsg);
+        economy.dodajXP(chatroomId, cleanUsername, xpPerMsg, pointsPerMsg, isSub, poruka);
     } catch (e) {
         channelState.leaderboard[key].xp = (channelState.leaderboard[key].xp || 0) + xpPerMsg;
         channelState.leaderboard[key].points = (channelState.leaderboard[key].points || 0) + pointsPerMsg;
@@ -466,7 +466,7 @@ function osigurajCuvanjeLjubavi(chatroomId) {
 }
 
 /**
- * Periodični oporavak/normalizacija ljubavi ka 0% (svakih 1h pomera modifikator za 1% bliže nuli)
+ * Periodični oporavak/normalizacija ljubavi ka 0% (svakih 2h pomera modifikator za 1% bliže nuli)
  * - Ako je modifikator pozitivan (>0): smanjuje se za 1%
  * - Ako je modifikator negativan (<0): povećava se za 1% ka nuli
  */
@@ -887,7 +887,11 @@ async function ucitajBotConfig(chatroomId) {
 
                 if (rankData) {
                     channelState.currency_name = rankData.currency_name || 'Koins';
+                    channelState.points_per_msg = rankData.points_per_msg ?? 5;
+                    channelState.smart_chat_validation = rankData.smart_chat_validation ?? true;
                     channelState.first_interaction_bonus = rankData.first_interaction_bonus ?? 100;
+                    channelState.points_per_watchtime = rankData.points_per_watchtime ?? 20;
+                    channelState.level_up_announce = rankData.level_up_announce ?? true;
                     channelState.sub_multiplier = rankData.sub_multiplier ?? 2.0;
                     channelState.sub_bonus_per_msg = rankData.sub_bonus_per_msg ?? 10;
                     channelState.points_per_sub = rankData.points_per_sub ?? 1000;

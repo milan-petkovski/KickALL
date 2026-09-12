@@ -1082,7 +1082,7 @@ async function initAuth() {
           const channelSlug = kickUser.slug || kickUser.username || channelId;
 
           if (existingChannels.some(c => c.id === channelId)) {
-            showToast('info', `@${channelSlug} je već dodat na tvoj profil.`, 'ℹ️');
+            showToast('info', `@${channelSlug} je već dodat na tvoj profil.`);
             const cleanUrl = window.location.pathname + '?settings=channels';
             window.history.replaceState({}, '', cleanUrl);
             await initApp();
@@ -4402,7 +4402,6 @@ async function loadBotConfig() {
     if (document.getElementById('cfgSpamThreshold')) document.getElementById('cfgSpamThreshold').value = data.spam_threshold ?? 3;
     if (document.getElementById('cfgSpamWindow')) document.getElementById('cfgSpamWindow').value = data.spam_window_ms ?? 15000;
     if (document.getElementById('cfgPinMsg')) document.getElementById('cfgPinMsg').value = data.stream_pin_msg || '';
-    if (document.getElementById('cfgWelcomeMsg')) document.getElementById('cfgWelcomeMsg').value = data.welcome_message || '';
 
     const loadedBotName = data.custom_bot_name || '';
     const isBotActive = data.custom_bot_active ?? (!!loadedBotName);
@@ -4732,7 +4731,7 @@ async function saveBotConfig(silent = false) {
     spam_threshold: parseInt(document.getElementById('cfgSpamThreshold')?.value) || 3,
     spam_window_ms: parseInt(document.getElementById('cfgSpamWindow')?.value) || 15000,
     stream_pin_msg: document.getElementById('cfgPinMsg')?.value || null,
-    welcome_message: document.getElementById('cfgAlertWelcomeMsg')?.value || document.getElementById('cfgWelcomeMsg')?.value || null,
+    welcome_message: document.getElementById('cfgAlertWelcomeMsg')?.value || null,
     custom_bot_name: (function () {
       const raw = document.getElementById('cfgCustomBotName')?.value.trim() || '';
       if (!raw) return null;
@@ -6429,26 +6428,57 @@ function switchPanel(panelId, resetTab = false) {
     } else if (typeof loadLeaderboard === 'function') {
       loadLeaderboard();
     }
+    if (typeof loadWatchtime === 'function') {
+      loadWatchtime();
+    }
+    if (typeof loadCommands === 'function' && (!Array.isArray(allCommands) || allCommands.length === 0)) {
+      loadCommands();
+    }
+    if (typeof loadMarriages === 'function' && (!Array.isArray(allMarriages) || allMarriages.length === 0)) {
+      loadMarriages();
+    }
     if (!liveFeedInterval && typeof startLiveActivityFeed === 'function') {
       startLiveActivityFeed();
     }
   }
-  if (panelId === 'commands') { loadCommands(); }
-  if (panelId === 'builtin-commands') { loadCommands(); renderBuiltinCommandsGrid(); }
-  if (panelId === 'leaderboard') { loadLeaderboard(); loadWatchtime(); }
-  if (panelId === 'marriages') { loadMarriages(); loadLoveStatuses(); }
-  if (panelId === 'bot-interaction') loadBotConfig();
+  if (panelId === 'commands') {
+    loadCommands();
+    renderPlanLimitBanners();
+  }
+  if (panelId === 'builtin-commands') {
+    loadCommands();
+    renderBuiltinCommandsGrid();
+  }
+  if (panelId === 'leaderboard') {
+    loadLeaderboard();
+    loadWatchtime();
+    renderPlanLimitBanners();
+  }
+  if (panelId === 'marriages') {
+    loadMarriages();
+    loadLoveStatuses();
+    renderPlanLimitBanners();
+  }
+  if (panelId === 'bot-interaction') {
+    loadBotConfig();
+  }
   if (panelId === 'auto-announces') {
     loadBotConfig();
     renderPlanLimitBanners();
   }
-  if (panelId === 'config') loadBotConfig();
+  if (panelId === 'config') {
+    loadBotConfig();
+    renderPlanLimitBanners();
+  }
   if (panelId === 'moderation') {
     loadBotConfig();
     renderPlanLimitBanners();
     applyPenaltySettingsRestrictions();
   }
-  if (panelId === 'songs') loadBotConfig();
+  if (panelId === 'songs') {
+    loadBotConfig();
+    renderPlanLimitBanners();
+  }
   if (panelId === 'economy') {
     loadBotConfig();
     const targetTab = resetTab ? 'config' : (currentEconomyTab || 'config');
@@ -6458,12 +6488,25 @@ function switchPanel(panelId, resetTab = false) {
     loadBotConfig();
     loadMinigamesConfig();
     renderPlanLimitBanners();
+    updateMinigamesStatsDisplay();
   }
 
   if (window.innerWidth < 768) {
     document.getElementById('sidebar').classList.remove('mobile-open');
   }
 }
+
+// ── Mobile Overlay Home Navigation ────────────────────────
+function goHome(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  try {
+    sessionStorage.setItem('from_kickot', 'true');
+    localStorage.setItem('kick_origin_site', 'kickot');
+  } catch (_) { }
+  window.location.href = '../index.html';
+  return false;
+}
+window.goHome = goHome;
 
 // ── Sidebar Toggle ─────────────────────────────────────────
 function toggleSidebar() {
@@ -6622,7 +6665,7 @@ async function checkServerLogoutStatus() {
 }
 
 checkServerLogoutStatus();
-function goToSettings() { showToast('info', 'Podešavanja dolaze uskoro', 'ℹ️'); }
+function goToSettings() { showToast('info', 'Podešavanja dolaze uskoro'); }
 
 // ═══════════════════════════════════════════════════════════
 // MODAL HELPERS
@@ -7517,7 +7560,7 @@ function renderSettingsChannelList() {
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         ${badgeHtml}
-        <button class="btn btn-outline btn-sm" onclick="deleteConnectedChannel('${ch.id}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;border-color:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;" title="Ukloni kanal">✕</button>
+        <button class="btn btn-outline btn-sm" onclick="deleteConnectedChannel('${ch.id}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;border-color:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="Ukloni kanal"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
     `;
     listEl.appendChild(item);
@@ -8160,7 +8203,7 @@ function setupAutosave() {
   const configInputIds = [
     'cfgPrefix', 'cfgLanguage', 'cfgCooldown', 'cfgLeaderboard',
     'cfgGames', 'cfgLove', 'cfgModeration', 'cfgAutoresponse', 'cfgSpamThreshold',
-    'cfgSpamWindow', 'cfgPinMsg', 'cfgWelcomeMsg', 'cfgAnnounceInterval',
+    'cfgSpamWindow', 'cfgPinMsg', 'cfgAnnounceInterval',
     'cfgAnnounceThreshold', 'cfgAnnounceTimeEnabled', 'cfgAnnounceMsgEnabled',
     'cfgAlertFollowEnabled', 'cfgAlertFollowMsg',
     'cfgAlertKicksEnabled', 'cfgAlertKicksMsg', 'cfgAlertKicksMin',
@@ -8553,19 +8596,7 @@ function handleFeedbackFormSubmit(event) {
 }
 
 // ── Song Request & YouTube Audio Player Logic ─────────────────────────────
-let localSongQueue = [
-  {
-    id: 'yt_dQw4w9WgXcQ',
-    ytId: 'dQw4w9WgXcQ',
-    title: 'Never Gonna Give You Up',
-    artist: 'Rick Astley',
-    requester: 'Strimer',
-    duration: 212,
-    source: 'youtube',
-    coverUrl: 'https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg'
-  }
-];
-
+let localSongQueue = [];
 let currentSongIndex = 0;
 let isPlaying = false;
 let playbackInterval = null;
@@ -8700,7 +8731,7 @@ function renderSongQueue() {
   }
 
   if (localSongQueue.length === 0) {
-    queueList.innerHTML = '<div style="color: var(--text-muted); text-align: center; padding: 24px; font-size: 0.82rem; font-style: italic;">Red za puštanje je prazan. Dodajte pesmu dole levo ili sačekajte muzičku želju iz četa.</div>';
+    queueList.innerHTML = '<div class="sr-queue-empty">Red za puštanje je prazan. Dodajte pesmu dole levo ili sačekajte muzičku želju iz četa.</div>';
     return;
   }
 
@@ -9244,7 +9275,7 @@ function removeSong(index) {
 
 function clearSongQueue() {
   if (localSongQueue.length === 0) {
-    showToast('info', 'Red sa pesmama je već prazan.', 'ℹ️');
+    showToast('info', 'Red sa pesmama je već prazan.');
     return;
   }
 
@@ -9290,7 +9321,21 @@ window.switchEconomyTab = switchEconomyTab;
 window.updateEconomyPreviews = updateEconomyPreviews;
 window.saveEconomyConfig = saveEconomyConfig;
 window.saveMinigamesConfig = saveMinigamesConfig;
+window.switchMinigamesTab = switchMinigamesTab;
+window.updateMinigamesStatsDisplay = updateMinigamesStatsDisplay;
+window.setMinigamesMaxBetPreset = setMinigamesMaxBetPreset;
+window.selectSimGame = selectSimGame;
+window.setSimBetPreset = setSimBetPreset;
+window.setRouletteBetChoice = setRouletteBetChoice;
+window.setCoinflipChoice = setCoinflipChoice;
+window.simTriggerFun = simTriggerFun;
+window.copyMiniCommand = copyMiniCommand;
+window.copySimChatResult = copySimChatResult;
+window.copyAllCommandsGuide = copyAllCommandsGuide;
 window.runSimulatedGame = runSimulatedGame;
+window.filterMinigamesCatalog = filterMinigamesCatalog;
+window.searchMinigamesCatalog = searchMinigamesCatalog;
+window.testGameInSimulator = testGameInSimulator;
 window.openCreateStoreItemModal = openCreateStoreItemModal;
 window.saveStoreItem = saveStoreItem;
 window.editStoreItem = editStoreItem;
@@ -9364,7 +9409,15 @@ function switchEconomyTab(tabName) {
     renderStoreItems();
     renderStoreRedemptions();
   } else if (tabName === 'leaderboard') {
-    renderEconomyLeaderboard();
+    if (!Array.isArray(allLeaderboard) || allLeaderboard.length === 0) {
+      if (typeof loadLeaderboard === 'function') {
+        loadLeaderboard().then(() => renderEconomyLeaderboard()).catch(() => renderEconomyLeaderboard());
+      } else {
+        renderEconomyLeaderboard();
+      }
+    } else {
+      renderEconomyLeaderboard();
+    }
   }
 }
 
@@ -9384,7 +9437,9 @@ function updateEconomyPreviews() {
   const pSubBonus = document.getElementById('previewSubBonus');
   const pKicks = document.getElementById('previewKicksBonus');
   const pStreak = document.getElementById('previewDailyStreak');
+  const pTitle = document.getElementById('previewCurrencyTitle');
 
+  if (pTitle) pTitle.textContent = valuta;
   if (pFirst) pFirst.textContent = `+${firstJoin.toLocaleString()} ${valuta}`;
   if (pWatch) pWatch.textContent = `+${watchtime.toLocaleString()} ${valuta}`;
   if (pSubMult) pSubMult.textContent = `${subMult.toFixed(1)}x Bonus`;
@@ -9411,7 +9466,7 @@ async function saveEconomyConfig(silent = false) {
     points_daily_streak: parseInt(document.getElementById('cfgPointsDailyStreak')?.value, 10) || 150,
     points_per_raid: parseInt(document.getElementById('cfgPointsPerRaid')?.value, 10) || 300,
     gamble_enabled: document.getElementById('cfgGambleEnabled')?.checked ?? true,
-    max_gamble_amount: parseInt(document.getElementById('cfgMaxGambleAmount')?.value, 10) || 5000
+    max_gamble_amount: parseInt(document.getElementById('cfgMinigamesMaxBet')?.value, 10) || parseInt(document.getElementById('cfgMaxGambleAmount')?.value, 10) || 5000
   };
 
   if (!currentChannelConfig) currentChannelConfig = {};
@@ -9447,8 +9502,157 @@ async function saveEconomyConfig(silent = false) {
     if (!silent) showToast('success', 'Podešavanja ranking sistema su uspešno sačuvana!');
   }
 
-  if (document.getElementById('cfgMinigamesMaxBet')) document.getElementById('cfgMinigamesMaxBet').value = ecoSettings.max_gamble_amount;
   updateEconomyPreviews();
+}
+
+// ── Mini Games Enhanced Sub-Tabs & Visual Arcade Simulator ──
+let currentMinigamesTab = 'overview';
+let currentSimGame = 'slots';
+let currentRouletteChoice = 'crvena';
+let currentCoinflipChoice = 'pismo';
+
+function switchMinigamesTab(tabName) {
+  currentMinigamesTab = tabName;
+  try {
+    sessionStorage.setItem('active-minigames-tab', tabName);
+  } catch (e) {}
+
+  // Sync tab buttons
+  const tabIds = {
+    overview: 'mgTabBtnOverview',
+    casino: 'mgTabBtnCasino',
+    fun: 'mgTabBtnFun',
+    simulator: 'mgTabBtnSimulator',
+    cheatsheet: 'mgTabBtnCheatsheet'
+  };
+
+  Object.entries(tabIds).forEach(([key, btnId]) => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      if (key === tabName) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+
+  // Sync subpanels
+  const panelIds = {
+    overview: 'mgSubPanelOverview',
+    casino: 'mgSubPanelCasino',
+    fun: 'mgSubPanelFun',
+    simulator: 'mgSubPanelSimulator',
+    cheatsheet: 'mgSubPanelCheatsheet'
+  };
+
+  Object.entries(panelIds).forEach(([key, pId]) => {
+    const panel = document.getElementById(pId);
+    if (panel) {
+      if (key === tabName) panel.classList.add('active');
+      else panel.classList.remove('active');
+    }
+  });
+
+  updateMinigamesStatsDisplay();
+}
+
+function updateMinigamesStatsDisplay() {
+  const currency = currentChannelConfig?.currency_name || 'Koins';
+  const maxBetVal = parseInt(document.getElementById('cfgMinigamesMaxBet')?.value, 10) || 5000;
+
+  const currEl = document.getElementById('mgOverviewCurrencyName');
+  if (currEl) currEl.textContent = currency;
+
+  const unitEl = document.getElementById('mgMaxBetCurrencyUnit');
+  if (unitEl) unitEl.textContent = currency;
+
+  const maxBetDisp = document.getElementById('mgOverviewMaxBetDisplay');
+  if (maxBetDisp) maxBetDisp.textContent = maxBetVal.toLocaleString();
+
+  const simBal = document.getElementById('mgSimBalanceLabel');
+  if (simBal) simBal.textContent = `Valuta kanala: ${currency}`;
+}
+
+function setMinigamesMaxBetPreset(val) {
+  const input = document.getElementById('cfgMinigamesMaxBet');
+  if (input) {
+    input.value = val;
+    saveMinigamesConfig(true);
+    updateMinigamesStatsDisplay();
+    showToast('success', `Maksimalni ulog postavljen na ${val.toLocaleString()} poena!`);
+  }
+}
+
+function filterMinigamesCatalog(category, btn) {
+  document.querySelectorAll('.mg-catalog-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+
+  const cards = document.querySelectorAll('#mgSubPanelOverview .mg-game-card');
+  const sections = document.querySelectorAll('#mgSubPanelOverview .mg-catalog-section');
+
+  cards.forEach(card => {
+    const cardCat = card.getAttribute('data-category');
+    if (category === 'all' || cardCat === category) {
+      card.style.display = 'flex';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+
+  sections.forEach(sec => {
+    const secCat = sec.getAttribute('data-category');
+    if (category === 'all' || secCat === category) {
+      sec.style.display = 'flex';
+    } else {
+      sec.style.display = 'none';
+    }
+  });
+
+  const countBadge = document.getElementById('mgCatalogCountBadge');
+  if (countBadge) {
+    if (category === 'all') countBadge.textContent = '11 Igara';
+    else if (category === 'casino') countBadge.textContent = '5 Kazino Igara';
+    else if (category === 'fun') countBadge.textContent = '6 Čet Igara';
+  }
+}
+
+function searchMinigamesCatalog(query) {
+  const q = (query || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('#mgSubPanelOverview .mg-game-card');
+  const sections = document.querySelectorAll('#mgSubPanelOverview .mg-catalog-section');
+
+  let visibleCount = 0;
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase();
+    const matches = !q || text.includes(q);
+    card.style.display = matches ? 'flex' : 'none';
+    if (matches) visibleCount++;
+  });
+
+  sections.forEach(sec => {
+    if (!q) {
+      sec.style.display = 'flex';
+    } else {
+      const nextGrid = sec.nextElementSibling;
+      const hasVisible = nextGrid && Array.from(nextGrid.querySelectorAll('.mg-game-card')).some(c => c.style.display !== 'none');
+      sec.style.display = hasVisible ? 'flex' : 'none';
+    }
+  });
+
+  const countBadge = document.getElementById('mgCatalogCountBadge');
+  if (countBadge) {
+    countBadge.textContent = q ? `${visibleCount} pronađeno` : '11 Igara';
+  }
+}
+
+function testGameInSimulator(gameType, funSubcmd) {
+  switchMinigamesTab('simulator');
+  selectSimGame(gameType);
+  if (gameType === 'fun' && funSubcmd) {
+    simTriggerFun(funSubcmd);
+  }
+  const target = document.getElementById('minigamesTabsBar');
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 async function loadMinigamesConfig() {
@@ -9469,6 +9673,18 @@ async function loadMinigamesConfig() {
       currentChannelConfig.max_gamble_amount = maxVal;
       currentChannelConfig.gamble_enabled = isEnabled;
     }
+  }
+
+  // Restore active sub-tab if saved
+  try {
+    const savedTab = sessionStorage.getItem('active-minigames-tab');
+    if (savedTab && ['overview', 'casino', 'fun', 'simulator', 'cheatsheet'].includes(savedTab)) {
+      switchMinigamesTab(savedTab);
+    } else {
+      updateMinigamesStatsDisplay();
+    }
+  } catch (e) {
+    updateMinigamesStatsDisplay();
   }
 }
 
@@ -9511,78 +9727,412 @@ async function saveMinigamesConfig(silent = false) {
 
   const { error } = await saveBotConfigFields(fieldsToSave);
 
+  updateMinigamesStatsDisplay();
+
   if (!silent) {
     if (error || mgError) {
       showToast('error', 'Greška pri čuvanju podešavanja mini igara!');
     } else {
-      showToast('success', 'Podešavanja mini igara su uspešno sačuvana u mini_games!');
+      showToast('success', 'Podešavanja mini igara su uspešno sačuvana!');
     }
   }
 }
 
+function selectSimGame(type) {
+  currentSimGame = type;
+  const typeInput = document.getElementById('simGameType');
+  if (typeInput) typeInput.value = type;
+
+  // Tabs sync
+  const tabs = {
+    slots: 'mgSimTabSlots',
+    roulette: 'mgSimTabRoulette',
+    coinflip: 'mgSimTabCoinflip',
+    wheel: 'mgSimTabWheel',
+    duel: 'mgSimTabDuel',
+    fun: 'mgSimTabFun'
+  };
+
+  Object.entries(tabs).forEach(([k, btnId]) => {
+    const b = document.getElementById(btnId);
+    if (b) {
+      if (k === type) b.classList.add('active');
+      else b.classList.remove('active');
+    }
+  });
+
+  // Stages sync
+  const stages = {
+    slots: 'mgStageSlots',
+    roulette: 'mgStageRoulette',
+    coinflip: 'mgStageCoinflip',
+    wheel: 'mgStageWheel',
+    duel: 'mgStageDuel',
+    fun: 'mgStageFun'
+  };
+
+  Object.entries(stages).forEach(([k, stageId]) => {
+    const s = document.getElementById(stageId);
+    if (s) {
+      s.style.display = (k === type) ? 'block' : 'none';
+    }
+  });
+}
+
+function setSimBetPreset(val) {
+  const input = document.getElementById('simBetAmount');
+  if (input) input.value = val;
+}
+
+function setRouletteBetChoice(choice, btn) {
+  currentRouletteChoice = choice;
+  document.querySelectorAll('#mgStageRoulette .mg-chip-btn').forEach(b => {
+    b.style.borderColor = '';
+    b.style.transform = 'none';
+  });
+  if (btn) {
+    btn.style.borderColor = '#53fc18';
+    btn.style.transform = 'scale(1.05)';
+  }
+}
+
+function setCoinflipChoice(choice, btn) {
+  currentCoinflipChoice = choice;
+  const hBtn = document.getElementById('cBtnHeads');
+  const tBtn = document.getElementById('cBtnTails');
+  if (hBtn && tBtn) {
+    if (choice === 'pismo') {
+      hBtn.style.background = 'rgba(234,179,8,0.2)';
+      hBtn.style.borderColor = '#eab308';
+      hBtn.style.color = '#fef08a';
+      tBtn.style.background = '';
+      tBtn.style.borderColor = '';
+      tBtn.style.color = '';
+    } else {
+      tBtn.style.background = 'rgba(234,179,8,0.2)';
+      tBtn.style.borderColor = '#eab308';
+      tBtn.style.color = '#fef08a';
+      hBtn.style.background = '';
+      hBtn.style.borderColor = '';
+      hBtn.style.color = '';
+    }
+  }
+}
+
+// ── SVG ikone simbola za Slot Mašinu (BEZ EMOJIJA) ──
+const slotSymbolSVGs = {
+  sedmica: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h14l-7 16"></path></svg>`,
+  dijamant: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 18 3 22 9 12 22 2 9"></polygon></svg>`,
+  kruna: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path></svg>`,
+  zvezda: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`,
+  detelina: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"></circle><circle cx="16" cy="8" r="4"></circle><circle cx="8" cy="16" r="4"></circle><circle cx="16" cy="16" r="4"></circle><path d="M12 12v8"></path></svg>`,
+  zvono: `<svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>`
+};
+
+const slotSymbolNames = {
+  sedmica: 'Zlatna Sedmica',
+  dijamant: 'Plavi Dijamant',
+  kruna: 'Kraljevska Kruna',
+  zvezda: 'Sjajna Zvezda',
+  detelina: 'Srećna Detelina',
+  zvono: 'Zlatno Zvono'
+};
+
 function runSimulatedGame() {
-  const type = document.getElementById('simGameType')?.value || 'slots';
+  const type = currentSimGame || document.getElementById('simGameType')?.value || 'slots';
   const bet = parseInt(document.getElementById('simBetAmount')?.value, 10) || 100;
+  const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || currentChannelConfig?.currency_name || 'Poena';
   const resEl = document.getElementById('simGameResult');
-  const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || 'Poena';
-
-  if (!resEl) return;
-
-  // Osiguravamo da container prikazuje tekst kao normalan blok
-  resEl.style.display = 'block';
-  resEl.style.textAlign = 'center';
 
   if (type === 'slots') {
-    const simboli = ['🍒', '🍋', '🔔', '🍇', '🍉', '💎', '7️⃣'];
-    const s1 = simboli[Math.floor(Math.random() * simboli.length)];
-    const s2 = simboli[Math.floor(Math.random() * simboli.length)];
-    const s3 = simboli[Math.floor(Math.random() * simboli.length)];
+    const keys = Object.keys(slotSymbolSVGs);
+    const r1 = document.getElementById('slotReel1');
+    const r2 = document.getElementById('slotReel2');
+    const r3 = document.getElementById('slotReel3');
 
-    let resText = `<strong>@Strimer</strong> je zavrteo slot: [ ${s1} | ${s2} | ${s3} ] — `;
-    if (s1 === s2 && s2 === s3) {
-      if (s1 === '7️⃣' || s1 === '💎') {
-        resText += `<span style="color:#eab308; font-weight:700;">JACKPOT 10x! Osvojio si +${(bet * 10).toLocaleString()} ${valuta}!</span>`;
+    if (r1) r1.classList.add('spinning');
+    if (r2) r2.classList.add('spinning');
+    if (r3) r3.classList.add('spinning');
+
+    setTimeout(() => {
+      const k1 = keys[Math.floor(Math.random() * keys.length)];
+      const k2 = keys[Math.floor(Math.random() * keys.length)];
+      const k3 = keys[Math.floor(Math.random() * keys.length)];
+
+      if (r1) { r1.classList.remove('spinning'); r1.innerHTML = slotSymbolSVGs[k1]; }
+      if (r2) { r2.classList.remove('spinning'); r2.innerHTML = slotSymbolSVGs[k2]; }
+      if (r3) { r3.classList.remove('spinning'); r3.innerHTML = slotSymbolSVGs[k3]; }
+
+      let payoutRatio = 0;
+      let outcomeLabel = '';
+      let badgeColor = '#ef4444';
+
+      if (k1 === k2 && k2 === k3) {
+        if (k1 === 'sedmica' || k1 === 'dijamant') {
+          payoutRatio = 10;
+          outcomeLabel = `JACKPOT 10x! +${(bet * 10).toLocaleString()} ${valuta}!`;
+          badgeColor = '#eab308';
+        } else {
+          payoutRatio = 5;
+          outcomeLabel = `3 u nizu 5x! +${(bet * 5).toLocaleString()} ${valuta}!`;
+          badgeColor = '#53fc18';
+        }
+      } else if (k1 === k2 || k2 === k3 || k1 === k3) {
+        payoutRatio = 1.5;
+        outcomeLabel = `2 u nizu! Povrat +${Math.floor(bet * 1.5).toLocaleString()} ${valuta}!`;
+        badgeColor = '#eab308';
       } else {
-        resText += `<span style="color:#53fc18; font-weight:700;">3 u nizu 5x! Osvojio si +${(bet * 5).toLocaleString()} ${valuta}!</span>`;
+        payoutRatio = 0;
+        outcomeLabel = `Nema pogotka! Izgubljeno ${bet.toLocaleString()} ${valuta}.`;
+        badgeColor = '#ef4444';
       }
-    } else if (s1 === s2 || s2 === s3 || s1 === s3) {
-      const dobitak = Math.floor(bet * 1.5);
-      resText += `<span style="color:#eab308;">2 u nizu 1.5x! Dobio si nazad +${dobitak.toLocaleString()} ${valuta}!</span>`;
-    } else {
-      resText += `<span style="color:#ef4444;">Nema pogotka! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
-    }
-    resEl.innerHTML = resText;
+
+      const badgeEl = document.getElementById('slotOutcomeBadge');
+      if (badgeEl) {
+        badgeEl.textContent = outcomeLabel;
+        badgeEl.style.color = badgeColor;
+      }
+
+      if (resEl) {
+        const s1Name = slotSymbolNames[k1];
+        const s2Name = slotSymbolNames[k2];
+        const s3Name = slotSymbolNames[k3];
+        resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo slot: [ ${s1Name} | ${s2Name} | ${s3Name} ] — <span style="color:${badgeColor}; font-weight:700;">${outcomeLabel}</span>`;
+      }
+    }, 450);
 
   } else if (type === 'roulette') {
+    const wheelBox = document.getElementById('rouletteWheelBox');
+    if (wheelBox) {
+      wheelBox.style.transform = `rotate(${Math.floor(720 + Math.random() * 720)}deg)`;
+    }
+
     const loptica = Math.floor(Math.random() * 37);
     const crveniBrojevi = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
     const boja = loptica === 0 ? 'ZELENA' : (crveniBrojevi.includes(loptica) ? 'CRVENA' : 'CRNA');
 
-    resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo rulet! Loptica je pala na <strong>${loptica} (${boja})</strong>! <span style="color:#53fc18;">Isplata: +${(bet * 2).toLocaleString()} ${valuta} (Boja/Par) ili +${(bet * 36).toLocaleString()} ${valuta} (Tačan broj)!</span>`;
+    const ballDisplay = document.getElementById('rouletteBallDisplay');
+    if (ballDisplay) {
+      const col = boja === 'ZELENA' ? '#53fc18' : (boja === 'CRVENA' ? '#ef4444' : '#94a3b8');
+      ballDisplay.innerHTML = `<span style="color:${col}; font-weight:800;">${loptica} (${boja})</span>`;
+    }
+
+    let isWin = false;
+    let payout = 0;
+    const choice = (currentRouletteChoice || 'crvena').toLowerCase();
+
+    if (choice === 'crvena' && boja === 'CRVENA') { isWin = true; payout = bet * 2; }
+    else if (choice === 'crna' && boja === 'CRNA') { isWin = true; payout = bet * 2; }
+    else if (choice === 'par' && loptica !== 0 && loptica % 2 === 0) { isWin = true; payout = bet * 2; }
+    else if (choice === 'nepar' && loptica !== 0 && loptica % 2 !== 0) { isWin = true; payout = bet * 2; }
+    else if (choice === String(loptica)) { isWin = true; payout = bet * 36; }
+
+    if (resEl) {
+      if (isWin) {
+        resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo rulet: loptica je pala na <strong>${loptica} (${boja})</strong>! <span style="color:#53fc18; font-weight:700;">Pogodak na [${choice.toUpperCase()}]! Isplata: +${payout.toLocaleString()} ${valuta}!</span>`;
+      } else {
+        resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo rulet: loptica je pala na <strong>${loptica} (${boja})</strong>! <span style="color:#ef4444; font-weight:700;">Promašaj na [${choice.toUpperCase()}]! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
+      }
+    }
 
   } else if (type === 'coinflip') {
-    const ishod = Math.random() < 0.5 ? 'PISMO' : 'GLAVA';
-    const isWin = Math.random() < 0.5;
-
-    if (isWin) {
-      resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#53fc18; font-weight:700;">Pobeda! Osvojio si +${bet.toLocaleString()} ${valuta}!</span>`;
-    } else {
-      resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod}</strong>! <span style="color:#ef4444;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
+    const coinEl = document.getElementById('simCoin3d');
+    if (coinEl) {
+      coinEl.classList.remove('flipping');
+      void coinEl.offsetWidth;
+      coinEl.classList.add('flipping');
     }
+
+    const ishod = Math.random() < 0.5 ? 'pismo' : 'glava';
+    const isWin = (ishod === (currentCoinflipChoice || 'pismo'));
+
+    setTimeout(() => {
+      const lbl = document.getElementById('simCoinLabel');
+      if (lbl) {
+        lbl.textContent = ishod.toUpperCase();
+        lbl.style.color = isWin ? '#53fc18' : '#ef4444';
+      }
+
+      if (resEl) {
+        if (isWin) {
+          resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod.toUpperCase()}</strong>! <span style="color:#53fc18; font-weight:700;">Pobeda! Osvojio si +${bet.toLocaleString()} ${valuta}!</span>`;
+        } else {
+          resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod.toUpperCase()}</strong>! <span style="color:#ef4444; font-weight:700;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
+        }
+      }
+    }, 450);
 
   } else if (type === 'wheel') {
     const mults = [0, 0.5, 1.5, 2, 3, 5];
     const m = mults[Math.floor(Math.random() * mults.length)];
+    const wheelWrap = document.getElementById('simWheelWrap');
+    if (wheelWrap) {
+      const randSpin = 1080 + Math.floor(Math.random() * 360);
+      wheelWrap.style.transform = `rotate(${randSpin}deg)`;
+    }
+
     const dobitak = Math.floor(bet * m);
     const razlika = dobitak - bet;
 
-    if (razlika > 0) {
-      resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#53fc18; font-weight:700;">Profit! Osvojio si +${dobitak.toLocaleString()} ${valuta}!</span>`;
-    } else if (razlika === 0 || m === 1.5) {
-      resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#eab308;">Vraćeno ${dobitak.toLocaleString()} ${valuta}.</span>`;
-    } else {
-      resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#ef4444;">Gubitak! Izgubio si ${Math.abs(razlika).toLocaleString()} ${valuta}.</span>`;
+    setTimeout(() => {
+      const resLbl = document.getElementById('simWheelResultLabel');
+      if (resLbl) {
+        resLbl.textContent = `Točak se zaustavio na ${m}x!`;
+        resLbl.style.color = razlika > 0 ? '#53fc18' : (razlika === 0 ? '#eab308' : '#ef4444');
+      }
+
+      if (resEl) {
+        if (razlika > 0) {
+          resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#53fc18; font-weight:700;">Profit! Osvojio si +${dobitak.toLocaleString()} ${valuta}!</span>`;
+        } else if (razlika === 0 || m === 1.5) {
+          resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#eab308; font-weight:700;">Vraćeno ${dobitak.toLocaleString()} ${valuta}.</span>`;
+        } else {
+          resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#ef4444; font-weight:700;">Gubitak! Izgubio si ${Math.abs(razlika).toLocaleString()} ${valuta}.</span>`;
+        }
+      }
+    }, 700);
+
+  } else if (type === 'duel') {
+    const challengerWins = Math.random() < 0.5;
+    const combatLog = document.getElementById('simDuelCombatLog');
+
+    if (combatLog) {
+      combatLog.innerHTML = challengerWins
+        ? `<span style="color:#53fc18; font-weight:700;">Pobednik: @Izazivač (+${bet.toLocaleString()} ${valuta})</span>`
+        : `<span style="color:#ef4444; font-weight:700;">Pobednik: @Protivnik (+${bet.toLocaleString()} ${valuta})</span>`;
     }
+
+    if (resEl) {
+      if (challengerWins) {
+        resEl.innerHTML = `Dvoboj završen: <strong>@Izazivač</strong> je porazio <strong>@Protivnik</strong> u borbi i osvojio +${bet.toLocaleString()} ${valuta}!`;
+      } else {
+        resEl.innerHTML = `Dvoboj završen: <strong>@Protivnik</strong> je uspešno odbranio napad i pobedio <strong>@Izazivač</strong>, osvojivši +${bet.toLocaleString()} ${valuta}!`;
+      }
+    }
+
+  } else if (type === 'fun') {
+    simTriggerFun('iq');
+  }
+}
+
+function simTriggerFun(cmd) {
+  const resEl = document.getElementById('simGameResult');
+  const statusEl = document.getElementById('simFunStatus');
+
+  if (cmd === 'iq') {
+    const iqScore = Math.floor(55 + Math.random() * 105);
+    let desc = '';
+    if (iqScore > 130) desc = 'Pravi balkanski genije!';
+    else if (iqScore > 100) desc = 'Solidan kapacitet za preživljavanje.';
+    else if (iqScore > 80) desc = 'Mozak na standardnom fabričkom podešavanju.';
+    else desc = 'Sobna temperatura u januaru.';
+
+    const msg = `Merenje inteligencije za <strong>@Gledalac</strong>: IQ rezultat je <strong>${iqScore}</strong> (${desc}).`;
+    if (resEl) resEl.innerHTML = msg;
+    if (statusEl) statusEl.innerHTML = `Generisan !iq: <strong>${iqScore} IQ</strong>`;
+
+  } else if (cmd === 'samar') {
+    const predmeti = ['tiganjem od livenog gvožđa', 'mokrom krpom preko usta', 'svežim somom od 3 kile', 'gejmerskom tastaturom', 'starom vojničkom čizmom'];
+    const p = predmeti[Math.floor(Math.random() * predmeti.length)];
+    const msg = `<strong>@Strimer</strong> je zalepio brutalnu šamarčinu korisniku <strong>@Meta</strong> ${p}!`;
+    if (resEl) resEl.innerHTML = msg;
+    if (statusEl) statusEl.innerHTML = `Generisan !samar udarac`;
+
+  } else if (cmd === 'roll') {
+    const r1 = Math.floor(1 + Math.random() * 100);
+    const r2 = Math.floor(1 + Math.random() * 100);
+    let msg = '';
+    if (r1 === 67) {
+      msg = `Roll dvoboj: <strong>@Igrač1</strong> je bacio legendarni <strong>67</strong> i ostvario automatsku pobedu protiv <strong>@Igrač2</strong>!`;
+    } else if (r2 === 67) {
+      msg = `Roll dvoboj: <strong>@Igrač2</strong> je bacio legendarni <strong>67</strong> i ostvario automatsku pobedu protiv <strong>@Igrač1</strong>!`;
+    } else if (r1 > r2) {
+      msg = `Roll dvoboj: <strong>@Igrač1</strong> [${r1}] je pobedio <strong>@Igrač2</strong> [${r2}]!`;
+    } else if (r2 > r1) {
+      msg = `Roll dvoboj: <strong>@Igrač2</strong> [${r2}] je pobedio <strong>@Igrač1</strong> [${r1}]!`;
+    } else {
+      msg = `Roll dvoboj: Nerešeno! Obojica su bacili [${r1}].`;
+    }
+    if (resEl) resEl.innerHTML = msg;
+    if (statusEl) statusEl.innerHTML = `Generisane kockice: ${r1} vs ${r2}`;
+
+  } else if (cmd === 'rr') {
+    const metak = Math.floor(1 + Math.random() * 6);
+    const preziveo = metak !== 1;
+    const msg = preziveo
+      ? `Ruski rulet: <strong>@Gledalac</strong> je povukao obarač... *KLIK*! Prazna komora, preživeo si!`
+      : `Ruski rulet: <strong>@Gledalac</strong> je povukao obarač... *BUM*! Metak u komori, laku noć u četu!`;
+    if (resEl) resEl.innerHTML = msg;
+    if (statusEl) statusEl.innerHTML = preziveo ? `Ruski rulet: Preživeo` : `Ruski rulet: Pogodak!`;
+
+  } else if (cmd === 'alkotest') {
+    const promili = (Math.random() * 3.5).toFixed(2);
+    let nivo = '';
+    if (promili < 0.3) nivo = 'Trezan kao kap vode.';
+    else if (promili < 1.0) nivo = 'Pričljiv i veseo za šankom.';
+    else if (promili < 2.0) nivo = 'Počinje da naručuje pesme koje ne zna.';
+    else nivo = 'Zreo za krevet ili poziv hitnoj.';
+
+    const msg = `Alkotest za <strong>@Gledalac</strong>: <strong>${promili}‰</strong> u krvi (${nivo}).`;
+    if (resEl) resEl.innerHTML = msg;
+    if (statusEl) statusEl.innerHTML = `Alkotest: ${promili}‰`;
+
+  } else if (cmd === 'cinjenica') {
+    const facts = [
+      'Hobotnice imaju tri srca i plavu krv.',
+      'Med je jedina hrana na svetu koja se nikada ne može pokvariti.',
+      'Jagoda sa botaničke strane nije bobica, ali banana jeste.',
+      'Dan na planeti Veneri traje duže nego cela njena godina.',
+      'Kenguri ne mogu da se kreću unazad zbog strukture svojih nogu.'
+    ];
+    const f = facts[Math.floor(Math.random() * facts.length)];
+    const msg = `Zanimljiva činjenica: ${f}`;
+    if (resEl) resEl.innerHTML = msg;
+    if (statusEl) statusEl.innerHTML = `Činjenica poslata u čet`;
+  }
+}
+
+function copyMiniCommand(cmd, btn) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(cmd);
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = 'Kopirano!';
+      setTimeout(() => { btn.innerHTML = orig; }, 1400);
+    }
+    showToast('success', `Kopirano: ${cmd}`);
+  }
+}
+
+function copySimChatResult() {
+  const el = document.getElementById('simGameResult');
+  if (el) {
+    const txt = el.innerText || el.textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt);
+      showToast('success', 'Tekst poruke je kopiran!');
+    }
+  }
+}
+
+function copyAllCommandsGuide() {
+  const guide = `MINI IGRE KOMANDE NA KANALU:
+- !slot <ulog> (Igraj slot, Jackpot 10x)
+- !rulet <broj/crvena/crna/par/nepar> <ulog> (Rulet isplata do 36x)
+- !coinflip <pismo/glava> <ulog> (Baci novčić za 2x)
+- !tocak <ulog> (Točak sreće 0x do 5x)
+- !duel @korisnik <ulog> (Izazovi nekoga u poene)
+- !accept / !odbij (Prihvati ili odbij dvoboj)
+- !iq [@korisnik] (Izmeri IQ)
+- !samar @korisnik (Zalepi šamarčinu)
+- !roll @korisnik (Kockice 1-100)
+- !ruskirulet (Testiraj sreću sa revolverom)
+- !alkotest [@korisnik] (Izmeri promile)
+- !cinjenica (Slučajna zanimljivost)`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(guide);
+    showToast('success', 'Kompletan vodič komandi je kopiran!');
   }
 }
 
@@ -9591,13 +10141,13 @@ let currentRedemptionsFilter = 'all';
 
 function getIconSVG(iconStr) {
   const str = (iconStr || '').toLowerCase();
-  if (str.includes('vip') || str.includes('⭐') || str.includes('star')) {
+  if (str.includes('vip') || str.includes('\u2B50') || str.includes('star')) {
     return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
   }
-  if (str.includes('song') || str.includes('pesma') || str.includes('🎵') || str.includes('music')) {
+  if (str.includes('song') || str.includes('pesma') || str.includes('\uD83C\uDFB5') || str.includes('music')) {
     return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
   }
-  if (str.includes('voda') || str.includes('water') || str.includes('💧')) {
+  if (str.includes('voda') || str.includes('water') || str.includes('\uD83D\uDCA7')) {
     return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>`;
   }
   return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>`;
@@ -9821,14 +10371,30 @@ function getStoreRedemptions() {
   return (currentChannelConfig && currentChannelConfig.store_redemptions) ? currentChannelConfig.store_redemptions : [];
 }
 
-function filterRedemptions(status) {
+function filterRedemptions(status, btnEl) {
   currentRedemptionsFilter = status;
-  ['redFilterAll', 'redFilterPending', 'redFilterCompleted', 'redFilterRejected'].forEach(id => {
+  const filterMap = {
+    all: 'redFilterAll',
+    pending: 'redFilterPending',
+    completed: 'redFilterCompleted',
+    rejected: 'redFilterRejected'
+  };
+
+  Object.entries(filterMap).forEach(([st, id]) => {
     const btn = document.getElementById(id);
     if (btn) {
-      btn.className = 'btn btn-xs ' + (id.toLowerCase().includes(status) || (status === 'all' && id === 'redFilterAll') ? 'btn-primary' : 'btn-outline');
+      if (st === status) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
     }
   });
+
+  if (btnEl && typeof btnEl.blur === 'function') {
+    btnEl.blur();
+  }
+
   renderStoreRedemptions();
 }
 
@@ -10022,10 +10588,14 @@ function renderEconomyLeaderboard() {
   const prevBtn = document.getElementById('ecoLbPrevPageBtn');
   const nextBtn = document.getElementById('ecoLbNextPageBtn');
   const pageInfo = document.getElementById('ecoLbPageInfo');
+  const rightWrap = document.querySelector('#ecoLbPaginationBar .pagination-bar__right');
 
   if (prevBtn) prevBtn.disabled = ecoLbCurrentPage <= 1;
   if (nextBtn) nextBtn.disabled = ecoLbCurrentPage >= totalPages;
   if (pageInfo) pageInfo.textContent = `Stranica ${ecoLbCurrentPage} od ${totalPages}`;
+  if (rightWrap) {
+    rightWrap.innerHTML = `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">Ukupno na listi: <strong style="color:#fff;">${totalItems}</strong> gledalaca</span>`;
+  }
 
   if (pageItems.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">Nema podataka na rang listi.</td></tr>`;
@@ -10034,9 +10604,20 @@ function renderEconomyLeaderboard() {
 
   const coinIconSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2" style="vertical-align:middle;"><circle cx="12" cy="12" r="8"/><path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"/></svg>`;
 
-  tbody.innerHTML = pageItems.map((u, idx) => `
-    <tr>
-      <td style="font-weight:700; color:var(--text-muted);">${startIndex + idx + 1}</td>
+  tbody.innerHTML = pageItems.map((u, idx) => {
+    const rankNum = startIndex + idx + 1;
+    let rankBadge = `<span style="font-weight:700; color:var(--text-muted);">${rankNum}</span>`;
+    if (rankNum === 1) {
+      rankBadge = `<span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:rgba(234,179,8,0.2); color:#eab308; border:1px solid rgba(234,179,8,0.5); font-weight:800; font-size:0.85rem;">1</span>`;
+    } else if (rankNum === 2) {
+      rankBadge = `<span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:rgba(203,213,225,0.2); color:#cbd5e1; border:1px solid rgba(203,213,225,0.4); font-weight:800; font-size:0.85rem;">2</span>`;
+    } else if (rankNum === 3) {
+      rankBadge = `<span style="display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; background:rgba(217,119,6,0.2); color:#d97706; border:1px solid rgba(217,119,6,0.4); font-weight:800; font-size:0.85rem;">3</span>`;
+    }
+
+    return `
+    <tr style="${rankNum <= 3 ? 'background:rgba(255,255,255,0.015);' : ''}">
+      <td style="text-align:center; width:50px;">${rankBadge}</td>
       <td style="font-weight:600; color:#fff;">@${escapeHtml(u.username)}</td>
       <td style="color:#eab308; font-weight:700;">
         <span style="display:inline-flex; align-items:center; gap:4px;">
@@ -10050,7 +10631,8 @@ function renderEconomyLeaderboard() {
         <button class="btn btn-sm btn-outline" onclick="openEditUserPointsModal('${escapeHtml(u.rawUsername || u.username)}', ${u.coins})" style="padding:2px 8px; font-size:0.72rem;">Izmeni</button>
       </td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 let ecoLbCurrentPage = 1;
@@ -10465,13 +11047,13 @@ function switchBotrixTab(tabName) {
   });
 
   const guides = {
-    cmds: 'Otvori svoj Botrix Dashboard ➔ <strong>Commands</strong> ➔ Selektuj celu stranicu sa <strong>Ctrl+A</strong>, kopiraj i nalepi ispod. Kickot će sam izvući i konvertovati komande!',
-    timers: 'Otvori svoj Botrix Dashboard ➔ <strong>Timers / Najave</strong> ➔ Kopiraj poruke sa stranice i nalepi ispod. Svaka linija biće uneta kao automatska najava!',
-    blacklist: 'Otvori svoj Botrix Dashboard ➔ <strong>Moderation / Blacklist</strong> ➔ Kopiraj listu zabranjenih reči sa stranice i nalepi ispod.',
-    watchtime: 'Otvori svoj Botrix Dashboard ➔ <strong>Loyalty / Leaderboard</strong> ➔ Selektuj i kopiraj listu sa <strong>Ctrl+A</strong> i nalepi je ispod. Kickot će uvesti gledaoce i njihovo vreme gledanja!',
-    store: 'Otvori svoj Botrix Dashboard ➔ <strong>Loyalty / Store</strong> ➔ Uđi u svaku nagradu pojedinačno klikom na nju i <strong>Ctrl+A</strong> i nalepi ispod. Kickot će automatski konvertovati nagradu i njenu cenu u poenima!',
-    alerts: 'Otvori svoj Botrix Dashboard ➔ <strong>Alerts</strong> ➔ Kopiraj prilagođene poruke za obaveštenja (Follow, Sub, Raid...) i nalepi ispod!',
-    greetings: 'Otvori svoj Botrix Dashboard ➔ <strong>Chat Bot / Welcome</strong> ➔ Kopiraj pozdravnu poruku i nalepi ispod!'
+    cmds: 'Otvori svoj Botrix Dashboard &rarr; <strong>Commands</strong> &rarr; Selektuj celu stranicu sa <strong>Ctrl+A</strong>, kopiraj i nalepi ispod. Kickot će sam izvući i konvertovati komande!',
+    timers: 'Otvori svoj Botrix Dashboard &rarr; <strong>Timers / Najave</strong> &rarr; Kopiraj poruke sa stranice i nalepi ispod. Svaka linija biće uneta kao automatska najava!',
+    blacklist: 'Otvori svoj Botrix Dashboard &rarr; <strong>Moderation / Blacklist</strong> &rarr; Kopiraj listu zabranjenih reči sa stranice i nalepi ispod.',
+    watchtime: 'Otvori svoj Botrix Dashboard &rarr; <strong>Loyalty / Leaderboard</strong> &rarr; Selektuj i kopiraj listu sa <strong>Ctrl+A</strong> i nalepi je ispod. Kickot će uvesti gledaoce i njihovo vreme gledanja!',
+    store: 'Otvori svoj Botrix Dashboard &rarr; <strong>Loyalty / Store</strong> &rarr; Uđi u svaku nagradu pojedinačno klikom na nju i <strong>Ctrl+A</strong> i nalepi ispod. Kickot će automatski konvertovati nagradu i njenu cenu u poenima!',
+    alerts: 'Otvori svoj Botrix Dashboard &rarr; <strong>Alerts</strong> &rarr; Kopiraj prilagođene poruke za obaveštenja (Follow, Sub, Raid...) i nalepi ispod!',
+    greetings: 'Otvori svoj Botrix Dashboard &rarr; <strong>Chat Bot / Welcome</strong> &rarr; Kopiraj pozdravnu poruku i nalepi ispod!'
   };
 
   const labels = {
@@ -10485,7 +11067,7 @@ function switchBotrixTab(tabName) {
   };
 
   const placeholders = {
-    cmds: 'Nalepi ovde kopiranu Botrix stranicu (Ctrl+A ➔ Ctrl+C ➔ Ctrl+V)...\nKickot će sam izvući i očistiti sve komande!',
+    cmds: 'Nalepi ovde kopiranu Botrix stranicu (Ctrl+A &rarr; Ctrl+C &rarr; Ctrl+V)...\nKickot će sam izvući i očistiti sve komande!',
     timers: 'Nalepi ovde poruke tajmera (jedna po liniji):\nZapratite kanal i pritisnite Follow!\nPosetite naš zvanični merch shop na sajtu!',
     blacklist: 'Nalepi ovde zabranjene reči:\nbadword1, badword2, badword3',
     watchtime: 'Nalepi ovde kopiranu tabelu sa Botrix-a ili tekst:\nuser1 120 min\nuser2 5.5 sati',
@@ -11001,7 +11583,7 @@ async function executeBotrixImport() {
 
     } else if (botrixActiveTab === 'timers') {
       const limits = getPlanLimits();
-      const { data: annData } = await sb.from('auto_announces').select('message').eq('channel_id', activeChannel.id).order('position', { ascending: true });
+      const { data: annData } = await getSbPanels().from('auto_messages').select('message').eq('channel_id', activeChannel.id).order('position', { ascending: true });
       const currentAnnounces = Array.isArray(annData) ? annData.map(r => r.message) : [];
 
       const availableSpace = limits.maxAutoAnnounces - currentAnnounces.length;

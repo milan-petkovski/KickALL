@@ -663,9 +663,11 @@ function povezi() {
                 messenger.posaljiPoruku(chatroomId, welcomeMsg);
             }
 
-            // Evidentiraj poruku u leaderboardu aktivnosti
+            // Evidentiraj poruku u leaderboardu aktivnosti i dodeli poene (uz sub multiplikator)
             if (channelState.isStreamLive && !startsWithPrefix && userKey !== channelState.channelUsername.toLowerCase()) {
-                database.evidentirajPoruku(chatroomId, username, poruka);
+                const userRank = getUserRankLevel(username, chatData.sender, channelState.channelUsername);
+                const isSubUser = userRank >= 1; // subscriber, vip, og, mod, broadcaster
+                database.evidentirajPoruku(chatroomId, username, poruka, isSubUser);
             }
 
             // Watchtime: registruj korisnika kao aktivnog gledaoca
@@ -2501,14 +2503,14 @@ async function start() {
         // 5. Pokreni periodicnu proaktivnu proveru live statusa
         setInterval(proveriDaLiSuLiveSvi, 2 * 60 * 1000).unref();
 
-        // 5b. Pokreni periodičnu normalizaciju ljubavnih modifikatora ka 0% (svakih 1h po 1%)
+        // 5b. Pokreni periodičnu normalizaciju ljubavnih modifikatora ka 0% (svakih 2h po 1%)
         setInterval(() => {
             try {
                 database.normalizujLjubavKaNuli();
             } catch (err) {
                 utils.log('ERR', `Greška pri normalizaciji ljubavi: ${err.message}`);
             }
-        }, 60 * 60 * 1000).unref();
+        }, 2 * 60 * 60 * 1000).unref();
 
         // 6. Osluškuj izmene konfiguracije u realnom vremenu
         const lastUpdateLogs = new Map();
