@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <!-- Styles -->
-  <link rel="stylesheet" href="css/kickan.css" />
+  <link rel="stylesheet" href="css/kickan.css?v=2.3" />
   <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon" />
 
   <!-- Supabase + Core JS -->
@@ -244,6 +244,21 @@
             <svg class="sc-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
           </summary>
           <div class="sc-accordion-body">
+            <button type="button" class="sc-btn sc-btn-history" onclick="window.openPastStreamsModal()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span>Prošli Lajvovi (Arhiva)</span>
+              <span class="sc-badge-count" id="sidebarPastStreamsCount">0</span>
+            </button>
+            <button type="button" class="sc-btn sc-btn-save-stream" onclick="window.saveLiveStreamToDatabase(true)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <polyline points="7 3 7 8 15 8"/>
+              </svg>
+              <span>Sačuvaj trenutni lajv u bazu</span>
+            </button>
             <button type="button" class="sc-btn sc-btn-export-full" onclick="window.openExportModal()">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -341,6 +356,7 @@
             <button class="topbar-channel-pill" id="channelStatusPill" onclick="window.toggleChannelDropdown(event)" title="Izaberi ili promeni Kick kanal" aria-haspopup="true" aria-expanded="false">
               <span class="channel-dot" id="channelDot"></span>
               <span class="channel-pill-text">Kanal: <strong id="connectedChannelName">Učitavanje...</strong></span>
+              <span class="cdm-role-badge cdm-role-owner" id="connectedRoleBadge" style="margin-left:6px;">Vlasnik</span>
               <svg class="channel-pill-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <path d="M6 9l6 6 6-6"/>
               </svg>
@@ -397,6 +413,14 @@
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
               <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
             </svg>
+          </button>
+
+          <!-- Past Streams Button -->
+          <button class="topbar-btn" id="btnOpenPastStreams" onclick="window.openPastStreamsModal()" title="Prošli lajvovi i arhiva sesija">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span class="topbar-btn-badge" id="pastStreamsCountBadge" style="display:none;">0</span>
           </button>
 
           <!-- Fullscreen Studio Button -->
@@ -490,6 +514,10 @@
             <div class="hsc-card">
               <span class="hsc-label">Brzina chata</span>
               <strong class="hsc-val" id="statChatVelocity">0/m</strong>
+            </div>
+            <div class="hsc-card hsc-earnings-card">
+              <span class="hsc-label">Procenjena Zarada</span>
+              <strong class="hsc-val" id="statEstimatedEarnings" style="color:var(--an-green); text-shadow:0 0 10px rgba(83,252,24,0.3);">$0.00</strong>
             </div>
           </div>
         </section>
@@ -647,6 +675,128 @@
             </div>
             <div class="metric-value" style="color:var(--an-pink);" id="metricActiveSubs">0</div>
             <div class="metric-footer">Udeo subova u chatu</div>
+          </div>
+        </section>
+
+        <!-- ── KICK PARTNER & KCIP MONETIZATION SECTION ── -->
+        <section class="kcip-monetization-card" aria-label="Kick Partner i KCIP Monetizacija">
+          <!-- Top Row: Title, Big Amount, Live Badges & Explanation -->
+          <div class="kcip-top-row">
+            <div class="kcip-left">
+              <div class="kcip-badge-group">
+                <div class="kcip-badge">
+                  <span class="kcip-live-dot"></span>
+                  <span>KICK CREATOR INCENTIVE PROGRAM (KCIP)</span>
+                </div>
+                <span class="kcip-tier-pill" id="kcipTierPill">PARTNER TIER</span>
+              </div>
+              <div class="kcip-title-row">
+                <span class="kcip-subtext">Procenjena zarada trenutne sesije:</span>
+                <div class="kcip-amount-wrap">
+                  <h2 class="kcip-amount" id="metricEstEarningsHero">$0.00</h2>
+                  <span class="kcip-rate-chip" id="kcipRateChip">~ $0.00 / sat</span>
+                </div>
+              </div>
+              <p class="kcip-formula-note">
+                Kompletan KCIP algoritam: obračunava satnicu po prosečnim gledaocima, odstrimovano vreme, chat velocity multiplikator, procenjeni ad CPM, demografiju publike, 95% revenue share za pretplate i direktne Kicks donacije.
+              </p>
+            </div>
+
+            <div class="kcip-right-badges">
+              <div class="kcip-status-chip" id="kcipStatusChip">
+                <span class="ksc-dot" id="kcipStatusDot"></span>
+                <span>KCIP Status: <strong id="kcipStatusVal">Provera...</strong></span>
+              </div>
+              <div class="kcip-status-chip chip-cyan">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>Angažovanost: <strong id="kcipEngageMultBadge">1.00x</strong></span>
+              </div>
+              <div class="kcip-status-chip chip-amber">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>Ad CPM: <strong id="kcipCpmBadge">$3.00</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Grid: 6 Detailed Factors Breakdown Boxes -->
+          <div class="kcip-factors-grid">
+            <!-- Factor 1: Prosečan broj gledalaca -->
+            <div class="kcip-factor-box">
+              <div class="kfb-head">
+                <div class="kfb-icon kfb-cyan">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </div>
+                <span class="kfb-label">Prosečni Gledaoci</span>
+              </div>
+              <strong class="kfb-value" id="kcipAvgViewersVal">0</strong>
+              <div class="kfb-sub">Baza satnice: <span id="kcipBaseRateVal">$0.00/h</span></div>
+            </div>
+
+            <!-- Factor 2: Broj odstrimovanih sati -->
+            <div class="kcip-factor-box">
+              <div class="kfb-head">
+                <div class="kfb-icon kfb-violet">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <span class="kfb-label">Odstrimovano Vreme</span>
+              </div>
+              <strong class="kfb-value" id="kcipHoursVal">--:--:--</strong>
+              <div class="kfb-sub">Akumulirano: <span id="kcipHoursDecimal">0.00 h</span></div>
+            </div>
+
+            <!-- Factor 3: Chat Velocity Multiplikator -->
+            <div class="kcip-factor-box">
+              <div class="kfb-head">
+                <div class="kfb-icon kfb-amber">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                </div>
+                <span class="kfb-label">Chat Velocity Multiplikator</span>
+              </div>
+              <strong class="kfb-value" id="kcipVelocityVal">1.00x</strong>
+              <div class="kfb-sub">Brzina: <span id="kcipVelocitySpeed">0 msg/min</span></div>
+            </div>
+
+            <!-- Factor 4: CPM za Reklame -->
+            <div class="kcip-factor-box">
+              <div class="kfb-head">
+                <div class="kfb-icon kfb-pink">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+                <span class="kfb-label">CPM za Reklame</span>
+              </div>
+              <strong class="kfb-value" id="kcipCpmVal">$3.00 CPM</strong>
+              <div class="kfb-sub">Procenjen Ad prihod: <span id="kcipAdRevenueVal">$0.00</span></div>
+            </div>
+
+            <!-- Factor 5: Demografija Gledalaca -->
+            <div class="kcip-factor-box">
+              <div class="kfb-head">
+                <div class="kfb-icon kfb-blue">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                </div>
+                <span class="kfb-label">Demografija &amp; Geo</span>
+              </div>
+              <strong class="kfb-value" id="kcipGeoVal">Detekcija...</strong>
+              <div class="kfb-sub">Regionalni faktor: <span id="kcipGeoMultVal">1.00x</span></div>
+            </div>
+
+            <!-- Factor 6: Ukupna angažovanost (Subs, Kicks, KCIP satnica) -->
+            <div class="kcip-factor-box kfb-highlight">
+              <div class="kfb-head">
+                <div class="kfb-icon kfb-green">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                </div>
+                <span class="kfb-label">Ukupna Angažovanost</span>
+              </div>
+              <strong class="kfb-value" id="kcipSubsKicksVal">$0.00</strong>
+              <div class="kfb-sub"><span id="kcipSubsCountVal">0 Subs</span> • <span id="kcipKicksCountVal">0 Kicks</span> • KCIP: <span id="mbKcipHourlyEst">$0.00</span></div>
+            </div>
+          </div>
+
+          <!-- Hidden preserved spans for existing code/tests compatibility -->
+          <div style="display:none;" aria-hidden="true">
+            <span id="mbSubsEst">$0.00</span>
+            <span id="mbKicksEst">$0.00</span>
           </div>
         </section>
 
@@ -811,6 +961,7 @@
         <div class="topbar-channel-pill" id="studioChannelPill">
           <span class="channel-dot"></span>
           <strong id="studioChannelName">Milan_567</strong>
+          <span class="cdm-role-badge cdm-role-owner" id="studioRoleBadge" style="margin-left:4px;">Vlasnik</span>
         </div>
       </div>
       <div class="studio-header-center">
@@ -834,6 +985,14 @@
             <span>Brzina:</span>
             <strong id="studioVelocity" style="color:var(--an-amber);">0/m</strong>
           </div>
+          <div class="sqs-item">
+            <span>Čateri:</span>
+            <strong id="studioTopUniqueChatters" style="color:var(--an-purple);">0</strong>
+          </div>
+          <div class="sqs-item">
+            <span>Kicks:</span>
+            <strong id="studioTopKicks" style="color:var(--an-green);">0</strong>
+          </div>
         </div>
         <button class="studio-close-btn" onclick="window.closeFullscreenStudio()" title="Zatvori Fullscreen (Esc)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -853,6 +1012,118 @@
         <div class="studio-emotes-card">
           <h4>Top Emoti Kanala</h4>
           <div class="progress-list-container" id="studioPopularEmotesContainer"></div>
+        </div>
+        <div class="studio-stats-card">
+          <div class="studio-stats-head">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+              <h4>Statistika Lajva</h4>
+            </div>
+            <span class="studio-stats-badge">Live Telemetrija</span>
+          </div>
+          <div class="studio-stats-grid">
+            <div class="studio-stat-box">
+              <div class="ssb-icon ssb-cyan">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+              </div>
+              <div class="ssb-info">
+                <span class="ssb-label">Ukupno Poruka</span>
+                <strong class="ssb-val" id="studioStatTotalMessages">0</strong>
+              </div>
+            </div>
+            <div class="studio-stat-box">
+              <div class="ssb-icon ssb-purple">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+              <div class="ssb-info">
+                <span class="ssb-label">Jedinstvenih Čatera</span>
+                <strong class="ssb-val" id="studioStatUniqueChatters">0</strong>
+              </div>
+            </div>
+            <div class="studio-stat-box">
+              <div class="ssb-icon ssb-green">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/>
+                  <line x1="12" y1="6" x2="12" y2="8"/>
+                  <line x1="12" y1="16" x2="12" y2="18"/>
+                </svg>
+              </div>
+              <div class="ssb-info">
+                <span class="ssb-label">Kicks Donacije</span>
+                <strong class="ssb-val ssb-kicks" id="studioStatTotalKicks">0</strong>
+              </div>
+            </div>
+            <div class="studio-stat-box">
+              <div class="ssb-icon ssb-green" style="background:rgba(83,252,24,0.18); border-color:#53fc18;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="12" y1="1" x2="12" y2="23"/>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+              </div>
+              <div class="ssb-info">
+                <span class="ssb-label">Procenjena Zarada (KCIP)</span>
+                <strong class="ssb-val ssb-kicks" id="studioStatEstEarnings">$0.00</strong>
+              </div>
+            </div>
+            <div class="studio-stat-box">
+              <div class="ssb-icon ssb-amber">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </div>
+              <div class="ssb-info">
+                <span class="ssb-label">Peak Gledaoci</span>
+                <strong class="ssb-val" id="studioStatPeakViewers">0</strong>
+              </div>
+            </div>
+            <div class="studio-stat-box">
+              <div class="ssb-icon ssb-orange">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                  <line x1="9" y1="9" x2="9.01" y2="9"/>
+                  <line x1="15" y1="9" x2="15.01" y2="9"/>
+                </svg>
+              </div>
+              <div class="ssb-info">
+                <span class="ssb-label">Ukupno Emotea</span>
+                <strong class="ssb-val" id="studioStatTotalEmotes">0</strong>
+              </div>
+            </div>
+            <div class="studio-stat-box">
+              <div class="ssb-icon ssb-red">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+              </div>
+              <div class="ssb-info">
+                <span class="ssb-label">Brzina Chata</span>
+                <strong class="ssb-val" id="studioStatChatVelocity">0/m</strong>
+              </div>
+            </div>
+            <div class="studio-stat-box">
+              <div class="ssb-icon ssb-purple">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </div>
+              <div class="ssb-info">
+                <span class="ssb-label">Pretplatnici (Subs)</span>
+                <strong class="ssb-val" id="studioStatActiveSubs">0</strong>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="studio-right-column">
@@ -1018,6 +1289,109 @@
             </svg>
             <span>contact@milanwebportal.com</span>
           </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PAST STREAMS ARCHIVE MODAL ══════════ -->
+  <div class="modal-backdrop" id="pastStreamsModal" onclick="window.handleModalBg(event, 'pastStreamsModal')" role="dialog" aria-modal="true" aria-labelledby="pastStreamsModalTitle">
+    <div class="modal-box modal-box-xl">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5">
+            <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h3 id="pastStreamsModalTitle">Arhiva Prošlih Lajvova</h3>
+          <span class="past-streams-count-pill" id="pastStreamsModalCount">0 lajvova</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button type="button" class="sc-btn sc-btn-save-stream" style="padding:6px 12px; font-size:0.8rem;" onclick="window.saveLiveStreamToDatabase(true)" title="Sačuvaj trenutnu sesiju odmah">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+              <polyline points="17 21 17 13 7 13 7 21"/>
+              <polyline points="7 3 7 8 15 8"/>
+            </svg>
+            <span>Sačuvaj trenutni lajv</span>
+          </button>
+          <button type="button" class="modal-close-btn" onclick="window.closeModal('pastStreamsModal')" aria-label="Zatvori">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px;">
+        <!-- Filter bar -->
+        <div class="past-streams-filter-bar">
+          <div class="past-streams-search-wrap">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--an-muted)" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="pastStreamsSearchInput" placeholder="Pretraži arhivu po datumu ili naslovu..." oninput="window.filterPastStreamsTable()" />
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.8rem; color:var(--an-muted);">Prikaz za kanal: <strong id="pastStreamsFilterChannelName" style="color:#fff;">Svi</strong></span>
+            <button type="button" class="table-icon-btn" onclick="window.fetchPastStreams()" title="Osveži podatke iz baze">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6"/>
+                <path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Table responsive -->
+        <div class="past-streams-table-wrap">
+          <table class="data-table past-streams-table">
+            <thead>
+              <tr>
+                <th>Datum & Vreme</th>
+                <th>Kanal / Naslov</th>
+                <th>Trajanje</th>
+                <th>Peak Gledaoci</th>
+                <th>Poruke</th>
+                <th>Jedinstveni</th>
+                <th>Brzina</th>
+                <th style="text-align:right;">Akcije</th>
+              </tr>
+            </thead>
+            <tbody id="pastStreamsTableBody">
+              <tr>
+                <td colspan="8" class="table-empty-state">Učitavanje prošlih lajvova iz baze...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PAST STREAM DETAIL MODAL ══════════ -->
+  <div class="modal-backdrop" id="pastStreamDetailModal" onclick="window.handleModalBg(event, 'pastStreamDetailModal')" role="dialog" aria-modal="true" aria-labelledby="pastStreamDetailTitle">
+    <div class="modal-box modal-box-lg">
+      <div class="modal-head">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+          <h3 id="pastStreamDetailTitle">Detalji Prošlog Lajva</h3>
+        </div>
+        <button type="button" class="modal-close-btn" onclick="window.closeModal('pastStreamDetailModal')" aria-label="Zatvori">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px;">
+        <div id="pastStreamDetailContent">
+          <!-- Dynamic details content injected here -->
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@
     "test:bot": "node --test Bot/tests/*.test.js",
     "test:website": "node --test Website/tests/*.test.js",
     "lint": "npx eslint .",
-    "audit": "npm audit --audit-level=high",
+    "audit": "node scripts/audit.js",
     "verify": "node scripts/build.js"
   },
   "devDependencies": {

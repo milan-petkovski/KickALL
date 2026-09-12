@@ -24,6 +24,15 @@ exports.handler = async (event) => {
     };
   }
 
+  const MAX_BODY_BYTES = 50000;
+  if (event.body && event.body.length > MAX_BODY_BYTES) {
+    return {
+      statusCode: 413,
+      headers,
+      body: JSON.stringify({ error: 'Payload too large', detail: 'Request body exceeds 50KB limit' })
+    };
+  }
+
   const botBase = (process.env.RENDER_BOT_API_BASE || process.env.BOT_API_URL || 'https://kickbot-ihzb.onrender.com').replace(/\/+$/, '');
   const secret = process.env.INTERNAL_API_SECRET;
 

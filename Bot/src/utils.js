@@ -30,6 +30,32 @@ function log(tip, poruka, meta = null) {
             state.globalLogs.shift();
         }
     } catch (_) {}
+
+    // Opcioni eksterni HTTP odvod logova (Better Stack Logtail / Papertrail / custom drain)
+    const logDrainToken = process.env.BETTER_STACK_TOKEN || process.env.LOGTAIL_SOURCE_TOKEN;
+    const logDrainUrl = process.env.LOG_DRAIN_URL || (logDrainToken ? 'https://in.logs.betterstack.com' : null);
+    if (logDrainUrl && (tip === 'ERR' || tip === 'WARN' || process.env.LOG_ALL_TO_DRAIN === 'true')) {
+        try {
+            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timeout = controller ? setTimeout(() => controller.abort(), 2500) : null;
+            fetch(logDrainUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(logDrainToken ? { 'Authorization': `Bearer ${logDrainToken}` } : {})
+                },
+                body: JSON.stringify({
+                    dt: new Date().toISOString(),
+                    level: tip,
+                    message: poruka,
+                    instance: state.instanceId || 'bot'
+                }),
+                signal: controller ? controller.signal : undefined
+            })
+                .catch(() => {})
+                .finally(() => { if (timeout) clearTimeout(timeout); });
+        } catch (_) {}
+    }
 }
 
 /**

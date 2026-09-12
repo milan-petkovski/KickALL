@@ -1176,6 +1176,29 @@ body.kickaj-body {
   color: #fff;
 }
 
+.bulk-test-dropdown {
+  backdrop-filter: blur(10px);
+}
+
+.bulk-test-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.bulk-test-item:hover {
+  background: rgba(6, 182, 212, 0.18);
+  color: #38bdf8;
+}
+
 .sc-btn-reset-text {
   background: none;
   border: none;
@@ -2701,7 +2724,8 @@ body.kickaj-body {
   transition: var(--aj-ease);
 }
 
-.list-action-btn:hover { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.4); color: #ef4444; }
+.list-action-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); color: #fff; }
+#btnClearParticipants:hover { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.4); color: #ef4444; }
 
 .list-search {
   display: flex;

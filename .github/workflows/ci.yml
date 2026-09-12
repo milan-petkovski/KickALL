@@ -43,7 +43,7 @@ jobs:
 
       - name: Run Security Audit (Root & Bot)
         run: |
-          npm audit --audit-level=high
+          npm run audit
           cd Bot && npm audit --audit-level=high
 
       - name: Verify Web Application Assets

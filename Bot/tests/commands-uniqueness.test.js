@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const state = require('../src/state');
 const commands = require('../src/commands');
-const gambling = require('../src/gambling');
 
 test('Commands Uniqueness - handleMrzim računa mržnju i šalje unikatnu poruku', () => {
     const chatroomId = 'test_room_mrzim_1';

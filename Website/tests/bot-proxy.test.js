@@ -105,3 +105,19 @@ test('Bot Proxy - Dozvoljena putanja /api/kick/follow-check se uspešno prosleđ
         if (originalSecret) process.env.INTERNAL_API_SECRET = originalSecret;
     }
 });
+
+test('Bot Proxy - Odbija preveliki payload (>50KB) sa statusom 413', async () => {
+    process.env.INTERNAL_API_SECRET = 'test_secret_123';
+    const hugeBody = 'x'.repeat(55000);
+    const res = await handler({
+        httpMethod: 'POST',
+        path: '/.netlify/functions/bot-proxy/api/kick/send-message',
+        headers: { 'x-nf-client-connection-ip': '1.2.3.8' },
+        body: hugeBody
+    });
+
+    assert.equal(res.statusCode, 413);
+    const body = JSON.parse(res.body);
+    assert.equal(body.error, 'Payload too large');
+    if (originalSecret) process.env.INTERNAL_API_SECRET = originalSecret;
+});

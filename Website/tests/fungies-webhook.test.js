@@ -8,7 +8,9 @@ const {
         normalizeEventType,
         resolvePlanTier,
         extractEntityData,
-        buildProfilePayload
+        buildProfilePayload,
+        recordDeadLetterPayment,
+        sendDiscordAlert
     }
 } = require('../netlify/functions/fungies-webhook');
 
@@ -127,4 +129,44 @@ test('Fungies Webhook - handler accepts valid signed webhook', async () => {
     assert.equal(parsedBody.simulated, true);
     assert.equal(parsedBody.planTier, 'pro');
     assert.equal(parsedBody.clientReferenceId, 'user_456');
+});
+
+test('Fungies Webhook - Odbija preveliki payload (>100KB) sa statusom 413', async () => {
+    const hugeBody = 'x'.repeat(105000);
+    const res = await handler({
+        httpMethod: 'POST',
+        headers: {},
+        body: hugeBody
+    });
+
+    assert.equal(res.statusCode, 413);
+    const parsed = JSON.parse(res.body);
+    assert.equal(parsed.error, 'Payload too large');
+});
+
+test('Fungies Webhook - recordDeadLetterPayment vraća false za nepostojeće parametre', async () => {
+    const result = await recordDeadLetterPayment('', '', { userId: '123' });
+    assert.equal(result, false);
+});
+
+test('Fungies Webhook - sendDiscordAlert bez URL-a vraća false i ne blokira rad', async () => {
+    const result = await sendDiscordAlert('', { userId: 'user_test', plan: 'pro' });
+    assert.equal(result, false);
+});
+
+test('Fungies Webhook - podrška za rotaciju tajnih ključeva (comma-separated secrets)', () => {
+    const rotatingSecrets = 'new_fungies_sec_2026, old_fungies_sec_2025';
+    const payload = JSON.stringify({ event: 'subscription_created', data: { id: 'sub_rot_1' } });
+
+    // Potpis kreiran sa novim ključem
+    const hexNew = crypto.createHmac('sha256', 'new_fungies_sec_2026').update(payload, 'utf8').digest('hex');
+    assert.equal(verifyFungiesSignature(payload, `sha256_${hexNew}`, rotatingSecrets), true);
+
+    // Potpis kreiran sa starim ključem
+    const hexOld = crypto.createHmac('sha256', 'old_fungies_sec_2025').update(payload, 'utf8').digest('hex');
+    assert.equal(verifyFungiesSignature(payload, `sha256_${hexOld}`, rotatingSecrets), true);
+
+    // Potpis sa trećim nepoznatim ključem
+    const hexFake = crypto.createHmac('sha256', 'fake_sec').update(payload, 'utf8').digest('hex');
+    assert.equal(verifyFungiesSignature(payload, `sha256_${hexFake}`, rotatingSecrets), false);
 });

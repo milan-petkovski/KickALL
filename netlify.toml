@@ -8,7 +8,7 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://cdn.jsdelivr.net https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob: https://i.ytimg.com; media-src 'self' data: https: blob:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://*.fungies.io; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://rcukparptzzyssqdmydt.supabase.co https://kickbot-ihzb.onrender.com https://id.kick.com https://kick.com https://api.kick.com https://*.kick.com https://www.youtube.com https://*.youtube.com https://*.googlevideo.com https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.fungies.io wss:;"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://cdn.jsdelivr.net https://www.youtube.com https://s.ytimg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob: https://i.ytimg.com https://*.ytimg.com https://*.kick.com https://files.kick.com https://images.kick.com https://*.cloudfront.net https://*.cloudflareimages.com https://*.s3.amazonaws.com https://*.s3.*.amazonaws.com; media-src 'self' data: https: blob:; frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://*.fungies.io; connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://rcukparptzzyssqdmydt.supabase.co https://kickbot-ihzb.onrender.com https://id.kick.com https://kick.com https://api.kick.com https://*.kick.com https://files.kick.com https://images.kick.com https://*.cloudfront.net https://*.cloudflareimages.com https://*.s3.amazonaws.com https://*.s3.*.amazonaws.com https://www.youtube.com https://*.youtube.com https://*.googlevideo.com https://api.allorigins.win https://corsproxy.io https://api.codetabs.com https://*.fungies.io wss:;"
 
 # API i Auth preusmeravanja (najveći prioritet)
 [[redirects]]
@@ -138,9 +138,39 @@
   status = 200
   force = false
 
-# Catch-all za glavnu aplikaciju (MORA IĆI NA SAMOM DNU)
+[[redirects]]
+  from = "/dashboard"
+  to = "/dashboard.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/pricing"
+  to = "/pricing.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/terms"
+  to = "/terms.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/refund"
+  to = "/refund.html"
+  status = 200
+  force = true
+
+# 404 stranica za nepostojeće rute (MORA IĆI NA SAMOM DNU)
 [[redirects]]
   from = "/*"
-  to = "/index.html"
-  status = 200
+  to = "/404.html"
+  status = 404
   force = false

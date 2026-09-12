@@ -26,15 +26,16 @@ Allow: /
 User-agent: Bingbot
 Allow: /
 
-# Disallow specific paths if needed
+# Disallow private and authenticated dashboard paths
 Disallow: /auth/
-Disallow: /dashboard/
+Disallow: /dashboard
+Disallow: /dashboard.html
 Disallow: /api/
 Disallow: /admin/
+Disallow: /kickot/
 Disallow: /kickaj/
 Disallow: /kickan/
 Disallow: /kickov/
-Disallow: /kickot/dashboard.html
 
 # Sitemap
 Sitemap: https://kickall.app/sitemap.xml

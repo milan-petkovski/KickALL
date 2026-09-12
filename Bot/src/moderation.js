@@ -144,14 +144,18 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
             
         if (badWords.length > 0) {
             const contentLC = content.toLowerCase();
+            const normalizedContent = normalizujZaPoredjenje(content);
             const cleanContentLC = contentLC
+                .replace(/š/g, 's').replace(/đ/g, 'd').replace(/č/g, 'c').replace(/ć/g, 'c').replace(/ž/g, 'z');
+            const cleanNormalized = normalizedContent
                 .replace(/š/g, 's').replace(/đ/g, 'd').replace(/č/g, 'c').replace(/ć/g, 'c').replace(/ž/g, 'z');
                 
             const hasBadWord = badWords.some(word => {
                 const wordLC = word.toLowerCase();
                 const wordLCAlt = wordLC
                     .replace(/š/g, 's').replace(/đ/g, 'd').replace(/č/g, 'c').replace(/ć/g, 'c').replace(/ž/g, 'z');
-                return contentLC.includes(wordLC) || cleanContentLC.includes(wordLCAlt);
+                return contentLC.includes(wordLC) || cleanContentLC.includes(wordLCAlt) ||
+                       normalizedContent.includes(wordLC) || cleanNormalized.includes(wordLCAlt);
             });
             
             if (hasBadWord) {
@@ -225,6 +229,12 @@ function kazniKorisnika(chatroomId, username, messageId, reason, actionType, tim
     const act = actionType || 'delete';
     const duration = timeoutDuration !== undefined ? timeoutDuration : 600;
     const userKey = username.toLowerCase();
+
+    // Beleži u streamAnalytics za Kickan
+    try {
+        const streamAnalytics = require('./streamAnalytics');
+        streamAnalytics.recordModerationAction(chatroomId, act.toUpperCase(), username, 'Kickot Bot', reason);
+    } catch (_) {}
 
     if (act === 'timeout') {
         if (messageId) obrisiPoruku(chatroomId, messageId);

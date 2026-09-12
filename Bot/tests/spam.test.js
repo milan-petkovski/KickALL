@@ -102,4 +102,17 @@ test('normalizujZaPoredjenje uklanja zero-width karaktere i normalizuje case/whi
     const a = normalizujZaPoredjenje('Zdravo Svima\u200B');
     const b = normalizujZaPoredjenje('  zdravo svima');
     assert.equal(a, b);
+
+    // RTL override bypass
+    const withRtlOverride = normalizujZaPoredjenje('Spam\u202EPoruka');
+    assert.equal(withRtlOverride, 'spamporuka');
+
+    // Bidi isolate bypass
+    const withBidiIsolate = normalizujZaPoredjenje('Spam\u2066Poruka\u2069');
+    assert.equal(withBidiIsolate, 'spamporuka');
+
+    // Variation selector bypass
+    const withVariationSelector = normalizujZaPoredjenje('Test\uFE0FPoruka');
+    assert.equal(withVariationSelector, 'testporuka');
 });
+

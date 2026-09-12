@@ -35,6 +35,26 @@ test('API Proxy - SSRF zaštita: Odbija targetUrl sa nedozvoljenim domenom (evil
     assert.equal(body.error, 'Target domain not allowed');
 });
 
+test('API Proxy - SSRF zaštita: Odbija neprijavljen onrender poddomen (attacker.onrender.com)', async () => {
+    const res = await handler({
+        httpMethod: 'POST',
+        headers: { 'x-nf-client-connection-ip': '10.0.0.21' },
+        body: JSON.stringify({ targetUrl: 'https://attacker.onrender.com/steal-secret' })
+    });
+    assert.equal(res.statusCode, 403);
+    const body = JSON.parse(res.body);
+    assert.equal(body.error, 'Target domain not allowed');
+});
+
+test('API Proxy - SSRF zaštita: Odbija nevalidne protokole (file://)', async () => {
+    const res = await handler({
+        httpMethod: 'POST',
+        headers: { 'x-nf-client-connection-ip': '10.0.0.22' },
+        body: JSON.stringify({ targetUrl: 'file:///etc/passwd' })
+    });
+    assert.equal(res.statusCode, 400);
+});
+
 test('API Proxy - Neispravan URL vraća 400 Bad Request', async () => {
     const res = await handler({
         httpMethod: 'POST',

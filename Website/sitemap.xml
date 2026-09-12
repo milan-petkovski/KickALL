@@ -8,14 +8,7 @@
         <priority>1.0</priority>
     </url>
     
-    <!-- Kickot Bot Sub-page -->
-    <url>
-        <loc>https://kickall.app/kickot/</loc>
-        <lastmod>2026-07-28</lastmod>
-        <changefreq>weekly</changefreq>
-        <priority>0.8</priority>
-    </url>
-    
+
 
     <!-- Terms of Service -->
     <url>

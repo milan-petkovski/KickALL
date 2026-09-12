@@ -108,9 +108,12 @@ function getChannelState(chatroomId) {
             // Naziv kanala
             channelUsername: '',
 
-            // Slanje poruka red
+            // Slanje poruka red (Leaky Bucket tempo i 429 zaštita)
             isProcessingQueue: false,
             messageQueue: [],
+            lastSentTimestamp: 0,
+            rateLimitUntil: 0,
+            queueDrainTimer: null,
 
             // Kanalski tajmeri
             leaderboardSaveTimer: null,
@@ -137,7 +140,13 @@ module.exports = {
     // Globalni status autentifikacije bota
     isBotAuthenticated: true,
     lastAuthErrorTs: 0,
-    authErrorCount: 0
+    authErrorCount: 0,
+
+    // Split-brain prevencija, distributed lock i graceful shutdown status
+    instanceId: null,
+    isLeader: true,
+    isShuttingDown: false,
+    leaderLockTimer: null
 };
 
 

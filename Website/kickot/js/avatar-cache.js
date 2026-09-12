@@ -85,6 +85,11 @@ async function getAvatarFromCache(username) {
  */
 async function setAvatarInCache(username, url) {
   if (!username) return;
+  if (url && url !== 'none') {
+    if (typeof url !== 'string' || !/^https?:\/\/[^\s"'<>()]+$/i.test(url)) {
+      return;
+    }
+  }
   
   try {
     await initAvatarCache();
@@ -215,24 +220,21 @@ async function getCacheStats() {
  */
 function clearOldLocalStorageAvatars() {
   try {
-    let clearedCount = 0;
+    const keysToRemove = [];
     
-    // Prođi kroz sve localStorage ključeve
+    // Sakupi sve avatar cache ključeve pre brisanja kako se indeks ne bi poremetio tokom iteracije
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      
-      // Proveri da li je avatar cache ključ
       if (key && key.startsWith('avatar-cache-')) {
-        localStorage.removeItem(key);
-        clearedCount++;
+        keysToRemove.push(key);
       }
     }
     
-    if (clearedCount > 0) {
-
-    }
+    keysToRemove.forEach(key => {
+      localStorage.removeItem(key);
+    });
     
-    return clearedCount;
+    return keysToRemove.length;
   } catch (error) {
     console.error('Error clearing old localStorage avatars:', error);
     return 0;

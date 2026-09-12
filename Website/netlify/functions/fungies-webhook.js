@@ -44,17 +44,21 @@ function timingSafeEqualHex(a, b) {
 function verifyFungiesSignature(rawBody, signatureHeader, secret) {
   if (!signatureHeader || !secret) return false;
 
+  const secrets = String(secret).split(',').map(s => s.trim()).filter(Boolean);
   const cleanHeader = String(signatureHeader).trim();
   const hexSignature = cleanHeader.startsWith('sha256_')
     ? cleanHeader.substring(7)
     : cleanHeader;
 
-  const expectedHex = crypto.createHmac('sha256', secret).update(rawBody || '', 'utf8').digest('hex');
+  for (const sec of secrets) {
+    const expectedHex = crypto.createHmac('sha256', sec).update(rawBody || '', 'utf8').digest('hex');
+    const expectedWithPrefix = `sha256_${expectedHex}`;
+    if (timingSafeEqualHex(cleanHeader, expectedWithPrefix) || timingSafeEqualHex(hexSignature, expectedHex)) {
+      return true;
+    }
+  }
 
-  // Match either "sha256_<hex>" or plain "<hex>"
-  const expectedWithPrefix = `sha256_${expectedHex}`;
-
-  return timingSafeEqualHex(cleanHeader, expectedWithPrefix) || timingSafeEqualHex(hexSignature, expectedHex);
+  return false;
 }
 
 function safeJsonParse(rawBody) {
@@ -234,20 +238,112 @@ async function patchUserProfile(supabaseUrl, supabaseKey, userId, payload) {
   return { ok: false, errorText: lastErrorText };
 }
 
-async function notifyBot(renderBotApiBase, internalSecret, payload) {
-  if (!renderBotApiBase) return;
+async function notifyBot(renderBotApiBase, internalSecret, payload, maxRetries = 3) {
+  if (!renderBotApiBase) return false;
 
+  const url = `${renderBotApiBase.replace(/\/+$/, '')}/api/internal/subscription-sync`;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': internalSecret || ''
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (res.ok) {
+        console.log(`[Fungies Webhook] Bot backend notified successfully (attempt ${attempt})`);
+        return true;
+      }
+      console.warn(`[Fungies Webhook] Bot returned HTTP ${res.status} (attempt ${attempt}/${maxRetries})`);
+    } catch (error) {
+      console.warn(`[Fungies Webhook] Bot notify attempt ${attempt}/${maxRetries} failed: ${error.message}`);
+    }
+
+    if (attempt < maxRetries) {
+      await new Promise(r => setTimeout(r, attempt * 600));
+    }
+  }
+
+  console.warn('[Fungies Webhook] All bot notify attempts exhausted. Supabase DB holds ground truth.');
+  return false;
+}
+
+async function recordDeadLetterPayment(supabaseUrl, supabaseKey, dlqRecord) {
+  if (!supabaseUrl || !supabaseKey) return false;
   try {
-    await fetch(`${renderBotApiBase}/api/internal/subscription-sync`, {
+    const res = await fetch(`${supabaseUrl}/rest/v1/payment_dead_letter_queue`, {
       method: 'POST',
       headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
         'Content-Type': 'application/json',
-        'x-internal-secret': internalSecret || ''
+        Prefer: 'return=minimal'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({
+        event_id: dlqRecord.eventId || null,
+        event_type: dlqRecord.eventType || 'subscription_activated',
+        user_id: dlqRecord.userId || null,
+        customer_email: dlqRecord.customerEmail || null,
+        plan: dlqRecord.plan || 'free',
+        status: 'pending_bot_sync',
+        error_detail: dlqRecord.errorDetail || 'All bot notify retry attempts exhausted',
+        payload: dlqRecord.payload || {},
+        attempts: dlqRecord.attempts || 3,
+        created_at: new Date().toISOString()
+      })
     });
-  } catch (error) {
-    console.warn('[Fungies Webhook] Failed to notify bot backend:', error.message);
+    if (!res.ok) {
+      const txt = await res.text();
+      console.error('[Fungies Webhook] Failed to write to payment_dead_letter_queue:', res.status, txt);
+      return false;
+    }
+    console.log('[Fungies Webhook] Recorded failed payment in payment_dead_letter_queue for user:', dlqRecord.userId);
+    return true;
+  } catch (err) {
+    console.error('[Fungies Webhook] Exception writing to DLQ:', err.message);
+    return false;
+  }
+}
+
+async function sendDiscordAlert(webhookUrl, alertData) {
+  if (!webhookUrl) {
+    console.warn('[Fungies Webhook] Discord webhook URL not configured (DISCORD_WEBHOOK_URL). Skipping alert.');
+    return false;
+  }
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const content = `[HITNA UZBUNA - DEAD LETTER QUEUE] Neuspešno obaveštavanje bota za uplatu!\n` +
+      `Korisnik ID: ${alertData.userId || 'Nepoznat'}\n` +
+      `Email: ${alertData.customerEmail || 'Nepoznat'}\n` +
+      `Plan: ${alertData.plan || 'Nepoznat'}\n` +
+      `Razlog: ${alertData.errorDetail || 'Bot servis nedostupan nakon svih retry pokušaja'}\n` +
+      `Status: Zabeleženo u payment_dead_letter_queue bazi za automatsku sinhronizaciju.`;
+
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    if (!res.ok) {
+      console.warn('[Fungies Webhook] Discord webhook returned HTTP', res.status);
+      return false;
+    }
+    console.log('[Fungies Webhook] Discord alert sent successfully.');
+    return true;
+  } catch (err) {
+    console.warn('[Fungies Webhook] Failed to send Discord alert:', err.message);
+    return false;
   }
 }
 
@@ -262,6 +358,15 @@ exports.handler = async (event) => {
       statusCode: 405,
       headers,
       body: JSON.stringify({ error: 'Method not allowed' })
+    };
+  }
+
+  const MAX_PAYLOAD_BYTES = 100000;
+  if (event.body && event.body.length > MAX_PAYLOAD_BYTES) {
+    return {
+      statusCode: 413,
+      headers,
+      body: JSON.stringify({ error: 'Payload too large', detail: 'Webhook body exceeds 100KB limit' })
     };
   }
 
@@ -363,7 +468,7 @@ exports.handler = async (event) => {
   }
 
   // Obavesti Bot pozadinski server radi instant sinhronizacije
-  await notifyBot(
+  const botNotified = await notifyBot(
     process.env.RENDER_BOT_API_BASE,
     process.env.INTERNAL_API_SECRET,
     {
@@ -376,6 +481,26 @@ exports.handler = async (event) => {
     }
   );
 
+  // Ako bot nije primio notifikaciju nakon svih retry pokušaja, aktiviraj Dead Letter Queue i Discord uzbunu
+  if (!botNotified) {
+    console.warn('[Fungies Webhook] Bot notifikacija nije uspela posle svih pokušaja. Šaljem u Dead Letter Queue i šaljem Discord uzbunu.');
+    const dlqRecord = {
+      eventId: payload?.id || payload?.event_id || null,
+      eventType: normalizedEvent,
+      userId: userProfile.id,
+      customerEmail: customerEmail || userProfile.email || '',
+      plan: updatePayload.plan,
+      errorDetail: 'Bot pozadinski servis nedostupan nakon 3 uzastopna retry pokušaja (Render restart/hladan start)',
+      payload: { clientReferenceId, offerId, planTier, planPeriod, subscriptionStatus },
+      attempts: 3
+    };
+
+    await recordDeadLetterPayment(supabaseUrl, supabaseKey, dlqRecord);
+
+    const discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL || process.env.ALERT_DISCORD_WEBHOOK_URL;
+    await sendDiscordAlert(discordWebhookUrl, dlqRecord);
+  }
+
   return {
     statusCode: 200,
     headers,
@@ -383,7 +508,8 @@ exports.handler = async (event) => {
       received: true,
       updated: true,
       userId: userProfile.id,
-      plan: updatePayload.plan
+      plan: updatePayload.plan,
+      botNotified
     })
   };
 };
@@ -395,5 +521,7 @@ exports._test = {
   resolvePlanTier,
   extractEntityData,
   buildProfilePayload,
-  getHeader
+  getHeader,
+  recordDeadLetterPayment,
+  sendDiscordAlert
 };

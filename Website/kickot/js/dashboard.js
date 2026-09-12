@@ -826,8 +826,9 @@ async function getOrFetchAvatar(username, elementId) {
 function updateAvatarUI(elementId, avatarUrl) {
   const el = document.getElementById(elementId);
   if (el) {
-    if (avatarUrl && avatarUrl !== 'none' && avatarUrl !== 'null' && /^https?:\/\//.test(avatarUrl)) {
-      el.style.backgroundImage = `url("${avatarUrl}")`;
+    if (avatarUrl && avatarUrl !== 'none' && avatarUrl !== 'null' && /^https?:\/\//i.test(avatarUrl)) {
+      const safeUrl = encodeURI(avatarUrl).replace(/["'()<>]/g, '');
+      el.style.backgroundImage = `url("${safeUrl}")`;
       el.style.backgroundSize = 'cover';
       el.style.backgroundPosition = 'center';
       el.style.border = '1px solid rgba(255,255,255,0.15)';
@@ -1436,8 +1437,15 @@ async function initApp() {
     await loadAllData();
     // Detekcija osvežavanja stranice (F5/Reload) vs nove posete
     const isReload = (performance.getEntriesByType && performance.getEntriesByType('navigation')[0] && performance.getEntriesByType('navigation')[0].type === 'reload') || (performance.navigation && performance.navigation.type === 1);
-    const sessionPanel = sessionStorage.getItem('active-dashboard-panel-session');
-    const hashPanel = window.location.hash ? window.location.hash.replace('#', '') : null;
+    const slugAliases = {
+      'games': 'builtin-commands',
+      'announces': 'auto-announces',
+      'autoresponse': 'bot-interaction'
+    };
+    const rawHash = window.location.hash ? window.location.hash.replace('#', '') : null;
+    const rawSession = sessionStorage.getItem('active-dashboard-panel-session');
+    const hashPanel = slugAliases[rawHash] || rawHash;
+    const sessionPanel = slugAliases[rawSession] || rawSession;
     const validPanels = ['overview', 'leaderboard', 'commands', 'builtin-commands', 'auto-announces', 'bot-interaction', 'marriages', 'minigames', 'songs', 'economy', 'config', 'moderation'];
 
     let lastPanel = 'overview';
@@ -5208,6 +5216,7 @@ function handleAnnounceInputChange(val) {
   if (!trimmed) {
     if (errEl) errEl.style.display = 'none';
     if (inputEl) inputEl.style.borderColor = '';
+    if (addBtn) addBtn.disabled = true;
     return;
   }
 
@@ -5217,15 +5226,18 @@ function handleAnnounceInputChange(val) {
       errEl.style.display = 'block';
     }
     if (inputEl) inputEl.style.borderColor = '#EF4444';
+    if (addBtn) addBtn.disabled = true;
   } else if (limits.maxAutoAnnounces !== Infinity && localAnnounces.length >= limits.maxAutoAnnounces) {
     if (errEl) {
       errEl.textContent = `Dostignut je limit od ${limits.maxAutoAnnounces} poruka za ${limits.name} paket.`;
       errEl.style.display = 'block';
     }
     if (inputEl) inputEl.style.borderColor = '#EF4444';
+    if (addBtn) addBtn.disabled = true;
   } else {
     if (errEl) errEl.style.display = 'none';
     if (inputEl) inputEl.style.borderColor = '';
+    if (addBtn) addBtn.disabled = false;
   }
 }
 
@@ -5407,7 +5419,6 @@ document.addEventListener('visibilitychange', () => {
 
 function deleteAnnounceMessage(i) {
   if (i < 0 || i >= localAnnounces.length) return;
-  const removedMsg = localAnnounces[i];
   localAnnounces.splice(i, 1);
   renderAnnounceList();
   renderPlanLimitBanners(); // Update the announce banner
@@ -5911,7 +5922,6 @@ function updateModalPreview() {
   }
 
   const rawCommand = document.getElementById('cmdName').value.trim();
-  const enabled = document.getElementById('cmdEnabled').checked;
 
   const firstAlias = rawCommand.split(',')[0].trim().replace(/^!/, '').toLowerCase();
   const triggerDisplay = firstAlias ? `!${firstAlias}` : '!komanda';
@@ -6382,6 +6392,13 @@ function loadEconomyPanelData() {
 }
 
 function switchPanel(panelId, resetTab = false) {
+  const slugAliases = {
+    'games': 'builtin-commands',
+    'announces': 'auto-announces',
+    'autoresponse': 'bot-interaction'
+  };
+  panelId = slugAliases[panelId] || panelId;
+
   // Prevent switching if already on this panel
   const currentPanel = document.querySelector('.panel.active');
   if (currentPanel && currentPanel.id === `panel-${panelId}`) return;
@@ -9796,7 +9813,7 @@ function setRouletteBetChoice(choice, btn) {
   }
 }
 
-function setCoinflipChoice(choice, btn) {
+function setCoinflipChoice(choice, _btn) {
   currentCoinflipChoice = choice;
   const hBtn = document.getElementById('cBtnHeads');
   const tBtn = document.getElementById('cBtnTails');
@@ -9863,26 +9880,26 @@ function runSimulatedGame() {
       if (r2) { r2.classList.remove('spinning'); r2.innerHTML = slotSymbolSVGs[k2]; }
       if (r3) { r3.classList.remove('spinning'); r3.innerHTML = slotSymbolSVGs[k3]; }
 
-      let payoutRatio = 0;
+      let _payoutRatio = 0;
       let outcomeLabel = '';
       let badgeColor = '#ef4444';
 
       if (k1 === k2 && k2 === k3) {
         if (k1 === 'sedmica' || k1 === 'dijamant') {
-          payoutRatio = 10;
+          _payoutRatio = 10;
           outcomeLabel = `JACKPOT 10x! +${(bet * 10).toLocaleString()} ${valuta}!`;
           badgeColor = '#eab308';
         } else {
-          payoutRatio = 5;
+          _payoutRatio = 5;
           outcomeLabel = `3 u nizu 5x! +${(bet * 5).toLocaleString()} ${valuta}!`;
           badgeColor = '#53fc18';
         }
       } else if (k1 === k2 || k2 === k3 || k1 === k3) {
-        payoutRatio = 1.5;
+        _payoutRatio = 1.5;
         outcomeLabel = `2 u nizu! Povrat +${Math.floor(bet * 1.5).toLocaleString()} ${valuta}!`;
         badgeColor = '#eab308';
       } else {
-        payoutRatio = 0;
+        _payoutRatio = 0;
         outcomeLabel = `Nema pogotka! Izgubljeno ${bet.toLocaleString()} ${valuta}.`;
         badgeColor = '#ef4444';
       }

@@ -4,16 +4,59 @@ const kickAuth = require('./kickAuth');
 const { posaljiPrekoZvanicnogApija } = kickAuth;
 
 
+const MAX_QUEUE_SIZE = 50;
+const MIN_SEND_INTERVAL_MS = 1000; // Leaky Bucket tempo: najviše 1 poruka u sekundi po kanalu
+
 function posaljiPoruku(chatroomId, tekst) {
-    if (!chatroomId) return;
+    if (!chatroomId || !tekst) return;
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
+    // Zaštita od curenja memorije i zagušenja reda poruka (backpressure)
+    if (channelState.messageQueue.length >= MAX_QUEUE_SIZE) {
+        log('WARN', `[${channelState.channelUsername || chatroomId}] Red poruka popunjen (${channelState.messageQueue.length}/${MAX_QUEUE_SIZE}). Odbacujem poruku radi prevencije OOM curenja memorije.`);
+        return;
+    }
+
     channelState.messageQueue.push(tekst);
-    processQueue(chatroomId);
+    scheduleQueueDrain(chatroomId);
 }
 
-async function processQueue(chatroomId) {
+function scheduleQueueDrain(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    if (channelState.isProcessingQueue) return;
+    if (channelState.messageQueue.length === 0) return;
+    if (channelState.queueDrainTimer) return;
+
+    const now = Date.now();
+    let delay = 0;
+
+    // 1. Provera aktivne Kick 429 Too Many Requests blokade
+    if (channelState.rateLimitUntil && now < channelState.rateLimitUntil) {
+        delay = Math.max(0, channelState.rateLimitUntil - now);
+    } else {
+        // 2. Leaky bucket regulator: obezbeđuje razmak od najmanje MIN_SEND_INTERVAL_MS
+        const elapsed = now - (channelState.lastSentTimestamp || 0);
+        if (elapsed < MIN_SEND_INTERVAL_MS) {
+            delay = MIN_SEND_INTERVAL_MS - elapsed;
+        }
+    }
+
+    if (delay > 0) {
+        channelState.queueDrainTimer = setTimeout(() => {
+            channelState.queueDrainTimer = null;
+            drainNextMessage(chatroomId);
+        }, delay);
+        if (channelState.queueDrainTimer && channelState.queueDrainTimer.unref) {
+            channelState.queueDrainTimer.unref();
+        }
+    } else {
+        drainNextMessage(chatroomId);
+    }
+}
+
+async function drainNextMessage(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
     if (channelState.isProcessingQueue) return;
@@ -21,17 +64,36 @@ async function processQueue(chatroomId) {
 
     channelState.isProcessingQueue = true;
     const tekst = channelState.messageQueue.shift();
+    channelState.lastSentTimestamp = Date.now();
 
     try {
         await izvrsiSlanje(chatroomId, tekst);
     } catch (error) {
         log('ERR', `[${channelState.channelUsername || chatroomId}] Greška pri izvršavanju slanja poruke: ${error.message}`);
-    }
-
-    setTimeout(() => {
+    } finally {
         channelState.isProcessingQueue = false;
-        processQueue(chatroomId);
-    }, 1500);
+        // Ako u redu i dalje ima poruka, nastavi leaky bucket drenažu
+        if (channelState.messageQueue.length > 0) {
+            scheduleQueueDrain(chatroomId);
+        }
+    }
+}
+
+// Kompatibilni alias za postojeće pozive i testove
+function processQueue(chatroomId) {
+    scheduleQueueDrain(chatroomId);
+}
+
+function resetQueue(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+    if (channelState.queueDrainTimer) {
+        clearTimeout(channelState.queueDrainTimer);
+        channelState.queueDrainTimer = null;
+    }
+    channelState.messageQueue = [];
+    channelState.isProcessingQueue = false;
+    channelState.rateLimitUntil = 0;
 }
 
 async function izvrsiSlanje(chatroomId, tekst) {
@@ -157,5 +219,10 @@ module.exports = {
     pinujPoruku,
     odpinujPoruku,
     obrisiPoruku,
-    izvrsiSlanje
+    izvrsiSlanje,
+    processQueue,
+    scheduleQueueDrain,
+    resetQueue,
+    MIN_SEND_INTERVAL_MS,
+    MAX_QUEUE_SIZE
 };

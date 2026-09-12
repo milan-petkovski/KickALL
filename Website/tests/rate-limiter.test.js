@@ -20,3 +20,19 @@ test('RateLimiter - in-memory rate limiter ograničava učestale zahteve sa iste
     // 4. zahtev mora biti blokiran (true)
     assert.equal(await isRateLimited(testIp, options), true);
 });
+
+test('RateLimiter - konkurentni paralelni zahtevi poštuju maxRequests limit bez race condition-a', async () => {
+    const testIp = '198.51.100.77';
+    const options = { windowMs: 2000, maxRequests: 5, endpoint: 'concurrent_test' };
+
+    // Pokrećemo 12 paralelnih asinhronih zahteva u isto vreme
+    const results = await Promise.all(
+        Array.from({ length: 12 }, () => isRateLimited(testIp, options))
+    );
+
+    const allowed = results.filter(r => r === false).length;
+    const blocked = results.filter(r => r === true).length;
+
+    assert.equal(allowed, 5, 'Tačno 5 zahteva mora biti propušteno');
+    assert.equal(blocked, 7, 'Preostalih 7 zahteva mora biti blokirano');
+});

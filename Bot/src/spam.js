@@ -4,13 +4,14 @@ const { log } = require('./utils');
 const { smanjiPoruku } = require('./database');
 const { posaljiPoruku } = require('./messenger');
 
-// Nevidljivi/zero-width unicode karakteri koje spam-raid nalozi koriste da bi
-// "identičnu" poruku učinili tehnički drugačijom (drugačiji hash/string) i tako
-// zaobišli detekciju duplikata. Uklanjamo ih pre poređenja.
+// Nevidljivi/zero-width unicode karakteri i bidi override oznake koje spam-raid nalozi koriste
+// da bi "identičnu" poruku učinili tehnički drugačijom i tako zaobišli detekciju duplikata.
 // U200B-U200D: zero-width space/non-joiner/joiner, U200E-U200F: LTR/RTL mark,
-// UFEFF: zero-width no-break space (BOM), U2060-U2064: word joiner i slično,
-// U00AD: soft hyphen, U061C: Arabic letter mark.
-const NEVIDLJIVI_KARAKTERI_REGEX = /[\u200B-\u200F\uFEFF\u2060-\u2064\u00AD\u061C]/g;
+// U202A-U202E: Bidi embedding i directional override (LRE, RLE, PDF, LRO, RLO),
+// U2060-U206F: word joiner, invisible operators, bidi isolates (LRI, RLI, FSI, PDI),
+// UFE00-UFE0F: variation selectors, UFEFF: zero-width no-break space (BOM),
+// U00AD: soft hyphen, U061C: Arabic letter mark, U180E: Mongolian vowel separator.
+const NEVIDLJIVI_KARAKTERI_REGEX = /[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFE00-\uFE0F\uFEFF\u00AD\u061C\u180E]/g;
 
 function normalizujZaPoredjenje(poruka) {
     return poruka

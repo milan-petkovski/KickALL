@@ -114,6 +114,10 @@ test('Moderation - Bad Words sa zameno srpskih dijakritika (š, č, ć, ž, đ)'
     // Sa dijakritičkom varijacijom
     channelState.moderationSettings.words_list = 'šala,čudo';
     assert.equal(proveriModeraciju(chatroomId, 'BadUser2', 'Baš lepo sala', '130', sender), true);
+
+    // Sa nevidljivim karakterom i bidi override-om unutar reči (evasion bypass)
+    channelState.moderationSettings.words_list = 'budala';
+    assert.equal(proveriModeraciju(chatroomId, 'BadUser3', 'Ti si b\u200Buda\u202Ela!', '130b', sender), true);
 });
 
 test('Moderation - Emotes, Symbols, Max Length i Mentions pravila', () => {

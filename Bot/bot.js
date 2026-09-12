@@ -15,6 +15,7 @@ const moderation = require('./src/moderation');
 const economy = require('./src/economy');
 const gambling = require('./src/gambling');
 const kickAuth = require('./src/kickAuth');
+const streamAnalytics = require('./src/streamAnalytics');
 
 (async () => {
     try {
@@ -404,8 +405,43 @@ async function obradiCustomKomandu(chatroomId, username, porukaNormalized, chann
     return true;
 }
 
-// ─── WEBSOCKET KONEKCIJA ──────────────────────────────────────────────────────
+// ─── WEBSOCKET KONEKCIJA & SPLIT-BRAIN DEDUPLICATION ─────────────────────────
+const processedMessageCache = new Map();
+
+function isDuplicateMessage(msgId) {
+    if (!msgId) return false;
+    const id = String(msgId);
+    const now = Date.now();
+    if (processedMessageCache.has(id)) {
+        return true;
+    }
+    processedMessageCache.set(id, now);
+    if (processedMessageCache.size > 2000) {
+        const threshold = now - 60000;
+        for (const [k, ts] of processedMessageCache.entries()) {
+            if (ts < threshold) processedMessageCache.delete(k);
+        }
+    }
+    return false;
+}
+
 function povezi() {
+    if (state.isShuttingDown) {
+        utils.log('WARN', 'Gašenje u toku — preskačem ponovno povezivanje na WebSocket.');
+        return;
+    }
+
+    // Zaštita od curenja memorije: skidanje listenera i terminacija stare konekcije
+    if (state.ws) {
+        try {
+            state.ws.removeAllListeners();
+            if (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING) {
+                state.ws.terminate();
+            }
+        } catch (_) {}
+        state.ws = null;
+    }
+
     utils.log('INFO', `Pokušavam konekciju... (pokušaj #${state.reconnectAttempt + 1})`);
 
     state.ws = new WebSocket(
@@ -430,6 +466,10 @@ function povezi() {
     });
 
     state.ws.on('message', async (data) => {
+        if (state.isShuttingDown || !state.isLeader) {
+            return;
+        }
+
         let response;
         try {
             response = JSON.parse(data);
@@ -585,6 +625,11 @@ function povezi() {
 
             if (!chatData) return;
 
+            // Split-Brain & Duplicate Event prevencija
+            if (chatData.id && isDuplicateMessage(chatData.id)) {
+                return;
+            }
+
             const poruka = (chatData.content || chatData.message || '').trim();
             const username = chatData.sender?.username || chatData.sender?.slug || chatData.user?.username || chatData.username || '';
 
@@ -630,6 +675,16 @@ function povezi() {
             if (botKey && userKey === botKey && !startsWithPrefix) {
                 return;
             }
+
+            // Autonomous Stream Analytics za Kickan (beleži poruke u realnom vremenu)
+            try {
+                streamAnalytics.recordChatMessage(
+                    chatroomId,
+                    username,
+                    poruka,
+                    chatData.sender?.identity?.badges || chatData.sender?.badges || []
+                );
+            } catch (_) {}
 
             // Logujemo chat poruku u konzoli / logovima
             utils.log('CHAT', `[@${channelState.channelUsername || chatroomId}] ${username}: ${poruka}`);
@@ -1354,7 +1409,15 @@ function povezi() {
     });
 
     state.ws.on('error', (greska) => {
-        utils.log('ERR', `WebSocket greška: ${greska.message}`);
+        const isTransient = greska.code === 'ECONNRESET' ||
+                            greska.code === 'ETIMEDOUT' ||
+                            greska.code === 'EPIPE' ||
+                            (greska.message && greska.message.includes('ECONNRESET'));
+        if (isTransient) {
+            utils.log('WARN', `WebSocket prolazni prekid veze (${greska.code || 'ECONNRESET'}): ${greska.message}`);
+        } else {
+            utils.log('ERR', `WebSocket greška: ${greska.message}`);
+        }
     });
 }
 
@@ -1421,6 +1484,15 @@ async function proveriDaLiJeLive(chatroomId) {
                 }
             }
 
+            if (liveState && data.livestream) {
+                try {
+                    await streamAnalytics.onStreamLive(chatroomId, channelUsername, data.livestream, channelState.userId);
+                    streamAnalytics.recordViewerCount(chatroomId, data.livestream.viewer_count || 0);
+                } catch (saErr) {
+                    utils.log('WARN', `[${channelUsername}] Greška u streamAnalytics.onStreamLive: ${saErr.message}`);
+                }
+            }
+
             if (liveState !== channelState.isStreamLive) {
                 channelState.isStreamLive = liveState;
                 utils.log('INFO', `[${channelUsername}] Status strima promenjen: ${channelState.isStreamLive ? '🔴 LIVE' : '⚪ OFFLINE'}`);
@@ -1430,6 +1502,11 @@ async function proveriDaLiJeLive(chatroomId) {
                         messenger.posaljiIPinujPoruku(chatroomId, channelState.STREAM_START_PIN_MESSAGE);
                     }
                 } else if (!channelState.isStreamLive) {
+                    try {
+                        await streamAnalytics.onStreamOffline(chatroomId, channelUsername);
+                    } catch (saOffErr) {
+                        utils.log('WARN', `[${channelUsername}] Greška u streamAnalytics.onStreamOffline: ${saOffErr.message}`);
+                    }
                     watchtime.ocistiAktivneGledaoce(chatroomId);
                     channelState.welcomedUsers.clear(); // Očisti pozdravljene korisnike za sledeći stream
                     channelState.porukePosleAnnounce = 0; // Resetuj brojač za "broj poruka" pravilo za sledeći stream
@@ -1665,27 +1742,6 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
 }
 
 
-// ─── SHUTDOWN HANDLER ─────────────────────────────────────────────────────────
-let isShuttingDown = false;
-async function gracefulShutdown(signal) {
-    if (isShuttingDown) return;
-    isShuttingDown = true;
-    utils.log('INFO', `Bot se gasi... (${signal})`);
-
-    // Čuvanje podataka za sve pokrenute kanale
-    for (const chatroomId of Object.keys(state.channels)) {
-        await zaustaviKanal(chatroomId);
-    }
-
-    watchtime.zaustavljWatchtimeTick();
-    stopHeartbeat();
-    if (state.ws) state.ws.close();
-    process.exit(0);
-}
-
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-
 // ─── GLOBAL CRASH PROTECTION ──────────────────────────────────────────────────
 process.on('uncaughtException', async (err) => {
     utils.log('ERR', `Neuhvaćena greška (uncaughtException): ${err.stack || err.message}`);
@@ -1758,28 +1814,48 @@ function resolveKickRedirectUri(candidate) {
 }
 
 function verifyInternalToken(req) {
-    const secret = process.env.INTERNAL_API_SECRET || process.env.INTERNAL_SECRET;
-    const tokenHeader = req.headers['x-internal-token'];
+    const rawSecret = process.env.INTERNAL_API_SECRET || process.env.INTERNAL_SECRET;
+    if (!rawSecret) {
+        utils.log('ERR', '[AUTH] CRITICAL: INTERNAL_API_SECRET is missing. Rejecting internal admin request (fail-closed).');
+        return false;
+    }
+    const validSecrets = String(rawSecret).split(',').map(s => s.trim()).filter(Boolean);
+    if (validSecrets.length === 0) return false;
+
+    const tokenHeader = req.headers['x-internal-token'] || req.headers['x-internal-secret'];
     const authHeader = req.headers['authorization'];
-    if (secret) {
+
+    for (const secret of validSecrets) {
         if (tokenHeader && tokenHeader === secret) return true;
         if (authHeader && (authHeader === `Bearer ${secret}` || authHeader === secret)) return true;
     }
-    const origin = req.headers['origin'];
-    const allowedOrigins = [
-        process.env.ALLOWED_ORIGIN,
-        'https://kickall.app',
-        'https://www.kickall.app',
-        'http://localhost:8888',
-        'http://127.0.0.1:8888',
-        'http://localhost:5500',
-        'http://127.0.0.1:5500',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000'
-    ].filter(Boolean);
-    if (origin && allowedOrigins.includes(origin)) return true;
+    return false;
+}
 
-    return !secret;
+function readRequestBody(req, res, maxBytes = 50000) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        let receivedBytes = 0;
+
+        req.on('data', chunk => {
+            receivedBytes += chunk.length;
+            if (receivedBytes > maxBytes) {
+                res.writeHead(413, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Payload too large', detail: `Request body exceeds ${maxBytes} bytes limit` }));
+                req.destroy();
+                return reject(new Error('PAYLOAD_TOO_LARGE'));
+            }
+            body += chunk.toString();
+        });
+
+        req.on('end', () => {
+            resolve(body);
+        });
+
+        req.on('error', err => {
+            reject(err);
+        });
+    });
 }
 
 async function handleHttpRequest(req, res) {
@@ -2232,28 +2308,27 @@ async function handleHttpRequest(req, res) {
                 res.end(JSON.stringify({ error: 'Unauthorized access to test-ping' }));
                 return;
             }
-            let body = '';
-            req.on('data', chunk => { body += chunk.toString(); });
-            req.on('end', async () => {
-                try {
-                    const params = new URLSearchParams(body);
-                    const chatroomId = params.get('chatroom_id');
-                    if (!chatroomId) {
-                        res.writeHead(400, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'Missing chatroom_id parameter' }));
-                        return;
-                    }
+            try {
+                const body = await readRequestBody(req, res, 50000);
+                const params = new URLSearchParams(body);
+                const chatroomId = params.get('chatroom_id');
+                if (!chatroomId) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing chatroom_id parameter' }));
+                    return;
+                }
 
-                    // Izvrši slanje sinhrono da vidimo da li uspeva
-                    await messenger.izvrsiSlanje(chatroomId, '🤖 Veza je uspešno testirana! 🟢');
+                // Izvrši slanje sinhrono da vidimo da li uspeva
+                await messenger.izvrsiSlanje(chatroomId, '🤖 Veza je uspešno testirana! 🟢');
 
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: true, message: 'Test message sent' }));
-                } catch (err) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'Test message sent' }));
+            } catch (err) {
+                if (err.message !== 'PAYLOAD_TOO_LARGE') {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Failed to send message', detail: err.message }));
                 }
-            });
+            }
             return;
         }
 
@@ -2263,46 +2338,45 @@ async function handleHttpRequest(req, res) {
                 res.end(JSON.stringify({ error: 'Unauthorized access to send-message' }));
                 return;
             }
-            let body = '';
-            req.on('data', chunk => { body += chunk.toString(); });
-            req.on('end', async () => {
+            try {
+                const body = await readRequestBody(req, res, 50000);
+                let chatroomId = '';
+                let channelUsername = '';
+                let message = '';
                 try {
-                    let chatroomId = '';
-                    let channelUsername = '';
-                    let message = '';
-                    try {
-                        const json = JSON.parse(body);
-                        chatroomId = json.chatroom_id || json.channel_id;
-                        channelUsername = json.channel_username || json.username;
-                        message = json.message;
-                    } catch (_) {
-                        const params = new URLSearchParams(body);
-                        chatroomId = params.get('chatroom_id') || params.get('channel_id');
-                        channelUsername = params.get('channel_username') || params.get('username');
-                        message = params.get('message');
-                    }
+                    const json = JSON.parse(body);
+                    chatroomId = json.chatroom_id || json.channel_id;
+                    channelUsername = json.channel_username || json.username;
+                    message = json.message;
+                } catch (_) {
+                    const params = new URLSearchParams(body);
+                    chatroomId = params.get('chatroom_id') || params.get('channel_id');
+                    channelUsername = params.get('channel_username') || params.get('username');
+                    message = params.get('message');
+                }
 
-                    if (!chatroomId || !message) {
-                        res.writeHead(400, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'Missing chatroom_id or message parameter' }));
-                        return;
-                    }
+                if (!chatroomId || !message) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing chatroom_id or message parameter' }));
+                    return;
+                }
 
-                    const idStr = String(chatroomId);
-                    const channelState = state.getChannelState(idStr);
-                    if (channelState && channelUsername && !channelState.channelUsername) {
-                        channelState.channelUsername = channelUsername;
-                    }
+                const idStr = String(chatroomId);
+                const channelState = state.getChannelState(idStr);
+                if (channelState && channelUsername && !channelState.channelUsername) {
+                    channelState.channelUsername = channelUsername;
+                }
 
-                    messenger.posaljiPoruku(idStr, String(message).trim());
+                messenger.posaljiPoruku(idStr, String(message).trim());
 
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: true, message: 'Message queued for sending' }));
-                } catch (err) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'Message queued for sending' }));
+            } catch (err) {
+                if (err.message !== 'PAYLOAD_TOO_LARGE') {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Failed to send message', detail: err.message }));
                 }
-            });
+            }
             return;
         }
 
@@ -2312,30 +2386,60 @@ async function handleHttpRequest(req, res) {
                 res.end(JSON.stringify({ error: 'Unauthorized' }));
                 return;
             }
-            let body = '';
-            req.on('data', chunk => { body += chunk.toString(); });
-            req.on('end', async () => {
-                try {
-                    const json = JSON.parse(body);
-                    const cookie = json.session_cookie || json.cookie;
-                    if (!cookie || typeof cookie !== 'string' || cookie.trim().length < 10) {
-                        res.writeHead(400, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'Missing or invalid session_cookie' }));
-                        return;
-                    }
-                    const ok = await kickAuth.saveSessionCookie(cookie.trim());
-                    if (ok) {
-                        res.writeHead(200, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ success: true, message: 'Sesijski kolačić uspešno sačuvan u Supabase.' }));
-                    } else {
-                        res.writeHead(500, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'Greška pri čuvanju sesijskog kolačića u Supabase.' }));
-                    }
-                } catch (err) {
+            try {
+                const body = await readRequestBody(req, res, 50000);
+                const json = JSON.parse(body);
+                const cookie = json.session_cookie || json.cookie;
+                if (!cookie || typeof cookie !== 'string' || cookie.trim().length < 10) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing or invalid session_cookie' }));
+                    return;
+                }
+                const ok = await kickAuth.saveSessionCookie(cookie.trim());
+                if (ok) {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: true, message: 'Sesijski kolačić uspešno sačuvan u Supabase.' }));
+                } else {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Greška pri čuvanju sesijskog kolačića u Supabase.' }));
+                }
+            } catch (err) {
+                if (err.message !== 'PAYLOAD_TOO_LARGE') {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Interna greška', detail: err.message }));
                 }
-            });
+            }
+            return;
+        }
+
+        if (parsedUrl.pathname === '/api/internal/subscription-sync' && req.method === 'POST') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized' }));
+                return;
+            }
+            try {
+                const body = await readRequestBody(req, res, 50000);
+                const json = JSON.parse(body || '{}');
+                const userId = json.userId || json.clientReferenceId;
+                if (userId) {
+                    for (const chatroomId of Object.keys(state.channels)) {
+                        const chState = state.channels[chatroomId];
+                        if (chState && chState.userId === userId) {
+                            await database.ucitajUserPlan(userId, chatroomId);
+                            await database.ucitajCustomKomande(chatroomId);
+                            utils.log('INFO', `[SubscriptionSync] Osvežen plan za korisnika ${userId} (@${chState.channelUsername}).`);
+                        }
+                    }
+                }
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true }));
+            } catch (err) {
+                if (err.message !== 'PAYLOAD_TOO_LARGE') {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Interna greška pri sinhronizaciji pretplate', detail: err.message }));
+                }
+            }
             return;
         }
 
@@ -2453,30 +2557,275 @@ function pokreniServer() {
     });
 }
 
-// ─── MEMORY CLEANUP ───────────────────────────────────────────────────────────
+// ─── MEMORY CLEANUP WORKER (Svakih 10 minuta) ──────────────────────────────────
 setInterval(() => {
     const sada = Date.now();
     for (const chatroomId of Object.keys(state.channels)) {
         const channelState = state.channels[chatroomId];
+
+        // 1. Spam & Rapid tracker
         for (const key in channelState.spamTracker) {
             channelState.spamTracker[key] = channelState.spamTracker[key].filter(t => sada - t < (channelState.SPAM_WINDOW_MS || 15000));
-            if (channelState.spamTracker[key].length === 0) {
-                delete channelState.spamTracker[key];
-            }
+            if (channelState.spamTracker[key].length === 0) delete channelState.spamTracker[key];
         }
         for (const key in channelState.rapidTracker) {
             channelState.rapidTracker[key] = channelState.rapidTracker[key].filter(t => sada - t < 8000);
-            if (channelState.rapidTracker[key].length === 0) {
-                delete channelState.rapidTracker[key];
+            if (channelState.rapidTracker[key].length === 0) delete channelState.rapidTracker[key];
+        }
+
+        // 2. Cooldowns čišćenje (istekli cooldown-i)
+        for (const cmd in channelState.cooldowns) {
+            if (channelState.cooldowns[cmd] && channelState.cooldowns[cmd] < sada) {
+                delete channelState.cooldowns[cmd];
+            }
+        }
+
+        // 3. Last warned & love/hate cooldowns stariji od 1h/24h
+        for (const user in channelState.lastWarned) {
+            if (sada - channelState.lastWarned[user] > 3600000) delete channelState.lastWarned[user];
+        }
+        for (const user in channelState.loveHateCooldowns) {
+            if (sada - channelState.loveHateCooldowns[user] > 86400000) delete channelState.loveHateCooldowns[user];
+        }
+
+        // 4. Bounded Set za welcomedUsers (ograničavamo na max 2000 korisnika radi zaštite RAM-a)
+        if (channelState.welcomedUsers && channelState.welcomedUsers.size > 2000) {
+            channelState.welcomedUsers.clear();
+        }
+
+        // 5. Warnings count i permits
+        if (channelState.warningsCount) {
+            for (const [user, data] of channelState.warningsCount.entries()) {
+                if (data && data.timestamp && (sada - data.timestamp > 86400000)) channelState.warningsCount.delete(user);
+            }
+        }
+        if (channelState.permits) {
+            for (const [user, expiry] of channelState.permits.entries()) {
+                if (expiry && expiry < sada) channelState.permits.delete(user);
+            }
+        }
+
+        // 6. Duplicate tracker
+        if (channelState.duplicateTracker) {
+            for (const [user, data] of channelState.duplicateTracker.entries()) {
+                if (data && data.timestamp && (sada - data.timestamp > 3600000)) channelState.duplicateTracker.delete(user);
+            }
+        }
+
+        // 7. Watchtime last seen
+        for (const user in channelState.watchtimeLastSeen) {
+            if (sada - channelState.watchtimeLastSeen[user] > 1800000) delete channelState.watchtimeLastSeen[user];
+        }
+
+        // 8. Pending duels i proposals
+        for (const duelId in channelState.pendingDuels) {
+            if (channelState.pendingDuels[duelId]?.created_at && (sada - channelState.pendingDuels[duelId].created_at > 300000)) {
+                delete channelState.pendingDuels[duelId];
+            }
+        }
+        for (const propId in channelState.pendingProposals) {
+            if (channelState.pendingProposals[propId]?.created_at && (sada - channelState.pendingProposals[propId].created_at > 300000)) {
+                delete channelState.pendingProposals[propId];
             }
         }
     }
+
+    // 9. Čišćenje globalnog deduplication keša poruka
+    if (processedMessageCache.size > 2000) {
+        const threshold = sada - 60000;
+        for (const [msgId, ts] of processedMessageCache.entries()) {
+            if (ts < threshold) processedMessageCache.delete(msgId);
+        }
+    }
 }, 10 * 60 * 1000).unref(); // Svakih 10 minuta
+
+// ─── BACKGROUND SUBSCRIPTION RETRY WORKER ──────────────────────────────────────
+async function syncPendingSubscriptions() {
+    if (!database.KORISTI_SUPABASE || !database.supabase) return;
+    try {
+        const { data: users, error } = await database.supabase
+            .from('user_profiles')
+            .select('id, plan, plan_tier, subscription_status');
+
+        if (error || !users) return;
+
+        for (const user of users) {
+            for (const chatroomId of Object.keys(state.channels)) {
+                const chState = state.channels[chatroomId];
+                if (chState && chState.userId === user.id) {
+                    const expectedPlan = (user.plan_tier || user.plan || 'free').toLowerCase();
+                    if (chState.userPlan !== expectedPlan) {
+                        utils.log('INFO', `[RETRY-SYNC] Osvežavam plan za korisnika ${user.id} (@${chState.channelUsername}): ${chState.userPlan} -> ${expectedPlan}`);
+                        await database.ucitajUserPlan(user.id, chatroomId);
+                        await database.ucitajCustomKomande(chatroomId);
+                    }
+                }
+            }
+        }
+        // 2. Sravnjivanje zaostalih uplata iz Dead Letter Queue tabele
+        const { data: dlqItems, error: dlqErr } = await database.supabase
+            .from('payment_dead_letter_queue')
+            .select('*')
+            .eq('status', 'pending_bot_sync');
+
+        if (!dlqErr && dlqItems && dlqItems.length > 0) {
+            for (const dlq of dlqItems) {
+                const targetUserId = dlq.user_id;
+                const targetPlan = (dlq.plan || 'free').toLowerCase();
+                for (const chatroomId of Object.keys(state.channels)) {
+                    const chState = state.channels[chatroomId];
+                    if (chState && chState.userId === targetUserId) {
+                        chState.userPlan = targetPlan;
+                        chState.planLimits = config.PLAN_LIMITS[targetPlan] || config.PLAN_LIMITS.free;
+                        await database.ucitajCustomKomande(chatroomId);
+                        utils.log('INFO', `[DLQ-RESOLVED] Automatski aktiviran plan ${targetPlan} iz Dead Letter Queue za korisnika ${targetUserId} na kanalu @${chState.channelUsername}`);
+                    }
+                }
+                // Označi zapis u DLQ kao razrešen
+                await database.supabase
+                    .from('payment_dead_letter_queue')
+                    .update({
+                        status: 'resolved',
+                        resolved_at: new Date().toISOString()
+                    })
+                    .eq('id', dlq.id);
+            }
+        }
+    } catch (e) {
+        utils.log('WARN', `[RETRY-SYNC] Neuspešan periodični sync pretplata: ${e.message}`);
+    }
+}
+
+// ─── DISTRIBUTED LOCK & LEADER ELECTION (LEAST HEARTBEAT) ─────────────────────
+const CLUSTER_LOCK_ID = 'primary_bot_leader';
+const LEASE_DURATION_MS = 15000;
+const HEARTBEAT_INTERVAL_MS = 5000;
+
+async function acquireOrRenewLeaderLock() {
+    if (!database.supabase || !database.KORISTI_SUPABASE) return true;
+    if (state.isShuttingDown) return false;
+
+    const nowIso = new Date().toISOString();
+    const expiresAtIso = new Date(Date.now() + LEASE_DURATION_MS).toISOString();
+
+    try {
+        const { data: existingLock, error: readError } = await database.supabase
+            .from('bot_cluster_lock')
+            .select('*')
+            .eq('lock_id', CLUSTER_LOCK_ID)
+            .maybeSingle();
+
+        if (readError) {
+            utils.log('WARN', `[DISTRIBUTED-LOCK] Greška čitanja cluster lock-a: ${readError.message}`);
+            return state.isLeader;
+        }
+
+        if (!existingLock) {
+            // Lock ne postoji, kreiraj ga kao novi lider
+            const { error: insertError } = await database.supabase
+                .from('bot_cluster_lock')
+                .insert({
+                    lock_id: CLUSTER_LOCK_ID,
+                    leader_instance_id: state.instanceId,
+                    heartbeat_at: nowIso,
+                    expires_at: expiresAtIso,
+                    updated_at: nowIso
+                });
+            if (insertError) {
+                utils.log('WARN', `[DISTRIBUTED-LOCK] Greška pri kreiranju lock-a: ${insertError.message}`);
+            } else {
+                state.isLeader = true;
+                utils.log('INFO', `[DISTRIBUTED-LOCK] Osvojen primarni distributed lock (Instance ID: ${state.instanceId})`);
+            }
+            return state.isLeader;
+        }
+
+        const isCurrentHolder = existingLock.leader_instance_id === state.instanceId;
+        const isExpired = new Date(existingLock.expires_at).getTime() < Date.now();
+
+        if (isCurrentHolder || isExpired) {
+            const { error: updateError } = await database.supabase
+                .from('bot_cluster_lock')
+                .update({
+                    leader_instance_id: state.instanceId,
+                    heartbeat_at: nowIso,
+                    expires_at: expiresAtIso,
+                    updated_at: nowIso
+                })
+                .eq('lock_id', CLUSTER_LOCK_ID);
+
+            if (updateError) {
+                utils.log('WARN', `[DISTRIBUTED-LOCK] Greška pri obnovi lock-a: ${updateError.message}`);
+            } else {
+                state.isLeader = true;
+            }
+            return true;
+        }
+
+        // Lock drži druga instanca i važeći je
+        if (state.isLeader) {
+            utils.log('WARN', `[DISTRIBUTED-LOCK] Druga instanca (${existingLock.leader_instance_id}) drži aktivan lease do ${existingLock.expires_at}. Prepuštam vođstvo radi prevencije split-brain-a.`);
+            state.isLeader = false;
+            gracefulShutdown('SPLIT_BRAIN_LEASE_LOST');
+            return false;
+        }
+
+        return false;
+    } catch (err) {
+        utils.log('WARN', `[DISTRIBUTED-LOCK] Izuzetak pri obradi lock-a: ${err.message}`);
+        return state.isLeader;
+    }
+}
+
+async function startLeaderLockHeartbeat() {
+    await acquireOrRenewLeaderLock();
+    if (state.leaderLockTimer) clearInterval(state.leaderLockTimer);
+    state.leaderLockTimer = setInterval(async () => {
+        await acquireOrRenewLeaderLock();
+    }, HEARTBEAT_INTERVAL_MS);
+    if (state.leaderLockTimer && state.leaderLockTimer.unref) {
+        state.leaderLockTimer.unref();
+    }
+}
+
+async function announceLeadership() {
+    state.instanceId = state.instanceId || require('crypto').randomUUID();
+    state.isLeader = true;
+    utils.log('INFO', `[LEADER-ELECTION] Bot instanca preuzima vođstvo (Instance ID: ${state.instanceId})`);
+
+    // 1. Dual-Layer: Osvoji Distributed Lock u Supabase bazi sa TTL obnovom (Fail-safe)
+    await startLeaderLockHeartbeat();
+
+    // 2. Dual-Layer: Pošalji Realtime broadcast za trenutni (sub-second) prenos liderstva (Fast-path)
+    if (database.supabase && typeof database.supabase.channel === 'function') {
+        try {
+            const clusterChannel = database.supabase.channel('kickall-cluster-control');
+            clusterChannel
+                .on('broadcast', { event: 'instance_takeover' }, payload => {
+                    const newInstanceId = payload.payload?.instanceId;
+                    if (newInstanceId && newInstanceId !== state.instanceId && !state.isShuttingDown) {
+                        utils.log('WARN', `[SPLIT-BRAIN ZAŠTITA] Nova instanca (${newInstanceId}) preuzima vođstvo. Stara instanca (${state.instanceId}) gasi WebSocket i pokreće graceful shutdown.`);
+                        gracefulShutdown('SPLIT_BRAIN_TAKEOVER');
+                    }
+                })
+                .subscribe(status => {
+                    if (status === 'SUBSCRIBED') {
+                        clusterChannel.send({
+                            type: 'broadcast',
+                            event: 'instance_takeover',
+                            payload: { instanceId: state.instanceId, timestamp: Date.now() }
+                        }).catch(() => {});
+                    }
+                });
+        } catch (_) {}
+    }
+}
 
 // ─── START ────────────────────────────────────────────────────────────────────
 async function start() {
     utils.log('INFO', '🤖 Multi-channel Kick bot se pokreće...');
     await detectBotUsername();
+    await announceLeadership();
 
     if (database.KORISTI_SUPABASE && database.supabase) {
         // 1. Učitaj sve kanale koji imaju aktivnog bota
@@ -2496,6 +2845,10 @@ async function start() {
 
         // 3. Pokreni globalne watchtime tick cikluse
         watchtime.pokreniWatchtimeTick();
+
+        // 3b. Sinhronizuj pending pretplate iz Supabase baze (uplate koje su stigle dok je bot restartovan)
+        await syncPendingSubscriptions();
+        setInterval(syncPendingSubscriptions, 3 * 60 * 1000).unref();
 
         // 4. Poveži WebSocket na Kick Pusher
         povezi();
@@ -2707,31 +3060,89 @@ async function start() {
     }
 }
 
+let isShuttingDown = false;
+
 async function gracefulShutdown(signal) {
+    if (isShuttingDown) {
+        utils.log('WARN', `Shutdown je već u toku (stigao signal ${signal}). Preskačem višestruko gašenje.`);
+        return;
+    }
+    isShuttingDown = true;
+    state.isShuttingDown = true;
+    state.isLeader = false;
+
     utils.log('WARN', `Primljen signal ${signal}. Pokrećem bezbedno gašenje bota i sinhronizaciju podataka sa Supabase...`);
 
-    // Zaustavi watchtime tick tajmer
-    watchtime.zaustavljWatchtimeTick();
+    // 1. Sigurnosni tajmer: ako baza visi, nasilno gasi proces posle 10 sekundi (Render SIGTERM timeout je obično 15-30s)
+    const watchdogTimer = setTimeout(() => {
+        utils.log('ERR', 'Graceful shutdown timeout (10s) istekao. Nasilno gašenje procesa.');
+        process.exit(1);
+    }, 10000);
+    if (watchdogTimer.unref) watchdogTimer.unref();
 
-    // Flush svih sačuvanih podataka za sve aktivne kanale
-    for (const chatroomId of Object.keys(state.channels)) {
-        try {
-            await database.sacuvajLeaderboard(chatroomId);
-            await database.sacuvajEkonomiju(chatroomId);
-            await database.sacuvajWatchtime(chatroomId);
-            await database.sacuvajLjubav(chatroomId);
-        } catch (e) {
-            utils.log('ERR', `Greška pri bezbednom čuvanju kanala ${chatroomId}: ${e.message}`);
-        }
-    }
-
-    // Zatvori WebSocket konekciju
+    // 2. Odmah prekidamo prijem i obradu novih čet poruka i događaja preko WebSocket-a (Split-Brain prevencija)
     if (state.ws) {
         try {
-            state.ws.close();
+            state.ws.removeAllListeners();
+            state.ws.terminate();
+        } catch (_) {}
+        state.ws = null;
+    }
+    state.isConnected = false;
+
+    // 3. Zaustavi HTTP server tako da novi deploy preuzme rutiranje
+    if (server && server.listening) {
+        try {
+            server.close(() => {
+                utils.log('INFO', 'Lokalni HTTP server bezbedno zaustavljen.');
+            });
         } catch (_) {}
     }
 
+    // 4. Zaustavi globalne tajmere
+    stopHeartbeat();
+    watchtime.zaustavljWatchtimeTick();
+    if (state.leaderLockTimer) clearInterval(state.leaderLockTimer);
+
+    // 5. Zaustavi sve tajmere po kanalima
+    for (const chatroomId of Object.keys(state.channels)) {
+        const channelState = state.channels[chatroomId];
+        if (channelState.autoAnnounceTimer) clearInterval(channelState.autoAnnounceTimer);
+        if (channelState.leaderboardSaveTimer) clearTimeout(channelState.leaderboardSaveTimer);
+        if (channelState.economySaveTimer) clearTimeout(channelState.economySaveTimer);
+        if (channelState.watchtimeSaveTimer) clearTimeout(channelState.watchtimeSaveTimer);
+        if (channelState.loveSaveTimer) clearTimeout(channelState.loveSaveTimer);
+        if (channelState.queueDrainTimer) clearTimeout(channelState.queueDrainTimer);
+    }
+
+    // 6. Grupni kontrolisani upis podataka u Supabase (Zaštita od preopterećenja konekcija / Supavisor pooler port 6543)
+    // Ograničavamo konkurentnost na grupe od po BATCH_SIZE = 4 kanala istovremeno
+    const channelIds = Object.keys(state.channels);
+    const BATCH_SIZE = 4;
+    for (let i = 0; i < channelIds.length; i += BATCH_SIZE) {
+        const batch = channelIds.slice(i, i + BATCH_SIZE);
+        await Promise.allSettled(
+            batch.map(async (chatroomId) => {
+                try {
+                    await database.sacuvajLeaderboard(chatroomId);
+                    await database.sacuvajEkonomiju(chatroomId);
+                    await database.sacuvajWatchtime(chatroomId);
+                    await database.sacuvajLjubav(chatroomId);
+                } catch (e) {
+                    utils.log('ERR', `Greška pri bezbednom čuvanju kanala ${chatroomId}: ${e.message}`);
+                }
+            })
+        );
+    }
+
+    try {
+        await streamAnalytics.flushAllSessions();
+        utils.log('INFO', 'Stream analytics sesije uspešno sačuvane pre gašenja.');
+    } catch (saFlushErr) {
+        utils.log('ERR', `Greška pri čuvanju stream analytics sesija pri gašenju: ${saFlushErr.message}`);
+    }
+
+    clearTimeout(watchdogTimer);
     utils.log('INFO', 'Svi podaci bezbedno sačuvani u Supabase. Bot je spreman za gašenje.');
     process.exit(0);
 }

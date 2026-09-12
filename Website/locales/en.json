@@ -68,13 +68,13 @@
       "f1": "Real-time growth charts",
       "f2": "Detailed chat reports",
       "f3": "Stream history and metrics",
-      "overlay": "Analytics is under development. Click below to view and test simulation."
+      "overlay": "Advanced analytics is active. Click below to open dashboard or test simulation."
     },
     "kickov": {
       "f1": "Dynamic alerts with sound",
       "f2": "Modern chat boxes and emotes",
       "f3": "Easy OBS setup",
-      "overlay": "Overlay integration is under development. Click below to view and test simulation."
+      "overlay": "Overlay studio is active. Click below to open dashboard or test simulation."
     }
   },
   "tabs": {
@@ -87,7 +87,7 @@
     "subtitle": "Below you can test all four tools before trying them on Kick."
   },
   "sim": {
-    "status": "IN DEVELOPMENT"
+    "status": "ACTIVE & AVAILABLE"
   },
   "kickaj": {
     "heading": "Giveaway Simulation",
@@ -232,7 +232,7 @@
       "f3": "Up to 50 custom commands",
       "f4": "<strong>Kickov</strong> overlays (soon)",
       "f5": "<strong>Kickaj</strong> giveaway system",
-      "f6": "<strong>Kickan</strong> advanced analytics (soon)",
+      "f6": "<strong>Kickan</strong> advanced analytics",
       "f7": "Priority support",
       "btn": "Start for free",
       "btnWithPrice": "Start for free",

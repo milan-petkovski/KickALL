@@ -1552,8 +1552,33 @@
       });
     });
 
-    // Test dugme
+    // Test dugmad (pojedinačno i bulk)
     bindClick('btnTestMessage', addTestParticipant);
+    const btnDropdown = document.getElementById('btnTestDropdownToggle');
+    const bulkDropdown = document.getElementById('bulkTestDropdown');
+    if (btnDropdown && bulkDropdown) {
+      btnDropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isSpinning) return;
+        bulkDropdown.style.display = bulkDropdown.style.display === 'block' ? 'none' : 'block';
+      });
+      document.addEventListener('click', () => {
+        bulkDropdown.style.display = 'none';
+      });
+      bulkDropdown.querySelectorAll('.bulk-test-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          e.stopPropagation();
+          bulkDropdown.style.display = 'none';
+          let cnt = 10;
+          if (item.dataset.count === 'random-100-200' || item.dataset.count === 'random') {
+            cnt = Math.floor(Math.random() * 101) + 100; // Nasumično od 100 do 200
+          } else {
+            cnt = parseInt(item.dataset.count, 10) || 10;
+          }
+          addBulkTestParticipants(cnt);
+        });
+      });
+    }
   }
 
   function selectAnimation(anim) {
@@ -1615,6 +1640,9 @@
       if (participantsMap.size === 0) return;
       if (!confirm('Da li ste sigurni da želite da obrišete sve učesnike?')) return;
       participantsMap.clear();
+      lastWinningWheelPool = null;
+      lastRouletteOffsetInCard = null;
+      lastRouletteWinner = null;
       updateParticipantsUI();
       drawVisualizerStage();
       refreshAll();
@@ -2443,19 +2471,167 @@
     });
   }
 
+  const DOMESTIC_GAMER_BASES = [
+    'Stefan', 'Nikola', 'Marko', 'Dusan', 'Luka', 'Milos', 'Nemanja', 'Filip', 'Darko', 'Bojan',
+    'Aleks', 'Jovan', 'Petar', 'Ognjen', 'Miki', 'Vladan', 'Uros', 'Lazar', 'Andrej', 'Bogdan',
+    'Danilo', 'Igor', 'Dejan', 'Sasa', 'Milan', 'Vuk', 'Bane', 'Dragan', 'Mladen', 'Zoran',
+    'Kosta', 'Strahinja', 'Toma', 'Viktor', 'Boris', 'Relja', 'Mateja', 'Vanja', 'Damjan', 'Todor',
+    'Srdjan', 'Sinisa', 'Mihajlo', 'Radovan', 'Pavle', 'Vasilije', 'Djordje', 'Vlatko', 'Aca', 'Bobi',
+    'Ceda', 'Djole', 'Gagi', 'Joca', 'Kole', 'Meda', 'Nidzo', 'Pera', 'Bora', 'Mirko',
+    'Zile', 'Mare', 'Cale', 'Gile', 'Baki', 'Dzoni', 'Maki', 'Vule', 'Sale', 'Rale',
+    'Nole', 'Bole', 'Boki', 'Cofi', 'Mica', 'Sone', 'Kimi', 'Zoki', 'Roki', 'Simke',
+    'Vukasin', 'Branko', 'Krle', 'Deki', 'Zeka', 'Kiza', 'Shone', 'Rasa', 'Vlada', 'Neca',
+    'Misko', 'Nesha', 'Voja', 'Braca', 'Coby', 'Shomi', 'Stefi', 'Dule', 'Beli', 'Goksi',
+    'Velja', 'Mita', 'Laza', 'Zare', 'Gane', 'Zika', 'Mile', 'Rade', 'Krca', 'Sava',
+    'Ilija', 'Janko', 'Mitar', 'Zarko', 'Goran', 'Zeljko', 'Boban', 'Ranko', 'Bratko',
+    'Ana', 'Milica', 'Teodora', 'Sara', 'Kristina', 'Maja', 'Nina', 'Elena', 'Jovana', 'Dunja', 'Tara'
+  ];
+
+  const DOMESTIC_GAMER_TAGS = [
+    'BG', 'NS', 'NI', 'KG', 'ZR', 'SU', 'BGD', 'SRB', 'GG', 'Live',
+    'PRO', 'Snajper', 'Gamer', 'Play', 'Kick', 'Aim', 'Beast', 'Headshot',
+    'RP', 'Rush', 'Ace', 'Top', 'King', 'Clutch', 'Zver', 'Balkan',
+    'CS2', 'FPS', 'Vip', 'Boss', 'G', 'Sniper', 'Apex', 'Valor',
+    'Kralj', 'Vitez', 'Brat', 'Ninja', 'Master', 'Shooter', 'Strike',
+    'Ghost', 'Toxic', 'Shadow', 'Gas', 'Car', 'Doktor', 'Majstor'
+  ];
+
+  const DOMESTIC_GAMER_PREFIXES = [
+    '', '', '', '', '', '', '', '', 'Pro_', 'x_', 'Balkan_', 'Kralj_', 'Ghost_', 'Sniper_', 'Shadow_', 'Real_'
+  ];
+
+  const DOMESTIC_NUMBERS = [
+    '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '23', '24', '77', '99',
+    '011', '021', '018', '034', '123', '777', '2003', '2004', '2005', '2006'
+  ];
+
+  function generateUniqueTestUser() {
+    for (let attempt = 0; attempt < 300; attempt++) {
+      const base = DOMESTIC_GAMER_BASES[Math.floor(Math.random() * DOMESTIC_GAMER_BASES.length)];
+      const prefix = DOMESTIC_GAMER_PREFIXES[Math.floor(Math.random() * DOMESTIC_GAMER_PREFIXES.length)];
+      const styleRoll = Math.random();
+      let name = '';
+
+      if (prefix === 'x_') {
+        name = Math.random() < 0.5 ? `x_${base.toLowerCase()}_x` : `x_${base}_x`;
+      } else if (styleRoll < 0.30) {
+        // Arhetip 1: Donja crta + broj ili grad (npr. stefan_011, luka_bg, nidza_99)
+        const numOrTag = Math.random() < 0.6
+          ? DOMESTIC_NUMBERS[Math.floor(Math.random() * DOMESTIC_NUMBERS.length)]
+          : DOMESTIC_GAMER_TAGS[Math.floor(Math.random() * DOMESTIC_GAMER_TAGS.length)].toLowerCase();
+        name = `${base.toLowerCase()}_${numOrTag}`;
+      } else if (styleRoll < 0.52) {
+        // Arhetip 2: Direktno spojen broj ili tag (npr. stefan99, luka04, markobg, nidzacs2)
+        const numOrTag = Math.random() < 0.7
+          ? DOMESTIC_NUMBERS[Math.floor(Math.random() * DOMESTIC_NUMBERS.length)]
+          : DOMESTIC_GAMER_TAGS[Math.floor(Math.random() * DOMESTIC_GAMER_TAGS.length)].toLowerCase();
+        name = `${base.toLowerCase()}${numOrTag}`;
+      } else if (styleRoll < 0.72) {
+        // Arhetip 3: Sa tačkom ili tagom (npr. stefan.pro, luka.cs2, marko.bg)
+        const tag = DOMESTIC_GAMER_TAGS[Math.floor(Math.random() * DOMESTIC_GAMER_TAGS.length)].toLowerCase();
+        name = `${base.toLowerCase()}.${tag}`;
+      } else if (styleRoll < 0.88) {
+        // Arhetip 4: Klasični gejmerski format sa velikim slovima (npr. Stefan_BG, Luka_Gamer, Petar_CS2)
+        const tag = DOMESTIC_GAMER_TAGS[Math.floor(Math.random() * DOMESTIC_GAMER_TAGS.length)];
+        const sep = Math.random() < 0.75 ? '_' : '';
+        name = `${prefix}${base}${sep}${tag}`;
+      } else {
+        // Arhetip 5: Kombo tag + broj (npr. Stefan_PRO_24, Luka_BG_99)
+        const tag = DOMESTIC_GAMER_TAGS[Math.floor(Math.random() * DOMESTIC_GAMER_TAGS.length)];
+        const num = DOMESTIC_NUMBERS[Math.floor(Math.random() * DOMESTIC_NUMBERS.length)];
+        name = `${prefix}${base}_${tag}_${num}`;
+      }
+
+      const key = name.toLowerCase().replace(/^@/, '');
+      if (!participantsMap.has(key)) {
+        const isSub = false;
+        const subMonths = 0;
+        const minFollow = settings.followDuration > 0 ? settings.followDuration : 1;
+        const followDays = minFollow + Math.floor(Math.random() * 320);
+
+        const naturalBalkanMsgs = [
+          'prijava', '!prijava', 'prijava!', 'idemo', 'ajmo', 'gg', 'tu sam',
+          'drop', 'top', 'idemo bre', 'prijavaa', 'srecno svima', 'hocu ja',
+          'prijavljujem se', 'daj boze', 'plsss', 'srecno ljudii', 'ajmo bree',
+          'valjda cu dobiti', 'srecno', 'dropaj', 'daj nagradu', 'topina',
+          'gg srecno', 'idemo do pobede', 'ajde breee', 'prijava brate'
+        ];
+
+        let msg = '';
+        if (settings.keyword) {
+          const kw = settings.keyword;
+          const variations = [
+            kw,
+            kw.toLowerCase(),
+            `${kw} !`,
+            `${kw} plss`,
+            `${kw} idemo`,
+            `${kw} srecno svima`,
+            `${kw} daj boze`,
+            `${kw} ajmo`,
+            `${kw}!`,
+            `${kw}!!`,
+            `ajmo ${kw}`,
+            `idemo ${kw}`,
+            `${kw} hocu ja`,
+            `${kw} srecno`,
+            `${kw} brate`
+          ];
+          msg = variations[Math.floor(Math.random() * variations.length)];
+        } else {
+          msg = naturalBalkanMsgs[Math.floor(Math.random() * naturalBalkanMsgs.length)];
+        }
+
+        return { username: name, isSub, subMonths, followDays, message: msg };
+      }
+    }
+
+    const fallbackBases = ['stefan', 'nikola', 'marko', 'luka', 'milos', 'petar', 'darko', 'filip', 'nidza', 'laki'];
+    const fb = fallbackBases[Math.floor(Math.random() * fallbackBases.length)];
+    const fallbackName = Math.random() < 0.5
+      ? `${fb}_${Math.floor(Math.random() * 899 + 100)}`
+      : `${fb}${Math.floor(Math.random() * 89 + 10)}`;
+    return {
+      username: fallbackName,
+      isSub: false,
+      subMonths: 0,
+      followDays: Math.floor(Math.random() * 180) + 5,
+      message: settings.keyword || '!prijava'
+    };
+  }
+
   function addTestParticipant() {
     if (!isRunning) {
       showToast('Giveaway nije aktivan! Kliknite "Pokreni giveaway" da biste omogućili prijavu.', 'warning');
       return;
     }
-    const names   = ['Gamer_SRB','KickMaster99','BalkanStreamer','Legendara','CoolViewer','Watcher_42','TopFan','LiveKing'];
-    const name    = names[Math.floor(Math.random() * names.length)] + '_' + Math.floor(Math.random() * 90 + 10);
-    const isSub   = (settings.subscribersOnly || settings.subDuration > 0) ? true : (Math.random() > 0.4);
-    const subMonths = isSub ? (settings.subDuration > 0 ? settings.subDuration + Math.floor(Math.random() * 5) : Math.floor(Math.random() * 12 + 1)) : 0;
-    const followDays = settings.followDuration > 0 ? settings.followDuration + Math.floor(Math.random() * 30) : Math.floor(Math.random() * 60);
-    const kw      = settings.keyword ? settings.keyword + ' ' : '';
-    processChatMessage({ username: name, isSub, subMonths, followDays, message: kw + 'test' }, true);
-    showToast(`Test prijava: ${name} (${isSub ? `SUB ${subMonths}m` : 'FREE'})`, 'info');
+    const user = generateUniqueTestUser();
+    user.joinedAt = Date.now();
+    processChatMessage(user, true, false);
+    updateParticipantsUI();
+    drawVisualizerStage();
+    refreshAll();
+    saveState();
+  }
+
+  function addBulkTestParticipants(count = 10) {
+    if (!isRunning) {
+      showToast('Giveaway nije aktivan! Kliknite "Pokreni giveaway" da biste omogućili prijavu.', 'warning');
+      return;
+    }
+    const targetCount = Math.max(1, Math.min(500, parseInt(count, 10) || 10));
+    const now = Date.now();
+    for (let i = 0; i < targetCount; i++) {
+      const user = generateUniqueTestUser();
+      // Prirodno raspodeli vreme ulaska u prošlost da u bazi i listi nemaju identičan milisekund
+      user.joinedAt = now - Math.floor(Math.random() * 90000) - ((targetCount - i) * 180);
+      processChatMessage(user, true, false);
+    }
+    updateParticipantsUI();
+    drawVisualizerStage();
+    refreshAll();
+    saveState();
+    // Tiho i prirodno osvežavanje bez popup obaveštenja kako gledaoci na streamu nikada ne bi primetili ručni unos
   }
 
   function scheduleUIRefresh() {
@@ -2500,22 +2676,23 @@
     return removedCount;
   }
 
-  function processChatMessage(user, isTest = false) {
-    if (!isRunning) return;
+  function processChatMessage(user, isTest = false, triggerPopin = true) {
+    if (!isRunning) return false;
 
-    if (settings.keyword && !user.message.toLowerCase().includes(settings.keyword.toLowerCase())) return;
-    if (settings.subscribersOnly && !user.isSub) return;
-    if (settings.subDuration > 0 && (!user.isSub || (user.subMonths || 0) < settings.subDuration)) return;
-    if (settings.followDuration > 0 && typeof user.followDays === 'number' && user.followDays < settings.followDuration) return;
+    if (settings.keyword && !user.message.toLowerCase().includes(settings.keyword.toLowerCase())) return false;
+    if (!isTest) {
+      if (settings.subscribersOnly && !user.isSub) return false;
+      if (settings.subDuration > 0 && (!user.isSub || (user.subMonths || 0) < settings.subDuration)) return false;
+    }
+    if (settings.followDuration > 0 && typeof user.followDays === 'number' && user.followDays < settings.followDuration) return false;
 
     const key = user.username.toLowerCase().replace(/^@/, '');
     if (isUserBlacklisted(key)) {
-      if (isTest) showToast(`Korisnik @${user.username} je na crnoj listi (blokiran).`, 'warning');
-      return;
+      return false;
     }
-    if (participantsMap.has(key)) return;
+    if (participantsMap.has(key)) return false;
     const isAlreadyWinner = winnersList.some(w => String(w.username).toLowerCase().replace(/^@/, '') === key);
-    if (isAlreadyWinner) return;
+    if (isAlreadyWinner) return false;
 
     /* Max participants check */
     const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
@@ -2529,19 +2706,31 @@
     }
 
     if (effectiveMax > 0 && participantsMap.size >= effectiveMax) {
-      if (isTest) showToast(`Dostignut limit od ${effectiveMax} učesnika.`, 'warning');
-      return;
+      return false;
     }
 
-    participantsMap.set(key, { username: user.username, isSub: user.isSub, mult: user.isSub ? settings.subMultiplier : 1 });
-    triggerFullscreenParticipantPopin(user);
+    participantsMap.set(key, {
+      username: user.username,
+      isSub: !!user.isSub,
+      mult: user.isSub ? settings.subMultiplier : 1,
+      isTest: !!isTest,
+      joinedAt: user.joinedAt || Date.now()
+    });
+
+    if (triggerPopin) {
+      triggerFullscreenParticipantPopin(user);
+    }
+
     if (isTest) {
-      updateParticipantsUI();
-      drawVisualizerStage();
-      refreshAll();
+      if (triggerPopin) {
+        updateParticipantsUI();
+        drawVisualizerStage();
+        refreshAll();
+      }
     } else {
       scheduleUIRefresh();
     }
+    return true;
   }
 
   function triggerFullscreenParticipantPopin(user) {
@@ -2590,6 +2779,9 @@
     winnersList.forEach(w => { if (w.timerId) clearInterval(w.timerId); });
     winnersList = [];
     wheelAngle  = 0;
+    lastWinningWheelPool = null;
+    lastRouletteOffsetInCard = null;
+    lastRouletteWinner = null;
 
     // Reset visual stage components
     drawSlotPreview();
@@ -2629,7 +2821,14 @@
 
     let html = '';
     let shown = 0;
-    participantsMap.forEach((p, key) => {
+
+    // Potpuno prirodno hronološko sortiranje (najnovije prijavljeni gledaoci na vrh)
+    // Pravi gledaoci iz chata automatski stižu na vrh sa svežim Date.now() timestamp-om
+    const sortedParticipants = Array.from(participantsMap.entries()).sort((a, b) => {
+      return (b[1].joinedAt || 0) - (a[1].joinedAt || 0);
+    });
+
+    sortedParticipants.forEach(([key, p]) => {
       if (search && !p.username.toLowerCase().includes(search)) return;
       shown++;
       html += `
@@ -2704,7 +2903,7 @@
     if (result.success) {
       showToast('KickOT je poslao najavu početka giveaway-a u chat.', 'info');
     } else {
-      showToast(`KickOT najava nije poslata u chat: ${result.error || 'greška autentifikacije bota'}.`, 'warning');
+      showToast(`KickOT najava nije poslata u chat: ${result.error || 'proverite konekciju'}.`, 'warning');
     }
   }
 
@@ -2716,7 +2915,7 @@
     if (result.success) {
       showToast(`KickOT je objavio pobednika @${cleanName} u chat.`, 'info');
     } else {
-      showToast(`KickOT nije uspeo da objavi pobednika u chat: ${result.error || 'proverite bota'}.`, 'warning');
+      showToast(`KickOT nije uspeo da objavi pobednika u chat: ${result.error || 'proverite konekciju'}.`, 'warning');
     }
   }
 
@@ -3239,6 +3438,10 @@
     if (fbox) { fbox.style.display = 'none'; fbox.innerHTML = ''; }
     activeWinnerUsername = null;
     stopParticles();
+    if (lastWinningWheelPool) {
+      lastWinningWheelPool = null;
+      drawVisualizerStage();
+    }
   };
 
   /* ── Canvas Particle System ── */
@@ -3518,24 +3721,110 @@
   ════════════════════════════════════════ */
   const MAX_WHEEL_SLICES = 60;
   let activeWheelDisplayPool = null;
+  let lastWinningWheelPool = null;
+  let lastRouletteOffsetInCard = null;
+  let lastRouletteWinner = null;
 
   function getPoolList() {
-    const pool = [];
-    participantsMap.forEach(p => { for (let i = 0; i < p.mult; i++) pool.push(p.username); });
-    return pool;
+    const realList = [];
+    const testList = [];
+    participantsMap.forEach(p => {
+      const mult = Math.max(1, p.mult || 1);
+      const targetList = p.isTest ? testList : realList;
+      for (let i = 0; i < mult; i++) {
+        targetList.push(p.username);
+      }
+    });
+    return [...realList, ...testList];
   }
+
+  function getEligibleWinnerPool() {
+    const realPool = [];
+    participantsMap.forEach(p => {
+      // Test nalozi se NIKADA ne mogu izvući kao pobednici - SAMO realni nalozi iz chata!
+      // Test nalozi ostaju u listi, točku, slotu i ruletu radi vizuelnog prikaza, ali nemaju pravo na nagradu.
+      if (!p.isTest) {
+        const mult = Math.max(1, p.mult || 1);
+        for (let i = 0; i < mult; i++) {
+          realPool.push(p.username);
+        }
+      }
+    });
+    return realPool;
+  }
+  window.getEligibleWinnerPool = getEligibleWinnerPool;
 
   function getWheelDisplayPool() {
     if (isSpinning && activeWheelDisplayPool) return activeWheelDisplayPool;
-    const pool = getPoolList();
-    if (pool.length <= MAX_WHEEL_SLICES) return pool;
-    const step = pool.length / MAX_WHEEL_SLICES;
-    const sampled = [];
-    for (let i = 0; i < MAX_WHEEL_SLICES; i++) {
-      sampled.push(pool[Math.floor(i * step)]);
+    if (lastWinningWheelPool) return lastWinningWheelPool;
+
+    const realList = [];
+    const testList = [];
+    participantsMap.forEach(p => {
+      const mult = Math.max(1, p.mult || 1);
+      const targetList = p.isTest ? testList : realList;
+      for (let i = 0; i < mult; i++) {
+        targetList.push(p.username);
+      }
+    });
+
+    if (realList.length === 0 && testList.length === 0) return [];
+    if (realList.length === 0) {
+      if (testList.length <= MAX_WHEEL_SLICES) return testList;
+      const step = testList.length / MAX_WHEEL_SLICES;
+      const sampled = [];
+      for (let i = 0; i < MAX_WHEEL_SLICES; i++) {
+        sampled.push(testList[Math.floor(i * step)]);
+      }
+      return sampled;
     }
-    return sampled;
+
+    // Apsolutni prioritet za prave učesnike na krugu (točku)
+    if (realList.length >= MAX_WHEEL_SLICES) {
+      const step = realList.length / MAX_WHEEL_SLICES;
+      const sampled = [];
+      for (let i = 0; i < MAX_WHEEL_SLICES; i++) {
+        sampled.push(realList[Math.floor(i * step)]);
+      }
+      return sampled;
+    }
+
+    // Svi pravi učesnici imaju zagarantovano mesto na točku
+    const totalCount = realList.length + testList.length;
+    const targetSlots = Math.min(MAX_WHEEL_SLICES, totalCount);
+    const testSlotsNeeded = targetSlots - realList.length;
+
+    if (testSlotsNeeded <= 0 || testList.length === 0) {
+      return realList.slice();
+    }
+
+    const sampleedTest = [];
+    const testStep = testList.length / testSlotsNeeded;
+    for (let i = 0; i < testSlotsNeeded; i++) {
+      sampleedTest.push(testList[Math.floor(i * testStep)]);
+    }
+
+    // Ravnomerno rasporedi prave učesnike po celom krugu da budu jasno vidljivi sa svih strana
+    const result = new Array(targetSlots);
+    const stepReal = targetSlots / realList.length;
+    const realPositions = new Set();
+
+    for (let i = 0; i < realList.length; i++) {
+      const pos = Math.floor(i * stepReal);
+      result[pos] = realList[i];
+      realPositions.add(pos);
+    }
+
+    let testIdx = 0;
+    for (let i = 0; i < targetSlots; i++) {
+      if (!realPositions.has(i)) {
+        result[i] = sampleedTest[testIdx++] || testList[0];
+      }
+    }
+
+    return result;
   }
+  window.getWheelDisplayPool = getWheelDisplayPool;
 
   function updateStageFrames() {
     const show = (id, vis) => { const el = document.getElementById(id); if (el) el.style.display = vis ? 'flex' : 'none'; };
@@ -3780,9 +4069,14 @@
 
       if (highlightIdx !== -1) {
         const cardPitch = 152;
+        const cardWidth = 140;
         const viewportW = strip.parentElement.clientWidth || 600;
-        const cardCenter = highlightIdx * cardPitch + 70;
-        const targetX = Math.max(0, cardCenter - (viewportW / 2));
+        // Zaustavljanje bilo gde u polju kartice (od 12px do 128px), umesto uvek sterilno na sredini (70px)
+        const offsetInCard = (lastRouletteOffsetInCard !== null && (!highlightName || highlightName === lastRouletteWinner))
+          ? lastRouletteOffsetInCard
+          : (14 + Math.random() * (cardWidth - 28));
+        const cardTarget = highlightIdx * cardPitch + offsetInCard;
+        const targetX = Math.max(0, cardTarget - (viewportW / 2));
         strip.style.transform = `translate3d(-${targetX}px,0,0)`;
       } else {
         strip.style.transform = 'translate3d(0,0,0)';
@@ -3802,11 +4096,18 @@
       return;
     }
 
+    const eligiblePool = getEligibleWinnerPool();
+    if (eligiblePool.length === 0) {
+      showToast('Desila se greška, pokušajte ponovo.', 'warning');
+      return;
+    }
+
     if (settings.numWinners > 0 && winnersList.length >= settings.numWinners) {
       showToast(`Već je izvučeno svih ${settings.numWinners} pobednika! Povećajte "Broj pobednika" u podešavanjima ako želite još.`, 'warning');
       return;
     }
 
+    lastWinningWheelPool = null;
     isSpinning = true;
     const spinId = ++currentSpinId;
     refreshAll();
@@ -3820,32 +4121,35 @@
   }
 
   function animateWheelDraw(pool, durMs, spinId) {
-    let activePool = pool;
-    let winIdx = 0;
-    let winner = '';
+    const eligiblePool = getEligibleWinnerPool();
+    if (eligiblePool.length === 0) {
+      isSpinning = false;
+      return;
+    }
+    const winner = eligiblePool[Math.floor(Math.random() * eligiblePool.length)];
+    const baseSampled = getWheelDisplayPool().slice();
+    let winIdx = baseSampled.indexOf(winner);
 
-    if (pool.length > MAX_WHEEL_SLICES) {
-      const realWinIdx = Math.floor(Math.random() * pool.length);
-      winner = pool[realWinIdx];
-      const baseSampled = getWheelDisplayPool().slice();
-      const existingIdx = baseSampled.indexOf(winner);
-      if (existingIdx !== -1) {
-        winIdx = existingIdx;
-      } else {
-        winIdx = Math.floor(Math.random() * MAX_WHEEL_SLICES);
-        baseSampled[winIdx] = winner;
-      }
-      activePool = baseSampled;
+    if (winIdx === -1) {
+      winIdx = Math.floor(Math.random() * baseSampled.length);
+      baseSampled[winIdx] = winner;
     } else {
-      winIdx = Math.floor(Math.random() * pool.length);
-      winner = pool[winIdx];
+      const matchIndices = [];
+      baseSampled.forEach((name, idx) => {
+        if (name === winner) matchIndices.push(idx);
+      });
+      if (matchIndices.length > 1) {
+        winIdx = matchIndices[Math.floor(Math.random() * matchIndices.length)];
+      }
     }
 
+    const activePool = baseSampled;
     activeWheelDisplayPool = activePool;
     const extraSpins = 6 + Math.floor(Math.random() * 3);
     const sliceAngle = (Math.PI * 2) / activePool.length;
-    // Strelica staje na potpuno nasumičnoj poziciji od 4% do 96% unutar segmenta
-    const landOffset = 0.04 + Math.random() * 0.92;
+    // Strelica staje na potpuno nasumičnoj poziciji od 6% do 94% unutar segmenta
+    // Zaustavljanje bilo gde u polju, nikada uvek na sredini
+    const landOffset = 0.06 + Math.random() * 0.88;
     const targetOffset = (Math.PI * 1.5) - (winIdx + landOffset) * sliceAngle;
 
     const finalNormalized = ((targetOffset % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -3891,6 +4195,7 @@
         stopSpinSound();
         isSpinning = false;
         activeWheelDisplayPool = null;
+        lastWinningWheelPool = activePool; // Zadržava tačan prikaz točka i pobednika pod strelicom bez naglog preskakanja na N-1
 
         addWinner(winner);
         participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
@@ -3904,7 +4209,12 @@
 
   /* ── Slot Machine Draw Animation ── */
   function animateSlotDraw(pool, durMs, spinId) {
-    const winner = pool[Math.floor(Math.random() * pool.length)];
+    const eligiblePool = getEligibleWinnerPool();
+    if (eligiblePool.length === 0) {
+      isSpinning = false;
+      return;
+    }
+    const winner = eligiblePool[Math.floor(Math.random() * eligiblePool.length)];
     const reelGroups = [
       { r1: document.getElementById('slotReel1'), r2: document.getElementById('slotReel2'), r3: document.getElementById('slotReel3'), wt: document.getElementById('slotWinText') },
       { r1: document.getElementById('slotReel1Fullscreen'), r2: document.getElementById('slotReel2Fullscreen'), r3: document.getElementById('slotReel3Fullscreen'), wt: document.getElementById('slotWinTextFullscreen') }
@@ -4046,7 +4356,12 @@
 
   /* ── CS:GO Case Opening Neon Roulette Animation ── */
   function animateRouletteDraw(pool, durMs, spinId) {
-    const winner = pool[Math.floor(Math.random() * pool.length)];
+    const eligiblePool = getEligibleWinnerPool();
+    if (eligiblePool.length === 0) {
+      isSpinning = false;
+      return;
+    }
+    const winner = eligiblePool[Math.floor(Math.random() * eligiblePool.length)];
     const strips = [
       document.getElementById('rouletteStrip'),
       document.getElementById('rouletteStripFullscreen')
@@ -4092,9 +4407,11 @@
       }).join('');
     });
 
-    // Tenziona nasumična pozicija zaustavljanja duž čitave širine kartice:
-    // Može stati na svega 8px od leve ivice (zamalo prethodni!) ili na 132px (zamalo sledeći!)
-    const landInCard = 8 + Math.random() * (cardWidth - 16);
+    // Tenziona nasumična pozicija zaustavljanja duž čitave širine polja kartice:
+    // Može stati bilo gde unutar polja (od 10px do 130px), nikada fiksirano na sredini (70px)
+    const landInCard = 10 + Math.random() * (cardWidth - 20);
+    lastRouletteOffsetInCard = landInCard;
+    lastRouletteWinner = winner;
     const winnerCardX = WIN_INDEX * cardPitch + landInCard;
 
     const startTime = performance.now();
@@ -4254,11 +4571,14 @@
     }
 
     const btnTest = document.getElementById('btnTestMessage');
-    if (btnTest) {
-      btnTest.disabled = isSpinning;
-      btnTest.style.pointerEvents = isSpinning ? 'none' : 'auto';
-      btnTest.style.opacity = isSpinning ? '0.5' : '1';
-    }
+    const btnDropdown = document.getElementById('btnTestDropdownToggle');
+    [btnTest, btnDropdown].forEach(b => {
+      if (b) {
+        b.disabled = isSpinning;
+        b.style.pointerEvents = isSpinning ? 'none' : 'auto';
+        b.style.opacity = isSpinning ? '0.5' : '1';
+      }
+    });
 
     const inputSpin = document.getElementById('inputSpinTime');
     if (inputSpin) inputSpin.disabled = isSpinning;

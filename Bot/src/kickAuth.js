@@ -180,6 +180,13 @@ async function posaljiPrekoZvanicnogApija(chatroomId, tekst, channelUsername, _c
         if (!response.ok) {
             const errText = await response.text();
             log('ERR', `[${channelUsername || chatroomId}] Greška slanja na Kick API: HTTP ${response.status} - ${errText}`);
+            if (response.status === 429 && _channelState) {
+                const retryAfterHeader = response.headers ? response.headers.get('retry-after') : null;
+                const retrySec = parseInt(retryAfterHeader, 10);
+                const backoffMs = (!isNaN(retrySec) && retrySec > 0) ? (retrySec * 1000) : 6000;
+                _channelState.rateLimitUntil = Date.now() + backoffMs;
+                log('WARN', `[${channelUsername || chatroomId}] Detektovan Kick 429 Too Many Requests. Pauziram red slanja poruka za ${backoffMs / 1000}s.`);
+            }
             return null;
         }
 

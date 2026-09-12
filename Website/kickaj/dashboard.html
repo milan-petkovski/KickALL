@@ -614,12 +614,22 @@
                 Učesnici
               </div>
               <div style="display:flex;align-items:center;gap:8px;">
-                <button class="list-action-btn list-test-btn" id="btnTestMessage" title="Dodaj test učesnika sa strane">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M12 5v14M5 12h14"/>
-                  </svg>
-                  <span>Test</span>
-                </button>
+                <div class="test-btn-group" style="display:inline-flex;align-items:center;position:relative;">
+                  <button class="list-action-btn" id="btnTestDropdownToggle" aria-label="Opcije">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </button>
+                  <div class="bulk-test-dropdown" id="bulkTestDropdown" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#13111c;border:1px solid rgba(255,255,255,0.12);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:99;min-width:145px;padding:4px 0;">
+                    <button type="button" class="bulk-test-item" data-count="1">+1 učesnik</button>
+                    <button type="button" class="bulk-test-item" data-count="10">+10 učesnika</button>
+                    <button type="button" class="bulk-test-item" data-count="25">+25 učesnika</button>
+                    <button type="button" class="bulk-test-item" data-count="50">+50 učesnika</button>
+                    <button type="button" class="bulk-test-item" data-count="100">+100 učesnika</button>
+                    <div style="height:1px;background:rgba(255,255,255,0.08);margin:3px 0;"></div>
+                    <button type="button" class="bulk-test-item" data-count="random-100-200">Nasumično (100-200)</button>
+                  </div>
+                </div>
                 <button class="list-action-btn" id="btnClearParticipants" title="Očisti učesnike">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"/>
@@ -856,7 +866,7 @@
         OK
       </button>
 
-      <div class="winner-reveal-chatlog-box" id="winnerRevealChatlogBox" onclick="window.testWinnerChat()" title="Kliknite za test ako niste uživo">
+      <div class="winner-reveal-chatlog-box" id="winnerRevealChatlogBox">
         <div class="winner-chatlog-dots" id="winnerChatlogDots">
           <span></span><span></span><span></span>
         </div>

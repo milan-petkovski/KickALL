@@ -68,13 +68,13 @@
       "f1": "Grafikoni rasta u realnom vremenu",
       "f2": "Detaljni izveštaji o čatu",
       "f3": "Istorija strimova i metrike",
-      "overlay": "Analitika je u razvoju. Klikni ispod da pogledaš i testiraš simulaciju."
+      "overlay": "Napredna analitika je aktivna. Klikni ispod da otvoriš dashboard ili isprobaš simulaciju."
     },
     "kickov": {
       "f1": "Dinamični alerti sa zvukom",
       "f2": "Moderni čet boksovi i emotikoni",
       "f3": "Laka OBS podešavanja",
-      "overlay": "Integracija overleja je u razvoju. Klikni ispod da pogledaš i testiraš simulaciju."
+      "overlay": "Integracija overleja je aktivna. Klikni ispod da otvoriš dashboard ili isprobaš simulaciju."
     }
   },
   "tabs": {
@@ -87,7 +87,7 @@
     "subtitle": "Ispod možete testirati sva četiri alata pre nego što ih isprobate na Kicku."
   },
   "sim": {
-    "status": "U RAZVOJU"
+    "status": "AKTIVAN I DOSTUPAN"
   },
   "kickaj": {
     "heading": "Simulacija Nagradne Igre",
@@ -232,7 +232,7 @@
       "f3": "Do 50 prilagođenih komandi",
       "f4": "<strong>Kickov</strong> overlayevi (uskoro)",
       "f5": "<strong>Kickaj</strong> giveaway sistem",
-      "f6": "<strong>Kickan</strong> napredna analitika (uskoro)",
+      "f6": "<strong>Kickan</strong> napredna analitika",
       "f7": "Prioritetna podrška",
       "btn": "Započni besplatno",
       "btnWithPrice": "Započni besplatno",

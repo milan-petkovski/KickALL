@@ -292,3 +292,58 @@ button:focus-visible {
     outline: 2px solid rgba(139, 92, 246, 0.55);
     outline-offset: 2px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Accessibility: Screen reader utility & Accessible Skip Link
+   ═══════════════════════════════════════════════════════════ */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+.skip-link {
+    position: absolute;
+    top: -120px;
+    left: 20px;
+    z-index: 99999;
+    padding: 12px 20px;
+    background: var(--color-bg-dark, #06040A);
+    color: var(--color-green, #53FC18);
+    border: 2px solid var(--color-green, #53FC18);
+    border-radius: 8px;
+    font-weight: 700;
+    font-family: var(--font-heading, sans-serif);
+    text-decoration: none;
+    transition: top var(--transition-fast, 0.2s ease);
+    box-shadow: 0 0 20px rgba(83, 252, 24, 0.4);
+}
+
+.skip-link:focus,
+.skip-link:focus-visible {
+    top: 20px;
+    outline: 2px solid #ffffff;
+    outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Prefers Reduced Motion (WCAG 2.2)
+   ═══════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

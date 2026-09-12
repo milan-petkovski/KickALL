@@ -43,6 +43,14 @@ exports.handler = async function (event, _context) {
     };
   }
 
+  if (query.length > 200) {
+    return {
+      statusCode: 400,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Query too long (max 200 characters)' })
+    };
+  }
+
   try {
     const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
     const response = await fetch(searchUrl, {
@@ -67,7 +75,7 @@ exports.handler = async function (event, _context) {
 
     if (!videoId) {
       return {
-        statusCode: 444,
+        statusCode: 404,
         headers: corsHeaders,
         body: JSON.stringify({ error: 'No YouTube video found for query' })
       };

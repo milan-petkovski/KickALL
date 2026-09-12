@@ -70,7 +70,6 @@ exports.handler = async (event) => {
       'i.ytimg.com',
       'api.allorigins.win',
       'corsproxy.io',
-      'onrender.com',
       'kickbot-ihzb.onrender.com'
     ];
 
@@ -82,6 +81,14 @@ exports.handler = async (event) => {
         statusCode: 400,
         headers,
         body: JSON.stringify({ error: 'Invalid URL', detail: 'The provided targetUrl is not a valid URL' })
+      };
+    }
+
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Invalid Protocol', detail: 'Only http and https protocols are allowed' })
       };
     }
 
@@ -113,8 +120,8 @@ exports.handler = async (event) => {
       }
     }
 
-    // Ako zahtev ide ka Render bot servisu, automatski priloži X-Internal-Token
-    if (url.hostname.includes('onrender.com') && process.env.INTERNAL_API_SECRET) {
+    // Ako zahtev ide ka zvaničnom Render bot servisu, automatski priloži X-Internal-Token
+    if (url.hostname === 'kickbot-ihzb.onrender.com' && process.env.INTERNAL_API_SECRET) {
       sanitizedHeaders['X-Internal-Token'] = process.env.INTERNAL_API_SECRET;
     }
 

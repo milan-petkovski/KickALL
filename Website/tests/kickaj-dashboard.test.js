@@ -569,3 +569,347 @@ test('Kickaj - Crna lista (Blacklist) blokira i uklanja neželjene korisnike', (
   assert.equal(participants.has('bot1'), false);
   assert.equal(participants.has('spamer'), false);
 });
+
+test('Kickaj - Test nalozi imaju isTest=true, dok chat nalozi imaju isTest=false', () => {
+  const participantsMap = new Map();
+
+  function processChatMessage(user, isTest = false) {
+    const key = user.username.toLowerCase().replace(/^@/, '');
+    participantsMap.set(key, {
+      username: user.username,
+      isSub: !!user.isSub,
+      mult: user.isSub ? 2 : 1,
+      isTest: !!isTest,
+      joinedAt: Date.now()
+    });
+  }
+
+  // Pravi korisnik iz chata
+  processChatMessage({ username: 'PraviGledalac', isSub: true, message: '!gw' }, false);
+  // Test bot nalog sa panela
+  processChatMessage({ username: 'Stefan_BG_44', isSub: false, message: '!gw test' }, true);
+
+  const realUser = participantsMap.get('pravigledalac');
+  const testUser = participantsMap.get('stefan_bg_44');
+
+  assert.equal(realUser.isTest, false, 'Pravi korisnik mora imati isTest=false');
+  assert.equal(testUser.isTest, true, 'Test nalog mora imati isTest=true');
+});
+
+test('Kickaj - getEligibleWinnerPool NIKADA ne bira test naloge ako postoji bar jedan pravi korisnik', () => {
+  const participantsMap = new Map();
+
+  // 1 pravi korisnik iz chata
+  participantsMap.set('pravigledalac', {
+    username: 'PraviGledalac',
+    isSub: false,
+    mult: 1,
+    isTest: false
+  });
+
+  // 50 test botova na lajvu da prikriju viewbotting
+  for (let i = 0; i < 50; i++) {
+    participantsMap.set(`test_bot_${i}`, {
+      username: `Test_Bot_${i}`,
+      isSub: Math.random() > 0.5,
+      mult: 1,
+      isTest: true
+    });
+  }
+
+  function getPoolList() {
+    const pool = [];
+    participantsMap.forEach(p => {
+      for (let i = 0; i < p.mult; i++) pool.push(p.username);
+    });
+    return pool;
+  }
+
+  function getEligibleWinnerPool() {
+    const realPool = [];
+    participantsMap.forEach(p => {
+      if (!p.isTest) {
+        const mult = Math.max(1, p.mult || 1);
+        for (let i = 0; i < mult; i++) {
+          realPool.push(p.username);
+        }
+      }
+    });
+    return realPool;
+  }
+
+  // Ukupan pool za vizuelne animacije sadrži sve (51 nalog)
+  const fullVisualPool = getPoolList();
+  assert.equal(fullVisualPool.length >= 51, true, 'Vizuelni pool mora prikazivati sve naloge radi verodostojnosti');
+
+  // Bazen za izvlačenje pobednika
+  const eligiblePool = getEligibleWinnerPool();
+  assert.equal(eligiblePool.length, 1, 'Bazen za pobednike mora sadržati SAMO pravog korisnika');
+  assert.equal(eligiblePool[0], 'PraviGledalac');
+
+  // Testiramo 200 uzastopnih simulacija izvlačenja: test bot NIKADA ne sme pobediti
+  for (let spin = 0; spin < 200; spin++) {
+    const winner = eligiblePool[Math.floor(Math.random() * eligiblePool.length)];
+    assert.equal(winner, 'PraviGledalac', `U krugu ${spin}, pobednik mora biti pravi korisnik a ne bot`);
+  }
+});
+
+test('Kickaj - getEligibleWinnerPool NIKADA ne dozvoljava test naloge (čak i ako ima 0 pravih učesnika)', () => {
+  const participantsMap = new Map();
+
+  // 0 pravih učesnika, 3 test naloga
+  participantsMap.set('test_1', { username: 'Test_1', isTest: true, mult: 1 });
+  participantsMap.set('test_2', { username: 'Test_2', isTest: true, mult: 1 });
+  participantsMap.set('test_3', { username: 'Test_3', isTest: true, mult: 1 });
+
+  function getEligibleWinnerPool() {
+    const realPool = [];
+    participantsMap.forEach(p => {
+      if (!p.isTest) {
+        const mult = Math.max(1, p.mult || 1);
+        for (let i = 0; i < mult; i++) {
+          realPool.push(p.username);
+        }
+      }
+    });
+    return realPool;
+  }
+
+  const eligiblePool = getEligibleWinnerPool();
+  assert.equal(eligiblePool.length, 0, 'Test nalozi NIKADA ne mogu ući u eligiblePool, čak i sa 0 pravih korisnika');
+});
+
+test('Kickaj - updateParticipantsUI sortira prijavljene gledaoce hronološki bez veštačkog odvajanja', () => {
+  const participantsMap = new Map();
+
+  // Dodaj 3 simulirana naloga sa raspodeljenim vremenom
+  participantsMap.set('stefan_011', { username: 'stefan_011', isTest: true, joinedAt: 1000 });
+  participantsMap.set('luka_bg', { username: 'luka_bg', isTest: true, joinedAt: 2000 });
+  participantsMap.set('nidza_99', { username: 'nidza_99', isTest: true, joinedAt: 3000 });
+
+  // Dodaj 2 prava korisnika koji se javljaju u chat (noviji timestamp)
+  participantsMap.set('pravi_marko', { username: 'Pravi_Marko', isTest: false, joinedAt: 4000 });
+  participantsMap.set('pravi_stefan', { username: 'Pravi_Stefan', isTest: false, joinedAt: 5000 });
+
+  const sortedParticipants = Array.from(participantsMap.entries()).sort((a, b) => {
+    return (b[1].joinedAt || 0) - (a[1].joinedAt || 0);
+  });
+
+  // Pravi gledaoci iz chata stižu na vrh jer su se upravo prijavili
+  assert.equal(sortedParticipants[0][1].username, 'Pravi_Stefan');
+  assert.equal(sortedParticipants[1][1].username, 'Pravi_Marko');
+  // Simulirani nalozi prate prirodan raspored bez ikakvog odavanja
+  assert.equal(sortedParticipants[2][1].username, 'nidza_99');
+  assert.equal(sortedParticipants[3][1].username, 'luka_bg');
+  assert.equal(sortedParticipants[4][1].username, 'stefan_011');
+});
+
+test('Kickaj - Test nalozi NIKADA nemaju sub status i uvek imaju nasumične follow days', () => {
+  const DOMESTIC_GAMER_BASES = ['Stefan', 'Nikola', 'Marko', 'Petar', 'Luka'];
+  const DOMESTIC_GAMER_TAGS = ['BG', 'CS2', 'FPS', 'PRO', 'Snajper'];
+  const DOMESTIC_GAMER_PREFIXES = ['', 'x_', 'Pro_'];
+
+  function generateUniqueTestUser() {
+    const base = DOMESTIC_GAMER_BASES[Math.floor(Math.random() * DOMESTIC_GAMER_BASES.length)];
+    const prefix = DOMESTIC_GAMER_PREFIXES[Math.floor(Math.random() * DOMESTIC_GAMER_PREFIXES.length)];
+    const tag = DOMESTIC_GAMER_TAGS[Math.floor(Math.random() * DOMESTIC_GAMER_TAGS.length)];
+    const name = `${prefix}${base}_${tag}`;
+    const isSub = false;
+    const subMonths = 0;
+    const followDays = 1 + Math.floor(Math.random() * 320);
+    return { username: name, isSub, subMonths, followDays, message: '!prijava' };
+  }
+
+  for (let i = 0; i < 50; i++) {
+    const user = generateUniqueTestUser();
+    assert.equal(user.isSub, false, `Test nalog ${user.username} ne sme imati sub`);
+    assert.equal(user.subMonths, 0, `Test nalog ${user.username} mora imati 0 meseci suba`);
+    assert.equal(user.followDays >= 1, true, `Test nalog ${user.username} mora imati validan broj dana praćenja`);
+  }
+});
+
+test('Kickaj - Zaustavljanje točka staje nasumično bilo gde unutar polja i zadržava vizuelni prikaz pobednika', () => {
+  const pool = ['Milan', 'Nikola', 'Stefan', 'Marko', 'Petar'];
+  const winner = 'Stefan';
+  const winIdx = pool.indexOf(winner);
+  const sliceAngle = (Math.PI * 2) / pool.length;
+
+  const offsets = [];
+  for (let i = 0; i < 60; i++) {
+    const landOffset = 0.06 + Math.random() * 0.88;
+    offsets.push(landOffset);
+    assert.ok(landOffset >= 0.05 && landOffset <= 0.95, 'landOffset mora biti unutar polja (5%-95%)');
+    assert.notEqual(landOffset, 0.5, 'landOffset ne sme biti uvek fiksno na sredini');
+
+    const targetOffset = (Math.PI * 1.5) - (winIdx + landOffset) * sliceAngle;
+    const pointerRay = (((Math.PI * 1.5 - targetOffset) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const actualOffset = (pointerRay - winIdx * sliceAngle) / sliceAngle;
+    assert.ok(Math.abs(actualOffset - landOffset) < 0.0001, 'Strelica mora stajati tačno na izračunatom random offsetu');
+  }
+
+  // Provera da postoji varijansa u poziciji zaustavljanja (nije uvek u sredini)
+  const minOffset = Math.min(...offsets);
+  const maxOffset = Math.max(...offsets);
+  assert.ok(minOffset < 0.35, 'Barem neka izvlačenja moraju stati blizu prve polovine/ivice');
+  assert.ok(maxOffset > 0.65, 'Barem neka izvlačenja moraju stati blizu druge polovine/ivice');
+
+  // Provera zadržavanja pobedničkog točka
+  let activeWheelDisplayPool = pool;
+  let lastWinningWheelPool = pool;
+  let isSpinning = false;
+  const participantsMap = new Map([['milan', { username: 'Milan' }], ['nikola', { username: 'Nikola' }], ['stefan', { username: 'Stefan' }]]);
+  // Simulacija brisanja pobednika iz mape:
+  participantsMap.delete('stefan');
+
+  function getWheelDisplayPool() {
+    if (isSpinning && activeWheelDisplayPool) return activeWheelDisplayPool;
+    if (lastWinningWheelPool) return lastWinningWheelPool;
+    const res = [];
+    participantsMap.forEach(p => res.push(p.username));
+    return res;
+  }
+
+  // Dok je lastWinningWheelPool aktivan, točak i dalje prikazuje pobednika pod strelicom:
+  assert.ok(getWheelDisplayPool().includes('Stefan'), 'Točak mora zadržati pobednika pod strelicom dok je modal aktivan');
+
+  // Nakon zatvaranja modala:
+  lastWinningWheelPool = null;
+  assert.ok(!getWheelDisplayPool().includes('Stefan'), 'Nakon zatvaranja modala, točak prelazi na preostale učesnike');
+});
+
+test('Kickaj - Zaustavljanje ruleta staje nasumično duž širine polja kartice i ne zakucava na 70px centar', () => {
+  const cardWidth = 140;
+  const cardPitch = 152;
+  const winnerIdx = 45;
+  const offsets = [];
+
+  for (let i = 0; i < 50; i++) {
+    const landInCard = 10 + Math.random() * (cardWidth - 20);
+    offsets.push(landInCard);
+    assert.ok(landInCard >= 10 && landInCard <= (cardWidth - 10), 'Offset mora biti unutar tela kartice');
+    assert.notEqual(landInCard, 70, 'Offset ne sme biti fiksno centriran na 70px');
+  }
+
+  const minLand = Math.min(...offsets);
+  const maxLand = Math.max(...offsets);
+  assert.ok(minLand < 45, 'Mora postojati zaustavljanje blizu leve ivice polja');
+  assert.ok(maxLand > 95, 'Mora postojati zaustavljanje blizu desne ivice polja');
+
+  // Provera drawRoulettePreview funkcije da ne koristi hardkodovanih 70px
+  let lastRouletteOffsetInCard = 22.5;
+  const lastRouletteWinner = 'Pobednik1';
+  function computeRouletteTarget(highlightIdx, highlightName, viewportW = 600) {
+    const offsetInCard = (lastRouletteOffsetInCard !== null && (!highlightName || highlightName === lastRouletteWinner))
+      ? lastRouletteOffsetInCard
+      : (14 + Math.random() * (cardWidth - 28));
+    const cardTarget = highlightIdx * cardPitch + offsetInCard;
+    return Math.max(0, cardTarget - (viewportW / 2));
+  }
+
+  const targetX = computeRouletteTarget(winnerIdx, 'Pobednik1');
+  const expectedX = Math.max(0, winnerIdx * cardPitch + 22.5 - 300);
+  assert.equal(targetX, expectedX, 'Rulet mora sačuvati tačnu poziciju zaustavljanja unutar polja a ne resetovati na 70px centar');
+});
+
+test('Kickaj - Opcija za dodavanje nasumičnog broja test učesnika od 100 do 200', () => {
+  function computeBulkCount(datasetValue) {
+    if (datasetValue === 'random-100-200' || datasetValue === 'random') {
+      return Math.floor(Math.random() * 101) + 100;
+    }
+    return parseInt(datasetValue, 10) || 10;
+  }
+
+  const generatedCounts = [];
+  for (let i = 0; i < 200; i++) {
+    const c = computeBulkCount('random-100-200');
+    assert.ok(c >= 100 && c <= 200, `Generisani broj ${c} mora biti u opsegu od 100 do 200`);
+    assert.equal(Number.isInteger(c), true, 'Broj mora biti ceo broj');
+    generatedCounts.push(c);
+  }
+
+  const minGenerated = Math.min(...generatedCounts);
+  const maxGenerated = Math.max(...generatedCounts);
+  assert.ok(minGenerated <= 115, 'Mora pokriti donji deo opsega (blizu 100)');
+  assert.ok(maxGenerated >= 185, 'Mora pokriti gornji deo opsega (blizu 200)');
+  const uniqueCount = new Set(generatedCounts).size;
+  assert.ok(uniqueCount > 40, 'Mora postojati visoka varijacija nasumičnih brojeva');
+});
+
+test('Kickaj - getWheelDisplayPool prioritetno prikazuje prave učesnike na krugu (točku)', () => {
+  const MAX_WHEEL_SLICES = 60;
+  function simulateWheelPool(participantsMap) {
+    const realList = [];
+    const testList = [];
+    participantsMap.forEach(p => {
+      const mult = Math.max(1, p.mult || 1);
+      const targetList = p.isTest ? testList : realList;
+      for (let i = 0; i < mult; i++) targetList.push(p.username);
+    });
+
+    if (realList.length === 0 && testList.length === 0) return [];
+    if (realList.length === 0) {
+      if (testList.length <= MAX_WHEEL_SLICES) return testList;
+      const step = testList.length / MAX_WHEEL_SLICES;
+      const sampled = [];
+      for (let i = 0; i < MAX_WHEEL_SLICES; i++) sampled.push(testList[Math.floor(i * step)]);
+      return sampled;
+    }
+
+    if (realList.length >= MAX_WHEEL_SLICES) {
+      const step = realList.length / MAX_WHEEL_SLICES;
+      const sampled = [];
+      for (let i = 0; i < MAX_WHEEL_SLICES; i++) sampled.push(realList[Math.floor(i * step)]);
+      return sampled;
+    }
+
+    const totalCount = realList.length + testList.length;
+    const targetSlots = Math.min(MAX_WHEEL_SLICES, totalCount);
+    const testSlotsNeeded = targetSlots - realList.length;
+    if (testSlotsNeeded <= 0 || testList.length === 0) return realList.slice();
+
+    const sampleedTest = [];
+    const testStep = testList.length / testSlotsNeeded;
+    for (let i = 0; i < testSlotsNeeded; i++) sampleedTest.push(testList[Math.floor(i * testStep)]);
+
+    const result = new Array(targetSlots);
+    const stepReal = targetSlots / realList.length;
+    const realPositions = new Set();
+    for (let i = 0; i < realList.length; i++) {
+      const pos = Math.floor(i * stepReal);
+      result[pos] = realList[i];
+      realPositions.add(pos);
+    }
+    let testIdx = 0;
+    for (let i = 0; i < targetSlots; i++) {
+      if (!realPositions.has(i)) result[i] = sampleedTest[testIdx++] || testList[0];
+    }
+    return result;
+  }
+
+  // Scenario 1: 5 pravih korisnika i 150 test botova
+  const map1 = new Map();
+  const realUsers = ['Gledalac_1', 'Gledalac_2', 'Gledalac_3', 'Gledalac_4', 'Gledalac_5'];
+  realUsers.forEach(u => map1.set(u.toLowerCase(), { username: u, isTest: false, mult: 1 }));
+  for (let i = 0; i < 150; i++) {
+    map1.set(`bot_${i}`, { username: `Bot_${i}`, isTest: true, mult: 1 });
+  }
+
+  const pool1 = simulateWheelPool(map1);
+  assert.equal(pool1.length, 60, 'Točak mora imati maksimalnih 60 isečaka');
+  realUsers.forEach(u => {
+    assert.ok(pool1.includes(u), `Pravi korisnik ${u} mora 100% biti prisutan na točku pored 150 botova`);
+  });
+
+  // Scenario 2: 70 pravih korisnika i 50 test botova
+  const map2 = new Map();
+  for (let i = 0; i < 70; i++) map2.set(`real_${i}`, { username: `Real_${i}`, isTest: false, mult: 1 });
+  for (let i = 0; i < 50; i++) map2.set(`test_${i}`, { username: `Test_${i}`, isTest: true, mult: 1 });
+
+  const pool2 = simulateWheelPool(map2);
+  assert.equal(pool2.length, 60);
+  assert.ok(!pool2.some(x => x.startsWith('Test_')), 'Kada ima 60+ pravih korisnika, test nalozi ne smeju zauzimati krug');
+});
+
+
+
+
