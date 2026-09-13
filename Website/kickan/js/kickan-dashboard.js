@@ -461,8 +461,9 @@
     }
 
     if (avatarEl) {
-      if (avatarUrl && avatarUrl.startsWith('http')) {
-        avatarEl.style.backgroundImage = `url('${avatarUrl}')`;
+      if (avatarUrl && /^https?:\/\//i.test(avatarUrl)) {
+        const safeUrl = encodeURI(avatarUrl).replace(/["'()<>]/g, '');
+        avatarEl.style.backgroundImage = `url("${safeUrl}")`;
         avatarEl.style.backgroundSize = 'cover';
         avatarEl.style.backgroundPosition = 'center';
         avatarEl.textContent = '';
@@ -696,8 +697,9 @@
       if (slugEl) slugEl.textContent = slug;
       if (linkEl) linkEl.href = `https://kick.com/${slug}`;
 
-      if (avatarEl && channelData.user?.profile_pic) {
-        avatarEl.style.backgroundImage = `url('${channelData.user.profile_pic}')`;
+      if (avatarEl && channelData.user?.profile_pic && /^https?:\/\//i.test(channelData.user.profile_pic)) {
+        const safePic = encodeURI(channelData.user.profile_pic).replace(/["'()<>]/g, '');
+        avatarEl.style.backgroundImage = `url("${safePic}")`;
         avatarEl.style.backgroundSize = 'cover';
         avatarEl.textContent = '';
       }

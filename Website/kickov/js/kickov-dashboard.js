@@ -535,8 +535,9 @@
     const clean    = cleanUsername(uname) || 'Streamer';
     if (nameEl) nameEl.textContent = clean;
     if (avatarEl) {
-      if (avatarUrl && avatarUrl.startsWith('http')) {
-        avatarEl.style.backgroundImage    = `url('${avatarUrl}')`;
+      if (avatarUrl && /^https?:\/\//i.test(avatarUrl)) {
+        const safeUrl = encodeURI(avatarUrl).replace(/["'()<>]/g, '');
+        avatarEl.style.backgroundImage    = `url("${safeUrl}")`;
         avatarEl.style.backgroundSize     = 'cover';
         avatarEl.style.backgroundPosition = 'center';
         avatarEl.textContent              = '';

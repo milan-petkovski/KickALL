@@ -406,6 +406,13 @@ function ensureAutoFlushTimer() {
     }
 }
 
+function stopAutoFlushTimer() {
+    if (autoFlushTimer) {
+        clearInterval(autoFlushTimer);
+        autoFlushTimer = null;
+    }
+}
+
 function getActiveSession(chatroomId) {
     return activeSessions.get(String(chatroomId)) || null;
 }
@@ -419,5 +426,6 @@ module.exports = {
     flushSession,
     flushAllSessions,
     getActiveSession,
-    resolveOwnerUserId
+    resolveOwnerUserId,
+    stopAutoFlushTimer
 };

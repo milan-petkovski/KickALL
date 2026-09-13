@@ -21,6 +21,8 @@ function getChannelState(chatroomId) {
             economyDeltas: new Set(), // Usernames koji su se promenili od poslednjeg save-a
             loveModifiers: {},
             marriedCouples: {},
+            loveMetadata: {},
+            dirtyLoveKeys: new Set(),
             watchtime: {},
             watchtimeDeltas: {},
             watchtimeDaily: {},
@@ -87,7 +89,7 @@ function getChannelState(chatroomId) {
             songrequest_settings: {},
 
             // Ekonomija, Nivoi & Kockanje
-            currency_name: 'KickCoins',
+            currency_name: 'Coins',
             xp_per_msg: 15,
             points_per_msg: 5,
             xp_per_watchtime: 50,
@@ -146,7 +148,18 @@ module.exports = {
     instanceId: null,
     isLeader: true,
     isShuttingDown: false,
-    leaderLockTimer: null
+    leaderLockTimer: null,
+
+    // Reconnect i konekcioni guard-ovi
+    isConnecting: false,
+    reconnectTimer: null,
+
+    // Globalni periodični tajmeri
+    syncSubscriptionsTimer: null,
+    checkLiveTimer: null,
+    loveNormalizationTimer: null,
+    memoryCleanupTimer: null,
+    realtimeBotConfigDebounceTimers: new Map()
 };
 
 

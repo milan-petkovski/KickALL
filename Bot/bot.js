@@ -1,22 +1,20 @@
 require('dotenv').config();
-const WebSocket = require('ws');
-const http = require('http');
 
-// Uvoz pomoćnih modula
+// Uvoz konfiguracije i stanja
 const config = require('./src/config');
 const state = require('./src/state');
 const utils = require('./src/utils');
 const database = require('./src/database');
-const spam = require('./src/spam');
-const commands = require('./src/commands');
-const messenger = require('./src/messenger');
-const watchtime = require('./src/watchtime');
-const moderation = require('./src/moderation');
-const economy = require('./src/economy');
-const gambling = require('./src/gambling');
 const kickAuth = require('./src/kickAuth');
+const watchtime = require('./src/watchtime');
 const streamAnalytics = require('./src/streamAnalytics');
 
+// Uvoz modularizovanih podsistema
+const channelManager = require('./src/channelManager');
+const connection = require('./src/connection');
+const httpServer = require('./src/httpServer');
+
+// Inicijalizacija i automatska provera Kick OAuth tokena
 (async () => {
     try {
         const konfigurisano = await kickAuth.proveriKonfiguraciju();
@@ -31,8 +29,6 @@ const streamAnalytics = require('./src/streamAnalytics');
     }
 })();
 
-let botUsernameResolved = config.BOT_USERNAME;
-
 async function detectBotUsername() {
     if (!config.BEARER_TOKEN) return;
     try {
@@ -43,8 +39,8 @@ async function detectBotUsername() {
         if (response.ok) {
             const data = await response.json();
             if (data && data.username) {
-                botUsernameResolved = data.username;
-                utils.log('INFO', `Detektovano korisničko ime bota preko API-ja: @${botUsernameResolved}`);
+                channelManager.setBotUsername(data.username);
+                utils.log('INFO', `Detektovano korisničko ime bota preko API-ja: @${data.username}`);
             }
         }
     } catch (err) {
@@ -52,2513 +48,8 @@ async function detectBotUsername() {
     }
 }
 
-function ukloniSrpskeDijakritike(str) {
-    if (!str) return '';
-    return str
-        .replace(/š/g, 's')
-        .replace(/đ/g, 'd')
-        .replace(/č/g, 'c')
-        .replace(/ć/g, 'c')
-        .replace(/ž/g, 'z')
-        .replace(/Š/g, 's')
-        .replace(/Đ/g, 'd')
-        .replace(/Č/g, 'c')
-        .replace(/Ć/g, 'c')
-        .replace(/Ž/g, 'z');
-}
-
-const CUSTOM_COMMAND_REFRESH_THROTTLE_MS = 5000;
-
-const RANK_LEVELS = {
-    'everyone': 0,
-    'subscriber': 1,
-    'vip': 2,
-    'og': 3,
-    'moderator': 4,
-    'broadcaster': 5
-};
-
-const RANK_LABELS_SR = {
-    'everyone': 'Svi',
-    'subscriber': 'Subovi',
-    'vip': 'VIP',
-    'og': 'OG',
-    'moderator': 'Moderatori',
-    'broadcaster': 'Strimer'
-};
-
-const defaultBuiltinRanks = {
-    // Zabava
-    'iq': 'everyone',
-    'samar': 'everyone',
-    'slap': 'everyone',
-    'roll': 'everyone',
-    'dice': 'everyone',
-    'duel': 'everyone',
-    'ruskirulet': 'everyone',
-    'rr': 'everyone',
-    'russianroulette': 'everyone',
-    'alkotest': 'everyone',
-    'alcohol': 'everyone',
-    'bac': 'everyone',
-    'cinjenica': 'everyone',
-    'fact': 'everyone',
-    
-    // Ljubav & Brak
-    'love': 'everyone',
-    'mrzim': 'everyone',
-    'hate': 'everyone',
-    'vencaj': 'everyone',
-    'marry': 'everyone',
-    'propose': 'everyone',
-    'razvod': 'everyone',
-    'divorce': 'everyone',
-    'brakovi': 'everyone',
-    'brak': 'everyone',
-    'vencani': 'everyone',
-    'marriages': 'everyone',
-    'couples': 'everyone',
-    'posaljiljubav': 'everyone',
-    'sendlove': 'everyone',
-    'bacihejt': 'everyone',
-    'sendhate': 'everyone',
-    'prihvati': 'everyone',
-    'da': 'everyone',
-    'yes': 'everyone',
-    'pristajem': 'everyone',
-    'odbij': 'everyone',
-    'ne': 'everyone',
-    'no': 'everyone',
-    'odbijam': 'everyone',
-    'decline': 'everyone',
-    'cooldown': 'everyone',
-    'coldown': 'everyone',
-    'cd': 'everyone',
-    
-    // Strim Info
-    'komande': 'everyone',
-    'help': 'everyone',
-    'pomoc': 'everyone',
-    'commands': 'everyone',
-    'vreme': 'everyone',
-    'vrijeme': 'everyone',
-    'weather': 'everyone',
-    'uptime': 'everyone',
-    'up': 'everyone',
-    'igra': 'everyone',
-    'game': 'everyone',
-    'info': 'everyone',
-    
-    // Moderacija
-    'permit': 'moderator',
-    'dozvoli': 'moderator',
-    'addcom': 'moderator',
-    'dodajkomandu': 'moderator',
-    'delcom': 'moderator',
-    'obrisikomandu': 'moderator',
-    'osvezi': 'broadcaster',
-    'reload': 'broadcaster',
-    'pin': 'moderator',
-    'unpin': 'broadcaster',
-    'setlive': 'broadcaster',
-    'setgame': 'broadcaster',
-    
-    // Statistika
-    'watchtime': 'everyone',
-    'topwatchtime': 'everyone',
-    'topwatch': 'everyone',
-    'toptime': 'everyone',
-    'top': 'everyone',
-    'topchat': 'everyone',
-    'topchatters': 'everyone',
-    'topchaters': 'everyone',
-    'topporuke': 'everyone',
-    'topmessages': 'everyone',
-    'topcoins': 'everyone',
-    'toppoeni': 'everyone',
-    'toppoints': 'everyone',
-    'leaderboard': 'everyone',
-    'chat': 'everyone',
-    'aktivnost': 'everyone',
-    'poruke': 'everyone',
-    'messages': 'everyone',
-    'time': 'everyone',
-    'sati': 'everyone',
-    'stats': 'everyone',
-    'me': 'everyone',
-    'profil': 'everyone',
-    'profile': 'everyone',
-    'followage': 'everyone',
-    'pratim': 'everyone',
-    'resetleaderboard': 'broadcaster',
-    'resetlb': 'broadcaster',
-    
-    // Ekonomija
-    'rank': 'everyone',
-    'level': 'everyone',
-    'xp': 'everyone',
-    'points': 'everyone',
-    'poeni': 'everyone',
-    'bal': 'everyone',
-    'coins': 'everyone',
-    'daily': 'everyone',
-    'dnevna': 'everyone',
-    'give': 'everyone',
-    'givepoints': 'everyone',
-    'dajpoene': 'everyone',
-    'toplevel': 'everyone',
-    'topxp': 'everyone',
-    
-    // Kockanje
-    'slots': 'everyone',
-    'slot': 'everyone',
-    'roulette': 'everyone',
-    'rulet': 'everyone',
-    'coinflip': 'everyone',
-    'flip': 'everyone',
-    'piskoglava': 'everyone',
-    'gamble': 'everyone',
-    'kockaj': 'everyone',
-    'tocak': 'everyone',
-    'wheel': 'everyone',
-    'spin': 'everyone',
-    'dvoboj': 'everyone',
-    'accept': 'everyone',
-    
-    // Prodavnica
-    'store': 'everyone',
-    'prodavnica': 'everyone',
-    'shop': 'everyone',
-    'redeem': 'everyone',
-    'kupi': 'everyone',
-    'buy': 'everyone',
-    
-    // Muzika
-    'pesma': 'everyone',
-    'sr': 'everyone',
-    'song': 'everyone',
-    'queue': 'everyone',
-    'songqueue': 'everyone',
-    'redpesama': 'everyone',
-    'skip': 'moderator',
-    'skipsong': 'moderator',
-    'preskocipesmu': 'moderator'
-};
-
-function getUserRankLevel(username, senderObj, channelUsername) {
-    const userKey = username.toLowerCase();
-    if (userKey === channelUsername.toLowerCase() || (config.SUPER_ADMIN_USERNAME && userKey === config.SUPER_ADMIN_USERNAME)) return 5; // Streamer / Creator
-
-    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
-    const badges = identity.badges || [];
-
-    if (badges.some(b => b.type === 'broadcaster')) return 5;
-    if (badges.some(b => b.type === 'moderator')) return 4;
-    if (badges.some(b => b.type === 'og')) return 3;
-    if (badges.some(b => b.type === 'vip')) return 2;
-    if (badges.some(b => b.type === 'subscriber' || b.type === 'sub')) return 1;
-
-    return 0; // Svi (everyone)
-}
-
-function proveriDozvoluKomande(chatroomId, username, cmdIme, channelState, senderObj, podrazumevaniRank = 'everyone') {
-    const pronadjena = pronadjiCustomKomandu(channelState, cmdIme);
-    
-    let isEnabled = true;
-    let requiredRank = podrazumevaniRank;
-    
-    if (pronadjena) {
-        isEnabled = pronadjena.cmd.enabled !== false;
-        requiredRank = pronadjena.cmd.min_rank || podrazumevaniRank;
-    }
-    
-    if (!isEnabled) {
-        return { dozvoljeno: false, razlog: 'disabled' };
-    }
-    
-    const userRank = getUserRankLevel(username, senderObj, channelState.channelUsername);
-    if (userRank < RANK_LEVELS[requiredRank]) {
-        return { dozvoljeno: false, razlog: 'rank', requiredRank };
-    }
-    
-    return { dozvoljeno: true };
-}
-
-function pronadjiCustomKomandu(channelState, cmdImeRaw) {
-    if (!channelState.customCommands) return null;
-
-    if (channelState.customCommands[cmdImeRaw]) {
-        return { key: cmdImeRaw, cmd: channelState.customCommands[cmdImeRaw] };
-    }
-
-    const normalizedInput = ukloniSrpskeDijakritike(cmdImeRaw);
-    let foundKey = Object.keys(channelState.customCommands).find(k =>
-        ukloniSrpskeDijakritike(k.toLowerCase()) === normalizedInput
-    );
-
-    // Ako komanda nije pronađena po tačnom nazivu (npr. !up), a komanda je alias za drugu (npr. uptime),
-    // proveri da li u customCommands postoji unos po glavnom ključu (npr. "uptime")
-    if (!foundKey) {
-        const ALIAS_TO_MAIN_KEY = {
-            'up': 'uptime',
-            'topwatch': 'topwatchtime',
-            'help': 'komande',
-            'pomoc': 'komande',
-            'commands': 'komande',
-            'vrijeme': 'vreme',
-            'dozvoli': 'permit',
-            'addcom': 'dodajkomandu',
-            'delcom': 'obrisikomandu',
-            'leaderboard': 'top',
-            'topchat': 'top',
-            'topchatters': 'top',
-            'topchatter': 'top',
-            'topmessages': 'top',
-            'topporuke': 'top',
-            'sati': 'watchtime',
-            'poruke': 'chat',
-            'poruka': 'chat',
-            'stats': 'me',
-            'aktivnost': 'me',
-            'level': 'rank',
-            'xp': 'rank',
-            'poeni': 'points',
-            'bal': 'points',
-            'coins': 'points',
-            'dajpoene': 'givepoints',
-            'pay': 'givepoints',
-            'topxp': 'toplevel',
-            'toppoeni': 'topcoins',
-            'slot': 'slots',
-            'rulet': 'roulette',
-            'piskoglava': 'coinflip',
-            'gamble': 'coinflip',
-            'kockaj': 'coinflip',
-            'wheel': 'tocak',
-            'dvoboj': 'duel',
-            'prodavnica': 'store',
-            'shop': 'store',
-            'kupi': 'redeem',
-            'sr': 'pesma',
-            'song': 'pesma'
-        };
-        const mainKey = ALIAS_TO_MAIN_KEY[normalizedInput];
-        if (mainKey && channelState.customCommands[mainKey]) {
-            foundKey = mainKey;
-        }
-    }
-
-    if (foundKey) {
-        return { key: foundKey, cmd: channelState.customCommands[foundKey] };
-    }
-
-    return null;
-}
-
-async function obradiCustomKomandu(chatroomId, username, porukaNormalized, channelState, senderObj) {
-    if (channelState.feature_autoresponse === false) return false;
-    if (!porukaNormalized.startsWith(channelState.PREFIX || '!')) return false;
-
-    const cmdImeRaw = porukaNormalized.slice((channelState.PREFIX || '!').length).trim();
-    let pronadjena = pronadjiCustomKomandu(channelState, cmdImeRaw);
-
-    if (!pronadjena) {
-        const sada = Date.now();
-        if (sada - (channelState.lastCustomCommandsRefreshTs || 0) >= CUSTOM_COMMAND_REFRESH_THROTTLE_MS) {
-            channelState.lastCustomCommandsRefreshTs = sada;
-            await database.ucitajCustomKomande(chatroomId);
-            pronadjena = pronadjiCustomKomandu(channelState, cmdImeRaw);
-        }
-    }
-
-    if (!pronadjena) return false;
-
-    const { key: cmdIme, cmd: customCmd } = pronadjena;
-
-    // Rank proveru za custom komandu
-    const requiredRank = customCmd.min_rank || 'everyone';
-    const userRank = getUserRankLevel(username, senderObj, channelState.channelUsername);
-    if (userRank < RANK_LEVELS[requiredRank]) {
-        messenger.posaljiPoruku(chatroomId, `❌ @${username}, ova komanda je rezervisana za ulogu: ${RANK_LABELS_SR[requiredRank] || requiredRank}.`);
-        return true; // Konzumirano ali blokirano
-    }
-
-    if (utils.proveraKulauna(chatroomId, 'custom_' + cmdIme, username, customCmd.cooldown)) return true;
-
-    // Inkrementiraj usage brojač u bazi za custom komandu
-    if (database.KORISTI_SUPABASE && database.sbPanels && customCmd.id) {
-        (async () => {
-            try {
-                const nextUsage = (customCmd.usage || 0) + 1;
-                customCmd.usage = nextUsage;
-                await database.sbPanels
-                    .from('custom_commands')
-                    .update({ usage: nextUsage, updated_at: new Date().toISOString() })
-                    .eq('id', customCmd.id);
-            } catch (e) {
-                utils.log('WARN', `[CMDS] Greška pri inkrementiranju usage za komandu ${cmdIme}: ${e.message}`);
-            }
-        })();
-    }
-
-    messenger.posaljiPoruku(chatroomId, customCmd.response);
-    return true;
-}
-
-// ─── WEBSOCKET KONEKCIJA & SPLIT-BRAIN DEDUPLICATION ─────────────────────────
-const processedMessageCache = new Map();
-
-function isDuplicateMessage(msgId) {
-    if (!msgId) return false;
-    const id = String(msgId);
-    const now = Date.now();
-    if (processedMessageCache.has(id)) {
-        return true;
-    }
-    processedMessageCache.set(id, now);
-    if (processedMessageCache.size > 2000) {
-        const threshold = now - 60000;
-        for (const [k, ts] of processedMessageCache.entries()) {
-            if (ts < threshold) processedMessageCache.delete(k);
-        }
-    }
-    return false;
-}
-
-function povezi() {
-    if (state.isShuttingDown) {
-        utils.log('WARN', 'Gašenje u toku — preskačem ponovno povezivanje na WebSocket.');
-        return;
-    }
-
-    // Zaštita od curenja memorije: skidanje listenera i terminacija stare konekcije
-    if (state.ws) {
-        try {
-            state.ws.removeAllListeners();
-            if (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING) {
-                state.ws.terminate();
-            }
-        } catch (_) {}
-        state.ws = null;
-    }
-
-    utils.log('INFO', `Pokušavam konekciju... (pokušaj #${state.reconnectAttempt + 1})`);
-
-    state.ws = new WebSocket(
-        'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false'
-    );
-
-    state.ws.on('open', () => {
-        utils.log('INFO', 'Povezan na Kick server. Šaljem zahtev za pretplatu na sve aktivne kanale...');
-        state.reconnectAttempt = 0;
-        state.isConnected = true;
-
-        for (const chatroomId of Object.keys(state.channels)) {
-            const channelState = state.channels[chatroomId];
-            const subId = channelState.realChatroomId || chatroomId;
-            state.ws.send(JSON.stringify({
-                event: 'pusher:subscribe',
-                data: { channel: `chatrooms.${subId}.v2` }
-            }));
-        }
-
-        startHeartbeat();
-    });
-
-    state.ws.on('message', async (data) => {
-        if (state.isShuttingDown || !state.isLeader) {
-            return;
-        }
-
-        let response;
-        try {
-            response = JSON.parse(data);
-        } catch {
-            return;
-        }
-
-        // Odgovaramo na Pusher ping
-        if (response.event === 'pusher:ping') {
-            state.ws.send(JSON.stringify({ event: 'pusher:pong', data: {} }));
-            return;
-        }
-
-        // Potvrda pretplate
-        if (response.event === 'pusher_internal:subscription_succeeded') {
-            utils.log('INFO', `Uspešno pretplaćen na kanal četa: ${response.channel}`);
-            return;
-        }
-
-        // Ostali događaji sa kanala (Subscription, Gifted Subscription, Follower, Host/Raid, KICKs)
-        if (
-            response.event === 'App\\Events\\SubscriptionEvent' ||
-            response.event === 'App\\Events\\GiftedSubscriptionsEvent' ||
-            response.event === 'App\\Events\\FollowersUpdateEvent' ||
-            response.event === 'App\\Events\\StreamHostEvent' ||
-            response.event === 'StreamHostEvent' ||
-            response.event === 'App\\Events\\KicksGiftedEvent' ||
-            response.event === 'KicksGiftedEvent' ||
-            (typeof response.event === 'string' && (response.event.includes('StreamHost') || response.event.includes('KicksGifted') || response.event.includes('RaidEvent')))
-        ) {
-            let evtData;
-            try {
-                evtData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-            } catch {
-                evtData = null;
-            }
-
-            const match = response.channel ? response.channel.match(/^chatrooms\.(\d+)/) : null;
-            if (match && evtData) {
-                const pusherChatroomId = String(match[1]);
-                let chatroomId = Object.keys(state.channels).find(k => {
-                    const cs = state.channels[k];
-                    return String(cs.realChatroomId) === pusherChatroomId || String(k) === pusherChatroomId;
-                }) || pusherChatroomId;
-
-                const channelState = state.getChannelState(chatroomId);
-                if (channelState && channelState.isStreamLive) {
-                    const activeUser = evtData.username || evtData.follower?.username || evtData.subscriber?.username || evtData.user?.username || evtData.host_username;
-                    if (activeUser && activeUser.toLowerCase() !== channelState.channelUsername.toLowerCase()) {
-                        watchtime.registrujAktivnogGledaoca(chatroomId, activeUser);
-                    }
-                }
-
-                // Chat alertovi (Follow / Sub / Resub / Giftsub / KICKs / Host) — poštuju master toggle "Bot interakcija"
-                // i pojedinačni switch za svaki alert iz panela.
-                if (channelState && channelState.feature_autoresponse !== false) {
-                    const alerts = channelState.alerts_settings || {};
-
-                    if (response.event === 'App\\Events\\FollowersUpdateEvent') {
-                        // Kick šalje ovaj event i za follow i za unfollow — javljamo samo kad je followed !== false
-                        const followedNow = evtData.followed !== false;
-                        const followerName = evtData.username || evtData.follower?.username || evtData.user?.username;
-                        if (followedNow && followerName && alerts.follow_enabled) {
-                            const msg = utils.formatAlertMessage(alerts.follow_message, {
-                                name: followerName,
-                                fallback: `Hvala na praćenju @${followerName}!`
-                            });
-                            if (msg) messenger.posaljiPoruku(chatroomId, msg);
-                        }
-                    }
-
-                    if (response.event === 'App\\Events\\SubscriptionEvent') {
-                        const subName = evtData.username || evtData.subscriber?.username || evtData.user?.username;
-                        const months = evtData.months || evtData.duration || 1;
-                        if (subName) {
-                            const isResub = Number(months) > 1;
-                            const alertOn = isResub ? alerts.resub_enabled : alerts.sub_enabled;
-                            const template = isResub ? alerts.resub_message : alerts.sub_message;
-                            const fallback = isResub
-                                ? `Hvala @${subName} na obnovi pretplate od ${months} meseci!`
-                                : `Hvala na pretplati @${subName}!`;
-                            if (alertOn) {
-                                const msg = utils.formatAlertMessage(template, { name: subName, months, fallback });
-                                if (msg) messenger.posaljiPoruku(chatroomId, msg);
-                            }
-                        }
-                    }
-
-                    if (response.event === 'App\\Events\\GiftedSubscriptionsEvent') {
-                        const gifterName = evtData.gifter_username || evtData.gifter?.username || evtData.username;
-                        const giftedList = evtData.gifted_usernames || evtData.usernames || evtData.recipients || [];
-                        const amount = Array.isArray(giftedList) && giftedList.length ? giftedList.length : (evtData.quantity || 1);
-                        if (gifterName && alerts.giftsub_enabled) {
-                            const msg = utils.formatAlertMessage(alerts.giftsub_message, {
-                                name: gifterName,
-                                amount,
-                                fallback: `Hvala na poklonjenoj pretplati @${gifterName}!`
-                            });
-                            if (msg) messenger.posaljiPoruku(chatroomId, msg);
-                        }
-                    }
-
-                    // Host / Raid alert
-                    if (typeof response.event === 'string' && (response.event.includes('StreamHost') || response.event.includes('RaidEvent'))) {
-                        const hostName = evtData.host_username || evtData.username || evtData.channel?.username || evtData.user?.username;
-                        const viewers = Number(evtData.number_of_viewers || evtData.viewers || evtData.viewers_count || 0);
-                        const minViewers = Number(alerts.host_min_viewers) || 0;
-                        if (hostName && alerts.host_enabled && viewers >= minViewers) {
-                            const msg = utils.formatAlertMessage(alerts.host_message, {
-                                name: hostName,
-                                viewers,
-                                fallback: `@${hostName} Hvala na raid-u sa ${viewers} gledalaca!`
-                            });
-                            if (msg) messenger.posaljiPoruku(chatroomId, msg);
-                        }
-                    }
-
-                    // KICKs donacija alert
-                    if (typeof response.event === 'string' && (response.event.includes('KicksGifted') || response.event.includes('KicksEvent') || response.event.includes('GiftsEvent'))) {
-                        const senderName = evtData.sender?.username || evtData.username || evtData.user?.username || evtData.gifter_username;
-                        const amount = Number(evtData.amount || evtData.kicks || evtData.quantity || 0);
-                        const minAmount = Number(alerts.kicks_min_amount) || 0;
-                        if (senderName && alerts.kicks_enabled && amount >= minAmount) {
-                            const msg = utils.formatAlertMessage(alerts.kicks_message, {
-                                name: senderName,
-                                amount,
-                                fallback: `@${senderName} Hvala na ${amount} KICKs donaciji!`
-                            });
-                            if (msg) messenger.posaljiPoruku(chatroomId, msg);
-                        }
-                    }
-                }
-            }
-            return;
-        }
-
-        // Nova chat poruka
-        const isChatEvent = response.event && (
-            response.event === 'App\\Events\\ChatMessageEvent' ||
-            response.event === 'App\\Events\\ChatMessageSentEvent' ||
-            response.event === 'ChatMessageEvent' ||
-            response.event === 'ChatMessageSentEvent' ||
-            (typeof response.event === 'string' && response.event.includes('ChatMessage'))
-        );
-
-        if (isChatEvent) {
-            let chatData;
-            try {
-                chatData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
-            } catch {
-                return;
-            }
-
-            if (!chatData) return;
-
-            // Split-Brain & Duplicate Event prevencija
-            if (chatData.id && isDuplicateMessage(chatData.id)) {
-                return;
-            }
-
-            const poruka = (chatData.content || chatData.message || '').trim();
-            const username = chatData.sender?.username || chatData.sender?.slug || chatData.user?.username || chatData.username || '';
-
-            if (!poruka || !username) {
-                return;
-            }
-
-            // Ekstrakcija chatroom ID-ja iz koverte Pusher kanala (npr. chatrooms.93361227.v2 ili chatrooms.93361227)
-            const match = response.channel ? response.channel.match(/^chatrooms\.(\d+)/) : null;
-            if (!match) return;
-            const pusherChatroomId = String(match[1]);
-
-            // Nađimo odgovarajući interni chatroomId (baza/state ključ)
-            let chatroomId = Object.keys(state.channels).find(k => {
-                const cs = state.channels[k];
-                return String(cs.realChatroomId) === pusherChatroomId || String(k) === pusherChatroomId;
-            });
-            if (!chatroomId) {
-                chatroomId = pusherChatroomId;
-            }
-
-            const channelState = state.getChannelState(chatroomId);
-            if (!channelState || channelState.botActive === false) {
-                return;
-            }
-
-            const isBotMsg = chatData.sender?.is_bot || false;
-            const userKey = username.toLowerCase();
-            const botKey = (botUsernameResolved || '').toLowerCase();
-
-            // Preskačemo poznate eksterne botove
-            if (userKey === 'kickotbot' || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs') {
-                return;
-            }
-
-            const prefix = channelState.PREFIX || '!';
-            const startsWithPrefix = poruka.startsWith(prefix);
-
-            // Ako je automatska poruka od samog bota (i nije komanda), preskačemo da izbegnemo petlje
-            if (isBotMsg && !startsWithPrefix) {
-                return;
-            }
-            if (botKey && userKey === botKey && !startsWithPrefix) {
-                return;
-            }
-
-            // Autonomous Stream Analytics za Kickan (beleži poruke u realnom vremenu)
-            try {
-                streamAnalytics.recordChatMessage(
-                    chatroomId,
-                    username,
-                    poruka,
-                    chatData.sender?.identity?.badges || chatData.sender?.badges || []
-                );
-            } catch (_) {}
-
-            // Logujemo chat poruku u konzoli / logovima
-            utils.log('CHAT', `[@${channelState.channelUsername || chatroomId}] ${username}: ${poruka}`);
-
-            // Automatska moderacija četa
-            const messageId = chatData.id || chatData.messageId || null;
-            if (moderation.proveriModeraciju(chatroomId, username, poruka, messageId, chatData.sender)) {
-                return;
-            }
-
-            // Anti-spam filter (izuzimamo strimera)
-            if (userKey !== channelState.channelUsername.toLowerCase() && spam.spamFilter(chatroomId, username, poruka)) {
-                // Brišemo spam poruku iz čata (spamFilter je poslao upozorenje)
-                if (messageId) messenger.obrisiPoruku(chatroomId, messageId);
-                return;
-            }
-
-            // Ako poruka počinje sa prefiksom i posle njega ima razmak (npr. "! komanda"), spoj ih
-            let porukaSredjena = poruka;
-            if (startsWithPrefix) {
-                const ostatak = poruka.slice(prefix.length).trim();
-                porukaSredjena = prefix + ostatak;
-            }
-
-            // Welcome message: pošalji pozdravnu poruku ako je alert uključen, poruka je definisana
-            // i korisnik se prvi put javlja u ovoj sesiji
-            const welcomeAlertEnabled = (channelState.alerts_settings || {}).welcome_enabled ?? false;
-            if (welcomeAlertEnabled && channelState.welcome_message && !channelState.welcomedUsers.has(userKey)) {
-                channelState.welcomedUsers.add(userKey);
-                const welcomeMsg = utils.formatTemplateMessage(channelState.welcome_message, username);
-                messenger.posaljiPoruku(chatroomId, welcomeMsg);
-            }
-
-            // Evidentiraj poruku u leaderboardu aktivnosti i dodeli poene (uz sub multiplikator)
-            if (channelState.isStreamLive && !startsWithPrefix && userKey !== channelState.channelUsername.toLowerCase()) {
-                const userRank = getUserRankLevel(username, chatData.sender, channelState.channelUsername);
-                const isSubUser = userRank >= 1; // subscriber, vip, og, mod, broadcaster
-                database.evidentirajPoruku(chatroomId, username, poruka, isSubUser);
-            }
-
-            // Watchtime: registruj korisnika kao aktivnog gledaoca
-            if (channelState.isStreamLive && userKey !== channelState.channelUsername.toLowerCase()) {
-                watchtime.registrujAktivnogGledaoca(chatroomId, username);
-            }
-
-            // Auto-announce brojač po broju poruka (broji SVE poruke u chatu, ne samo komande)
-            if (channelState.isStreamLive && channelState.announce_msg_enabled && userKey !== channelState.channelUsername.toLowerCase()) {
-                channelState.porukePosleAnnounce++;
-                if (channelState.porukePosleAnnounce >= (channelState.announce_message_threshold || 30)) {
-                    const sada = Date.now();
-                    const minGapMs = 5 * 60 * 1000; // 5 minuta
-                    if (sada - channelState.zadnjaAutoPorukaTs >= minGapMs) {
-                        triggerAutoAnnounce(chatroomId);
-                    }
-                }
-            }
-
-            // Ako poruka ne počinje sa ispravnim prefiksom, proveravamo samo mentove, a sve ostale komande preskačemo
-            const porukaLowerOriginal = porukaSredjena.toLowerCase();
-            if (!startsWithPrefix) {
-                if (channelState.feature_autoresponse !== false && porukaLowerOriginal.includes('@' + botUsernameResolved.toLowerCase())) {
-                    const ment = commands.handleBotMentions(chatroomId, username, porukaLowerOriginal);
-                    if (ment) return;
-                }
-                return;
-            }
-
-            // Normalizujemo poruku da uvek interno počinje sa '!' radi kompatibilnosti sa ugrađenim komandama
-            let normalizovanaPoruka = '!' + porukaSredjena.slice(prefix.length).trim();
-            const porukaLower = normalizovanaPoruka.toLowerCase();
-            const porukaNormalized = ukloniSrpskeDijakritike(porukaLower);
-
-            // Ekstrakcija i provera dozvole za ugrađene komande
-            const cmdName = normalizovanaPoruka.slice(1).split(/\s+/)[0].toLowerCase();
-            if (defaultBuiltinRanks[cmdName] !== undefined) {
-                const podrazumevaniRank = defaultBuiltinRanks[cmdName];
-                const provera = proveriDozvoluKomande(chatroomId, username, cmdName, channelState, chatData.sender, podrazumevaniRank);
-                if (!provera.dozvoljeno) {
-                    if (provera.razlog === 'disabled') {
-                        // Komanda je onemogućena na dashboard-u za ovaj kanal — prekidamo izvršavanje bez odgovora
-                        return;
-                    }
-                    if (provera.razlog === 'rank') {
-                        messenger.posaljiPoruku(chatroomId, `❌ @${username}, ova komanda je rezervisana za ulogu: ${RANK_LABELS_SR[provera.requiredRank] || provera.requiredRank}.`);
-                    }
-                    return;
-                }
-                // Evidentiraj korišćenje ugrađene komande u bazi podataka za dashboard brojač
-                database.evidentirajKoriscenjeKomande(chatroomId, cmdName);
-            }
-
-            // Dinamičke komande
-            if (porukaNormalized.startsWith('!vreme') || porukaNormalized.startsWith('!vrijeme') || porukaNormalized.startsWith('!weather')) {
-                const isVreme = porukaNormalized.startsWith('!vreme');
-                const isWeather = porukaNormalized.startsWith('!weather');
-                let grad = '';
-                if (isVreme) grad = porukaSredjena.slice(6).trim();
-                else if (isWeather) grad = porukaSredjena.slice(8).trim();
-                else grad = porukaSredjena.slice(8).trim();
-                if (grad) {
-                    if (utils.proveraKulauna(chatroomId, '!vreme', username)) return;
-                    commands.handleVreme(chatroomId, grad);
-                } else {
-                    messenger.posaljiPoruku(chatroomId, `Upotreba: !vreme <naziv grada> (ili !weather <city>) — npr. !vreme Beograd`);
-                }
-                return;
-            }
-
-            if (porukaNormalized === '!uptime' || porukaNormalized === '!up') {
-                if (utils.proveraKulauna(chatroomId, '!uptime', username)) return;
-                commands.handleUptime(chatroomId);
-                return;
-            }
-
-            if (porukaNormalized === '!igra' || porukaNormalized === '!game') {
-                if (channelState.feature_games === false) return;
-                if (utils.proveraKulauna(chatroomId, '!igra', username)) return;
-                commands.handleIgra(chatroomId);
-                return;
-            }
-
-            if (porukaNormalized === '!watchtime' || porukaNormalized.startsWith('!watchtime ') || porukaNormalized === '!sati' || porukaNormalized.startsWith('!sati ') || porukaNormalized === '!time' || porukaNormalized.startsWith('!time ')) {
-                if (channelState.feature_watchtime === false) return;
-                let args = '';
-                if (porukaNormalized.startsWith('!watchtime')) {
-                    args = normalizovanaPoruka.slice(10).trim();
-                } else if (porukaNormalized.startsWith('!time')) {
-                    args = normalizovanaPoruka.slice(5).trim();
-                } else {
-                    args = normalizovanaPoruka.slice(5).trim();
-                }
-                if (utils.proveraKulauna(chatroomId, '!watchtime', username)) return;
-                watchtime.handleWatchtime(chatroomId, username, args);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!topwatchtime') || porukaNormalized.startsWith('!topwatch') || porukaNormalized.startsWith('!toptime')) {
-                if (channelState.feature_watchtime === false) return;
-                let limit = '';
-                if (porukaNormalized.startsWith('!topwatchtime')) limit = normalizovanaPoruka.slice(13).trim();
-                else if (porukaNormalized.startsWith('!toptime')) limit = normalizovanaPoruka.slice(8).trim();
-                else limit = normalizovanaPoruka.slice(9).trim();
-                if (utils.proveraKulauna(chatroomId, '!topwatchtime', username)) return;
-                watchtime.handleTopWatchtime(chatroomId, limit);
-                return;
-            }
-
-            // ─── NIVOI & EKONOMIJA ─────────────────────────────────────────
-            if (porukaNormalized.startsWith('!rank') || porukaNormalized.startsWith('!level') || porukaNormalized.startsWith('!xp')) {
-                let target = '';
-                if (porukaNormalized.startsWith('!rank')) target = porukaSredjena.slice(5).trim();
-                else if (porukaNormalized.startsWith('!level')) target = porukaSredjena.slice(6).trim();
-                else target = porukaSredjena.slice(3).trim();
-                if (utils.proveraKulauna(chatroomId, '!rank', username)) return;
-                economy.handleRank(chatroomId, username, target);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!points') || porukaNormalized.startsWith('!poeni') || porukaNormalized.startsWith('!bal') || porukaNormalized.startsWith('!coins')) {
-                let target = '';
-                if (porukaNormalized.startsWith('!points')) target = porukaSredjena.slice(7).trim();
-                else if (porukaNormalized.startsWith('!poeni')) target = porukaSredjena.slice(6).trim();
-                else if (porukaNormalized.startsWith('!coins')) target = porukaSredjena.slice(6).trim();
-                else target = porukaSredjena.slice(4).trim();
-                if (utils.proveraKulauna(chatroomId, '!points', username)) return;
-                economy.handlePoints(chatroomId, username, target);
-                return;
-            }
-
-            if (porukaNormalized === '!daily' || porukaNormalized === '!dnevna') {
-                if (utils.proveraKulauna(chatroomId, '!daily', username)) return;
-                economy.handleDaily(chatroomId, username);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!give ') || porukaNormalized.startsWith('!dajpoene ') || porukaNormalized.startsWith('!givepoints ')) {
-                let rest = '';
-                if (porukaNormalized.startsWith('!give ')) rest = porukaSredjena.slice(6).trim();
-                else if (porukaNormalized.startsWith('!dajpoene ')) rest = porukaSredjena.slice(10).trim();
-                else rest = porukaSredjena.slice(12).trim();
-                const parts = rest.split(/\s+/);
-                const target = parts[0] || '';
-                const amount = parts[1] || '';
-                if (utils.proveraKulauna(chatroomId, '!give', username)) return;
-                economy.handleGivePoints(chatroomId, username, target, amount);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!toplevel') || porukaNormalized.startsWith('!topxp')) {
-                const limit = porukaNormalized.startsWith('!toplevel') ? porukaSredjena.slice(9).trim() : porukaSredjena.slice(6).trim();
-                if (utils.proveraKulauna(chatroomId, '!toplevel', username)) return;
-                economy.handleTopLevel(chatroomId, limit);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!topcoins') || porukaNormalized.startsWith('!toppoeni') || porukaNormalized.startsWith('!toppoints')) {
-                let limit = '';
-                if (porukaNormalized.startsWith('!topcoins')) limit = porukaSredjena.slice(9).trim();
-                else if (porukaNormalized.startsWith('!toppoints')) limit = porukaSredjena.slice(10).trim();
-                else limit = porukaSredjena.slice(9).trim();
-                if (utils.proveraKulauna(chatroomId, '!topcoins', username)) return;
-                economy.handleTopCoins(chatroomId, limit);
-                return;
-            }
-
-            // ─── KOCKANJE & KAZINO ──────────────────────────────────────────
-            // Detekcija obrnutog redosleda: "200 !slot" → jasna poruka greške
-            if (/^\d+\s+!slots?$/.test(porukaNormalized)) {
-                messenger.posaljiPoruku(chatroomId, `@${username} Ispravna upotreba: !slot [iznos] (npr. !slot 200)`);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!slots') || porukaNormalized.startsWith('!slot')) {
-                if (channelState.feature_games === false) return;
-                const amount = porukaNormalized.startsWith('!slots') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(5).trim();
-                if (utils.proveraKulauna(chatroomId, '!slots', username)) return;
-                gambling.handleSlots(chatroomId, username, amount);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!roulette') || (porukaNormalized.startsWith('!rulet') && !porukaNormalized.startsWith('!ruskirulet'))) {
-                if (channelState.feature_games === false) return;
-                let rest = '';
-                if (porukaNormalized.startsWith('!roulette')) rest = porukaSredjena.slice(9).trim();
-                else rest = porukaSredjena.slice(6).trim();
-                const parts = rest.split(/\s+/);
-                const opt = parts[0] || '';
-                const amount = parts[1] || '';
-                if (utils.proveraKulauna(chatroomId, '!roulette', username)) return;
-                gambling.handleRoulette(chatroomId, username, opt, amount);
-                return;
-            }
-
-            // Detekcija čestih tipfelera za coinflip — pre provere prave komande
-            if (porukaNormalized.startsWith('!coinsflip') || porukaNormalized.startsWith('!coinflipp') || porukaNormalized.startsWith('!coinfliip')) {
-                messenger.posaljiPoruku(chatroomId, `@${username} Da li si mislio/la: !coinflip [iznos]? (npr. !coinflip 100 glava)`);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!coinflip ') || porukaNormalized === '!coinflip' || porukaNormalized.startsWith('!piskoglava ') || porukaNormalized.startsWith('!gamble ') || porukaNormalized.startsWith('!kockaj ') || porukaNormalized.startsWith('!flip ') || porukaNormalized === '!flip') {
-                if (channelState.feature_games === false) return;
-                let rest = '';
-                if (porukaNormalized.startsWith('!coinflip')) rest = porukaSredjena.slice(9).trim();
-                else if (porukaNormalized.startsWith('!flip')) rest = porukaSredjena.slice(5).trim();
-                else if (porukaNormalized.startsWith('!piskoglava ')) rest = porukaSredjena.slice(12).trim();
-                else if (porukaNormalized.startsWith('!gamble ')) rest = porukaSredjena.slice(8).trim();
-                else rest = porukaSredjena.slice(8).trim();
-
-                const parts = rest.split(/\s+/);
-                const side = parts[0] || 'glava';
-                const amount = parts[1] || parts[0] || '';
-                if (utils.proveraKulauna(chatroomId, '!coinflip', username)) return;
-                gambling.handleCoinflip(chatroomId, username, side, amount);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!tocak') || porukaNormalized.startsWith('!wheel') || porukaNormalized.startsWith('!spin')) {
-                if (channelState.feature_games === false) return;
-                let amount = '';
-                if (porukaNormalized.startsWith('!tocak')) amount = porukaSredjena.slice(6).trim();
-                else if (porukaNormalized.startsWith('!wheel')) amount = porukaSredjena.slice(6).trim();
-                else amount = porukaSredjena.slice(5).trim();
-                if (utils.proveraKulauna(chatroomId, '!wheel', username)) return;
-                gambling.handleWheel(chatroomId, username, amount);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!duel ') || porukaNormalized.startsWith('!dvoboj ')) {
-                if (channelState.feature_games === false) return;
-                const rest = porukaNormalized.startsWith('!duel ') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(8).trim();
-                const parts = rest.split(/\s+/);
-                const target = parts[0] || '';
-                const amount = parts[1] || '';
-                if (utils.proveraKulauna(chatroomId, '!duel', username)) return;
-                gambling.handleDuel(chatroomId, username, target, amount);
-                return;
-            }
-
-
-
-            // ─── PRODAVNICA & NAGRADE ───────────────────────────────────────
-            if (porukaNormalized === '!store' || porukaNormalized === '!prodavnica' || porukaNormalized === '!shop') {
-                if (utils.proveraKulauna(chatroomId, '!store', username)) return;
-                commands.handleStoreList(chatroomId);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!redeem ') || porukaNormalized.startsWith('!kupi ') || porukaNormalized.startsWith('!buy ')) {
-                let query = '';
-                if (porukaNormalized.startsWith('!redeem ')) query = porukaSredjena.slice(8).trim();
-                else if (porukaNormalized.startsWith('!kupi ')) query = porukaSredjena.slice(6).trim();
-                else query = porukaSredjena.slice(5).trim();
-                if (utils.proveraKulauna(chatroomId, '!redeem', username)) return;
-                commands.handleRedeemStore(chatroomId, username, query);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!roll') || porukaNormalized.startsWith('!dice')) {
-                if (channelState.feature_games === false) return;
-                const target = porukaNormalized.startsWith('!roll') ? porukaSredjena.slice(5).trim() : porukaSredjena.slice(5).trim();
-                if (utils.proveraKulauna(chatroomId, '!roll', username)) return;
-                commands.handleRoll(chatroomId, username, target);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!iq')) {
-                if (channelState.feature_games === false) return;
-                const target = porukaSredjena.slice(3).trim();
-                if (utils.proveraKulauna(chatroomId, '!iq', username)) return;
-                commands.handleIq(chatroomId, username, target);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!samar') || porukaNormalized.startsWith('!slap')) {
-                if (channelState.feature_games === false) return;
-                const target = porukaNormalized.startsWith('!samar') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(5).trim();
-                if (utils.proveraKulauna(chatroomId, '!samar', username)) return;
-                commands.handleSamar(chatroomId, username, target);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!ruskirulet') || porukaNormalized.startsWith('!rr') || porukaNormalized.startsWith('!russianroulette')) {
-                if (channelState.feature_games === false) return;
-                if (utils.proveraKulauna(chatroomId, '!ruskirulet', username)) return;
-                commands.handleRulet(chatroomId, username);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!alkotest') || porukaNormalized.startsWith('!alcohol') || porukaNormalized.startsWith('!bac')) {
-                if (channelState.feature_games === false) return;
-                let target = '';
-                if (porukaNormalized.startsWith('!alkotest')) target = porukaSredjena.slice(9).trim();
-                else if (porukaNormalized.startsWith('!alcohol')) target = porukaSredjena.slice(8).trim();
-                else target = porukaSredjena.slice(4).trim();
-                if (utils.proveraKulauna(chatroomId, '!alkotest', username)) return;
-                commands.handleAlkotest(chatroomId, username, target);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!cinjenica') || porukaNormalized.startsWith('!fact')) {
-                if (channelState.feature_games === false) return;
-                if (utils.proveraKulauna(chatroomId, '!cinjenica', username)) return;
-                commands.handleCinjenica(chatroomId);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!followage') || porukaNormalized.startsWith('!pratim')) {
-                const target = porukaNormalized.startsWith('!followage') ? porukaSredjena.slice(10).trim() : porukaSredjena.slice(7).trim();
-                if (utils.proveraKulauna(chatroomId, '!followage', username)) return;
-                commands.handleFollowage(chatroomId, username, target);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!permit') || porukaNormalized.startsWith('!dozvoli')) {
-                const isPermit = porukaNormalized.startsWith('!permit');
-                const target = isPermit ? porukaSredjena.slice(7).trim() : porukaSredjena.slice(8).trim();
-                commands.handlePermit(chatroomId, username, target, chatData.sender);
-                return;
-            }
-
-            if (porukaNormalized === '!komande' || porukaNormalized === '!help' || porukaNormalized === '!pomoc' || porukaNormalized === '!commands') {
-                if (utils.proveraKulauna(chatroomId, '!komande', username)) return;
-                commands.handleHelp(chatroomId, username);
-                return;
-            }
-
-            if (porukaNormalized === '!queue' || porukaNormalized === '!songqueue' || porukaNormalized === '!redpesama') {
-                if (channelState.feature_songrequest === false) return;
-                if (utils.proveraKulauna(chatroomId, '!queue', username)) return;
-                commands.handleSongQueue(chatroomId);
-                return;
-            }
-
-            if (porukaNormalized === '!skip' || porukaNormalized === '!skipsong' || porukaNormalized === '!preskocipesmu') {
-                if (channelState.feature_songrequest === false) return;
-                commands.handleSkipSong(chatroomId, username, chatData.sender);
-                return;
-            }
-
-            if (porukaNormalized === '!pesma' || porukaNormalized === '!sr' || porukaNormalized === '!song' ||
-                porukaNormalized.startsWith('!pesma ') || porukaNormalized.startsWith('!sr ') || porukaNormalized.startsWith('!song ')) {
-                if (channelState.feature_songrequest === false) return;
-                let songQuery = '';
-                if (porukaNormalized.startsWith('!pesma ')) songQuery = porukaSredjena.slice(7).trim();
-                else if (porukaNormalized.startsWith('!sr ')) songQuery = porukaSredjena.slice(4).trim();
-                else if (porukaNormalized.startsWith('!song ')) songQuery = porukaSredjena.slice(6).trim();
-                if (utils.proveraKulauna(chatroomId, '!pesma', username)) return;
-                commands.handlePesma(chatroomId, username, songQuery, chatData.sender);
-                return;
-            }
-
-            if (porukaNormalized === '!info') {
-                if (utils.proveraKulauna(chatroomId, '!info', username)) return;
-                commands.handleInfo(chatroomId);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!love')) {
-                if (channelState.feature_love === false) return;
-                const args = porukaSredjena.slice(5).trim();
-                if (utils.proveraKulauna(chatroomId, '!love', username)) return;
-                commands.handleLove(chatroomId, username, args);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!posaljiljubav') || porukaNormalized.startsWith('!sendlove')) {
-                if (channelState.feature_love === false) return;
-                const isPl = porukaNormalized.startsWith('!posaljiljubav');
-                const targetRaw = isPl ? porukaSredjena.slice(14).trim() : porukaSredjena.slice(9).trim();
-                const targetClean = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
-                if (!targetClean) {
-                    messenger.posaljiPoruku(chatroomId, `@${username}, upotreba: !posaljiljubav @user (ili !sendlove @user)`);
-                    return;
-                }
-
-                const userKey = username.toLowerCase();
-                const sada = Date.now();
-                const zadnji = channelState.loveHateCooldowns[userKey] || 0;
-
-                if (sada - zadnji < config.LOVE_HATE_COOLDOWN_MS) {
-                    const preostaloMs = config.LOVE_HATE_COOLDOWN_MS - (sada - zadnji);
-                    const sati = Math.floor(preostaloMs / 3600000);
-                    const minuti = Math.floor((preostaloMs % 3600000) / 60000);
-                    const sekunde = Math.floor((preostaloMs % 60000) / 1000);
-
-                    let preostaloTekst = '';
-                    if (sati > 0) preostaloTekst += `${sati}h `;
-                    if (minuti > 0) preostaloTekst += `${minuti}min `;
-                    if (sekunde > 0 || (sati === 0 && minuti === 0)) preostaloTekst += `${sekunde}s`;
-
-                    messenger.posaljiPoruku(chatroomId, `❌ @${username}, cooldown: ${preostaloTekst.trim()}.`);
-                    return;
-                }
-
-                const uspesno = commands.handleModifyLove(chatroomId, username, targetClean, 2);
-                if (uspesno) {
-                    channelState.loveHateCooldowns[userKey] = sada;
-                }
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!bacihejt') || porukaNormalized.startsWith('!sendhate')) {
-                if (channelState.feature_love === false) return;
-                const isBh = porukaNormalized.startsWith('!bacihejt');
-                const targetRaw = isBh ? porukaSredjena.slice(9).trim() : porukaSredjena.slice(9).trim();
-                const targetClean = targetRaw.split(/\s+/)[0].replace(/^@/, '').trim();
-                if (!targetClean) {
-                    messenger.posaljiPoruku(chatroomId, `@${username}, upotreba: !bacihejt @user (ili !sendhate @user)`);
-                    return;
-                }
-
-                const userKey = username.toLowerCase();
-                const sada = Date.now();
-                const zadnji = channelState.loveHateCooldowns[userKey] || 0;
-
-                if (sada - zadnji < config.LOVE_HATE_COOLDOWN_MS) {
-                    const preostaloMs = config.LOVE_HATE_COOLDOWN_MS - (sada - zadnji);
-                    const sati = Math.floor(preostaloMs / 3600000);
-                    const minuti = Math.floor((preostaloMs % 3600000) / 60000);
-                    const sekunde = Math.floor((preostaloMs % 60000) / 1000);
-
-                    let preostaloTekst = '';
-                    if (sati > 0) preostaloTekst += `${sati}h `;
-                    if (minuti > 0) preostaloTekst += `${minuti}min `;
-                    if (sekunde > 0 || (sati === 0 && minuti === 0)) preostaloTekst += `${sekunde}s`;
-
-                    messenger.posaljiPoruku(chatroomId, `❌ @${username}, cooldown: ${preostaloTekst.trim()}.`);
-                    return;
-                }
-
-                const uspesno = commands.handleModifyLove(chatroomId, username, targetClean, -5);
-                if (uspesno) {
-                    channelState.loveHateCooldowns[userKey] = sada;
-                }
-                return;
-            }
-
-            if (porukaNormalized === '!cooldown' || porukaNormalized === '!coldown' || porukaNormalized === '!cd') {
-                const userKey = username.toLowerCase();
-                const sada = Date.now();
-                const zadnji = channelState.loveHateCooldowns[userKey] || 0;
-
-                if (sada - zadnji < config.LOVE_HATE_COOLDOWN_MS) {
-                    const preostaloMs = config.LOVE_HATE_COOLDOWN_MS - (sada - zadnji);
-                    const sati = Math.floor(preostaloMs / 3600000);
-                    const minuti = Math.floor((preostaloMs % 3600000) / 60000);
-                    const sekunde = Math.floor((preostaloMs % 60000) / 1000);
-
-                    let preostaloTekst = '';
-                    if (sati > 0) preostaloTekst += `${sati}h `;
-                    if (minuti > 0) preostaloTekst += `${minuti}min `;
-                    if (sekunde > 0 || (sati === 0 && minuti === 0)) preostaloTekst += `${sekunde}s`;
-
-                    messenger.posaljiPoruku(chatroomId, `⏳ @${username}, cooldown: ${preostaloTekst.trim()}.`);
-                } else {
-                    messenger.posaljiPoruku(chatroomId, `✅ @${username}, nema cooldown-a.`);
-                }
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!mrzim') || porukaNormalized.startsWith('!hate')) {
-                if (channelState.feature_love === false) return;
-                const args = porukaNormalized.startsWith('!mrzim') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(5).trim();
-                if (utils.proveraKulauna(chatroomId, '!mrzim', username)) return;
-                commands.handleMrzim(chatroomId, username, args);
-                return;
-            }
-
-            // ─── UNIFICIRANO PRIHVATANJE & ODBIJANJE (DVOBOJ & BRAK) ─────────
-            if (porukaNormalized === '!accept' || porukaNormalized === '!prihvati' || porukaNormalized === '!da' || porukaNormalized === '!pristajem' || porukaNormalized === '!yes') {
-                const userKey = username.toLowerCase();
-                if (channelState.pendingDuels && channelState.pendingDuels[userKey]) {
-                    gambling.handleAcceptDuel(chatroomId, username);
-                    return;
-                }
-                if (channelState.pendingProposals && channelState.pendingProposals[userKey]) {
-                    if (utils.proveraKulauna(chatroomId, '!prihvati', username)) return;
-                    commands.handlePrihvatiBrak(chatroomId, username);
-                    return;
-                }
-                if (porukaNormalized === '!accept') {
-                    gambling.handleAcceptDuel(chatroomId, username);
-                } else {
-                    messenger.posaljiPoruku(chatroomId, `❌ @${username}, nemaš aktivnih poziva za dvoboj niti predloga za brak.`);
-                }
-                return;
-            }
-
-            if (porukaNormalized === '!odbij' || porukaNormalized === '!ne' || porukaNormalized === '!odbijam' || porukaNormalized === '!decline' || porukaNormalized === '!no') {
-                const userKey = username.toLowerCase();
-                if (channelState.pendingDuels && channelState.pendingDuels[userKey]) {
-                    gambling.handleDeclineDuel(chatroomId, username);
-                    return;
-                }
-                if (channelState.pendingProposals && channelState.pendingProposals[userKey]) {
-                    if (utils.proveraKulauna(chatroomId, '!odbij', username)) return;
-                    commands.handleOdbijBrak(chatroomId, username);
-                    return;
-                }
-                messenger.posaljiPoruku(chatroomId, `❌ @${username}, nemaš aktivnih poziva za dvoboj niti predloga za brak.`);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!vencaj') || porukaNormalized.startsWith('!marry') || porukaNormalized.startsWith('!propose')) {
-                if (channelState.feature_love === false) return;
-                let targetRaw = '';
-                if (porukaNormalized.startsWith('!vencaj')) targetRaw = porukaSredjena.slice(7).trim();
-                else if (porukaNormalized.startsWith('!marry')) targetRaw = porukaSredjena.slice(6).trim();
-                else targetRaw = porukaSredjena.slice(8).trim();
-                if (utils.proveraKulauna(chatroomId, '!vencaj', username)) return;
-                commands.handleVencaj(chatroomId, username, targetRaw);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!razvod') || porukaNormalized.startsWith('!divorce')) {
-                if (channelState.feature_love === false) return;
-                const target = porukaNormalized.startsWith('!razvod') ? porukaSredjena.slice(7).trim() : porukaSredjena.slice(8).trim();
-                if (utils.proveraKulauna(chatroomId, '!razvod', username)) return;
-                commands.handleRazvod(chatroomId, username, target);
-                return;
-            }
-
-            if (porukaNormalized === '!brakovi' || porukaNormalized === '!brak' || porukaNormalized === '!vencani' || porukaNormalized === '!marriages' || porukaNormalized === '!couples') {
-                if (channelState.feature_love === false) return;
-                if (utils.proveraKulauna(chatroomId, '!brakovi', username)) return;
-                commands.handleBrakovi(chatroomId);
-                return;
-            }
-
-            // Leaderboard komande
-            if (porukaNormalized.startsWith('!top') || porukaNormalized.startsWith('!leaderboard')) {
-                if (channelState.feature_leaderboard === false) return;
-                let limitStr = '';
-                if (porukaNormalized.startsWith('!top')) {
-                    limitStr = normalizovanaPoruka.slice(4).trim();
-                } else {
-                    limitStr = normalizovanaPoruka.slice(12).trim();
-                }
-                if (utils.proveraKulauna(chatroomId, '!top', username)) return;
-                commands.handleTop(chatroomId, limitStr);
-                return;
-            }
-
-            // Čet aktivnost (!chat, !aktivnost, !poruke, !messages)
-            if (porukaNormalized.startsWith('!chat') || porukaNormalized.startsWith('!aktivnost') || porukaNormalized.startsWith('!poruke') || porukaNormalized.startsWith('!poruka') || porukaNormalized.startsWith('!messages')) {
-                if (channelState.feature_leaderboard === false) return;
-                let target = '';
-                if (porukaNormalized.startsWith('!chat')) target = normalizovanaPoruka.slice(5).trim();
-                else if (porukaNormalized.startsWith('!aktivnost')) target = normalizovanaPoruka.slice(10).trim();
-                else if (porukaNormalized.startsWith('!messages')) target = normalizovanaPoruka.slice(9).trim();
-                else if (porukaNormalized.startsWith('!poruke')) target = normalizovanaPoruka.slice(7).trim();
-                else target = normalizovanaPoruka.slice(7).trim();
-                if (utils.proveraKulauna(chatroomId, '!chat', username)) return;
-                commands.handleAktivnost(chatroomId, username, target);
-                return;
-            }
-
-            // Korisnički profil i karton (!me, !stats, !profil, !profile)
-            if (porukaNormalized.startsWith('!me') || porukaNormalized.startsWith('!stats') || porukaNormalized.startsWith('!profil') || porukaNormalized.startsWith('!profile')) {
-                if (channelState.feature_leaderboard === false) return;
-                let target = '';
-                if (porukaNormalized.startsWith('!me')) target = porukaSredjena.slice(3).trim();
-                else if (porukaNormalized.startsWith('!stats')) target = porukaSredjena.slice(6).trim();
-                else if (porukaNormalized.startsWith('!profile')) target = porukaSredjena.slice(8).trim();
-                else target = porukaSredjena.slice(7).trim();
-                if (utils.proveraKulauna(chatroomId, '!me', username)) return;
-                commands.handleMe(chatroomId, username, target);
-                return;
-            }
-
-            // Admin komande
-            const isAuthorized = username.toLowerCase() === channelState.channelUsername.toLowerCase() ||
-                (config.SUPER_ADMIN_USERNAME && username.toLowerCase() === config.SUPER_ADMIN_USERNAME) ||
-                (chatData.sender.identity &&
-                    chatData.sender.identity.badges &&
-                    chatData.sender.identity.badges.some(b => b.type === 'broadcaster'));
-
-            const canPin = isAuthorized ||
-                (chatData.sender.identity &&
-                    chatData.sender.identity.badges &&
-                    chatData.sender.identity.badges.some(b => b.type === 'moderator'));
-
-            if (porukaNormalized === '!resetleaderboard' || porukaNormalized === '!resetlb') {
-                commands.handleResetLeaderboard(chatroomId, username, isAuthorized);
-                return;
-            }
-
-            if (porukaNormalized === '!osvezi' || porukaNormalized === '!reload') {
-                commands.handleOsvezi(chatroomId, username, isAuthorized);
-                return;
-            }
-
-            if (porukaNormalized === '!pin' || porukaNormalized.startsWith('!pin ')) {
-                if (canPin) {
-                    let tekst = '';
-                    if (porukaNormalized.startsWith('!pin ')) {
-                        tekst = porukaSredjena.slice(5).trim();
-                    } else {
-                        tekst = channelState.STREAM_START_PIN_MESSAGE;
-                    }
-
-                    if (tekst) {
-                        messenger.posaljiIPinujPoruku(chatroomId, tekst);
-                    } else {
-                        messenger.posaljiPoruku(chatroomId, `⚠️ Upotreba: !pin <tekst poruke za pinovanje>`);
-                    }
-                } else {
-                    messenger.posaljiPoruku(chatroomId, `❌ Samo moderatori i strimer mogu pinovati poruku.`);
-                }
-                return;
-            }
-
-            if (porukaNormalized === '!unpin') {
-                if (canPin) {
-                    messenger.odpinujPoruku(chatroomId);
-                } else {
-                    messenger.posaljiPoruku(chatroomId, `❌ Samo moderatori i strimer mogu odpinovati poruku.`);
-                }
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!setlive ')) {
-                if (isAuthorized) {
-                    const val = porukaSredjena.slice(9).trim().toLowerCase();
-                    if (val === 'true') {
-                        channelState.isStreamLive = true;
-                        channelState.manualStreamStartTs = Date.now();
-                        messenger.posaljiPoruku(chatroomId, '🔴 Status strima je ručno podešen na: LIVE.');
-                    } else if (val === 'false') {
-                        channelState.isStreamLive = false;
-                        channelState.manualStreamStartTs = 0;
-                        messenger.posaljiPoruku(chatroomId, '⚪ Status strima je ručno podešen na: OFFLINE.');
-                    } else {
-                        messenger.posaljiPoruku(chatroomId, 'Upotreba: !setlive true or !setlive false');
-                    }
-                }
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!setgame ')) {
-                if (isAuthorized) {
-                    const game = porukaSredjena.slice(9).trim();
-                    if (game) {
-                        channelState.manualGameName = game;
-                        messenger.posaljiPoruku(chatroomId, `🎮 Igra je ručno podešena na: ${game}`);
-                    } else {
-                        messenger.posaljiPoruku(chatroomId, 'Upotreba: !setgame <naziv igre>');
-                    }
-                }
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!addcom ') || porukaNormalized.startsWith('!dodajkomandu ')) {
-                const textRaw = porukaNormalized.startsWith('!addcom ') ? porukaSredjena.slice(8).trim() : porukaSredjena.slice(14).trim();
-                await commands.handleAddCommand(chatroomId, username, textRaw, chatData.sender);
-                return;
-            }
-
-            if (porukaNormalized.startsWith('!delcom ') || porukaNormalized.startsWith('!obrisikomandu ')) {
-                const cmdRaw = porukaNormalized.startsWith('!delcom ') ? porukaSredjena.slice(8).trim() : porukaSredjena.slice(15).trim();
-                await commands.handleDelCommand(chatroomId, username, cmdRaw, chatData.sender);
-                return;
-            }
-
-            // Custom komande iz baze podataka
-            if (await obradiCustomKomandu(chatroomId, username, porukaNormalized, channelState, chatData.sender)) {
-                return;
-            }
-
-
-            // Pošto su statičke komande uklonjene, komande koje se ne prepoznaju biće potpuno ignorisane.
-        }
-    });
-
-    state.ws.on('close', (kod, razlog) => {
-        state.isConnected = false;
-        stopHeartbeat();
-        const opis = razlog ? ` (${razlog})` : '';
-        utils.log('WARN', `Veza prekinuta (kod: ${kod})${opis}`);
-        const isImmediate = kod === 4200 || kod === 4201 || kod === 4202;
-        scheduleReconnect(isImmediate);
-    });
-
-    state.ws.on('error', (greska) => {
-        const isTransient = greska.code === 'ECONNRESET' ||
-                            greska.code === 'ETIMEDOUT' ||
-                            greska.code === 'EPIPE' ||
-                            (greska.message && greska.message.includes('ECONNRESET'));
-        if (isTransient) {
-            utils.log('WARN', `WebSocket prolazni prekid veze (${greska.code || 'ECONNRESET'}): ${greska.message}`);
-        } else {
-            utils.log('ERR', `WebSocket greška: ${greska.message}`);
-        }
-    });
-}
-
-function stopHeartbeat() {
-    if (state.heartbeatTimer) {
-        clearInterval(state.heartbeatTimer);
-        state.heartbeatTimer = null;
-    }
-}
-
-function startHeartbeat() {
-    stopHeartbeat();
-    state.heartbeatTimer = setInterval(() => {
-        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-            state.ws.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
-        }
-    }, config.HEARTBEAT_MS || 25000);
-}
-
-function scheduleReconnect(immediate = false) {
-    if (immediate) {
-        state.reconnectAttempt = 0;
-        utils.log('INFO', 'Hitna rekonekcija na WebSocket (kod 4200/4201) za 0.5s...');
-        setTimeout(povezi, 500);
-        return;
-    }
-    const baseCekanje = Math.min((config.RECONNECT_BASE_MS || 3000) * Math.pow(2, state.reconnectAttempt), config.RECONNECT_MAX_MS || 60000);
-    const jitter = Math.floor(Math.random() * 1000);
-    const cekanje = baseCekanje + jitter;
-    state.reconnectAttempt++;
-    utils.log('INFO', `Pokušavam ponovo za ${(cekanje / 1000).toFixed(1)}s...`);
-    setTimeout(povezi, cekanje);
-}
-
-// Provera statusa strima
-async function proveriDaLiJeLive(chatroomId) {
-    const channelState = state.getChannelState(chatroomId);
-    if (!channelState) return;
-    const channelUsername = channelState.channelUsername;
-    const realId = channelState.realChatroomId || chatroomId;
-
-    try {
-        const res = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}`);
-        if (res.ok) {
-            const data = await res.json();
-            const liveState = !!data.livestream;
-
-            // Moderator check - uklonjeno da bi bot radio i bez moderator statusa
-            const _isModOrOwner = (data.role === 'moderator' || data.role === 'creator' || data.role === 'broadcaster' || channelUsername.toLowerCase() === botUsernameResolved.toLowerCase());
-            channelState.isModerator = true; // Uvek dozvoli bota da radi
-
-            if (database.KORISTI_SUPABASE && database.supabase) {
-                try {
-                    await database.supabase
-                        .from('channels')
-                        .upsert({
-                            id: realId,
-                            username: channelUsername,
-                            is_active: liveState,
-                            updated_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
-                } catch (dbErr) {
-                    utils.log('ERR', `[${channelUsername}] Greška pri upisu statusa strima u bazu: ${dbErr.message}`);
-                }
-            }
-
-            if (liveState && data.livestream) {
-                try {
-                    await streamAnalytics.onStreamLive(chatroomId, channelUsername, data.livestream, channelState.userId);
-                    streamAnalytics.recordViewerCount(chatroomId, data.livestream.viewer_count || 0);
-                } catch (saErr) {
-                    utils.log('WARN', `[${channelUsername}] Greška u streamAnalytics.onStreamLive: ${saErr.message}`);
-                }
-            }
-
-            if (liveState !== channelState.isStreamLive) {
-                channelState.isStreamLive = liveState;
-                utils.log('INFO', `[${channelUsername}] Status strima promenjen: ${channelState.isStreamLive ? '🔴 LIVE' : '⚪ OFFLINE'}`);
-                if (channelState.isStreamLive && !channelState.isFirstLiveCheck) {
-                    utils.log('INFO', `[${channelUsername}] Strim je počeo! Slanje pozdravne poruke i pinovanje...`);
-                    if (channelState.STREAM_START_PIN_MESSAGE) {
-                        messenger.posaljiIPinujPoruku(chatroomId, channelState.STREAM_START_PIN_MESSAGE);
-                    }
-                } else if (!channelState.isStreamLive) {
-                    try {
-                        await streamAnalytics.onStreamOffline(chatroomId, channelUsername);
-                    } catch (saOffErr) {
-                        utils.log('WARN', `[${channelUsername}] Greška u streamAnalytics.onStreamOffline: ${saOffErr.message}`);
-                    }
-                    watchtime.ocistiAktivneGledaoce(chatroomId);
-                    channelState.welcomedUsers.clear(); // Očisti pozdravljene korisnike za sledeći stream
-                    channelState.porukePosleAnnounce = 0; // Resetuj brojač za "broj poruka" pravilo za sledeći stream
-                }
-            }
-            channelState.isFirstLiveCheck = false;
-        }
-    } catch (err) {
-        utils.log('ERR', `[${channelUsername}] Greška pri proveri statusa strima: ${err.message}`);
-    }
-}
-
-async function proveriDaLiSuLiveSvi() {
-    for (const chatroomId of Object.keys(state.channels)) {
-        await proveriDaLiJeLive(chatroomId);
-    }
-}
-
-// ─── AUTO ANNOUNCE ───────────────────────────────────────────────────────────
-function triggerAutoAnnounce(chatroomId) {
-    const channelState = state.getChannelState(chatroomId);
-    if (!channelState || channelState.isModerator === false) return;
-
-    const poruke = channelState.autoAnnounces || [];
-    if (poruke.length === 0) return;
-
-    let idx;
-    do {
-        idx = Math.floor(Math.random() * poruke.length);
-    } while (idx === channelState.zadnjiAutoPorukaIdx && poruke.length > 1);
-
-    channelState.zadnjiAutoPorukaIdx = idx;
-    channelState.porukePosleAnnounce = 0;
-    channelState.zadnjaAutoPorukaTs = Date.now();
-
-    messenger.posaljiPoruku(chatroomId, poruke[idx]);
-}
-
-function pokreniAutoAnnounceTajmer(chatroomId) {
-    const channelState = state.getChannelState(chatroomId);
-    if (!channelState) return;
-
-    if (channelState.autoAnnounceTimer) {
-        clearInterval(channelState.autoAnnounceTimer);
-        channelState.autoAnnounceTimer = null;
-    }
-
-    if (channelState.botActive && channelState.announce_time_enabled && channelState.announce_interval_mins > 0) {
-        channelState.autoAnnounceTimer = setInterval(() => {
-            if (channelState.isStreamLive) {
-                triggerAutoAnnounce(chatroomId);
-            }
-        }, channelState.announce_interval_mins * 60 * 1000);
-    }
-}
-
-// ─── UPRAVLJANJE KANALIMA ──────────────────────────────────────────────────────
-// Mutex guard: sprečava race condition ako se isti kanal pokušava
-// pokrenuti/zaustaviti više puta pre nego što prva operacija završi.
-const pendingChannelOps = new Map();
-
-async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
-    // Ako je operacija za ovaj kanal već u toku, čekamo da završi.
-    if (pendingChannelOps.has(chatroomId)) {
-        await pendingChannelOps.get(chatroomId);
-    }
-
-    let resolve;
-    const guard = new Promise(r => { resolve = r; });
-    pendingChannelOps.set(chatroomId, guard);
-
-    try {
-        utils.log('INFO', `Pokrećem rad na kanalu: @${channelUsername} (ID: ${chatroomId})...`);
-
-    // Inicijalizacija stanja kanala
-    const channelState = state.getChannelState(chatroomId);
-    channelState.channelUsername = channelUsername;
-
-    // Dohvatamo pravi chatroom ID sa Kick API-ja za pretplatu na WS i slanje poruka
-    let realChatroomId = chatroomId;
-    try {
-        const res = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${channelUsername}`);
-        if (res.ok) {
-            const data = await res.json();
-            if (data?.chatroom?.id) {
-                realChatroomId = String(data.chatroom.id);
-                utils.log('INFO', `[${channelUsername}] Nađen pravi chatroom ID: ${realChatroomId} (baza: ${chatroomId})`);
-                if (realChatroomId !== String(chatroomId)) {
-                    database.syncChatroomId(channelUsername, realChatroomId).catch(err => {
-                        utils.log('ERR', `[${channelUsername}] Neuspešna sinhronizacija chatroom ID-ja: ${err.message}`);
-                    });
-                }
-            }
-        }
-    } catch (e) {
-        utils.log('ERR', `[${channelUsername}] Greška pri pronalaženju pravog chatroom ID-ja: ${e.message}`);
-    }
-    channelState.realChatroomId = realChatroomId;
-
-    // Primenjujemo konfiguraciju iz baze uz prolinkovani plan
-    await azurirajKonfiguracijuKanala(channelState, dbConfig);
-
-    // Učitavamo in-memory podatke za ovaj kanal
-    await database.ucitajLeaderboard(chatroomId);
-    await database.ucitajEkonomiju(chatroomId);
-    await database.ucitajLjubav(chatroomId);
-    await database.ucitajCustomKomande(chatroomId);
-    await watchtime.ucitajWatchtime(chatroomId);
-
-        // Ako je WebSocket već otvoren, odmah se pretplatimo na ovaj čet
-        if (state.isConnected && state.ws && state.ws.readyState === WebSocket.OPEN) {
-            state.ws.send(JSON.stringify({
-                event: 'pusher:subscribe',
-                data: { channel: `chatrooms.${channelState.realChatroomId || chatroomId}.v2` }
-            }));
-        }
-
-        // Pokrećemo auto-announce vremenski tajmer za ovaj kanal
-        pokreniAutoAnnounceTajmer(chatroomId);
-
-        // Prva provera da li je live
-        await proveriDaLiJeLive(chatroomId);
-    } finally {
-        resolve();
-        pendingChannelOps.delete(chatroomId);
-    }
-}
-
-async function zaustaviKanal(chatroomId) {
-    // Ako je operacija za ovaj kanal već u toku, čekamo da završi.
-    if (pendingChannelOps.has(chatroomId)) {
-        await pendingChannelOps.get(chatroomId);
-    }
-
-    let resolve;
-    const guard = new Promise(r => { resolve = r; });
-    pendingChannelOps.set(chatroomId, guard);
-
-    try {
-        const channelState = state.channels[chatroomId];
-        if (!channelState) return;
-
-        const displayName = channelState.channelUsername || chatroomId;
-        utils.log('INFO', `Zaustavljam rad na kanalu: @${displayName} (ID: ${chatroomId})...`);
-
-    // Čuvamo podatke koji su izmenjeni
-    if (channelState.leaderboardDirty) {
-        await database.sacuvajLeaderboard(chatroomId);
-    }
-    if (channelState.loveDirty) {
-        await database.sacuvajLjubav(chatroomId);
-    }
-    if (channelState.watchtimeDirty) {
-        await watchtime.sacuvajWatchtime(chatroomId);
-    }
-    if (channelState.economyDirty) {
-        await database.sacuvajEkonomiju(chatroomId);
-    }
-
-        // Otkazivanje pretplate sa četa
-        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-            const subId = channelState.realChatroomId || chatroomId;
-            state.ws.send(JSON.stringify({
-                event: 'pusher:unsubscribe',
-                data: { channel: `chatrooms.${subId}.v2` }
-            }));
-        }
-
-        // Čišćenje tajmera
-        if (channelState.autoAnnounceTimer) {
-            clearInterval(channelState.autoAnnounceTimer);
-        }
-        if (channelState.economySaveTimer) {
-            clearTimeout(channelState.economySaveTimer);
-            channelState.economySaveTimer = null;
-        }
-
-        delete state.channels[chatroomId];
-    } finally {
-        resolve();
-        pendingChannelOps.delete(chatroomId);
-    }
-}
-
-async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
-    if (dbConfig.user_id) {
-        await database.ucitajUserPlan(dbConfig.user_id, dbConfig.channel_id);
-    }
-    const limits = channelState.planLimits || config.PLAN_LIMITS.free;
-
-    channelState.PREFIX = dbConfig.prefix || '!';
-    channelState.COOLDOWN_MS = Math.max(dbConfig.cooldown_ms ?? 3000, limits.minCooldownMs || 3000);
-    channelState.SPAM_THRESHOLD = dbConfig.spam_threshold ?? 3;
-    channelState.SPAM_WINDOW_MS = dbConfig.spam_window_ms ?? 15000;
-
-    channelState.STREAM_START_PIN_MESSAGE = dbConfig.stream_pin_msg || '';
-    channelState.welcome_message = dbConfig.welcome_message || '';
-    await database.ucitajAlerts(dbConfig.channel_id);
-
-    channelState.feature_leaderboard = limits.allowLeaderboard && (dbConfig.feature_leaderboard ?? true);
-    channelState.feature_watchtime = limits.allowWatchtime && (dbConfig.feature_watchtime ?? true);
-    channelState.feature_games = limits.allowGambling && (dbConfig.feature_games ?? true);
-    channelState.feature_love = limits.allowLove && (dbConfig.feature_love ?? true);
-    channelState.feature_moderation = limits.allowAdvancedModeration && (dbConfig.feature_moderation ?? false);
-    channelState.feature_autoresponse = dbConfig.feature_autoresponse ?? true;
-    channelState.feature_songrequest = limits.allowSongRequest && (dbConfig.feature_songrequest ?? false);
-    channelState.songrequest_settings = dbConfig.songrequest_settings || {};
-    channelState.botActive = dbConfig.bot_active || false;
-
-    await database.ucitajAutoAnnounces(dbConfig.channel_id);
-
-    channelState.announce_interval_mins = dbConfig.announce_interval_mins ?? 15;
-    channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 10;
-    channelState.announce_time_enabled = dbConfig.announce_time_enabled ?? true;
-    channelState.announce_msg_enabled = dbConfig.announce_msg_enabled ?? true;
-    channelState.moderationSettings = dbConfig.moderation_settings || {};
-    channelState.currency_name = dbConfig.currency_name || 'Koins';
-    channelState.max_gamble_amount = dbConfig.max_gamble_amount || 5000;
-    channelState.gamble_enabled = dbConfig.gamble_enabled ?? true;
-    channelState.first_interaction_bonus = dbConfig.first_interaction_bonus ?? 100;
-    channelState.sub_multiplier = dbConfig.sub_multiplier ?? 2.0;
-    channelState.sub_bonus_per_msg = dbConfig.sub_bonus_per_msg ?? 10;
-    channelState.points_per_sub = dbConfig.points_per_sub ?? 1000;
-    channelState.points_per_gift_sub = dbConfig.points_per_gift_sub ?? 2000;
-    channelState.points_per_100_kicks = dbConfig.points_per_100_kicks ?? 500;
-    // Kolone u bazi su `points_daily_streak` i `points_per_raid` (vidi database.js ucitajBotConfig)
-    channelState.daily_streak_bonus = dbConfig.points_daily_streak ?? 150;
-    channelState.host_raid_bonus = dbConfig.points_per_raid ?? 300;
-
-    const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
-    const rawStore = Array.isArray(dbConfig.store_items) ? dbConfig.store_items : [];
-    channelState.store_items = rawStore.slice(0, maxStoreItems);
-}
-
-
-// ─── GLOBAL CRASH PROTECTION ──────────────────────────────────────────────────
-process.on('uncaughtException', async (err) => {
-    utils.log('ERR', `Neuhvaćena greška (uncaughtException): ${err.stack || err.message}`);
-    utils.log('WARN', 'Pokrećem gracefulShutdown radi bezbednog ponovnog pokretanja bota...');
-    try {
-        await gracefulShutdown('uncaughtException');
-    } catch (shutdownErr) {
-        console.error('Shutdown failed during uncaughtException:', shutdownErr);
-        process.exit(1);
-    }
-});
-
-process.on('unhandledRejection', (reason, _promise) => {
-    const msg = reason instanceof Error ? reason.stack : String(reason);
-    utils.log('ERR', `Neobrađeno obećanje (unhandledRejection): ${msg}`);
-});
-
-const ALLOWED_KICK_REDIRECT_URIS = new Set([
-    'http://localhost:5500/auth/kick/callback',
-    'http://localhost:5500/auth/kick/callback/',
-    'http://127.0.0.1:5500/auth/kick/callback',
-    'http://127.0.0.1:5500/auth/kick/callback/',
-    'http://localhost:8888/auth/kick/callback',
-    'http://localhost:8888/auth/kick/callback/',
-    'http://127.0.0.1:8888/auth/kick/callback',
-    'http://127.0.0.1:8888/auth/kick/callback/',
-    'https://kickall.app/auth/kick/callback',
-    'https://kickall.app/auth/kick/callback/',
-    'http://localhost:5500/Website/auth/kick/callback',
-    'http://localhost:5500/Website/auth/kick/callback/',
-    'http://127.0.0.1:5500/Website/auth/kick/callback',
-    'http://127.0.0.1:5500/Website/auth/kick/callback/',
-    'http://localhost:8888/Website/auth/kick/callback',
-    'http://localhost:8888/Website/auth/kick/callback/',
-    'http://127.0.0.1:8888/Website/auth/kick/callback',
-    'http://127.0.0.1:8888/Website/auth/kick/callback/'
-]);
-
-function normalizeKickRedirectUri(uri) {
-    if (!uri || typeof uri !== 'string') return null;
-
-    try {
-        const parsed = new URL(uri);
-        // Preserve trailing slash for OAuth exact matching
-        return `${parsed.origin}${parsed.pathname}`;
-    } catch {
-        return null;
-    }
-}
-
-function resolveKickRedirectUri(candidate) {
-    // If candidate is provided and in allowed list, use it
-    if (candidate) {
-        const normalizedCandidate = normalizeKickRedirectUri(candidate);
-        if (ALLOWED_KICK_REDIRECT_URIS.has(candidate) || ALLOWED_KICK_REDIRECT_URIS.has(normalizedCandidate)) {
-            return candidate;
-        }
-    }
-
-    // Fallback to env var or production
-    const envUri = process.env.KICK_REDIRECT_URI;
-    if (envUri) {
-        const normalizedEnvUri = normalizeKickRedirectUri(envUri);
-        if (ALLOWED_KICK_REDIRECT_URIS.has(envUri) || ALLOWED_KICK_REDIRECT_URIS.has(normalizedEnvUri)) {
-            return envUri;
-        }
-    }
-
-    return 'https://kickall.app/auth/kick/callback/';
-}
-
-function verifyInternalToken(req) {
-    const rawSecret = process.env.INTERNAL_API_SECRET || process.env.INTERNAL_SECRET;
-    if (!rawSecret) {
-        utils.log('ERR', '[AUTH] CRITICAL: INTERNAL_API_SECRET is missing. Rejecting internal admin request (fail-closed).');
-        return false;
-    }
-    const validSecrets = String(rawSecret).split(',').map(s => s.trim()).filter(Boolean);
-    if (validSecrets.length === 0) return false;
-
-    const tokenHeader = req.headers['x-internal-token'] || req.headers['x-internal-secret'];
-    const authHeader = req.headers['authorization'];
-
-    for (const secret of validSecrets) {
-        if (tokenHeader && tokenHeader === secret) return true;
-        if (authHeader && (authHeader === `Bearer ${secret}` || authHeader === secret)) return true;
-    }
-    return false;
-}
-
-function readRequestBody(req, res, maxBytes = 50000) {
-    return new Promise((resolve, reject) => {
-        let body = '';
-        let receivedBytes = 0;
-
-        req.on('data', chunk => {
-            receivedBytes += chunk.length;
-            if (receivedBytes > maxBytes) {
-                res.writeHead(413, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Payload too large', detail: `Request body exceeds ${maxBytes} bytes limit` }));
-                req.destroy();
-                return reject(new Error('PAYLOAD_TOO_LARGE'));
-            }
-            body += chunk.toString();
-        });
-
-        req.on('end', () => {
-            resolve(body);
-        });
-
-        req.on('error', err => {
-            reject(err);
-        });
-    });
-}
-
-async function handleHttpRequest(req, res) {
-    const origin = req.headers['origin'];
-    const allowedOrigins = [
-        process.env.ALLOWED_ORIGIN,
-        'https://kickall.app',
-        'https://www.kickall.app',
-        'http://localhost:8888',
-        'http://127.0.0.1:8888',
-        'http://localhost:5500',
-        'http://127.0.0.1:5500',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000'
-    ].filter(Boolean);
-
-    if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.netlify.app'))) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-    } else {
-        res.setHeader('Access-Control-Allow-Origin', 'https://kickall.app');
-    }
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Internal-Token');
-
-    if (req.method === 'OPTIONS') {
-        res.writeHead(200);
-        res.end();
-        return;
-    }
-
-    try {
-        const parsedUrl = new URL(req.url, 'http://localhost');
-
-        // ─── Kick OAuth2 Callback ─────────────────────────────────────────────
-        if (parsedUrl.pathname === '/auth/kick/callback') {
-            const code = parsedUrl.searchParams.get('code');
-            const redirectUri = resolveKickRedirectUri(parsedUrl.searchParams.get('redirect_uri'));
-            if (!code) {
-                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-                res.end('Greška: nedostaje OAuth code parametar.');
-                return;
-            }
-
-            try {
-                const tokenRes = await fetch('https://id.kick.com/oauth/token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        grant_type: 'authorization_code',
-                        client_id: process.env.KICK_CLIENT_ID,
-                        client_secret: process.env.KICK_CLIENT_SECRET,
-                        redirect_uri: redirectUri,
-                        code: code,
-                        code_verifier: parsedUrl.searchParams.get('code_verifier') || '' // Ako se zove direktno
-                    }).toString()
-                });
-
-                if (!tokenRes.ok) {
-                    const errText = await tokenRes.text();
-                    utils.log('ERR', `Kick OAuth token greška: ${errText}`);
-                    res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8' });
-                    res.end('Greška pri razmeni koda za token.');
-                    return;
-                }
-
-                const tokenData = await tokenRes.json();
-                const accessToken = tokenData.access_token;
-                const tokenType = tokenData.token_type || 'Bearer';
-                const expiresIn = tokenData.expires_in || 3600;
-
-                utils.log('INFO', 'Kick OAuth2: Uspešno dobijen access_token.');
-
-                // Bezbedno preusmeri korisnika na dashboard stranicu
-                const dashboardUrl = `/Website/kickot/dashboard.html#kick_token=${encodeURIComponent(accessToken)}&token_type=${encodeURIComponent(tokenType)}&expires_in=${expiresIn}`;
-                res.writeHead(302, { 'Location': dashboardUrl });
-                res.end();
-            } catch (tokenErr) {
-                utils.log('ERR', `Kick OAuth grešk pri token razmeni: ${tokenErr.message}`);
-                res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-                res.end('Interna greška pri OAuth autorizaciji.');
-            }
-            return;
-        }
-
-        // ─── Kick OAuth2 Token Exchange API (za Live Server / 5500) ──────────
-        if (parsedUrl.pathname === '/api/kick/exchange' && req.method === 'POST') {
-            let body = '';
-            req.on('data', chunk => { body += chunk.toString(); });
-            req.on('end', async () => {
-                try {
-                    const params = new URLSearchParams(body);
-                    const code = params.get('code');
-                    const codeVerifier = params.get('code_verifier') || '';
-                    const requestedRedirectUri = params.get('redirect_uri');
-                    const normalizedRequestedRedirectUri = normalizeKickRedirectUri(requestedRedirectUri);
-                    const redirectUri = resolveKickRedirectUri(requestedRedirectUri);
-                    if (!code) {
-                        res.writeHead(400, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'Missing code' }));
-                        return;
-                    }
-
-                    if (requestedRedirectUri && !normalizedRequestedRedirectUri) {
-                        res.writeHead(400, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'Invalid redirect_uri format' }));
-                        return;
-                    }
-
-                    if (normalizedRequestedRedirectUri && !ALLOWED_KICK_REDIRECT_URIS.has(normalizedRequestedRedirectUri)) {
-                        res.writeHead(400, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'redirect_uri is not allowed' }));
-                        return;
-                    }
-
-                    const tokenRes = await fetch('https://id.kick.com/oauth/token', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        body: new URLSearchParams({
-                            grant_type: 'authorization_code',
-                            client_id: process.env.KICK_CLIENT_ID,
-                            client_secret: process.env.KICK_CLIENT_SECRET,
-                            redirect_uri: redirectUri,
-                            code: code,
-                            code_verifier: codeVerifier
-                        }).toString()
-                    });
-
-                    if (!tokenRes.ok) {
-                        const errText = await tokenRes.text();
-                        utils.log('ERR', `[AUTH] Kick token exchange greška: ${errText}`);
-                        res.writeHead(502, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({ error: 'Token exchange failed', detail: errText }));
-                        return;
-                    }
-
-                    const tokenData = await tokenRes.json();
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({
-                        access_token: tokenData.access_token,
-                        token_type: tokenData.token_type || 'Bearer',
-                        expires_in: tokenData.expires_in || 3600,
-                        scope: tokenData.scope || ''
-                    }));
-                } catch (err) {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-                }
-            });
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/kick/me' && req.method === 'GET') {
-            const authHeader = req.headers['authorization'];
-            if (!authHeader) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Missing authorization header' }));
-                return;
-            }
-
-            try {
-                let username = '';
-                let userId = '';
-                let avatar = '';
-
-                let kickUserRes = await fetch('https://api.kick.com/public/v1/users', {
-                    headers: { 'Authorization': authHeader }
-                });
-
-                if (kickUserRes.ok) {
-                    const kickData = await kickUserRes.json();
-                    const kickUser = Array.isArray(kickData?.data) ? kickData.data[0] : kickData?.data || kickData;
-                    username = kickUser?.username || kickUser?.name || '';
-                    userId = kickUser?.user_id || kickUser?.id || '';
-                    avatar = kickUser?.profile_picture || kickUser?.profile_pic || '';
-                } else {
-                    let altRes = await fetch('https://id.kick.com/oauth/userinfo', {
-                        headers: { 'Authorization': authHeader }
-                    });
-                    if (altRes.ok) {
-                        const altData = await altRes.json();
-                        username = altData?.preferred_username || altData?.name || altData?.sub || '';
-                        userId = altData?.sub || '';
-                        avatar = altData?.picture || '';
-                    }
-                }
-
-                if (!username) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Could not retrieve user info from Kick OAuth' }));
-                    return;
-                }
-
-                const channelRes = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${username}`);
-                let chatroomId = userId;
-                let slug = username;
-                if (channelRes.ok) {
-                    const channelData = await channelRes.json();
-                    chatroomId = channelData?.chatroom?.id || chatroomId;
-                    slug = channelData?.slug || slug;
-                    avatar = channelData?.user?.profile_pic || avatar;
-                }
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                    id: userId,
-                    username: username,
-                    slug: slug,
-                    avatar: avatar,
-                    profile_pic: avatar,
-                    chatroom_id: chatroomId
-                }));
-            } catch (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/avatar') {
-            const username = parsedUrl.searchParams.get('username');
-            if (!username) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Missing username parameter' }));
-                return;
-            }
-
-            try {
-                const channelRes = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${username}`);
-                let avatar = '';
-                let chatroomId = '';
-                let userId = '';
-                let slug = username;
-
-                if (channelRes.ok) {
-                    const channelData = await channelRes.json();
-                    avatar = channelData?.user?.profile_pic || '';
-                    chatroomId = channelData?.chatroom?.id || '';
-                    userId = channelData?.user_id ? String(channelData.user_id) : '';
-                    slug = channelData?.slug || username;
-                }
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                    id: userId,
-                    username: username,
-                    slug: slug,
-                    avatar: avatar,
-                    chatroom_id: chatroomId
-                }));
-            } catch (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-            }
-            return;
-        }
-
-        // Global logout endpoint (zahteva autentikaciju)
-        if (parsedUrl.pathname === '/api/global-logout' && req.method === 'POST') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized', detail: 'Missing or invalid authentication token' }));
-                return;
-            }
-            try {
-                const body = await new Promise((resolve) => {
-                    let data = '';
-                    req.on('data', chunk => data += chunk);
-                    req.on('end', () => resolve(data));
-                });
-                const { userId } = JSON.parse(body || '{}');
-
-                if (!global.logoutCache) {
-                    global.logoutCache = new Map();
-                }
-                if (userId) {
-                    global.logoutCache.set(userId, Date.now());
-                }
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true }));
-            } catch (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-            }
-            return;
-        }
-
-        // Check logout status endpoint
-        if (parsedUrl.pathname === '/api/check-logout' && req.method === 'GET') {
-            try {
-                const userId = parsedUrl.searchParams.get('userId');
-                let shouldLogout = false;
-
-                if (global.logoutCache && userId) {
-                    const logoutTime = global.logoutCache.get(userId);
-                    if (logoutTime && Date.now() - logoutTime < 300000) { // 5 minutes
-                        shouldLogout = true;
-                    }
-                }
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ shouldLogout }));
-            } catch (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Internal error', detail: err.message }));
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/kick/channel') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized access to channel endpoint' }));
-                return;
-            }
-            const username = parsedUrl.searchParams.get('username');
-            if (!username) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Missing username parameter' }));
-                return;
-            }
-
-            try {
-                const apiRes = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${username}`);
-                if (apiRes.ok) {
-                    const data = await apiRes.json();
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(data));
-                } else {
-                    res.writeHead(apiRes.status, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: `Kick API returned status ${apiRes.status}` }));
-                }
-            } catch (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message }));
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/kick/follow-check' && req.method === 'GET') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized access to follow-check endpoint' }));
-                return;
-            }
-            const channel = parsedUrl.searchParams.get('channel') || parsedUrl.searchParams.get('channelUsername');
-            const username = parsedUrl.searchParams.get('username');
-            if (!channel || !username) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Missing channel or username parameter' }));
-                return;
-            }
-            const cleanChannel = String(channel).trim().toLowerCase().replace(/^@/, '');
-            const cleanTarget = String(username).trim().toLowerCase().replace(/^@/, '');
-
-            try {
-                let data = null;
-                // 1. Primarno: Kick v2 API /api/v2/channels/{channel}/users/{username}
-                try {
-                    const resV2 = await utils.fetchKickAPI(`https://kick.com/api/v2/channels/${cleanChannel}/users/${cleanTarget}`);
-                    if (resV2 && resV2.ok) {
-                        data = await resV2.json();
-                    }
-                } catch (_) { }
-
-                // 2. Fallback preko zvaničnog Public API-ja (ako imamo token)
-                if (!data || !data.following_since) {
-                    try {
-                        const token = await kickAuth.getAccessToken();
-                        if (token) {
-                            const resAuth = await fetch(`https://api.kick.com/public/v1/channels/${cleanChannel}/users/${cleanTarget}`, {
-                                headers: {
-                                    'Authorization': `Bearer ${token}`,
-                                    'Accept': 'application/json'
-                                }
-                            });
-                            if (resAuth.ok) {
-                                const authData = await resAuth.json();
-                                if (authData && (authData.following_since || authData.followed_at)) {
-                                    data = { ...data, ...authData };
-                                }
-                            }
-                        }
-                    } catch (_) { }
-                }
-
-                // 3. Kick v2 users API vraća following_since (ISO timestamp ili null ako ne prati)
-                const rawDate = data ? (data.following_since || data.followed_at || data.follow_date) : null;
-                if (rawDate) {
-                    const followDate = new Date(rawDate);
-                    if (!isNaN(followDate.getTime())) {
-                        const diffTime = Math.max(0, Date.now() - followDate.getTime());
-                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                        res.writeHead(200, { 'Content-Type': 'application/json' });
-                        res.end(JSON.stringify({
-                            is_following: true,
-                            follow_days: diffDays,
-                            follow_date: followDate.toISOString(),
-                            subscribed_months: typeof data.subscribed_for === 'number' ? data.subscribed_for : 0,
-                            username: cleanTarget,
-                            channel: cleanChannel
-                        }));
-                        return;
-                    }
-                }
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                    is_following: false,
-                    follow_days: 0,
-                    follow_date: null,
-                    subscribed_months: (data && typeof data.subscribed_for === 'number') ? data.subscribed_for : 0,
-                    username: cleanTarget,
-                    channel: cleanChannel
-                }));
-            } catch (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: err.message, is_following: false, follow_days: 0 }));
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/kick/logs' && req.method === 'GET') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized access to bot logs' }));
-                return;
-            }
-            const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
-            const channelState = chatroomId ? state.getChannelState(chatroomId) : null;
-            const channelUsername = channelState ? channelState.channelUsername : null;
-
-            let filteredLogs = state.globalLogs || [];
-            if (channelUsername) {
-                const lowerUsername = channelUsername.toLowerCase();
-                filteredLogs = filteredLogs.filter(l => 
-                    (l.message && l.message.toLowerCase().includes(`[${lowerUsername}]`)) ||
-                    (l.message && l.message.toLowerCase().includes(`@${lowerUsername}`))
-                );
-            }
-
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify(filteredLogs));
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/kick/test-ping' && req.method === 'POST') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized access to test-ping' }));
-                return;
-            }
-            try {
-                const body = await readRequestBody(req, res, 50000);
-                const params = new URLSearchParams(body);
-                const chatroomId = params.get('chatroom_id');
-                if (!chatroomId) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Missing chatroom_id parameter' }));
-                    return;
-                }
-
-                // Izvrši slanje sinhrono da vidimo da li uspeva
-                await messenger.izvrsiSlanje(chatroomId, '🤖 Veza je uspešno testirana! 🟢');
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true, message: 'Test message sent' }));
-            } catch (err) {
-                if (err.message !== 'PAYLOAD_TOO_LARGE') {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Failed to send message', detail: err.message }));
-                }
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/kick/send-message' && req.method === 'POST') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized access to send-message' }));
-                return;
-            }
-            try {
-                const body = await readRequestBody(req, res, 50000);
-                let chatroomId = '';
-                let channelUsername = '';
-                let message = '';
-                try {
-                    const json = JSON.parse(body);
-                    chatroomId = json.chatroom_id || json.channel_id;
-                    channelUsername = json.channel_username || json.username;
-                    message = json.message;
-                } catch (_) {
-                    const params = new URLSearchParams(body);
-                    chatroomId = params.get('chatroom_id') || params.get('channel_id');
-                    channelUsername = params.get('channel_username') || params.get('username');
-                    message = params.get('message');
-                }
-
-                if (!chatroomId || !message) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Missing chatroom_id or message parameter' }));
-                    return;
-                }
-
-                const idStr = String(chatroomId);
-                const channelState = state.getChannelState(idStr);
-                if (channelState && channelUsername && !channelState.channelUsername) {
-                    channelState.channelUsername = channelUsername;
-                }
-
-                messenger.posaljiPoruku(idStr, String(message).trim());
-
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true, message: 'Message queued for sending' }));
-            } catch (err) {
-                if (err.message !== 'PAYLOAD_TOO_LARGE') {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Failed to send message', detail: err.message }));
-                }
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/kick/update-session' && req.method === 'POST') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized' }));
-                return;
-            }
-            try {
-                const body = await readRequestBody(req, res, 50000);
-                const json = JSON.parse(body);
-                const cookie = json.session_cookie || json.cookie;
-                if (!cookie || typeof cookie !== 'string' || cookie.trim().length < 10) {
-                    res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Missing or invalid session_cookie' }));
-                    return;
-                }
-                const ok = await kickAuth.saveSessionCookie(cookie.trim());
-                if (ok) {
-                    res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: true, message: 'Sesijski kolačić uspešno sačuvan u Supabase.' }));
-                } else {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Greška pri čuvanju sesijskog kolačića u Supabase.' }));
-                }
-            } catch (err) {
-                if (err.message !== 'PAYLOAD_TOO_LARGE') {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Interna greška', detail: err.message }));
-                }
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/internal/subscription-sync' && req.method === 'POST') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized' }));
-                return;
-            }
-            try {
-                const body = await readRequestBody(req, res, 50000);
-                const json = JSON.parse(body || '{}');
-                const userId = json.userId || json.clientReferenceId;
-                if (userId) {
-                    for (const chatroomId of Object.keys(state.channels)) {
-                        const chState = state.channels[chatroomId];
-                        if (chState && chState.userId === userId) {
-                            await database.ucitajUserPlan(userId, chatroomId);
-                            await database.ucitajCustomKomande(chatroomId);
-                            utils.log('INFO', `[SubscriptionSync] Osvežen plan za korisnika ${userId} (@${chState.channelUsername}).`);
-                        }
-                    }
-                }
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true }));
-            } catch (err) {
-                if (err.message !== 'PAYLOAD_TOO_LARGE') {
-                    res.writeHead(500, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Interna greška pri sinhronizaciji pretplate', detail: err.message }));
-                }
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/kick/reload') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized access to reload endpoint' }));
-                return;
-            }
-            const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
-            if (!chatroomId) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Missing chatroom_id parameter' }));
-                return;
-            }
-
-            try {
-                const cs = state.getChannelState(chatroomId);
-                if (cs) {
-                    // Samo reloadujemo konfiguraciju u memoriji — bez stop/start.
-                    // Supabase Realtime listener je zaduzen za reagovanje na bot_active promenama.
-                    await database.ucitajCustomKomande(chatroomId);
-                    await database.ucitajBotConfig(chatroomId);
-                }
-
-                utils.log('INFO', `[${chatroomId}] Bot konfiguracija i komande uspešno reloadovani preko API poziva.`);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true, message: 'Reloaded successfully' }));
-            } catch (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Failed to reload', detail: err.message }));
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/kick/check-moderator') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized access to check-moderator endpoint' }));
-                return;
-            }
-            const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
-            if (!chatroomId) {
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Missing chatroom_id parameter' }));
-                return;
-            }
-
-            try {
-                await proveriDaLiJeLive(chatroomId);
-                const channelState = state.getChannelState(chatroomId);
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ 
-                    success: true, 
-                    isModerator: channelState?.isModerator,
-                    botActive: channelState?.botActive 
-                }));
-            } catch (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Failed to check moderator status', detail: err.message }));
-            }
-            return;
-        }
-
-        if (parsedUrl.pathname === '/api/channels' && req.method === 'GET') {
-            if (!verifyInternalToken(req)) {
-                res.writeHead(401, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Unauthorized access to channels summary' }));
-                return;
-            }
-            try {
-                const channelsSummary = Object.keys(state.channels).map(id => {
-                    const c = state.channels[id];
-                    return {
-                        id: id,
-                        username: c.channelUsername,
-                        realChatroomId: c.realChatroomId || id,
-                        botActive: c.botActive,
-                        isStreamLive: c.isStreamLive,
-                        userPlan: c.userPlan || 'free',
-                        subscriptionStatus: c.subscriptionStatus || 'active',
-                        customCommandsCount: Object.keys(c.customCommands || {}).length,
-                        autoAnnouncesCount: (c.autoAnnounces || []).length,
-                        prefix: c.PREFIX
-                    };
-                });
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({
-                    success: true,
-                    totalActiveChannels: channelsSummary.length,
-                    isConnectedToKick: state.isConnected,
-                    channels: channelsSummary
-                }));
-            } catch (err) {
-                res.writeHead(500, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ error: 'Failed to fetch channels summary', detail: err.message }));
-            }
-            return;
-        }
-
-    } catch (err) {
-        console.error('Error handling HTTP request in bot.js:', err);
-    }
-
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end(`🤖 Multi-channel Kick Bot je aktivan!\nKanali na kojima radi: ${Object.values(state.channels).map(c => '@' + c.channelUsername).join(', ') || 'nijedan'}\n`);
-}
-
-const PORT = process.env.PORT || 3000;
-const server = http.createServer(handleHttpRequest);
-
-function pokreniServer() {
-    server.listen(PORT, () => {
-        utils.log('INFO', `Lokalni HTTP server pokrenut na portu: ${PORT}`);
-    });
-}
-
 // ─── MEMORY CLEANUP WORKER (Svakih 10 minuta) ──────────────────────────────────
-setInterval(() => {
+state.memoryCleanupTimer = setInterval(() => {
     const sada = Date.now();
     for (const chatroomId of Object.keys(state.channels)) {
         const channelState = state.channels[chatroomId];
@@ -2588,7 +79,7 @@ setInterval(() => {
             if (sada - channelState.loveHateCooldowns[user] > 86400000) delete channelState.loveHateCooldowns[user];
         }
 
-        // 4. Bounded Set za welcomedUsers (ograničavamo na max 2000 korisnika radi zaštite RAM-a)
+        // 4. Bounded Set za welcomedUsers
         if (channelState.welcomedUsers && channelState.welcomedUsers.size > 2000) {
             channelState.welcomedUsers.clear();
         }
@@ -2631,78 +122,46 @@ setInterval(() => {
     }
 
     // 9. Čišćenje globalnog deduplication keša poruka
-    if (processedMessageCache.size > 2000) {
+    if (connection.processedMessageCache.size > 2000) {
         const threshold = sada - 60000;
-        for (const [msgId, ts] of processedMessageCache.entries()) {
-            if (ts < threshold) processedMessageCache.delete(msgId);
+        for (const [msgId, ts] of connection.processedMessageCache.entries()) {
+            if (ts < threshold) connection.processedMessageCache.delete(msgId);
         }
     }
-}, 10 * 60 * 1000).unref(); // Svakih 10 minuta
+}, 10 * 60 * 1000).unref();
 
-// ─── BACKGROUND SUBSCRIPTION RETRY WORKER ──────────────────────────────────────
-async function syncPendingSubscriptions() {
-    if (!database.KORISTI_SUPABASE || !database.supabase) return;
-    try {
-        const { data: users, error } = await database.supabase
-            .from('user_profiles')
-            .select('id, plan, plan_tier, subscription_status');
+// ─── DISTRIBUTED LOCK & LEADER ELECTION ───────────────────────────────────────
+const CLUSTER_LOCK_ID = 'primary_bot_leader';
+const LEASE_DURATION_MS = 60000;
+const HEARTBEAT_INTERVAL_MS = 15000;
+const STARTUP_LOCK_WAIT_TIMEOUT_MS = 25000;
+const STARTUP_LOCK_RETRY_INTERVAL_MS = 2500;
 
-        if (error || !users) return;
+let lastLockErrorLogTime = 0;
+let consecutiveLockErrors = 0;
 
-        for (const user of users) {
-            for (const chatroomId of Object.keys(state.channels)) {
-                const chState = state.channels[chatroomId];
-                if (chState && chState.userId === user.id) {
-                    const expectedPlan = (user.plan_tier || user.plan || 'free').toLowerCase();
-                    if (chState.userPlan !== expectedPlan) {
-                        utils.log('INFO', `[RETRY-SYNC] Osvežavam plan za korisnika ${user.id} (@${chState.channelUsername}): ${chState.userPlan} -> ${expectedPlan}`);
-                        await database.ucitajUserPlan(user.id, chatroomId);
-                        await database.ucitajCustomKomande(chatroomId);
-                    }
-                }
-            }
-        }
-        // 2. Sravnjivanje zaostalih uplata iz Dead Letter Queue tabele
-        const { data: dlqItems, error: dlqErr } = await database.supabase
-            .from('payment_dead_letter_queue')
-            .select('*')
-            .eq('status', 'pending_bot_sync');
-
-        if (!dlqErr && dlqItems && dlqItems.length > 0) {
-            for (const dlq of dlqItems) {
-                const targetUserId = dlq.user_id;
-                const targetPlan = (dlq.plan || 'free').toLowerCase();
-                for (const chatroomId of Object.keys(state.channels)) {
-                    const chState = state.channels[chatroomId];
-                    if (chState && chState.userId === targetUserId) {
-                        chState.userPlan = targetPlan;
-                        chState.planLimits = config.PLAN_LIMITS[targetPlan] || config.PLAN_LIMITS.free;
-                        await database.ucitajCustomKomande(chatroomId);
-                        utils.log('INFO', `[DLQ-RESOLVED] Automatski aktiviran plan ${targetPlan} iz Dead Letter Queue za korisnika ${targetUserId} na kanalu @${chState.channelUsername}`);
-                    }
-                }
-                // Označi zapis u DLQ kao razrešen
-                await database.supabase
-                    .from('payment_dead_letter_queue')
-                    .update({
-                        status: 'resolved',
-                        resolved_at: new Date().toISOString()
-                    })
-                    .eq('id', dlq.id);
-            }
-        }
-    } catch (e) {
-        utils.log('WARN', `[RETRY-SYNC] Neuspešan periodični sync pretplata: ${e.message}`);
+function logLockWarningDebounced(msg) {
+    consecutiveLockErrors++;
+    const now = Date.now();
+    // Ne spamuj konzolu: loguj samo ako je greška nova i traje, najviše jednom u 5 minuta
+    if (now - lastLockErrorLogTime > 5 * 60 * 1000 || consecutiveLockErrors === 3) {
+        lastLockErrorLogTime = now;
+        utils.log('WARN', `[DISTRIBUTED-LOCK] ${msg} (ponovljeno ${consecutiveLockErrors}x)`);
     }
 }
 
-// ─── DISTRIBUTED LOCK & LEADER ELECTION (LEAST HEARTBEAT) ─────────────────────
-const CLUSTER_LOCK_ID = 'primary_bot_leader';
-const LEASE_DURATION_MS = 15000;
-const HEARTBEAT_INTERVAL_MS = 5000;
+function resetLockErrorCount() {
+    if (consecutiveLockErrors >= 3) {
+        utils.log('INFO', `[DISTRIBUTED-LOCK] Veza sa cluster lock bazom uspešno stabilizovana.`);
+    }
+    consecutiveLockErrors = 0;
+}
 
-async function acquireOrRenewLeaderLock() {
-    if (!database.supabase || !database.KORISTI_SUPABASE) return true;
+async function acquireOrRenewLeaderLock(options = {}) {
+    if (!database.supabase || !database.KORISTI_SUPABASE) {
+        state.isLeader = true;
+        return true;
+    }
     if (state.isShuttingDown) return false;
 
     const nowIso = new Date().toISOString();
@@ -2716,12 +175,11 @@ async function acquireOrRenewLeaderLock() {
             .maybeSingle();
 
         if (readError) {
-            utils.log('WARN', `[DISTRIBUTED-LOCK] Greška čitanja cluster lock-a: ${readError.message}`);
+            logLockWarningDebounced(`Greška čitanja cluster lock-a: ${readError.message}`);
             return state.isLeader;
         }
 
         if (!existingLock) {
-            // Lock ne postoji, kreiraj ga kao novi lider
             const { error: insertError } = await database.supabase
                 .from('bot_cluster_lock')
                 .insert({
@@ -2732,18 +190,19 @@ async function acquireOrRenewLeaderLock() {
                     updated_at: nowIso
                 });
             if (insertError) {
-                utils.log('WARN', `[DISTRIBUTED-LOCK] Greška pri kreiranju lock-a: ${insertError.message}`);
-            } else {
-                state.isLeader = true;
-                utils.log('INFO', `[DISTRIBUTED-LOCK] Osvojen primarni distributed lock (Instance ID: ${state.instanceId})`);
+                logLockWarningDebounced(`Greška pri kreiranju lock-a: ${insertError.message}`);
+                return false;
             }
-            return state.isLeader;
+            resetLockErrorCount();
+            state.isLeader = true;
+            utils.log('INFO', `[DISTRIBUTED-LOCK] Osvojen primarni distributed lock (Instance ID: ${state.instanceId})`);
+            return true;
         }
 
         const isCurrentHolder = existingLock.leader_instance_id === state.instanceId;
-        const isExpired = new Date(existingLock.expires_at).getTime() < Date.now();
+        const isExpired = new Date(existingLock.expires_at).getTime() <= Date.now();
 
-        if (isCurrentHolder || isExpired) {
+        if (isCurrentHolder || isExpired || options.force) {
             const { error: updateError } = await database.supabase
                 .from('bot_cluster_lock')
                 .update({
@@ -2755,14 +214,18 @@ async function acquireOrRenewLeaderLock() {
                 .eq('lock_id', CLUSTER_LOCK_ID);
 
             if (updateError) {
-                utils.log('WARN', `[DISTRIBUTED-LOCK] Greška pri obnovi lock-a: ${updateError.message}`);
-            } else {
-                state.isLeader = true;
+                logLockWarningDebounced(`Greška pri obnovi lock-a: ${updateError.message}`);
+                return false;
             }
+            resetLockErrorCount();
+            if (!state.isLeader) {
+                utils.log('INFO', `[DISTRIBUTED-LOCK] Preuzet primarni distributed lock (Instance ID: ${state.instanceId})`);
+            }
+            state.isLeader = true;
             return true;
         }
 
-        // Lock drži druga instanca i važeći je
+        // Ako je instanca već bila aktivan lider, a neko drugi je u međuvremenu preuzeo lock:
         if (state.isLeader) {
             utils.log('WARN', `[DISTRIBUTED-LOCK] Druga instanca (${existingLock.leader_instance_id}) drži aktivan lease do ${existingLock.expires_at}. Prepuštam vođstvo radi prevencije split-brain-a.`);
             state.isLeader = false;
@@ -2770,15 +233,15 @@ async function acquireOrRenewLeaderLock() {
             return false;
         }
 
+        // Ako proces tek startuje i nije još lider, ne gasi proces već vrati false (kandidat čeka istek)
         return false;
     } catch (err) {
-        utils.log('WARN', `[DISTRIBUTED-LOCK] Izuzetak pri obradi lock-a: ${err.message}`);
+        logLockWarningDebounced(`Izuzetak pri obradi lock-a: ${err.message}`);
         return state.isLeader;
     }
 }
 
-async function startLeaderLockHeartbeat() {
-    await acquireOrRenewLeaderLock();
+function startLeaderLockHeartbeat() {
     if (state.leaderLockTimer) clearInterval(state.leaderLockTimer);
     state.leaderLockTimer = setInterval(async () => {
         await acquireOrRenewLeaderLock();
@@ -2788,44 +251,82 @@ async function startLeaderLockHeartbeat() {
     }
 }
 
-async function announceLeadership() {
-    state.instanceId = state.instanceId || require('crypto').randomUUID();
-    state.isLeader = true;
-    utils.log('INFO', `[LEADER-ELECTION] Bot instanca preuzima vođstvo (Instance ID: ${state.instanceId})`);
-
-    // 1. Dual-Layer: Osvoji Distributed Lock u Supabase bazi sa TTL obnovom (Fail-safe)
-    await startLeaderLockHeartbeat();
-
-    // 2. Dual-Layer: Pošalji Realtime broadcast za trenutni (sub-second) prenos liderstva (Fast-path)
-    if (database.supabase && typeof database.supabase.channel === 'function') {
-        try {
-            const clusterChannel = database.supabase.channel('kickall-cluster-control');
-            clusterChannel
-                .on('broadcast', { event: 'instance_takeover' }, payload => {
-                    const newInstanceId = payload.payload?.instanceId;
-                    if (newInstanceId && newInstanceId !== state.instanceId && !state.isShuttingDown) {
-                        utils.log('WARN', `[SPLIT-BRAIN ZAŠTITA] Nova instanca (${newInstanceId}) preuzima vođstvo. Stara instanca (${state.instanceId}) gasi WebSocket i pokreće graceful shutdown.`);
-                        gracefulShutdown('SPLIT_BRAIN_TAKEOVER');
-                    }
-                })
-                .subscribe(status => {
-                    if (status === 'SUBSCRIBED') {
-                        clusterChannel.send({
-                            type: 'broadcast',
-                            event: 'instance_takeover',
-                            payload: { instanceId: state.instanceId, timestamp: Date.now() }
-                        }).catch(() => {});
-                    }
-                });
-        } catch (_) {}
+function setupClusterBroadcast() {
+    if (!database.supabase || typeof database.supabase.channel !== 'function') return null;
+    try {
+        const clusterChannel = database.supabase.channel('kickall-cluster-control');
+        clusterChannel
+            .on('broadcast', { event: 'instance_takeover' }, payload => {
+                const newInstanceId = payload.payload?.instanceId;
+                if (newInstanceId && newInstanceId !== state.instanceId && !state.isShuttingDown) {
+                    utils.log('WARN', `[SPLIT-BRAIN ZAŠTITA] Nova instanca (${newInstanceId}) preuzima vođstvo. Prepuštam lock i pokrećem graceful shutdown.`);
+                    gracefulShutdown('SPLIT_BRAIN_TAKEOVER');
+                }
+            })
+            .subscribe(status => {
+                if (status === 'SUBSCRIBED') {
+                    clusterChannel.send({
+                        type: 'broadcast',
+                        event: 'instance_takeover',
+                        payload: { instanceId: state.instanceId, timestamp: Date.now() }
+                    }).catch(() => {});
+                }
+            });
+        return clusterChannel;
+    } catch (_) {
+        return null;
     }
 }
 
-// ─── START ────────────────────────────────────────────────────────────────────
+async function acquireStartupLeadership() {
+    state.instanceId = state.instanceId || require('crypto').randomUUID();
+    state.isLeader = false;
+
+    if (!database.supabase || !database.KORISTI_SUPABASE) {
+        state.isLeader = true;
+        utils.log('INFO', `[LEADER-ELECTION] Supabase nije konfigurisan; instanca radi kao primarni bot (Instance ID: ${state.instanceId})`);
+        return true;
+    }
+
+    setupClusterBroadcast();
+
+    utils.log('INFO', `[LEADER-ELECTION] Provera statusa distributed lock-a (Instance ID: ${state.instanceId})...`);
+    let acquired = await acquireOrRenewLeaderLock();
+    if (acquired) {
+        startLeaderLockHeartbeat();
+        utils.log('INFO', `[LEADER-ELECTION] Bot instanca je uspešno postala primarni lider (Instance ID: ${state.instanceId})`);
+        return true;
+    }
+
+    // Prethodna instanca još uvek drži lease (npr. Render rolling deploy ili nedavni restart)
+    const startTime = Date.now();
+    utils.log('INFO', `[LEADER-ELECTION] Prethodna instanca još uvek drži lease. Čekam prenos vođstva (do ${STARTUP_LOCK_WAIT_TIMEOUT_MS / 1000}s)...`);
+
+    while (Date.now() - startTime < STARTUP_LOCK_WAIT_TIMEOUT_MS) {
+        await new Promise(r => setTimeout(r, STARTUP_LOCK_RETRY_INTERVAL_MS));
+        if (state.isShuttingDown) return false;
+
+        acquired = await acquireOrRenewLeaderLock();
+        if (acquired) {
+            startLeaderLockHeartbeat();
+            utils.log('INFO', `[LEADER-ELECTION] Uspešno preuzet distributed lock nakon čekanja (Instance ID: ${state.instanceId})`);
+            return true;
+        }
+    }
+
+    // Istekao maksimalan prozor za čekanje – nova instanca deploy-a preuzima lock autoritativno
+    utils.log('WARN', `[LEADER-ELECTION] Prethodna instanca nije oslobodila lease u predviđenom roku. Preuzimam primarni lock automatski...`);
+    acquired = await acquireOrRenewLeaderLock({ force: true });
+    startLeaderLockHeartbeat();
+    utils.log('INFO', `[LEADER-ELECTION] Bot instanca je autoritativno preuzela vođstvo (Instance ID: ${state.instanceId})`);
+    return true;
+}
+
+// ─── START WORKFLOW ───────────────────────────────────────────────────────────
 async function start() {
-    utils.log('INFO', '🤖 Multi-channel Kick bot se pokreće...');
+    utils.log('INFO', 'Multi-channel Kick bot se pokreće...');
     await detectBotUsername();
-    await announceLeadership();
+    await acquireStartupLeadership();
 
     if (database.KORISTI_SUPABASE && database.supabase) {
         // 1. Učitaj sve kanale koji imaju aktivnog bota
@@ -2837,7 +338,7 @@ async function start() {
             const chatroomId = String(dbConfig.channel_id);
             const channelUsername = dbConfig.channel_name || 'Nepoznat';
             try {
-                await pokreniKanal(chatroomId, channelUsername, dbConfig);
+                await channelManager.pokreniKanal(chatroomId, channelUsername, dbConfig);
             } catch (err) {
                 utils.log('ERR', `Greška pri pokretanju kanala @${channelUsername}: ${err.message}`);
             }
@@ -2846,24 +347,27 @@ async function start() {
         // 3. Pokreni globalne watchtime tick cikluse
         watchtime.pokreniWatchtimeTick();
 
-        // 3b. Sinhronizuj pending pretplate iz Supabase baze (uplate koje su stigle dok je bot restartovan)
-        await syncPendingSubscriptions();
-        setInterval(syncPendingSubscriptions, 3 * 60 * 1000).unref();
+        // 3b. Sinhronizuj pending pretplate iz Supabase baze
+        await channelManager.syncPendingSubscriptions();
+        state.syncSubscriptionsTimer = setInterval(channelManager.syncPendingSubscriptions, 3 * 60 * 1000);
+        if (state.syncSubscriptionsTimer && state.syncSubscriptionsTimer.unref) state.syncSubscriptionsTimer.unref();
 
         // 4. Poveži WebSocket na Kick Pusher
-        povezi();
+        connection.povezi();
 
-        // 5. Pokreni periodicnu proaktivnu proveru live statusa
-        setInterval(proveriDaLiSuLiveSvi, 2 * 60 * 1000).unref();
+        // 5. Pokreni periodičnu proaktivnu proveru live statusa
+        state.checkLiveTimer = setInterval(channelManager.proveriDaLiSuLiveSvi, 2 * 60 * 1000);
+        if (state.checkLiveTimer && state.checkLiveTimer.unref) state.checkLiveTimer.unref();
 
         // 5b. Pokreni periodičnu normalizaciju ljubavnih modifikatora ka 0% (svakih 2h po 1%)
-        setInterval(() => {
+        state.loveNormalizationTimer = setInterval(() => {
             try {
                 database.normalizujLjubavKaNuli();
             } catch (err) {
                 utils.log('ERR', `Greška pri normalizaciji ljubavi: ${err.message}`);
             }
-        }, 2 * 60 * 60 * 1000).unref();
+        }, 2 * 60 * 60 * 1000);
+        if (state.loveNormalizationTimer && state.loveNormalizationTimer.unref) state.loveNormalizationTimer.unref();
 
         // 6. Osluškuj izmene konfiguracije u realnom vremenu
         const lastUpdateLogs = new Map();
@@ -2876,7 +380,7 @@ async function start() {
             }
         }
 
-        const realtimeBotConfigDebounceTimers = new Map();
+        const realtimeBotConfigDebounceTimers = state.realtimeBotConfigDebounceTimers || new Map();
 
         database.supabase.channel('public:bot_config')
             .on('postgres_changes', {
@@ -2898,121 +402,34 @@ async function start() {
                     try {
                         if (eventType === 'DELETE') {
                             if (state.channels[chatroomId]) {
-                                utils.log('INFO', `🔴 Kanal @${oldRow.channel_name || chatroomId} je uklonjen iz bot konfiguracije.`);
-                                await zaustaviKanal(chatroomId);
+                                utils.log('INFO', `[REALTIME] Kanal @${oldRow.channel_name || chatroomId} je uklonjen iz bot konfiguracije.`);
+                                await channelManager.zaustaviKanal(chatroomId);
                             }
                         } else {
                             const channelUsername = newRow.channel_name || 'Nepoznat';
                             const botActive = newRow.bot_active || false;
 
                             if (botActive) {
-                                if (!state.channels[chatroomId] && !pendingChannelOps.has(chatroomId)) {
-                                    utils.log('INFO', `🟢 Bot je uspešno aktiviran za kanal @${channelUsername}!`);
-                                    await pokreniKanal(chatroomId, channelUsername, newRow);
+                                if (!state.channels[chatroomId] && !channelManager.pendingChannelOps.has(chatroomId)) {
+                                    utils.log('INFO', `[REALTIME] Bot je uspešno aktiviran za kanal @${channelUsername}!`);
+                                    await channelManager.pokreniKanal(chatroomId, channelUsername, newRow);
                                 } else if (state.channels[chatroomId]) {
-                                    const cs = state.getChannelState(chatroomId);
-                                    logDebouncedUpdate(`config::${chatroomId}`, `⚙️ [PRO Plan] Podešavanja i komande sinhronizovane za @${channelUsername}.`);
-
-                                    const noviInterval = newRow.announce_interval_mins ?? 15;
-                                    const noviTimeEnabled = newRow.announce_time_enabled ?? true;
-                                    const relevantnoPromenjeno = (
-                                        cs.announce_interval_mins !== noviInterval ||
-                                        cs.announce_time_enabled !== noviTimeEnabled ||
-                                        !cs.autoAnnounceTimer
-                                    );
-
-                                    await azurirajKonfiguracijuKanala(cs, newRow);
-
-                                    if (relevantnoPromenjeno) {
-                                        pokreniAutoAnnounceTajmer(chatroomId);
-                                    }
+                                    logDebouncedUpdate(`config::${chatroomId}`, `[REALTIME] Podešavanja i komande sinhronizovane za @${channelUsername}.`);
+                                    await channelManager.azurirajKonfiguracijuKanala(state.channels[chatroomId], newRow);
                                 }
                             } else {
-                                if (state.channels[chatroomId] && !pendingChannelOps.has(chatroomId)) {
-                                    utils.log('INFO', `⚪ Bot je zaustavljen za kanal @${channelUsername}.`);
-                                    await zaustaviKanal(chatroomId);
+                                if (state.channels[chatroomId]) {
+                                    utils.log('INFO', `[REALTIME] Bot je deaktiviran za kanal @${channelUsername}.`);
+                                    await channelManager.zaustaviKanal(chatroomId);
                                 }
                             }
                         }
                     } catch (err) {
-                        utils.log('ERR', `Greška pri primeni bot_config promene za ${chatroomId}: ${err.message}`);
+                        utils.log('ERR', `Greška pri obradi Realtime promene za kanal ${chatroomId}: ${err.message}`);
                     }
                 }, 1500);
 
-                if (timer && typeof timer.unref === 'function') timer.unref();
                 realtimeBotConfigDebounceTimers.set(chatroomId, timer);
-            })
-            .subscribe();
-
-        // 7. Osluškuj izmene na custom komandama u realnom vremenu
-        database.supabase.channel('public:custom_commands')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'custom_commands'
-            }, async (payload) => {
-                const { new: newRow, old: oldRow } = payload;
-                const row = newRow || oldRow;
-                if (row) {
-                    const chatroomId = String(row.channel_id);
-                    if (state.channels[chatroomId]) {
-                        logDebouncedUpdate(`custom_cmds::${chatroomId}`, `⚡ Custom komande osvežene za kanal.`);
-                        await database.ucitajCustomKomande(chatroomId);
-                    }
-                }
-            })
-            .subscribe();
-
-        // 7b. Osluškuj izmene na auto-najavama u realnom vremenu (tabela auto_messages, uz fallback na auto_announces)
-        database.supabase.channel('public:auto_messages')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'auto_messages'
-            }, async (payload) => {
-                const { new: newRow, old: oldRow } = payload;
-                const row = newRow || oldRow;
-                if (row) {
-                    const chatroomId = String(row.channel_id);
-                    if (state.channels[chatroomId]) {
-                        logDebouncedUpdate(`auto_messages::${chatroomId}`, `📢 Auto-najave osvežene za kanal.`);
-                        await database.ucitajAutoAnnounces(chatroomId);
-                    }
-                }
-            })
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'auto_announces'
-            }, async (payload) => {
-                const { new: newRow, old: oldRow } = payload;
-                const row = newRow || oldRow;
-                if (row) {
-                    const chatroomId = String(row.channel_id);
-                    if (state.channels[chatroomId]) {
-                        logDebouncedUpdate(`auto_announces::${chatroomId}`, `📢 Auto-najave osvežene za kanal.`);
-                        await database.ucitajAutoAnnounces(chatroomId);
-                    }
-                }
-            })
-            .subscribe();
-
-        // 7c. Osluškuj izmene na alertovima u realnom vremenu (tabela bot_interaction, uz fallback na chat_alerts)
-        database.supabase.channel('public:bot_interaction_alerts')
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'bot_interaction'
-            }, async (payload) => {
-                const { new: newRow, old: oldRow } = payload;
-                const row = newRow || oldRow;
-                if (row) {
-                    const chatroomId = String(row.channel_id);
-                    if (state.channels[chatroomId]) {
-                        logDebouncedUpdate(`bot_interaction::${chatroomId}`, `🔔 Alertovi osveženi za kanal.`);
-                        await database.ucitajAlerts(chatroomId);
-                    }
-                }
             })
             .on('postgres_changes', {
                 event: '*',
@@ -3024,14 +441,14 @@ async function start() {
                 if (row) {
                     const chatroomId = String(row.channel_id);
                     if (state.channels[chatroomId]) {
-                        logDebouncedUpdate(`chat_alerts::${chatroomId}`, `🔔 Alertovi osveženi za kanal.`);
+                        logDebouncedUpdate(`chat_alerts::${chatroomId}`, `[REALTIME] Alertovi osveženi za kanal.`);
                         await database.ucitajAlerts(chatroomId);
                     }
                 }
             })
             .subscribe();
 
-        // 8. Osluškuj izmene korisničkih profila (promene pretplate/plana)
+        // 8. Osluškuj izmene korisničkih profila
         database.supabase.channel('public:user_profiles')
             .on('postgres_changes', {
                 event: '*',
@@ -3054,12 +471,12 @@ async function start() {
             })
             .subscribe();
 
-
-        // 9. Pokreni Supabase Realtime CDC sinhronizaciju u realnom vremenu
+        // 9. Pokreni Supabase Realtime CDC sinhronizaciju
         database.postaviRealtimeSlusalac();
     }
 }
 
+// ─── SHUTDOWN & CLEANUP ───────────────────────────────────────────────────────
 let isShuttingDown = false;
 
 async function gracefulShutdown(signal) {
@@ -3073,38 +490,49 @@ async function gracefulShutdown(signal) {
 
     utils.log('WARN', `Primljen signal ${signal}. Pokrećem bezbedno gašenje bota i sinhronizaciju podataka sa Supabase...`);
 
-    // 1. Sigurnosni tajmer: ako baza visi, nasilno gasi proces posle 10 sekundi (Render SIGTERM timeout je obično 15-30s)
+    // 0. Otpusti distributed lock odmah u bazi kako bi nova instanca bez odlaganja preuzela vođstvo
+    if (database.supabase && database.KORISTI_SUPABASE && state.instanceId) {
+        try {
+            await database.supabase
+                .from('bot_cluster_lock')
+                .update({ expires_at: new Date().toISOString() })
+                .eq('lock_id', CLUSTER_LOCK_ID)
+                .eq('leader_instance_id', state.instanceId);
+        } catch (_) {}
+    }
+
     const watchdogTimer = setTimeout(() => {
         utils.log('ERR', 'Graceful shutdown timeout (10s) istekao. Nasilno gašenje procesa.');
         process.exit(1);
     }, 10000);
     if (watchdogTimer.unref) watchdogTimer.unref();
 
-    // 2. Odmah prekidamo prijem i obradu novih čet poruka i događaja preko WebSocket-a (Split-Brain prevencija)
-    if (state.ws) {
-        try {
-            state.ws.removeAllListeners();
-            state.ws.terminate();
-        } catch (_) {}
-        state.ws = null;
-    }
-    state.isConnected = false;
+    // 1. Prekini WebSocket konekciju
+    connection.prekiniKonekciju();
 
-    // 3. Zaustavi HTTP server tako da novi deploy preuzme rutiranje
-    if (server && server.listening) {
-        try {
-            server.close(() => {
-                utils.log('INFO', 'Lokalni HTTP server bezbedno zaustavljen.');
-            });
-        } catch (_) {}
-    }
+    // 2. Zaustavi HTTP server
+    httpServer.zaustaviServer();
 
-    // 4. Zaustavi globalne tajmere
-    stopHeartbeat();
+    // 3. Zaustavi globalne tajmere i procese
     watchtime.zaustavljWatchtimeTick();
-    if (state.leaderLockTimer) clearInterval(state.leaderLockTimer);
+    if (state.leaderLockTimer) { clearInterval(state.leaderLockTimer); state.leaderLockTimer = null; }
+    if (state.reconnectTimer) { clearTimeout(state.reconnectTimer); state.reconnectTimer = null; }
+    if (state.memoryCleanupTimer) { clearInterval(state.memoryCleanupTimer); state.memoryCleanupTimer = null; }
+    if (state.syncSubscriptionsTimer) { clearInterval(state.syncSubscriptionsTimer); state.syncSubscriptionsTimer = null; }
+    if (state.checkLiveTimer) { clearInterval(state.checkLiveTimer); state.checkLiveTimer = null; }
+    if (state.loveNormalizationTimer) { clearInterval(state.loveNormalizationTimer); state.loveNormalizationTimer = null; }
 
-    // 5. Zaustavi sve tajmere po kanalima
+    if (state.realtimeBotConfigDebounceTimers) {
+        for (const t of state.realtimeBotConfigDebounceTimers.values()) {
+            clearTimeout(t);
+        }
+        state.realtimeBotConfigDebounceTimers.clear();
+    }
+
+    database.zaustaviRealtimeSlusalac();
+    streamAnalytics.stopAutoFlushTimer();
+
+    // 4. Zaustavi tajmere po kanalima
     for (const chatroomId of Object.keys(state.channels)) {
         const channelState = state.channels[chatroomId];
         if (channelState.autoAnnounceTimer) clearInterval(channelState.autoAnnounceTimer);
@@ -3112,11 +540,11 @@ async function gracefulShutdown(signal) {
         if (channelState.economySaveTimer) clearTimeout(channelState.economySaveTimer);
         if (channelState.watchtimeSaveTimer) clearTimeout(channelState.watchtimeSaveTimer);
         if (channelState.loveSaveTimer) clearTimeout(channelState.loveSaveTimer);
+        if (channelState.commandUsageSaveTimer) clearTimeout(channelState.commandUsageSaveTimer);
         if (channelState.queueDrainTimer) clearTimeout(channelState.queueDrainTimer);
     }
 
-    // 6. Grupni kontrolisani upis podataka u Supabase (Zaštita od preopterećenja konekcija / Supavisor pooler port 6543)
-    // Ograničavamo konkurentnost na grupe od po BATCH_SIZE = 4 kanala istovremeno
+    // 5. Grupni kontrolisani upis podataka u Supabase
     const channelIds = Object.keys(state.channels);
     const BATCH_SIZE = 4;
     for (let i = 0; i < channelIds.length; i += BATCH_SIZE) {
@@ -3126,8 +554,9 @@ async function gracefulShutdown(signal) {
                 try {
                     await database.sacuvajLeaderboard(chatroomId);
                     await database.sacuvajEkonomiju(chatroomId);
-                    await database.sacuvajWatchtime(chatroomId);
+                    await watchtime.sacuvajWatchtime(chatroomId);
                     await database.sacuvajLjubav(chatroomId);
+                    await database.sacuvajCommandUsage(chatroomId);
                 } catch (e) {
                     utils.log('ERR', `Greška pri bezbednom čuvanju kanala ${chatroomId}: ${e.message}`);
                 }
@@ -3147,16 +576,37 @@ async function gracefulShutdown(signal) {
     process.exit(0);
 }
 
+// ─── PROCESS GUARDS ───────────────────────────────────────────────────────────
+process.on('uncaughtException', async (err) => {
+    utils.log('ERR', `Neuhvaćena greška (uncaughtException): ${err.stack || err.message}`);
+    utils.log('WARN', 'Pokrećem gracefulShutdown radi bezbednog ponovnog pokretanja bota...');
+    try {
+        await gracefulShutdown('uncaughtException');
+    } catch (shutdownErr) {
+        utils.log('ERR', `Shutdown failed during uncaughtException: ${shutdownErr.message || shutdownErr}`);
+        process.exit(1);
+    }
+});
+
+process.on('unhandledRejection', (reason, _promise) => {
+    const msg = reason instanceof Error ? reason.stack : String(reason);
+    utils.log('ERR', `Neobrađeno obećanje (unhandledRejection): ${msg}`);
+});
+
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 if (require.main === module) {
-    pokreniServer();
+    httpServer.pokreniServer();
     start();
 }
 
 module.exports = {
-    verifyInternalToken,
-    handleHttpRequest,
-    gracefulShutdown
+    verifyInternalToken: httpServer.verifyInternalToken,
+    handleHttpRequest: httpServer.handleHttpRequest,
+    gracefulShutdown,
+    start,
+    povezi: connection.povezi,
+    acquireOrRenewLeaderLock,
+    acquireStartupLeadership
 };

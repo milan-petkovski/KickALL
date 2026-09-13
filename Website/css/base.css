@@ -158,10 +158,14 @@ a {
 }
 
 .btn:focus,
-.btn:active,
+.btn:active {
+    outline: none;
+}
+
 .btn:focus-visible {
-    outline: none !important;
-    outline-offset: 0 !important;
+    outline: 2px solid var(--color-green, #53FC18) !important;
+    outline-offset: 3px !important;
+    box-shadow: 0 0 14px rgba(83, 252, 24, 0.5) !important;
 }
 
 .btn-primary {
@@ -329,6 +333,11 @@ button:focus-visible {
 .skip-link:focus,
 .skip-link:focus-visible {
     top: 20px;
+    width: auto;
+    height: auto;
+    clip: auto;
+    overflow: visible;
+    white-space: normal;
     outline: 2px solid #ffffff;
     outline-offset: 2px;
 }
@@ -347,3 +356,22 @@ button:focus-visible {
         scroll-behavior: auto !important;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Text Wrapping & Layout Integrity (Prevent Overflow Breaks)
+   ═══════════════════════════════════════════════════════════ */
+
+.card,
+.panel,
+.dashboard-card,
+.stat-card,
+.chat-message,
+.feed-item,
+.table-container td,
+.table-container th,
+.badge,
+.modal-body {
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+

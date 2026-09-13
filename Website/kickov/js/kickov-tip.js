@@ -75,8 +75,9 @@
         const avatarEl = document.getElementById('tipStreamerAvatar');
         const avatarUrl = data.avatar_url || (data.kick_channels && data.kick_channels[0]?.avatar);
         if (avatarEl) {
-          if (avatarUrl) {
-            avatarEl.style.backgroundImage = `url('${avatarUrl}')`;
+          if (avatarUrl && /^https?:\/\//i.test(avatarUrl)) {
+            const safeUrl = encodeURI(avatarUrl).replace(/["'()<>]/g, '');
+            avatarEl.style.backgroundImage = `url("${safeUrl}")`;
             avatarEl.style.backgroundSize = 'cover';
             avatarEl.textContent = '';
           } else {

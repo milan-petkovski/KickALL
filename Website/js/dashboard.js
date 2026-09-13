@@ -733,8 +733,9 @@ function initDashboard(user) {
   const avatar = document.getElementById('userAvatar');
   if (avatar) {
     const avatarUrl = user.user_metadata?.avatar_url;
-    if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:image'))) {
-      avatar.style.backgroundImage = `url("${avatarUrl}")`;
+    if (avatarUrl && /^https?:\/\//i.test(avatarUrl)) {
+      const safeUrl = encodeURI(avatarUrl).replace(/["'()<>]/g, '');
+      avatar.style.backgroundImage = `url("${safeUrl}")`;
       avatar.style.backgroundSize = 'cover';
       avatar.style.backgroundPosition = 'center';
       avatar.textContent = '';

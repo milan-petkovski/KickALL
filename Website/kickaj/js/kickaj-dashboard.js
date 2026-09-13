@@ -1339,8 +1339,9 @@
     const clean    = cleanUsername(username);
     if (nameEl) nameEl.textContent = clean;
     if (avatarEl) {
-      if (avatarUrl?.startsWith('http')) {
-        avatarEl.style.backgroundImage = `url('${avatarUrl}')`;
+      if (avatarUrl && /^https?:\/\//i.test(avatarUrl)) {
+        const safeUrl = encodeURI(avatarUrl).replace(/["'()<>]/g, '');
+        avatarEl.style.backgroundImage = `url("${safeUrl}")`;
         avatarEl.style.backgroundSize  = 'cover';
         avatarEl.style.backgroundPosition = 'center';
         avatarEl.textContent = '';
@@ -4112,8 +4113,11 @@
     const spinId = ++currentSpinId;
     refreshAll();
 
-    const durMs = settings.spinTime * 1000;
-    playSoundSpin(durMs);
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const durMs = prefersReducedMotion ? 50 : (settings.spinTime * 1000);
+    if (!prefersReducedMotion) {
+      playSoundSpin(durMs);
+    }
 
     if (settings.animation === 'slot')          animateSlotDraw(pool, durMs, spinId);
     else if (settings.animation === 'roulette') animateRouletteDraw(pool, durMs, spinId);

@@ -88,8 +88,9 @@ window.CONFIG = {
         url.searchParams.set('customer_email', userEmail);
       }
       const origin = window.location.origin || 'https://kickall.app';
-      url.searchParams.set('success_url', `${origin}/dashboard.html?billing=success`);
-      url.searchParams.set('cancel_url', `${origin}/pricing.html?billing=cancelled`);
+      const currentPath = window.location.pathname || '/dashboard.html';
+      url.searchParams.set('success_url', `${origin}${currentPath}?billing=success`);
+      url.searchParams.set('cancel_url', `${origin}${currentPath}?billing=cancelled`);
       return url.toString();
     }
   },

@@ -59,8 +59,9 @@ function spamFilter(chatroomId, username, poruka) {
             channelState.lastSpamPenalty[userKey] = sada;
         }
 
-        if (sada - zadnjeUpozorenje > windowIdenticna) {
-            posaljiPoruku(chatroomId, `@${username} molim te ne spamuj u chatu! 🙏`);
+        const warningCooldown = Math.max(windowIdenticna, 60000);
+        if (sada - zadnjeUpozorenje > warningCooldown) {
+            posaljiPoruku(chatroomId, `@${username}, molim te ne spamuj u chatu! 🙏`);
             channelState.lastWarned[userKey] = sada;
             log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [identična poruka]: upozoren ${username} (${countIdenticna}x ista poruka)`);
         } else {
@@ -85,8 +86,9 @@ function spamFilter(chatroomId, username, poruka) {
             channelState.lastSpamPenalty[userKey] = sada;
         }
 
-        if (sada - zadnjeUpozorenje > windowIdenticna) {
-            posaljiPoruku(chatroomId, `@${username} molim te ne spamuj u chatu! 🙏`);
+        const warningCooldown = Math.max(windowIdenticna, 60000);
+        if (sada - zadnjeUpozorenje > warningCooldown) {
+            posaljiPoruku(chatroomId, `@${username}, molim te ne spamuj u chatu! 🙏`);
             channelState.lastWarned[userKey] = sada;
             log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [brzo kucanje]: upozoren ${username} (${countRapid}x brze poruke)`);
         } else {

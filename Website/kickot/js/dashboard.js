@@ -26,6 +26,112 @@
   }
 })();
 
+// ── Performance & Memory Lifecycle Utilities ──────────────────
+const TimerRegistry = {
+  _timers: new Map(),
+  _currentPanel: 'overview',
+
+  setCurrentPanel(panelId) {
+    this._currentPanel = panelId;
+  },
+
+  registerInterval(panelId, fn, delay) {
+    const id = setInterval(fn, delay);
+    if (!this._timers.has(panelId)) {
+      this._timers.set(panelId, new Set());
+    }
+    this._timers.get(panelId).add({ id, type: 'interval' });
+    return id;
+  },
+
+  registerTimeout(panelId, fn, delay) {
+    const id = setTimeout(() => {
+      this.unregister(panelId, id);
+      fn();
+    }, delay);
+    if (!this._timers.has(panelId)) {
+      this._timers.set(panelId, new Set());
+    }
+    this._timers.get(panelId).add({ id, type: 'timeout' });
+    return id;
+  },
+
+  unregister(panelId, id) {
+    const set = this._timers.get(panelId);
+    if (!set) return;
+    for (const item of set) {
+      if (item.id === id) {
+        set.delete(item);
+        break;
+      }
+    }
+  },
+
+  clearAllForPanel(panelId) {
+    const set = this._timers.get(panelId);
+    if (!set) return;
+    for (const item of set) {
+      if (item.type === 'interval') {
+        clearInterval(item.id);
+      } else {
+        clearTimeout(item.id);
+      }
+    }
+    this._timers.delete(panelId);
+  },
+
+  clearAll() {
+    for (const panelId of Array.from(this._timers.keys())) {
+      this.clearAllForPanel(panelId);
+    }
+  }
+};
+window.TimerRegistry = TimerRegistry;
+
+function rAFThrottle(fn) {
+  let rAF = null;
+  return function(...args) {
+    if (rAF !== null) return;
+    rAF = requestAnimationFrame(() => {
+      rAF = null;
+      fn.apply(this, args);
+    });
+  };
+}
+window.rAFThrottle = rAFThrottle;
+
+function debounce(fn, wait = 300) {
+  let timeout;
+  const debounced = function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn.apply(this, args), wait);
+  };
+  debounced.cancel = () => clearTimeout(timeout);
+  return debounced;
+}
+window.debounce = debounce;
+
+function withTimeout(promise, ms = 8000, fallbackVal = null) {
+  let timer;
+  const timeoutPromise = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`[Kickot] Network operation timed out after ${ms}ms`);
+      resolve(fallbackVal);
+    }, ms);
+  });
+  return Promise.race([
+    promise.then((res) => {
+      clearTimeout(timer);
+      return res;
+    }).catch((err) => {
+      clearTimeout(timer);
+      throw err;
+    }),
+    timeoutPromise
+  ]);
+}
+window.withTimeout = withTimeout;
+
 // ── Configuration Check ───────────────────────────────────────
 if (!window.KickotConfig) {
   throw new Error('KickotConfig not loaded. Please ensure config.js is loaded before dashboard.js');
@@ -1530,10 +1636,7 @@ async function loadUserProfile() {
     myUsername = data.display_name || '';
     currentUserPlan = (data.plan || 'free').toLowerCase();
     const limits = getPlanLimits();
-    const sidebarPlanEl = document.getElementById('sidebarPlan');
-    if (sidebarPlanEl) {
-      sidebarPlanEl.innerHTML = `<span class="plan-badge ${limits.badgeClass}">${limits.name}</span>`;
-    }
+    updateSidebarUserPlanAndRole();
     const sidebarUpgradeEl = document.getElementById('sidebarUpgradeWrap');
     if (sidebarUpgradeEl) {
       if (limits.name !== 'Elite') {
@@ -1747,6 +1850,25 @@ async function tryFetchKickAvatarForSlug(username) {
 
 
 
+function updateSidebarUserPlanAndRole() {
+  const sidebarPlanEl = document.getElementById('sidebarPlan');
+  if (!sidebarPlanEl) return;
+
+  const limits = getPlanLimits();
+  const isManaged = Boolean(activeChannel?.is_managed || activeChannel?.role === 'managed');
+  const roleLabel = isManaged ? 'Menadžer' : 'Vlasnik';
+  const roleClass = isManaged ? 'role-badge-managed' : 'role-badge-owner';
+
+  const roleIcon = isManaged
+    ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`
+    : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>`;
+
+  sidebarPlanEl.innerHTML = `
+    <span class="plan-badge ${limits.badgeClass}">${limits.name}</span>
+    <span class="role-badge ${roleClass}">${roleIcon}<span>${roleLabel}</span></span>
+  `;
+}
+
 function setActiveChannel(ch) {
   activeChannel = ch;
   if (ch && (ch.id || ch.username)) {
@@ -1756,12 +1878,8 @@ function setActiveChannel(ch) {
     } catch (_) { }
   }
 
-  // Osveži bedž i limite paketa prema vlasniku izabranog kanala
-  const limits = getPlanLimits();
-  const sidebarPlanEl = document.getElementById('sidebarPlan');
-  if (sidebarPlanEl) {
-    sidebarPlanEl.innerHTML = `<span class="plan-badge ${limits.badgeClass}">${limits.name}</span>`;
-  }
+  // Osveži bedž i limite paketa prema vlasniku izabranog kanala i prikaži ulogu (Vlasnik/Menadžer) u istom redu
+  updateSidebarUserPlanAndRole();
   if (typeof renderPlanLimitBanners === 'function') {
     renderPlanLimitBanners();
   }
@@ -2808,15 +2926,21 @@ function renderMiniCommands(cmds) {
   }).join('');
 }
 
+const debouncedRenderUnifiedCommands = debounce(renderUnifiedCommands, 120);
+
 function filterCommands(query) {
   commandsPage = 1;
-  const q = query.trim().replace(/^!/, '').toLowerCase();
+  const q = (query || '').trim().replace(/^!/, '').toLowerCase();
   const customOnly = allCommands.filter(c => !c.is_default);
+  if (!q) {
+    renderUnifiedCommands(customOnly);
+    return;
+  }
   const filtered = customOnly.filter(c =>
     c.command.toLowerCase().includes(q) ||
     (c.response || '').toLowerCase().includes(q)
   );
-  renderUnifiedCommands(filtered);
+  debouncedRenderUnifiedCommands(filtered);
 }
 
 function updateCmdTableMeta(n) {
@@ -3048,8 +3172,16 @@ function renderBuiltinCommandsGrid() {
   }).join('');
 }
 
+const debouncedRenderBuiltinCommandsGrid = debounce(renderBuiltinCommandsGrid, 120);
+
 function filterBuiltinCommands() {
-  renderBuiltinCommandsGrid();
+  const searchInput = document.getElementById('builtinCmdSearchInput');
+  const q = searchInput ? searchInput.value.trim() : '';
+  if (!q) {
+    renderBuiltinCommandsGrid();
+  } else {
+    debouncedRenderBuiltinCommandsGrid();
+  }
 }
 
 function resetBuiltinFilters() {
@@ -3991,20 +4123,23 @@ function renderPodium(top3) {
 
 
 
+const debouncedRenderUnifiedLeaderboard = debounce((rows) => {
+  renderUnifiedLeaderboard(sortLeaderboardRows(rows));
+}, 120);
+
 function filterLeaderboard(q) {
   leaderboardPage = 1;
   const isCombined = activeLeaderboardType === 'combined';
-  let source;
-
-  if (isCombined) {
-    source = buildCombinedRows();
-  } else {
-    source = allLeaderboard;
+  const source = isCombined ? buildCombinedRows() : allLeaderboard;
+  const query = (q || '').toLowerCase().trim();
+  if (!query) {
+    renderUnifiedLeaderboard(sortLeaderboardRows(source));
+    return;
   }
   const filtered = source.filter(r =>
-    (r.display_name || r.username || '').toLowerCase().includes(q.toLowerCase())
+    (r.display_name || r.username || '').toLowerCase().includes(query)
   );
-  renderUnifiedLeaderboard(sortLeaderboardRows(filtered));
+  debouncedRenderUnifiedLeaderboard(filtered);
 }
 
 function changeLeaderboardPage(dir) {
@@ -4207,6 +4342,8 @@ function changeMarriagesPage(delta) {
   filterMarriages(marriagesQuery);
 }
 
+const debouncedRenderMarriages = debounce(renderMarriages, 120);
+
 function filterMarriages(q) {
   marriagesQuery = q || '';
   const query = marriagesQuery.toLowerCase().trim();
@@ -4219,8 +4356,10 @@ function filterMarriages(q) {
       (r.user1_display || '').toLowerCase().includes(query) ||
       (r.user2_display || '').toLowerCase().includes(query)
     );
+    debouncedRenderMarriages(rows);
+  } else {
+    renderMarriages(rows);
   }
-  renderMarriages(rows);
 }
 
 function renderMarriages(rows) {
@@ -6403,6 +6542,15 @@ function switchPanel(panelId, resetTab = false) {
   const currentPanel = document.querySelector('.panel.active');
   if (currentPanel && currentPanel.id === `panel-${panelId}`) return;
 
+  const oldPanelId = currentPanel ? currentPanel.id.replace('panel-', '') : null;
+  if (oldPanelId) {
+    if (oldPanelId === 'overview' && typeof stopLiveActivityFeed === 'function') {
+      stopLiveActivityFeed();
+    }
+    TimerRegistry.clearAllForPanel(oldPanelId);
+  }
+  TimerRegistry.setCurrentPanel(panelId);
+
   document.body.style.overflow = '';
   const mainContent = document.getElementById('mainContent');
   if (mainContent) mainContent.scrollTop = 0;
@@ -7670,7 +7818,7 @@ function syncOverviewCardsHeight() {
   }
 }
 
-window.addEventListener('resize', syncOverviewCardsHeight);
+window.addEventListener('resize', rAFThrottle(syncOverviewCardsHeight), { passive: true });
 
 function updateOverviewModulesUI() {
   const modules = [
@@ -8121,8 +8269,17 @@ function startLiveActivityFeed() {
 
   // Povuci odmah, pa na svake 3 sekunde
   fetchLogs();
-  liveFeedInterval = setInterval(fetchLogs, 3000);
+  liveFeedInterval = TimerRegistry.registerInterval('overview', fetchLogs, 3000);
 }
+
+function stopLiveActivityFeed() {
+  if (liveFeedInterval) {
+    clearInterval(liveFeedInterval);
+    TimerRegistry.unregister('overview', liveFeedInterval);
+    liveFeedInterval = null;
+  }
+}
+window.stopLiveActivityFeed = stopLiveActivityFeed;
 
 // ── Kick OAuth Helperi za dodavanje kanala ─────────────────────────────────
 function generateRandomString(length) {
@@ -11791,5 +11948,19 @@ window.copyAlertVar = copyAlertVar;
 window.handleAnnounceInputChange = handleAnnounceInputChange;
 window.addAnnounceMessage = addAnnounceMessage;
 window.deleteAnnounceMessage = deleteAnnounceMessage;
+
+// ── Page Visibility API (Pause polling on hidden tab) ────────
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (typeof stopLiveActivityFeed === 'function') {
+      stopLiveActivityFeed();
+    }
+  } else if (document.visibilityState === 'visible') {
+    const activePanel = document.querySelector('.panel.active');
+    if (activePanel && activePanel.id === 'panel-overview' && typeof startLiveActivityFeed === 'function') {
+      startLiveActivityFeed();
+    }
+  }
+});
 
 initAuth();

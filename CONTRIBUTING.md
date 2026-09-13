@@ -1,62 +1,69 @@
-# CONTRIBUTING TO KICKALL ECOSYSTEM 🚀
+# Contributing to KickALL Ecosystem
 
-Hvala vam što ste zainteresovani za doprinos KICKALL ekosistemu! Ovaj dokument pruža smernice za postavljanje lokalnog razvojnog okruženja, pisanje testova, proveru stila koda i podnošenje Pull Request-ova.
+Thank you for your interest in contributing to the KickALL ecosystem! This document outlines guidelines for setting up your local development environment, running tests, checking code style, and submitting Pull Requests.
 
 ---
 
-## 🛠️ Lokalno Razvojno Okruženje
+## Local Development Environment
 
-### Zahtevi
-- **Node.js**: v22.x ili novija
-- **npm**: v10.x ili novija
+### Prerequisites
+- **Node.js**: v22.x or later
+- **npm**: v10.x or later
 
-### Kloniranje i Instalacija
+### Cloning and Installation
 ```bash
-# 1. Klonirajte repozitorijum
+# 1. Clone the repository
 git clone https://github.com/milan-petkovski/kickALL.git
 cd kickALL
 
-# 2. Instalirajte zavisnosti za Bot i root projekat
+# 2. Install dependencies for the root workspace and Bot
 npm install
 cd Bot && npm install && cd ..
 ```
 
-### Konfiguracija Okruženja
-Kopirajte primere promenljivih okruženja:
+### Environment Configuration
+Copy the environment variable example files:
 ```bash
 cp Bot/.env.example Bot/.env
 cp Website/.env.example Website/.env
 ```
-Podesite `INTERNAL_API_SECRET` na podudarnu vrednost unutar oba `.env` fajla radi sigurne inter-service komunikacije.
+Set `INTERNAL_API_SECRET` to matching values across both `.env` files for secure inter-service communication.
 
 ---
 
-## 🧪 Testiranje & Kvalitet Koda
+## Testing & Code Quality
 
-Pre nego što pošaljete Pull Request, obavezno pokrenite sve automatizovane provere:
+Before opening a Pull Request, ensure that all automated checks pass cleanly:
 
 ```bash
-# Pokretanje svih nativnih unit testova (23+ testova)
+# Run all native unit tests
 npm test
 
-# Generisanje izveštaja o pokrivenosti koda (Coverage)
+# Run Bot unit tests only
+npm run test:bot
+
+# Run Website unit tests only
+npm run test:website
+
+# Generate code coverage report
 npm run test:coverage
 
-# Provera stila koda sa ESLint-om (mora proći sa 0 grešaka)
+# Check code style with ESLint (must pass with 0 errors)
 npm run lint
 
-# Provera zavisnosti na bezbednosne ranjivosti
+# Audit dependencies for security vulnerabilities
 npm run audit
 
-# Verifikacija i gradnja statičkih resursa
-npm run build
+# Verify static resources and asset integrity
+npm run verify
 ```
 
 ---
 
-## 📜 Pravila za Kod i Komite
+## Code Style & Contribution Guidelines
 
-1. **UTF-8 Enkodiranje**: Svi fajlovi moraju biti snimljeni u čistom UTF-8 formatu bez BOM-a uz očuvanje srpskih dijakritičkih karaktera (č, ć, š, đ, ž).
-2. **Bezbednost po podrazumevanom pravilu**: Sve nove admin/operativne rute moraju koristiti `verifyInternalToken` sa fail-closed logikom.
-3. **SVG Ikone**: Zabranjeno je korišćenje emoji simbola za grafičke komponente u UI-ju; uvek koristiti prilagođene SVG ikone.
-4. **Unit Testovi**: Za svaku novu funkciju ili komandu u `Bot/src/` ili Netlify funkciju u `Website/netlify/functions/`, obavezno napišite nativni unit test u odgovarajućem `tests/` folderu.
+1. **UTF-8 Encoding**: All files must enforce clean UTF-8 character encoding without BOM. Never introduce mojibake (`\uFFFD`) and preserve all regional characters (e.g. Serbian Latin: `č, ć, š, đ, ž`).
+2. **Security by Default**: All administrative and operational routes must enforce token verification with fail-closed security logic.
+3. **Icons & UI Design**: Never use emoji symbols for UI components. Always use clean custom SVG icons.
+4. **Unit Tests**: Every new feature, command in `Bot/src/`, or endpoint in `Website/` must include automated tests using Node's native test runner (`node:test` and `node:assert/strict`) located in the respective `tests/` directory.
+5. **Clean Pull Requests**: Ensure all linting, security audits, and tests pass before submitting your Pull Request. Keep commits atomic and descriptive.

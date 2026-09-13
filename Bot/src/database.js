@@ -385,10 +385,12 @@ async function ucitajLjubav(chatroomId) {
 
         const { data, error } = await sbPanels
             .from('love_and_marriages')
-            .select('user1, user2, modifier, is_married, married_at')
+            .select('user1, user2, modifier, is_married, married_at, updated_at')
             .eq('channel_id', chatroomId);
 
         if (error) throw error;
+
+        if (!channelState.loveMetadata) channelState.loveMetadata = {};
 
         if (data) {
             data.forEach(row => {
@@ -396,11 +398,16 @@ async function ucitajLjubav(chatroomId) {
                 if (row.modifier !== null && row.modifier !== undefined) {
                     channelState.loveModifiers[key] = row.modifier;
                 }
+                channelState.loveMetadata[key] = {
+                    married_at: row.married_at || null,
+                    updated_at: row.updated_at || null
+                };
                 if (row.is_married) {
                     channelState.marriedCouples[key] = {
                         user1: row.user1,
                         user2: row.user2,
-                        datum: row.married_at ? new Date(row.married_at).toLocaleDateString('sr-RS') : '\u2014'
+                        datum: row.married_at ? new Date(row.married_at).toLocaleDateString('sr-RS') : '\u2014',
+                        married_at: row.married_at || null
                     };
                 }
             });
@@ -416,24 +423,43 @@ async function sacuvajLjubav(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || !channelState.loveDirty) return;
     try {
-        const keys = new Set([
-            ...Object.keys(channelState.loveModifiers),
-            ...Object.keys(channelState.marriedCouples)
+        const allKeys = new Set([
+            ...Object.keys(channelState.loveModifiers || {}),
+            ...Object.keys(channelState.marriedCouples || {})
         ]);
 
-        const rows = Array.from(keys).map(key => {
+        const keysToSave = (channelState.dirtyLoveKeys && channelState.dirtyLoveKeys.size > 0)
+            ? Array.from(channelState.dirtyLoveKeys)
+            : Array.from(allKeys);
+
+        const rows = keysToSave.map(key => {
             const [u1, u2] = key.split('::');
             const isMarried = !!channelState.marriedCouples[key];
             const rawMod = channelState.loveModifiers[key] ?? 0;
             const clampedMod = Math.max(-100, Math.min(100, Number(rawMod) || 0));
+            const existingMeta = channelState.loveMetadata?.[key];
+            const marriedAt = isMarried
+                ? (channelState.marriedCouples[key]?.married_at || existingMeta?.married_at || new Date().toISOString())
+                : null;
+            const isDirectlyModified = channelState.dirtyLoveKeys && channelState.dirtyLoveKeys.has(key);
+            const updatedAt = isDirectlyModified
+                ? new Date().toISOString()
+                : (existingMeta?.updated_at || new Date().toISOString());
+
+            if (!channelState.loveMetadata) channelState.loveMetadata = {};
+            channelState.loveMetadata[key] = { married_at: marriedAt, updated_at: updatedAt };
+            if (isMarried && channelState.marriedCouples[key]) {
+                channelState.marriedCouples[key].married_at = marriedAt;
+            }
+
             return {
                 channel_id: chatroomId,
                 user1: (u1 || '').toLowerCase(),
                 user2: (u2 || '').toLowerCase(),
                 modifier: clampedMod,
                 is_married: isMarried,
-                married_at: isMarried ? new Date().toISOString() : null,
-                updated_at: new Date().toISOString()
+                married_at: marriedAt,
+                updated_at: updatedAt
             };
         });
 
@@ -445,6 +471,9 @@ async function sacuvajLjubav(chatroomId) {
             if (error) throw error;
         }
         channelState.loveDirty = false;
+        if (channelState.dirtyLoveKeys) {
+            channelState.dirtyLoveKeys.clear();
+        }
         log('INFO', `[${channelState.channelUsername || chatroomId}] Ljubavni podaci uspešno sačuvani u love_and_marriages na Supabase.`);
     } catch (err) {
         log('ERR', `Greška pri čuvanju ljubavnih podataka za ${chatroomId}: ${err.message}`);
@@ -482,9 +511,13 @@ function normalizujLjubavKaNuli() {
 
             if (val > 0) {
                 channelState.loveModifiers[kljuc] = Math.max(0, val - 1);
+                if (!channelState.dirtyLoveKeys) channelState.dirtyLoveKeys = new Set();
+                channelState.dirtyLoveKeys.add(kljuc);
                 dirty = true;
             } else if (val < 0) {
                 channelState.loveModifiers[kljuc] = Math.min(0, val + 1);
+                if (!channelState.dirtyLoveKeys) channelState.dirtyLoveKeys = new Set();
+                channelState.dirtyLoveKeys.add(kljuc);
                 dirty = true;
             }
         }
@@ -656,7 +689,7 @@ const BUILTIN_CMD_TO_DB_KEY = {
     'vreme': 'vreme', 'vrijeme': 'vreme', 'weather': 'vreme'
 };
 
-async function evidentirajKoriscenjeKomande(chatroomId, rawCmdName) {
+function evidentirajKoriscenjeKomande(chatroomId, rawCmdName) {
     try {
         if (!KORISTI_SUPABASE) return;
         const channelState = state.getChannelState(chatroomId);
@@ -667,7 +700,48 @@ async function evidentirajKoriscenjeKomande(chatroomId, rawCmdName) {
 
         const matchKey = BUILTIN_CMD_TO_DB_KEY[cleanCmd] || cleanCmd;
 
-        // Potraži da li u custom_commands tabeli već postoji red za ovu komandu
+        // Inkrementiraj memorijski delta brojač
+        channelState.commandUsageDeltas = channelState.commandUsageDeltas || {};
+        channelState.commandUsageDeltas[matchKey] = (channelState.commandUsageDeltas[matchKey] || 0) + 1;
+
+        // Ako je custom komanda učitana u memoriju, ažuriraj lokalno
+        if (channelState.customCommands) {
+            for (const key of Object.keys(channelState.customCommands)) {
+                if (key === cleanCmd || key === matchKey) {
+                    channelState.customCommands[key].usage = (channelState.customCommands[key].usage || 0) + 1;
+                }
+            }
+        }
+
+        // Debounced flush u bazu na svakih 15 sekundi radi sprečavanja zagušenja baze pri burstu
+        if (!channelState.commandUsageSaveTimer) {
+            channelState.commandUsageSaveTimer = setTimeout(() => {
+                sacuvajCommandUsage(chatroomId);
+                channelState.commandUsageSaveTimer = null;
+            }, 15000);
+            if (channelState.commandUsageSaveTimer && typeof channelState.commandUsageSaveTimer.unref === 'function') {
+                channelState.commandUsageSaveTimer.unref();
+            }
+        }
+    } catch (err) {
+        log('WARN', `Greška pri evidentiranju korišćenja komande '${rawCmdName}' za ${chatroomId}: ${err.message}`);
+    }
+}
+
+async function sacuvajCommandUsage(chatroomId) {
+    try {
+        if (!KORISTI_SUPABASE) return;
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState || !channelState.commandUsageDeltas) return;
+
+        const deltas = channelState.commandUsageDeltas;
+        const keys = Object.keys(deltas).filter(k => deltas[k] > 0);
+        if (keys.length === 0) return;
+
+        // Atomski kloniramo i čistimo delte pre asinhronog rada
+        const pendingDeltas = { ...deltas };
+        channelState.commandUsageDeltas = {};
+
         const { data: existingRows, error: searchErr } = await sbPanels
             .from('custom_commands')
             .select('id, usage, command')
@@ -675,41 +749,48 @@ async function evidentirajKoriscenjeKomande(chatroomId, rawCmdName) {
 
         if (searchErr) throw searchErr;
 
-        let targetRow = null;
-        if (existingRows && existingRows.length > 0) {
-            targetRow = existingRows.find(r => {
-                const names = r.command.split(',').map(n => n.trim().toLowerCase());
-                return names.some(n => n === matchKey || n === cleanCmd);
-            });
-        }
+        const rows = existingRows || [];
+        for (const cmdKey of Object.keys(pendingDeltas)) {
+            const delta = pendingDeltas[cmdKey];
+            if (delta <= 0) continue;
 
-        if (targetRow) {
-            const currentUsage = (targetRow.usage || 0) + 1;
-            await sbPanels
-                .from('custom_commands')
-                .update({ usage: currentUsage, updated_at: new Date().toISOString() })
-                .eq('id', targetRow.id);
-        } else {
-            // Ako red još ne postoji u bazi, kreiramo inicijalni red sa is_default: true i usage: 1
-            const userId = channelState.userId || null;
-            await sbPanels
-                .from('custom_commands')
-                .insert({
-                    channel_id: chatroomId,
-                    user_id: userId,
-                    command: matchKey,
-                    response: '',
-                    cooldown: 5000,
-                    min_rank: 'everyone',
-                    enabled: true,
-                    is_default: true,
-                    usage: 1,
-                    created_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
-                });
+            const targetRow = rows.find(r => {
+                const names = r.command.split(',').map(n => n.trim().toLowerCase());
+                return names.some(n => n === cmdKey);
+            });
+
+            if (targetRow) {
+                const currentUsage = (targetRow.usage || 0) + delta;
+                targetRow.usage = currentUsage;
+                await sbPanels
+                    .from('custom_commands')
+                    .update({ usage: currentUsage, updated_at: new Date().toISOString() })
+                    .eq('id', targetRow.id);
+            } else {
+                const userId = channelState.userId || null;
+                const { data: inserted } = await sbPanels
+                    .from('custom_commands')
+                    .insert({
+                        channel_id: chatroomId,
+                        user_id: userId,
+                        command: cmdKey,
+                        response: '',
+                        cooldown: 5000,
+                        min_rank: 'everyone',
+                        enabled: true,
+                        is_default: true,
+                        usage: delta,
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    })
+                    .select('id, usage, command');
+                if (inserted && inserted[0]) {
+                    rows.push(inserted[0]);
+                }
+            }
         }
     } catch (err) {
-        log('WARN', `Greška pri evidentiranju korišćenja komande '${rawCmdName}' za ${chatroomId}: ${err.message}`);
+        log('WARN', `Greška pri čuvanju brojača komandi za ${chatroomId}: ${err.message}`);
     }
 }
 
@@ -808,104 +889,76 @@ async function ucitajBotConfig(chatroomId) {
             channelState.feature_autoresponse = data.feature_autoresponse ?? true;
             channelState.feature_songrequest = limits.allowSongRequest && (data.feature_songrequest ?? false);
             channelState.welcome_message = data.welcome_message || '';
-            await ucitajAlerts(chatroomId);
-
             channelState.botActive = data.bot_active || false;
-
-            await ucitajAutoAnnounces(chatroomId);
-
             channelState.announce_interval_mins = data.announce_interval_mins ?? 15;
             channelState.announce_message_threshold = data.announce_message_threshold ?? 10;
             channelState.announce_time_enabled = data.announce_time_enabled ?? true;
             channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
-            
-            // Učitavanje podešavanja Moderacije 100% isključivo iz `moderation` tabele
-            try {
-                const { data: modData } = await sbPanels
-                    .from('moderation')
-                    .select('settings')
-                    .eq('channel_id', chatroomId)
-                    .eq('type', 'config')
-                    .maybeSingle();
 
-                channelState.moderationSettings = modData?.settings || {};
-            } catch (modErr) {
+            // Paralelizujemo ucitajAlerts, ucitajAutoAnnounces i 4 specifične tabele podešavanja radi maksimalne brzine
+            const [alertsRes, annRes, modRes, mgRes, srRes, rankRes] = await Promise.allSettled([
+                ucitajAlerts(chatroomId),
+                ucitajAutoAnnounces(chatroomId),
+                sbPanels.from('moderation').select('settings').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),
+                sbPanels.from('mini_games').select('enabled, max_bet').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),
+                sbPanels.from('song_request').select('*').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),
+                sbPanels.from('ranking').select('*').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle()
+            ]);
+
+            // Moderation
+            if (modRes.status === 'fulfilled' && !modRes.value.error && modRes.value.data) {
+                channelState.moderationSettings = modRes.value.data.settings || {};
+            } else {
                 channelState.moderationSettings = {};
             }
-            
-            // Učitavanje podešavanja mini igara isključivo iz jedinstvene tabele `mini_games`
-            try {
-                const { data: mgData } = await sbPanels
-                    .from('mini_games')
-                    .select('enabled, max_bet')
-                    .eq('channel_id', chatroomId)
-                    .eq('type', 'config')
-                    .maybeSingle();
 
-                channelState.max_gamble_amount = mgData?.max_bet ?? 5000;
-                channelState.gamble_enabled = mgData?.enabled ?? true;
-            } catch (mgErr) {
+            // Mini games
+            if (mgRes.status === 'fulfilled' && !mgRes.value.error && mgRes.value.data) {
+                channelState.max_gamble_amount = mgRes.value.data.max_bet ?? 5000;
+                channelState.gamble_enabled = mgRes.value.data.enabled ?? true;
+            } else {
                 channelState.max_gamble_amount = 5000;
                 channelState.gamble_enabled = true;
             }
 
-            // Učitavanje podešavanja Song Request panela isključivo iz tabele `song_request`
-            try {
-                const { data: srData } = await sbPanels
-                    .from('song_request')
-                    .select('*')
-                    .eq('channel_id', chatroomId)
-                    .eq('type', 'config')
-                    .maybeSingle();
-
-                if (srData) {
-                    channelState.feature_songrequest = srData.enabled ?? false;
-                    channelState.songrequest_settings = {
-                        request_role: srData.request_role || 'everyone',
-                        cost_points: srData.cost_points ?? 0,
-                        points_price: srData.cost_points ?? 0,
-                        max_duration_seconds: srData.max_duration_seconds ?? 360,
-                        queue: Array.isArray(srData.queue) ? srData.queue : []
-                    };
-                } else {
-                    channelState.feature_songrequest = false;
-                    channelState.songrequest_settings = { request_role: 'everyone', cost_points: 0, points_price: 0, max_duration_seconds: 360, queue: [] };
-                }
-            } catch (srErr) {
+            // Song request
+            if (srRes.status === 'fulfilled' && !srRes.value.error && srRes.value.data) {
+                const srData = srRes.value.data;
+                channelState.feature_songrequest = srData.enabled ?? false;
+                channelState.songrequest_settings = {
+                    request_role: srData.request_role || 'everyone',
+                    cost_points: srData.cost_points ?? 0,
+                    points_price: srData.cost_points ?? 0,
+                    max_duration_seconds: srData.max_duration_seconds ?? 360,
+                    queue: Array.isArray(srData.queue) ? srData.queue : []
+                };
+            } else {
                 channelState.feature_songrequest = false;
                 channelState.songrequest_settings = { request_role: 'everyone', cost_points: 0, points_price: 0, max_duration_seconds: 360, queue: [] };
             }
 
-            // Učitavanje podešavanja Ranking sistema i Prodavnice 100% isključivo iz `ranking` tabele
-            try {
-                const { data: rankData } = await sbPanels
-                    .from('ranking')
-                    .select('*')
-                    .eq('channel_id', chatroomId)
-                    .eq('type', 'config')
-                    .maybeSingle();
+            // Ranking
+            if (rankRes.status === 'fulfilled' && !rankRes.value.error && rankRes.value.data) {
+                const rankData = rankRes.value.data;
+                channelState.currency_name = rankData.currency_name || 'Koins';
+                channelState.points_per_msg = rankData.points_per_msg ?? 5;
+                channelState.smart_chat_validation = rankData.smart_chat_validation ?? true;
+                channelState.first_interaction_bonus = rankData.first_interaction_bonus ?? 100;
+                channelState.points_per_watchtime = rankData.points_per_watchtime ?? 20;
+                channelState.level_up_announce = rankData.level_up_announce ?? true;
+                channelState.sub_multiplier = rankData.sub_multiplier ?? 2.0;
+                channelState.sub_bonus_per_msg = rankData.sub_bonus_per_msg ?? 10;
+                channelState.points_per_sub = rankData.points_per_sub ?? 1000;
+                channelState.points_per_gift_sub = rankData.points_per_gift_sub ?? 2000;
+                channelState.points_per_100_kicks = rankData.points_per_100_kicks ?? 500;
+                channelState.daily_streak_bonus = rankData.points_daily_streak ?? 150;
+                channelState.host_raid_bonus = rankData.points_per_raid ?? 300;
 
-                if (rankData) {
-                    channelState.currency_name = rankData.currency_name || 'Koins';
-                    channelState.points_per_msg = rankData.points_per_msg ?? 5;
-                    channelState.smart_chat_validation = rankData.smart_chat_validation ?? true;
-                    channelState.first_interaction_bonus = rankData.first_interaction_bonus ?? 100;
-                    channelState.points_per_watchtime = rankData.points_per_watchtime ?? 20;
-                    channelState.level_up_announce = rankData.level_up_announce ?? true;
-                    channelState.sub_multiplier = rankData.sub_multiplier ?? 2.0;
-                    channelState.sub_bonus_per_msg = rankData.sub_bonus_per_msg ?? 10;
-                    channelState.points_per_sub = rankData.points_per_sub ?? 1000;
-                    channelState.points_per_gift_sub = rankData.points_per_gift_sub ?? 2000;
-                    channelState.points_per_100_kicks = rankData.points_per_100_kicks ?? 500;
-                    channelState.daily_streak_bonus = rankData.points_daily_streak ?? 150;
-                    channelState.host_raid_bonus = rankData.points_per_raid ?? 300;
-
-                    const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
-                    const rawStore = Array.isArray(rankData.store_items) ? rankData.store_items : [];
-                    channelState.store_items = rawStore.slice(0, maxStoreItems);
-                }
-            } catch (rankErr) {
-                log('ERR', `Greška pri učitavanju ranking podešavanja za ${chatroomId}: ${rankErr.message}`);
+                const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
+                const rawStore = Array.isArray(rankData.store_items) ? rankData.store_items : [];
+                channelState.store_items = rawStore.slice(0, maxStoreItems);
+            } else if (rankRes.status === 'rejected') {
+                log('ERR', `Greška pri učitavanju ranking podešavanja za ${chatroomId}: ${rankRes.reason?.message}`);
             }
 
             if (data.channel_name && data.channel_name !== channelState.channelUsername) {
@@ -1093,7 +1146,7 @@ async function syncChatroomId(channelName, realChatroomId) {
             .update({ chatroom_id: String(realChatroomId) })
             .eq('username', channelName);
     } catch (err) {
-        console.error('Greska u syncChatroomId:', err);
+        log('ERR', `Greška u syncChatroomId: ${err.message || err}`);
     }
 }
 
@@ -1105,6 +1158,32 @@ let realtimeChannel = null;
  * osvežava konfiguraciju tog kanala u memoriji bez ručnog osvežavanja.
  */
 const realtimeConfigDebounceTimers = new Map();
+
+function ocistiRealtimeDebounceTajmere() {
+    for (const timer of realtimeConfigDebounceTimers.values()) {
+        clearTimeout(timer);
+    }
+    realtimeConfigDebounceTimers.clear();
+
+    // Čišćenje preostalih debounce tajmera za čuvanje brojača komandi
+    for (const chatroomId of Object.keys(state.channels)) {
+        const cState = state.channels[chatroomId];
+        if (cState && cState.commandUsageSaveTimer) {
+            clearTimeout(cState.commandUsageSaveTimer);
+            cState.commandUsageSaveTimer = null;
+        }
+    }
+}
+
+function zaustaviRealtimeSlusalac() {
+    ocistiRealtimeDebounceTajmere();
+    if (realtimeChannel && supabase) {
+        try {
+            supabase.removeChannel(realtimeChannel);
+        } catch (_) {}
+        realtimeChannel = null;
+    }
+}
 
 function postaviRealtimeSlusalac() {
     if (!KORISTI_SUPABASE || !supabase || realtimeChannel) return;
@@ -1160,6 +1239,7 @@ module.exports = {
     smanjiPoruku,
     ucitajCustomKomande,
     evidentirajKoriscenjeKomande,
+    sacuvajCommandUsage,
     ucitajAutoAnnounces,
     ucitajAlerts,
     ucitajBotConfig,
@@ -1168,6 +1248,8 @@ module.exports = {
     posaljiKickovAlert,
     syncChatroomId,
     postaviRealtimeSlusalac,
+    zaustaviRealtimeSlusalac,
+    ocistiRealtimeDebounceTajmere,
     normalizujLjubavKaNuli
 };
 

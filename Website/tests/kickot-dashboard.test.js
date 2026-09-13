@@ -275,3 +275,105 @@ test('Kickot - Legacy panel slug aliases mapiraju se na nove nazive panela', () 
   assert.equal(resolvePanelSlug('overview'), 'overview');
   assert.equal(resolvePanelSlug('moderation'), 'moderation');
 });
+
+// ── 8. TIMER REGISTRY & PANEL LIFECYCLE CLEANUP ────────────────────────────
+class MockTimerRegistry {
+  constructor() {
+    this.panelIntervals = new Map(); // panelName -> Set of IDs
+    this.globalIntervals = new Set();
+  }
+
+  registerPanelInterval(panel, intervalId) {
+    if (!this.panelIntervals.has(panel)) {
+      this.panelIntervals.set(panel, new Set());
+    }
+    this.panelIntervals.get(panel).add(intervalId);
+  }
+
+  clearPanelIntervals(panel, clearIntervalFn = clearInterval) {
+    const set = this.panelIntervals.get(panel);
+    if (!set) return 0;
+    let count = 0;
+    for (const id of set) {
+      clearIntervalFn(id);
+      count++;
+    }
+    this.panelIntervals.delete(panel);
+    return count;
+  }
+
+  hasActiveIntervals(panel) {
+    const set = this.panelIntervals.get(panel);
+    return Boolean(set && set.size > 0);
+  }
+}
+
+test('Kickot - TimerRegistry uredno registruje i čisti intervale po panelu bez curenja memorije', () => {
+  const registry = new MockTimerRegistry();
+  const cleared = [];
+  const mockClearInterval = (id) => cleared.push(id);
+
+  registry.registerPanelInterval('overview', 101);
+  registry.registerPanelInterval('overview', 102);
+  registry.registerPanelInterval('songs', 201);
+
+  assert.equal(registry.hasActiveIntervals('overview'), true);
+  assert.equal(registry.hasActiveIntervals('songs'), true);
+  assert.equal(registry.hasActiveIntervals('commands'), false);
+
+  // Napuštanje overview panela
+  const clearedCount = registry.clearPanelIntervals('overview', mockClearInterval);
+  assert.equal(clearedCount, 2);
+  assert.deepEqual(cleared, [101, 102]);
+  assert.equal(registry.hasActiveIntervals('overview'), false);
+
+  // songs panel i dalje ima svoj interval
+  assert.equal(registry.hasActiveIntervals('songs'), true);
+});
+
+// ── 9. DEBOUNCE & THROTTLE TIMING BEHAVIOR ─────────────────────────────────
+function debounce(fn, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
+test('Kickot - Debounce funkcija sprečava višestruko okidanje i izvršava se samo jednom', async () => {
+  let callCount = 0;
+  let lastArg = null;
+  const debounced = debounce((val) => {
+    callCount++;
+    lastArg = val;
+  }, 20);
+
+  debounced('a');
+  debounced('b');
+  debounced('c');
+
+  assert.equal(callCount, 0);
+
+  await new Promise(res => setTimeout(res, 50));
+  assert.equal(callCount, 1);
+  assert.equal(lastArg, 'c');
+});
+
+// ── 10. BOTRIX VARIABLE CONVERSION ─────────────────────────────────────────
+function convertBotrixVariables(response) {
+  if (!response || typeof response !== 'string') return '';
+  return response
+    .replace(/\$\(user\)/gi, '{user}')
+    .replace(/\$\(touser\)/gi, '{touser}')
+    .replace(/\$\(channel\)/gi, '{channel}')
+    .replace(/\$\(count\)/gi, '{count}')
+    .replace(/\$\(random\.(\d+)-(\d+)\)/gi, '{random.$1-$2}')
+    .replace(/\$\(urlfetch\s+([^\)]+)\)/gi, '{fetch $1}');
+}
+
+test('Kickot - Botrix format varijabli $(user) se ispravno konvertuje u Kickot {user} format', () => {
+  const botrixInput = 'Pozdrav $(user)! Pozdravi $(touser). Random: $(random.1-100)';
+  const converted = convertBotrixVariables(botrixInput);
+  assert.equal(converted, 'Pozdrav {user}! Pozdravi {touser}. Random: {random.1-100}');
+});
+

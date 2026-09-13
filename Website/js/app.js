@@ -1309,8 +1309,9 @@ window.addEventListener('storage', (event) => {
                 
                 // Set avatar
                 if (userAvatar) {
-                    if (avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:image'))) {
-                        userAvatar.style.backgroundImage = `url("${avatarUrl}")`;
+                    if (avatarUrl && /^https?:\/\//i.test(avatarUrl)) {
+                        const safeUrl = encodeURI(avatarUrl).replace(/["'()<>]/g, '');
+                        userAvatar.style.backgroundImage = `url("${safeUrl}")`;
                         userAvatar.style.backgroundSize = 'cover';
                         userAvatar.style.backgroundPosition = 'center';
                         userAvatar.textContent = '';
@@ -1948,8 +1949,9 @@ window.addEventListener('storage', (event) => {
                     const avatar = card.querySelector('.showcase-avatar');
                     const viewers = card.querySelector('.showcase-viewers');
 
-                    if (data?.avatar && avatar) {
-                        avatar.style.backgroundImage = `url('${data.avatar}')`;
+                    if (data?.avatar && avatar && /^https?:\/\//i.test(data.avatar)) {
+                        const safeAvatar = encodeURI(data.avatar).replace(/["'()<>]/g, '');
+                        avatar.style.backgroundImage = `url("${safeAvatar}")`;
                     }
                     if (data?.is_live && liveBadge) {
                         liveBadge.className = 'showcase-live-badge pulse';
@@ -1984,8 +1986,9 @@ window.addEventListener('storage', (event) => {
                     const name = card.querySelector(`#t-name-${cardNum}`);
                     const role = card.querySelector(`#t-role-${cardNum}`);
 
-                    if (data?.avatar && avatar) {
-                        avatar.style.backgroundImage = `url('${data.avatar}')`;
+                    if (data?.avatar && avatar && /^https?:\/\//i.test(data.avatar)) {
+                        const safeAvatar = encodeURI(data.avatar).replace(/["'()<>]/g, '');
+                        avatar.style.backgroundImage = `url("${safeAvatar}")`;
                         avatar.textContent = '';
                     }
                     if (data?.username && name) {
