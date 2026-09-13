@@ -149,6 +149,7 @@ module.exports = {
     isLeader: true,
     isShuttingDown: false,
     leaderLockTimer: null,
+    clusterChannel: null,
 
     // Reconnect i konekcioni guard-ovi
     isConnecting: false,
@@ -159,7 +160,8 @@ module.exports = {
     checkLiveTimer: null,
     loveNormalizationTimer: null,
     memoryCleanupTimer: null,
-    realtimeBotConfigDebounceTimers: new Map()
+    realtimeBotConfigDebounceTimers: new Map(),
+    userProfileDebounceTimers: new Map()
 };
 
 

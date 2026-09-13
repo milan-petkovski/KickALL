@@ -15,6 +15,8 @@ test('Leader Election & Distributed Lock Tests', async (t) => {
         database.KORISTI_SUPABASE = originalKoristiSupabase;
         state.isLeader = originalIsLeader;
         state.instanceId = originalInstanceId;
+        state.clusterChannel = null;
+        state.isShuttingDown = false;
     });
 
     await t.test('Kandidat na startu ne prekida rad ako druga instanca drži aktivan lease', async () => {
@@ -62,7 +64,7 @@ test('Leader Election & Distributed Lock Tests', async (t) => {
 
         database.KORISTI_SUPABASE = true;
         database.supabase = {
-            from: (table) => ({
+            from: (_table) => ({
                 select: () => ({
                     eq: () => ({
                         maybeSingle: async () => ({ data: mockLockData, error: null })
@@ -115,5 +117,88 @@ test('Leader Election & Distributed Lock Tests', async (t) => {
         assert.equal(result, true, 'Force opcija mora autoritativno osvojiti lock');
         assert.equal(state.isLeader, true);
         assert.equal(updatedTo, 'test-deploy-replacement');
+    });
+
+    await t.test('Kandidat (non-leader) ignoriše takeover broadcast i ne gasi se', async () => {
+        state.isLeader = false;
+        state.instanceId = 'candidate-inst';
+        state.isShuttingDown = false;
+
+        let broadcastHandler = null;
+        database.supabase = {
+            channel: () => ({
+                on: (type, filter, handler) => {
+                    if (filter.event === 'instance_takeover') broadcastHandler = handler;
+                    return this;
+                },
+                subscribe: () => {}
+            })
+        };
+
+        bot.setupClusterBroadcast();
+        assert.equal(typeof broadcastHandler, 'function', 'Handler za takeover mora biti registrovan');
+
+        // Simuliramo takeover event sa druge instance
+        await broadcastHandler({ payload: { instanceId: 'rogue-or-old-instance' } });
+        assert.equal(state.isShuttingDown, false, 'Kandidat se ne sme gasiti na broadcast');
+        assert.equal(state.isLeader, false, 'Status lidera ostaje nepromenjen');
+    });
+
+    await t.test('Aktivni lider ignoriše neautorizovani takeover ako baza potvrđuje da je on i dalje lider', async () => {
+        state.isLeader = true;
+        state.instanceId = 'legitimate-leader';
+        state.isShuttingDown = false;
+
+        let broadcastHandler = null;
+        database.supabase = {
+            channel: () => ({
+                on: (type, filter, handler) => {
+                    if (filter.event === 'instance_takeover') broadcastHandler = handler;
+                    return this;
+                },
+                subscribe: () => {}
+            }),
+            from: (table) => {
+                assert.equal(table, 'bot_cluster_lock');
+                return {
+                    select: () => ({
+                        eq: () => ({
+                            maybeSingle: async () => ({
+                                data: { leader_instance_id: 'legitimate-leader' },
+                                error: null
+                            })
+                        })
+                    })
+                };
+            }
+        };
+
+        bot.setupClusterBroadcast();
+        assert.equal(typeof broadcastHandler, 'function');
+
+        // Prijem neautorizovanog takeover event-a
+        await broadcastHandler({ payload: { instanceId: 'fake-or-booting-instance' } });
+        assert.equal(state.isShuttingDown, false, 'Lider se ne sme ugasiti ako baza ne potvrđuje novog lidera');
+        assert.equal(state.isLeader, true, 'Lider zadržava status vođe');
+    });
+
+    await t.test('broadcastLeadershipTakeover šalje broadcast samo ako je instanca lider', async () => {
+        state.instanceId = 'leader-broadcast-test';
+        const sent = [];
+        state.clusterChannel = {
+            send: async (msg) => { sent.push(msg); }
+        };
+
+        // 1. Nije lider -> ne sme ništa poslati
+        state.isLeader = false;
+        await bot.broadcastLeadershipTakeover();
+        assert.equal(sent.length, 0, 'Non-leader ne sme slati takeover broadcast');
+
+        // 2. Jeste lider -> šalje takeover broadcast
+        state.isLeader = true;
+        await bot.broadcastLeadershipTakeover();
+        assert.equal(sent.length, 1, 'Lider mora poslati takeover broadcast');
+        assert.equal(sent[0].event, 'instance_takeover');
+        assert.equal(sent[0].payload.instanceId, 'leader-broadcast-test');
     });
 });

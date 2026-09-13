@@ -251,27 +251,59 @@ function startLeaderLockHeartbeat() {
     }
 }
 
+async function broadcastLeadershipTakeover() {
+    if (!state.clusterChannel || !state.isLeader) return;
+    try {
+        await state.clusterChannel.send({
+            type: 'broadcast',
+            event: 'instance_takeover',
+            payload: { instanceId: state.instanceId, timestamp: Date.now() }
+        });
+        utils.log('INFO', `[LEADER-ELECTION] Poslat broadcast signal za preuzimanje vođstva (Instance ID: ${state.instanceId})`);
+    } catch (err) {
+        utils.log('WARN', `[LEADER-ELECTION] Neuspešno slanje takeover broadcast-a: ${err.message}`);
+    }
+}
+
 function setupClusterBroadcast() {
     if (!database.supabase || typeof database.supabase.channel !== 'function') return null;
     try {
+        if (state.clusterChannel) return state.clusterChannel;
         const clusterChannel = database.supabase.channel('kickall-cluster-control');
         clusterChannel
-            .on('broadcast', { event: 'instance_takeover' }, payload => {
+            .on('broadcast', { event: 'instance_takeover' }, async (payload) => {
                 const newInstanceId = payload.payload?.instanceId;
-                if (newInstanceId && newInstanceId !== state.instanceId && !state.isShuttingDown) {
-                    utils.log('WARN', `[SPLIT-BRAIN ZAŠTITA] Nova instanca (${newInstanceId}) preuzima vođstvo. Prepuštam lock i pokrećem graceful shutdown.`);
-                    gracefulShutdown('SPLIT_BRAIN_TAKEOVER');
+                if (!newInstanceId || newInstanceId === state.instanceId || state.isShuttingDown) {
+                    return;
+                }
+                // Samo aktivni lider treba da proverava i prepušta vođstvo
+                // Kandidati koji tek startuju i čekaju na lock NE SMEJU da se gase!
+                if (!state.isLeader) {
+                    return;
+                }
+
+                // Autoritativna provera u bazi: da li je nova instanca zaista upisana kao lider?
+                try {
+                    const { data: currentLock, error: lockErr } = await database.supabase
+                        .from('bot_cluster_lock')
+                        .select('leader_instance_id')
+                        .eq('lock_id', CLUSTER_LOCK_ID)
+                        .maybeSingle();
+
+                    if (!lockErr && currentLock && currentLock.leader_instance_id === newInstanceId) {
+                        utils.log('WARN', `[SPLIT-BRAIN ZAŠTITA] Nova instanca (${newInstanceId}) je potvrđeni lider u bazi. Prepuštam lock i pokrećem graceful shutdown.`);
+                        state.isLeader = false;
+                        gracefulShutdown('SPLIT_BRAIN_TAKEOVER');
+                    } else {
+                        utils.log('INFO', `[SPLIT-BRAIN ZAŠTITA] Ignorisan instance_takeover od ${newInstanceId}; baza potvrđuje drugog lidera (${currentLock?.leader_instance_id || 'nema'}).`);
+                    }
+                } catch (verifyErr) {
+                    utils.log('WARN', `[SPLIT-BRAIN ZAŠTITA] Greška pri proveri lidera za takeover: ${verifyErr.message}`);
                 }
             })
-            .subscribe(status => {
-                if (status === 'SUBSCRIBED') {
-                    clusterChannel.send({
-                        type: 'broadcast',
-                        event: 'instance_takeover',
-                        payload: { instanceId: state.instanceId, timestamp: Date.now() }
-                    }).catch(() => {});
-                }
-            });
+            .subscribe();
+
+        state.clusterChannel = clusterChannel;
         return clusterChannel;
     } catch (_) {
         return null;
@@ -294,6 +326,7 @@ async function acquireStartupLeadership() {
     let acquired = await acquireOrRenewLeaderLock();
     if (acquired) {
         startLeaderLockHeartbeat();
+        await broadcastLeadershipTakeover();
         utils.log('INFO', `[LEADER-ELECTION] Bot instanca je uspešno postala primarni lider (Instance ID: ${state.instanceId})`);
         return true;
     }
@@ -309,6 +342,7 @@ async function acquireStartupLeadership() {
         acquired = await acquireOrRenewLeaderLock();
         if (acquired) {
             startLeaderLockHeartbeat();
+            await broadcastLeadershipTakeover();
             utils.log('INFO', `[LEADER-ELECTION] Uspešno preuzet distributed lock nakon čekanja (Instance ID: ${state.instanceId})`);
             return true;
         }
@@ -318,6 +352,7 @@ async function acquireStartupLeadership() {
     utils.log('WARN', `[LEADER-ELECTION] Prethodna instanca nije oslobodila lease u predviđenom roku. Preuzimam primarni lock automatski...`);
     acquired = await acquireOrRenewLeaderLock({ force: true });
     startLeaderLockHeartbeat();
+    await broadcastLeadershipTakeover();
     utils.log('INFO', `[LEADER-ELECTION] Bot instanca je autoritativno preuzela vođstvo (Instance ID: ${state.instanceId})`);
     return true;
 }
@@ -456,9 +491,32 @@ async function start() {
                 table: 'user_profiles'
             }, async (payload) => {
                 const { new: newRow, old: oldRow } = payload;
-                const row = newRow || oldRow;
-                if (row && row.id) {
-                    const userId = row.id;
+                if (!newRow && !oldRow) return;
+                const userId = (newRow || oldRow).id;
+                if (!userId) return;
+
+                // Reagujemo samo ako se zaista promenio plan ili pretplata (eliminiše spam pri izmeni settings-a, tema, kickaj_state, itd.)
+                if (newRow && oldRow) {
+                    const planIsti = newRow.plan === oldRow.plan;
+                    const statusIsti = newRow.subscription_status === oldRow.subscription_status;
+                    const endsIsti = newRow.ends_at === oldRow.ends_at;
+                    if (planIsti && statusIsti && endsIsti) {
+                        return;
+                    }
+                }
+
+                // Debounce po korisniku (1.5s) da se spreči flood i Gateway Timeout
+                if (!state.userProfileDebounceTimers) {
+                    state.userProfileDebounceTimers = new Map();
+                }
+                if (state.userProfileDebounceTimers.has(userId)) {
+                    clearTimeout(state.userProfileDebounceTimers.get(userId));
+                }
+
+                const timer = setTimeout(async () => {
+                    if (state.userProfileDebounceTimers) {
+                        state.userProfileDebounceTimers.delete(userId);
+                    }
                     for (const chatroomId of Object.keys(state.channels)) {
                         const channelState = state.channels[chatroomId];
                         if (channelState && channelState.userId === userId) {
@@ -467,7 +525,9 @@ async function start() {
                             await database.ucitajCustomKomande(chatroomId);
                         }
                     }
-                }
+                }, 1500);
+
+                state.userProfileDebounceTimers.set(userId, timer);
             })
             .subscribe();
 
@@ -527,6 +587,18 @@ async function gracefulShutdown(signal) {
             clearTimeout(t);
         }
         state.realtimeBotConfigDebounceTimers.clear();
+    }
+
+    if (state.userProfileDebounceTimers) {
+        for (const t of state.userProfileDebounceTimers.values()) {
+            clearTimeout(t);
+        }
+        state.userProfileDebounceTimers.clear();
+    }
+
+    if (state.clusterChannel && typeof state.clusterChannel.unsubscribe === 'function') {
+        try { state.clusterChannel.unsubscribe(); } catch (_) {}
+        state.clusterChannel = null;
     }
 
     database.zaustaviRealtimeSlusalac();
@@ -608,5 +680,7 @@ module.exports = {
     start,
     povezi: connection.povezi,
     acquireOrRenewLeaderLock,
-    acquireStartupLeadership
+    acquireStartupLeadership,
+    setupClusterBroadcast,
+    broadcastLeadershipTakeover
 };

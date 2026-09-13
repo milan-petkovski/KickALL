@@ -99,6 +99,44 @@
     "winnerLabel": "WINNER!",
     "wonText": "Won: <span id='winnerPrize'>Subscribe</span>"
   },
+  "kickajStudio": {
+    "title": "KICKAJ - Giveaway Studio",
+    "subtitle": "Interactive live winner draws directly from chat",
+    "btnStart": "Start giveaway",
+    "btnPause": "Pause giveaway",
+    "btnDraw": "Draw winner",
+    "btnReset": "Reset giveaway",
+    "fullscreen": "Fullscreen wheel display for stream",
+    "participants": "Participants",
+    "winners": "Winners",
+    "prize": "Prize",
+    "keyword": "Entry keyword",
+    "spinTime": "Spin duration",
+    "numWinners": "Number of winners",
+    "subscribersOnly": "Subscribers only",
+    "followDuration": "Minimum follow (days)",
+    "subDuration": "Minimum sub (months)",
+    "subMultiplier": "Subscriber multiplier",
+    "blacklist": "User blacklist",
+    "confirmTime": "Confirmation time (seconds)",
+    "animation": "Animation style",
+    "wheel": "Wheel of Fortune",
+    "slot": "Slot Machine",
+    "roulette": "Neon Roulette",
+    "sound": "Sound effects",
+    "volume": "Volume",
+    "statusLive": "Live Chat Active",
+    "statusSpinning": "Drawing in progress",
+    "statusPaused": "Paused",
+    "statusStandby": "Standby",
+    "noParticipants": "No participants to draw from! Wait for chat viewers to join.",
+    "allWinnersDrawn": "All {count} winners have already been drawn!",
+    "winnerConfirmed": "Winner confirmed via chat message.",
+    "winnerExpired": "Winner did not respond in time. Expired.",
+    "chatDisconnected": "Connection to Kick chat lost. Reconnecting ({attempt}/3)...",
+    "chatDisconnectedFinal": "Connection to Kick chat lost after multiple attempts.",
+    "copied": "Successfully copied!"
+  },
   "kickov": {
     "heading": "Beautiful Stream Overlays",
     "desc": "Try how our modern and smooth alerts look on screen during your stream. Change themes and styles live.",
@@ -169,6 +207,7 @@
     "catOverlay": "Overlay",
     "catOauth": "OAuth & Security",
     "catPricing": "Pricing",
+    "catGiveaway": "Giveaway",
     "q1": {
       "question": "How do I connect Kickot chatbot to my Kick channel?",
       "answer": "Simply click on \"Log in via Kick\", authorize your account, and activate Kickot bot in your Dashboard. The bot will join your chat automatically."
@@ -188,6 +227,10 @@
     "q5": {
       "question": "Can I create custom commands and alerts?",
       "answer": "Yes! Through the Dashboard you can create up to 50 commands on the free plan, while on others you can create unlimited. Just visit the commands panel within the Dashboard!"
+    },
+    "q6": {
+      "question": "What is Kickaj and how does the Kickaj giveaway tool work?",
+      "answer": "Kickaj is a dedicated giveaway studio for the Kick.com platform. It connects to your Kick chat in real time, automatically collects participants based on a specified keyword, applies follower and subscriber filters, and visualizes the winner draw through ultra-smooth 240 FPS animations: Wheel of Fortune, Slot Machine, or Neon Roulette with immersive sound effects and verification timers."
     }
   },
   "support": {

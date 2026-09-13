@@ -395,6 +395,12 @@ async function ucitajLjubav(chatroomId) {
         if (data) {
             data.forEach(row => {
                 const key = [row.user1.toLowerCase(), row.user2.toLowerCase()].sort().join('::');
+                const rawMod = Number(row.modifier || 0);
+                if (rawMod === 0 && !row.is_married) {
+                    // Ako u bazi postoji zaostali nivelisani zapis na 0% bez braka, ukloni ga
+                    sbPanels.from('love_and_marriages').delete().eq('channel_id', chatroomId).eq('user1', row.user1).eq('user2', row.user2).catch(() => {});
+                    return;
+                }
                 if (row.modifier !== null && row.modifier !== undefined) {
                     channelState.loveModifiers[key] = row.modifier;
                 }
@@ -406,7 +412,7 @@ async function ucitajLjubav(chatroomId) {
                     channelState.marriedCouples[key] = {
                         user1: row.user1,
                         user2: row.user2,
-                        datum: row.married_at ? new Date(row.married_at).toLocaleDateString('sr-RS') : '\u2014',
+                        datum: row.married_at ? new Date(row.married_at).toLocaleDateString('sr-RS') : '—',
                         married_at: row.married_at || null
                     };
                 }
@@ -432,11 +438,22 @@ async function sacuvajLjubav(chatroomId) {
             ? Array.from(channelState.dirtyLoveKeys)
             : Array.from(allKeys);
 
-        const rows = keysToSave.map(key => {
+        const rowsToUpsert = [];
+        const keysToDelete = [];
+
+        for (const key of keysToSave) {
             const [u1, u2] = key.split('::');
             const isMarried = !!channelState.marriedCouples[key];
             const rawMod = channelState.loveModifiers[key] ?? 0;
             const clampedMod = Math.max(-100, Math.min(100, Number(rawMod) || 0));
+
+            // Ako se modifikator iznivelisao vremenom na 0% i par nije u braku,
+            // zapis se briše iz baze da ne bi opterećivao bazu (pravi se novi ako ponovo pošalju)
+            if (clampedMod === 0 && !isMarried) {
+                keysToDelete.push({ user1: (u1 || '').toLowerCase(), user2: (u2 || '').toLowerCase(), key });
+                continue;
+            }
+
             const existingMeta = channelState.loveMetadata?.[key];
             const marriedAt = isMarried
                 ? (channelState.marriedCouples[key]?.married_at || existingMeta?.married_at || new Date().toISOString())
@@ -452,7 +469,7 @@ async function sacuvajLjubav(chatroomId) {
                 channelState.marriedCouples[key].married_at = marriedAt;
             }
 
-            return {
+            rowsToUpsert.push({
                 channel_id: chatroomId,
                 user1: (u1 || '').toLowerCase(),
                 user2: (u2 || '').toLowerCase(),
@@ -460,21 +477,39 @@ async function sacuvajLjubav(chatroomId) {
                 is_married: isMarried,
                 married_at: marriedAt,
                 updated_at: updatedAt
-            };
-        });
+            });
+        }
 
-        if (rows.length > 0) {
+        // 1. Obriši zapise koji su se iznivelisali na 0% i nemaju brak
+        for (const item of keysToDelete) {
+            try {
+                await sbPanels
+                    .from('love_and_marriages')
+                    .delete()
+                    .eq('channel_id', chatroomId)
+                    .eq('user1', item.user1)
+                    .eq('user2', item.user2);
+            } catch (delErr) {
+                log('ERR', `Greška pri brisanju nivelisanog 0% ljubavnog zapisa (${item.user1} + ${item.user2}): ${delErr.message}`);
+            }
+            delete channelState.loveModifiers[item.key];
+            if (channelState.loveMetadata) delete channelState.loveMetadata[item.key];
+        }
+
+        // 2. Sačuvaj aktivne modifikatore i brakove
+        if (rowsToUpsert.length > 0) {
             const { error } = await sbPanels
                 .from('love_and_marriages')
-                .upsert(rows, { onConflict: 'channel_id,user1,user2' });
+                .upsert(rowsToUpsert, { onConflict: 'channel_id,user1,user2' });
 
             if (error) throw error;
         }
+
         channelState.loveDirty = false;
         if (channelState.dirtyLoveKeys) {
             channelState.dirtyLoveKeys.clear();
         }
-        log('INFO', `[${channelState.channelUsername || chatroomId}] Ljubavni podaci uspešno sačuvani u love_and_marriages na Supabase.`);
+        log('INFO', `[${channelState.channelUsername || chatroomId}] Ljubavni podaci uspešno sinhronizovani sa love_and_marriages (sačuvano: ${rowsToUpsert.length}, obrisano 0%: ${keysToDelete.length}).`);
     } catch (err) {
         log('ERR', `Greška pri čuvanju ljubavnih podataka za ${chatroomId}: ${err.message}`);
     }
@@ -571,10 +606,13 @@ async function ucitajUserPlan(userId, chatroomId) {
         return limits;
     } catch (err) {
         log('WARN', `Greška pri učitavanju plana za korisnika ${userId}: ${err.message}`);
-        channelState.userPlan = 'free';
-        channelState.subscriptionStatus = 'active';
-        channelState.planLimits = config.PLAN_LIMITS.free;
-        return config.PLAN_LIMITS.free;
+        // Ne degradiraj postojeći plan na free ako je ovo privremena mrežna greška (npr. Gateway Timeout)
+        if (!channelState.userPlan) {
+            channelState.userPlan = 'free';
+            channelState.subscriptionStatus = 'active';
+            channelState.planLimits = config.PLAN_LIMITS.free;
+        }
+        return channelState.planLimits || config.PLAN_LIMITS.free;
     }
 }
 
@@ -896,7 +934,7 @@ async function ucitajBotConfig(chatroomId) {
             channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
 
             // Paralelizujemo ucitajAlerts, ucitajAutoAnnounces i 4 specifične tabele podešavanja radi maksimalne brzine
-            const [alertsRes, annRes, modRes, mgRes, srRes, rankRes] = await Promise.allSettled([
+            const [_alertsRes, _annRes, modRes, mgRes, srRes, rankRes] = await Promise.allSettled([
                 ucitajAlerts(chatroomId),
                 ucitajAutoAnnounces(chatroomId),
                 sbPanels.from('moderation').select('settings').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),

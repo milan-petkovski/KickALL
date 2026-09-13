@@ -156,6 +156,36 @@
                 }
             },
             {
+                "@type": "SoftwareApplication",
+                "@id": "https://kickall.app/#kickaj",
+                "name": "Kickaj — Giveaway Studio",
+                "alternateName": ["Kickaj", "Kick Giveaway", "Kick Točak Sreće", "Kick Giveaway Studio"],
+                "operatingSystem": "Web",
+                "applicationCategory": "EntertainmentApplication",
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD",
+                    "description": "Besplatno izvlačenje nagradnih igara za Kick streamere do 500 učesnika"
+                },
+                "featureList": [
+                    "Točak Sreće sa fizikom okretanja na 240 FPS",
+                    "Neon Slot Mašina i Rulet animacije",
+                    "Automatsko prijavljivanje preko Kick chat ključnih reči",
+                    "Provera praćenja i pretplate (follow and sub check)",
+                    "Trajni tajmer za potvrdu pobednika sa zvučnim signalima",
+                    "OBS i browser overlay kompatibilnost",
+                    "Kompletna zaštita od botova i lista blokiranih korisnika"
+                ],
+                "description": "Kickaj je profesionalni giveaway studio za Kick strimere koji omogućava interaktivno izvlačenje nagrada uživo iz chat poruka uz Točak Sreće, Slot Mašinu i Neon Rulet.",
+                "url": "https://kickall.app/kickaj/dashboard.html",
+                "browserRequirements": "Requires JavaScript and HTML5 Canvas. Supports modern browsers",
+                "softwareVersion": "3.0",
+                "author": {
+                    "@id": "https://kickall.app/#organization"
+                }
+            },
+            {
                 "@type": "FAQPage",
                 "@id": "https://kickall.app/#faq",
                 "mainEntity": [
@@ -189,6 +219,14 @@
                         "acceptedAnswer": {
                             "@type": "Answer",
                             "text": "KickALL nudi: napredni chatbot sa komandama, automatizovane nagradne igre i giveaway, overlay alate, detaljnu analitiku i statistiku, watchtime i leaderboard sisteme, kao i podršku za više jezika."
+                        }
+                    },
+                    {
+                        "@type": "Question",
+                        "name": "Šta je Kickaj i kako radi Kickaj giveaway alat?",
+                        "acceptedAnswer": {
+                            "@type": "Answer",
+                            "text": "Kickaj je specijalizovani giveaway studio unutar KickALL platforme koji strimerima na Kick platformi omogućava automatsko izvlačenje nagrada iz poruka gledalaca u čatu. Podržava Točak Sreće, Slot Mašinu i Neon Rulet na 240 FPS, filtere za pratioce i pretplatnike, proveru trajanja praćenja, automatsku potvrdu pobednika sa tajmerom i OBS overlay prikaz."
                         }
                     }
                 ]
@@ -764,6 +802,11 @@
                                         </div>
                                     </div>
                                 </div>
+                                <!-- AEO / GEO Knowledge Block -->
+                                <div class="kickaj-knowledge-box" id="kickajKnowledgeSummary" style="grid-column: 1 / -1; margin-top: 1.5rem; padding: 1.25rem 1.5rem; background: rgba(83, 252, 24, 0.04); border: 1px solid rgba(83, 252, 24, 0.2); border-radius: 14px;">
+                                    <h4 style="margin: 0 0 0.5rem; font-size: 1.05rem; font-weight: 700; color: #53fc18;">Šta je Kickaj i kako radi Kickaj giveaway alat?</h4>
+                                    <p style="margin: 0; font-size: 0.92rem; line-height: 1.6; color: #cbd5e1;">Kickaj je profesionalni giveaway studio unutar KickALL ekosistema, namenjen Kick.com strimerima za vođenje interaktivnih nagradnih igara uživo. Alat se u realnom vremenu povezuje sa Kick četom, automatski evidentira gledaoce koji pošalju zadatu ključnu reč (poput <code>!ucestvujem</code>), filtrira pratioce i pretplatnike prema zadatim uslovima, i vizualizuje izvlačenje pobednika kroz hardverski ubrzan Točak Sreće, Slot Mašinu ili Neon Rulet na stabilnih 240 FPS uz zvučne efekte i vremenski ograničenu potvrdu prisustva.</p>
+                                </div>
                             </div>
                         </div>
 
@@ -1013,6 +1056,8 @@
                             Bezbednost</button>
                         <button type="button" class="faq-pill" data-cat="pricing"
                             data-i18n="faq.catPricing">Cene</button>
+                        <button type="button" class="faq-pill" data-cat="giveaway"
+                            data-i18n="faq.catGiveaway">Giveaway</button>
                     </div>
                 </div>
 
@@ -1093,6 +1138,19 @@
                             <p data-i18n="faq.q5.answer">Da! Kroz Dashboard možete kreirati do 50 komandi na besplatnom
                                 planu, dok na ostalima možete neograničeno. Samo posetite komande panel u okviru
                                 Dashboard-a!</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item" data-cat="giveaway">
+                        <button type="button" class="faq-question">
+                            <span data-i18n="faq.q6.question">Šta je Kickaj i kako radi Kickaj giveaway alat?</span>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" class="faq-icon">
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </button>
+                        <div class="faq-answer">
+                            <p data-i18n="faq.q6.answer">Kickaj je specijalizovani studio za nagradne igre (giveaway) na Kick.com platformi. Povezuje se na Kick čet u realnom vremenu, automatski beleži učesnike preko zadate ključne reči, primenjuje filtere za pratioce i pretplatnike, i vizualizuje izvlačenje pobednika kroz ultra-glatke animacije: Točak Sreće, Slot Mašinu ili Neon Rulet na 240 FPS uz zvučne efekte i automatsku verifikaciju.</p>
                         </div>
                     </div>
                 </div>

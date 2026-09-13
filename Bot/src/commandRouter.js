@@ -1,7 +1,6 @@
 // Modul za proveru permisija, normalizaciju teksta i rutiranje chat komandi
 
 const config = require('./config');
-const state = require('./state');
 const utils = require('./utils');
 const database = require('./database');
 const commands = require('./commands');

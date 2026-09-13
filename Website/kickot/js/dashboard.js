@@ -170,6 +170,7 @@ let currentUser = null;
 let currentChannels = [];   // [{id, username, is_primary}]
 let managedChannels = [];   // [{id, username, avatar, is_managed: true, owner_id}]
 let activeChannel = null; // {id, username}
+window.activeChannel = null;
 let currentChannelConfig = {}; // cached bot_config payload
 function getChannelOwnerId() {
   if (activeChannel && activeChannel.is_managed && activeChannel.owner_id) {
@@ -184,6 +185,7 @@ let allMarriages = [];   // cached marriages
 let allLoveStatuses = [];  // cached love modifiers
 const avatarCache = {};
 let currentEconomyTab = localStorage.getItem('active-economy-tab') || 'config';
+let currentMinigamesTab = localStorage.getItem('active-minigames-tab') || 'overview';
 
 // ── Pricing Plan Limits ───────────────────────────────────────
 let currentUserPlan = 'free';
@@ -565,23 +567,33 @@ function applyPenaltySettingsRestrictions() {
 
 const upgradeSvgIcon = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="upgrade-btn-icon"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
 
+function isUserOrChannelElite() {
+  const userPlan = (currentUserPlan || (currentUserProfileData && currentUserProfileData.plan) || '').toLowerCase();
+  if (userPlan === 'elite' || userPlan === 'business') return true;
+  const limits = typeof getPlanLimits === 'function' ? getPlanLimits() : null;
+  if (limits && (limits.name === 'Elite' || limits.name === 'Business')) return true;
+  return false;
+}
+
 function renderPlanLimitBanners() {
   const limits = getPlanLimits();
+  const isElite = isUserOrChannelElite();
 
   // 0. Topbar & Sidebar Upgrade Buttons (For Free & Pro plans)
   const topbarWrap = document.getElementById('topbarUpgradeWrap');
   if (topbarWrap) {
-    if (limits.name !== 'Elite') {
-      topbarWrap.style.display = 'flex';
+    if (!isElite) {
+      topbarWrap.style.setProperty('display', 'flex', 'important');
       topbarWrap.innerHTML = `<button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')">${upgradeSvgIcon}<span>Nadogradi</span></button>`;
     } else {
-      topbarWrap.style.display = 'none';
+      topbarWrap.style.setProperty('display', 'none', 'important');
+      topbarWrap.innerHTML = '';
     }
   }
 
   const sidebarUpgradeEl = document.getElementById('sidebarUpgradeWrap');
   if (sidebarUpgradeEl) {
-    if (limits.name !== 'Elite') {
+    if (!isElite) {
       sidebarUpgradeEl.innerHTML = `<button type="button" class="plan-upgrade-btn sidebar-upgrade-btn" onclick="event.stopPropagation(); openUpgradeModal('general')">${upgradeSvgIcon}<span>Nadogradi Paket</span></button>`;
     } else {
       sidebarUpgradeEl.innerHTML = '';
@@ -1635,16 +1647,8 @@ async function loadUserProfile() {
   if (data) {
     myUsername = data.display_name || '';
     currentUserPlan = (data.plan || 'free').toLowerCase();
-    const limits = getPlanLimits();
     updateSidebarUserPlanAndRole();
-    const sidebarUpgradeEl = document.getElementById('sidebarUpgradeWrap');
-    if (sidebarUpgradeEl) {
-      if (limits.name !== 'Elite') {
-        sidebarUpgradeEl.innerHTML = `<button type="button" class="plan-upgrade-btn sidebar-upgrade-btn" onclick="event.stopPropagation(); openUpgradeModal('general')">${upgradeSvgIcon}<span>Nadogradi Paket</span></button>`;
-      } else {
-        sidebarUpgradeEl.innerHTML = '';
-      }
-    }
+    renderPlanLimitBanners();
 
     currentChannels = (data.kick_channels || []).map(ch => ({
       ...ch,
@@ -1871,6 +1875,7 @@ function updateSidebarUserPlanAndRole() {
 
 function setActiveChannel(ch) {
   activeChannel = ch;
+  window.activeChannel = ch;
   if (ch && (ch.id || ch.username)) {
     try {
       localStorage.setItem('kickbot_selected_channel_id', String(ch.id || ''));
@@ -4288,8 +4293,16 @@ async function loadLoveStatuses() {
   if (error) { return; }
 
   // Normalizuj i dedupliciraj ljubavne statuse po paru korisnika (case-insensitive)
+  // Zanemari i očisti zapise koji su se iznivelisali na 0% a nisu u braku
   const uniqueStatusMap = new Map();
   (data || []).forEach(row => {
+    const rawMod = Number(row.modifier || 0);
+    if (rawMod === 0 && !row.is_married) {
+      if (row.id) {
+        getSbPanels().from('love_and_marriages').delete().eq('id', row.id).then(() => {}).catch(() => {});
+      }
+      return;
+    }
     const pairKey = [String(row.user1 || '').toLowerCase(), String(row.user2 || '').toLowerCase()].sort().join('::');
     if (!uniqueStatusMap.has(pairKey)) {
       uniqueStatusMap.set(pairKey, row);
@@ -6651,9 +6664,10 @@ function switchPanel(panelId, resetTab = false) {
   }
   if (panelId === 'minigames') {
     loadBotConfig();
-    loadMinigamesConfig();
+    const targetTab = resetTab ? 'overview' : (currentMinigamesTab || 'overview');
+    switchMinigamesTab(targetTab);
+    loadMinigamesConfig(resetTab);
     renderPlanLimitBanners();
-    updateMinigamesStatsDisplay();
   }
 
   if (window.innerWidth < 768) {
@@ -7024,7 +7038,7 @@ async function syncLatestKickAvatar() {
   const origHTML = btn ? btn.innerHTML : '';
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = `<span style="display:inline-block; animation: spin 1s linear infinite;">⏳</span> Preuzimanje sa Kicka...`;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:6px; animation: spin 1s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Preuzimanje sa Kicka...`;
   }
 
   try {
@@ -7619,6 +7633,7 @@ async function deleteConnectedChannel(channelId) {
         setActiveChannel(currentChannels.find(c => c.is_primary) || currentChannels[0]);
       } else {
         activeChannel = null;
+        window.activeChannel = null;
         const nameDisplay = document.getElementById('channelNameDisplay');
         if (nameDisplay) nameDisplay.textContent = 'Nema kanala';
         const topbarDisplay = document.getElementById('topbarChannel');
@@ -7879,10 +7894,10 @@ function updateOverviewModulesUI() {
 
     if (isEnabled) {
       el.innerHTML = `<span>${m.label}</span> ${checkSvg}`;
-      el.className = 'module-status-badge active';
+      el.className = 'module-status-badge active kx-46';
     } else {
       el.innerHTML = `<span>${m.label}</span> ${crossSvg}`;
-      el.className = 'module-status-badge inactive';
+      el.className = 'module-status-badge inactive kx-46';
     }
 
     if (m.panelId) {
@@ -8732,7 +8747,7 @@ function handleFeedbackFormSubmit(event) {
 
   const channelInput = document.getElementById('feedbackFormChannel');
   if (channelInput) {
-    channelInput.value = window.activeChannel || 'Nepoznat kanal';
+    channelInput.value = (activeChannel?.username || activeChannel?.slug || activeChannel?.name || activeChannel?.id || window.activeChannel || 'Nepoznat kanal');
   }
 
   const subjectInput = document.getElementById('feedbackFormSubject');
@@ -9680,7 +9695,6 @@ async function saveEconomyConfig(silent = false) {
 }
 
 // ── Mini Games Enhanced Sub-Tabs & Visual Arcade Simulator ──
-let currentMinigamesTab = 'overview';
 let currentSimGame = 'slots';
 let currentRouletteChoice = 'crvena';
 let currentCoinflipChoice = 'pismo';
@@ -9689,6 +9703,7 @@ function switchMinigamesTab(tabName) {
   currentMinigamesTab = tabName;
   try {
     sessionStorage.setItem('active-minigames-tab', tabName);
+    localStorage.setItem('active-minigames-tab', tabName);
   } catch (e) {}
 
   // Sync tab buttons
@@ -9829,7 +9844,7 @@ function testGameInSimulator(gameType, funSubcmd) {
   }
 }
 
-async function loadMinigamesConfig() {
+async function loadMinigamesConfig(resetTab = false) {
   if (!activeChannel) return;
   const { data } = await sb.from('mini_games')
     .select('*')
@@ -9849,15 +9864,19 @@ async function loadMinigamesConfig() {
     }
   }
 
-  // Restore active sub-tab if saved
-  try {
-    const savedTab = sessionStorage.getItem('active-minigames-tab');
-    if (savedTab && ['overview', 'casino', 'fun', 'simulator', 'cheatsheet'].includes(savedTab)) {
-      switchMinigamesTab(savedTab);
-    } else {
+  // Restore active sub-tab if saved and not resetting tab
+  if (!resetTab) {
+    try {
+      const savedTab = localStorage.getItem('active-minigames-tab') || sessionStorage.getItem('active-minigames-tab');
+      if (savedTab && ['overview', 'casino', 'fun', 'simulator', 'cheatsheet'].includes(savedTab)) {
+        switchMinigamesTab(savedTab);
+      } else {
+        updateMinigamesStatsDisplay();
+      }
+    } catch (e) {
       updateMinigamesStatsDisplay();
     }
-  } catch (e) {
+  } else {
     updateMinigamesStatsDisplay();
   }
 }

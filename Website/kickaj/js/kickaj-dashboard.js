@@ -1,5 +1,5 @@
 /**
- * KICKAJ — Giveaway Studio
+ * KICKAJ - Giveaway Studio
  * Kompletna logika: Auth, Plan, Menadzer kanala (Vlasnicki + Managed + Custom sa Kickot integracijom),
  * WebSocket, Animacije, Zvuk, Fullscreen, Sinhronizacija baze (Supabase tabela 'kickaj')
  * i LocalStorage, Trajna trajnost tajmera pobednika.
@@ -40,6 +40,84 @@
   let wsReconnectTimer = null;
   let particleResizeHandler = null;
   let uiRefreshTimer   = null;
+
+  /* ── 240fps Master Animation Manager & Cache ── */
+  const AnimationManager = {
+    tasks: new Map(),
+    rafId: null,
+    lastTime: 0,
+    add(id, fn) {
+      this.tasks.set(id, fn);
+      if (!this.rafId) {
+        this.lastTime = performance.now();
+        this.rafId = requestAnimationFrame(this._loop.bind(this));
+      }
+    },
+    remove(id) {
+      this.tasks.delete(id);
+      if (this.tasks.size === 0 && this.rafId) {
+        cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+      }
+    },
+    has(id) {
+      return this.tasks.has(id);
+    },
+    clear() {
+      this.tasks.clear();
+      if (this.rafId) {
+        cancelAnimationFrame(this.rafId);
+        this.rafId = null;
+      }
+    },
+    _loop(now) {
+      if (this.tasks.size === 0) {
+        this.rafId = null;
+        return;
+      }
+      const dt = Math.min(now - (this.lastTime || now), 100);
+      this.lastTime = now;
+
+      for (const [id, fn] of this.tasks.entries()) {
+        try {
+          const keepRunning = fn(dt, now);
+          if (!keepRunning) {
+            this.tasks.delete(id);
+          }
+        } catch (err) {
+          console.error(`[AnimationManager] Error in task ${id}:`, err);
+          this.tasks.delete(id);
+        }
+      }
+
+      if (this.tasks.size > 0) {
+        this.rafId = requestAnimationFrame(this._loop.bind(this));
+      } else {
+        this.rafId = null;
+      }
+    }
+  };
+
+  const wheelCaches = new Map();
+  function invalidateWheelCache() {
+    wheelCaches.clear();
+  }
+
+  function debounce(fn, wait = 100) {
+    let timer = null;
+    return function (...args) {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        fn.apply(this, args);
+      }, wait);
+    };
+  }
+
+  function isFullscreenOverlayOpen() {
+    const ov = document.getElementById('wheelFullscreenOverlay');
+    return !!(ov && ov.classList.contains('open') && ov.style.display !== 'none');
+  }
 
   /* ── Settings ── */
   let settings = {
@@ -127,6 +205,15 @@
     return cleanPath;
   }
 
+  /* ── User & Channel Helpers ── */
+  function getEffectiveUserId() {
+    if (activeChannelObj && activeChannelObj.is_managed && activeChannelObj.owner_id) {
+      return activeChannelObj.owner_id;
+    }
+    return currentUser ? currentUser.id : null;
+  }
+  const getChannelOwnerId = getEffectiveUserId;
+
   /* ════════════════════════════════════════
      INIT
   ════════════════════════════════════════ */
@@ -145,6 +232,22 @@
     updateParticipantsUI();
     updateWinnersUI();
     refreshAll();
+
+    // Ako je giveaway bio aktivan pre reload-a, automatski se povezi na live chat
+    if (isRunning && !kickWebSocket) {
+      connectKickChat().then(ok => {
+        if (ok) {
+          updateStartButtonUI();
+          updateStateBadge();
+          updateActionStates();
+        } else {
+          isRunning = false;
+          updateStartButtonUI();
+          updateStateBadge();
+          updateActionStates();
+        }
+      });
+    }
   });
 
   /* ════════════════════════════════════════
@@ -190,10 +293,13 @@
     // 1. Momentalno cuvanje u LocalStorage (opsti kljuc + per-channel kljuc)
     try {
       localStorage.setItem(STATE_KEY, JSON.stringify(payload));
+      localStorage.setItem('kickaj_active_general', isRunning ? 'true' : 'false');
       if (channelName) {
-        localStorage.setItem(`${STATE_KEY}_${channelName.toLowerCase()}`, JSON.stringify(payload));
+        const cLower = channelName.toLowerCase();
+        localStorage.setItem(`${STATE_KEY}_${cLower}`, JSON.stringify(payload));
         localStorage.setItem('kickbot_selected_channel_name', channelName);
         if (channelId) localStorage.setItem('kickbot_selected_channel_id', String(channelId));
+        localStorage.setItem(`kickaj_active_${cLower}`, isRunning ? 'true' : 'false');
       }
     } catch (e) { /* silent */ }
 
@@ -220,7 +326,7 @@
           channel_name: cleanName,
           channel_id: channelId ? String(channelId) : null,
           chatroom_id: chatroomId ? parseInt(chatroomId, 10) : null,
-          settings: dataToSave.settings,
+          settings: { ...dataToSave.settings, is_running: !!dataToSave.isRunning },
           participants: dataToSave.participants || [],
           winners: dataToSave.winners,
           updated_at: new Date().toISOString()
@@ -236,9 +342,11 @@
       }
 
       // Rezervni backup u user_profiles
-      await sb.from('user_profiles').update({
-        kickaj_state: dataToSave
-      }).eq('id', currentUser.id);
+      if (currentUser?.id) {
+        await sb.from('user_profiles').update({
+          kickaj_state: dataToSave
+        }).eq('id', currentUser.id);
+      }
 
     } catch (e) {
       console.warn('[Kickaj DB Sync] Error:', e);
@@ -267,7 +375,8 @@
             chatroom_id: kickajRow.chatroom_id,
             settings: kickajRow.settings,
             participants: kickajRow.participants || [],
-            winners: kickajRow.winners
+            winners: kickajRow.winners,
+            isRunning: !!(kickajRow.settings?.is_running)
           };
           if (kickajRow.chatroom_id && !chatroomId) {
             chatroomId = parseInt(kickajRow.chatroom_id, 10);
@@ -276,7 +385,7 @@
       }
 
       // 2. Fallback: Proveri user_profiles.kickaj_state
-      if (!loadedData) {
+      if (!loadedData && currentUser?.id) {
         const { data: profile } = await sb
           .from('user_profiles')
           .select('kickaj_state')
@@ -365,12 +474,20 @@
     }
 
     if (typeof d.wheelAngle === 'number') wheelAngle = d.wheelAngle;
-    if (d.isRunning) isRunning = false; // safety
+    
+    // Ocuvaj aktivno stanje giveaway-a umesto forsiranog gasenja
+    const cLower = (channelName || '').toLowerCase();
+    const storedActive = cLower ? localStorage.getItem(`kickaj_active_${cLower}`) : localStorage.getItem('kickaj_active_general');
+    const wasRunning = (storedActive === 'true') || (storedActive === null && !!d.isRunning);
+    isRunning = wasRunning;
 
     restoreFormInputs();
     updateParticipantsUI();
     drawVisualizerStage();
     updateWinnersUI();
+    updateStartButtonUI();
+    updateStateBadge();
+    updateActionStates();
     winnersList.forEach(w => {
       if (!w.isConfirmed && !w.isExpired && w.confirmSeconds > 0) {
         startWinnerTimer(w);
@@ -403,6 +520,7 @@
     document.querySelectorAll('#multiplierChipsContainer .sc-chip').forEach(chip => {
       chip.classList.toggle('active', parseInt(chip.dataset.mult, 10) === settings.subMultiplier);
     });
+    updateInputSuffixes();
   }
 
   /* ════════════════════════════════════════
@@ -413,6 +531,7 @@
   window.hideAuthGate = function () {
     const authGate = document.getElementById('authGate');
     const app = document.getElementById('app');
+    document.body.classList.remove('auth-loading');
     if (authGate) {
       authGate.classList.add('fade-out');
       setTimeout(() => {
@@ -479,14 +598,14 @@
       }
 
       currentUser = session.user;
-      let username  = currentUser.user_metadata?.kick_username
-        || currentUser.user_metadata?.preferred_username
-        || currentUser.user_metadata?.name
-        || currentUser.user_metadata?.full_name
-        || (currentUser.email || '');
-      let avatarUrl = currentUser.user_metadata?.avatar_url
-        || currentUser.user_metadata?.picture
-        || currentUser.user_metadata?.profile_picture;
+      let username  = currentUser?.user_metadata?.kick_username
+        || currentUser?.user_metadata?.preferred_username
+        || currentUser?.user_metadata?.name
+        || currentUser?.user_metadata?.full_name
+        || (currentUser?.email || '');
+      let avatarUrl = currentUser?.user_metadata?.avatar_url
+        || currentUser?.user_metadata?.picture
+        || currentUser?.user_metadata?.profile_picture;
 
       userChannels = [];
 
@@ -632,6 +751,8 @@
         if (candidate.avatar) avatarUrl = candidate.avatar;
         if (candidate.chatroom_id) chatroomId = candidate.chatroom_id;
         if (candidate.id) channelId = candidate.id;
+        userPlan = resolveChannelPlan(candidate);
+        try { localStorage.setItem('kickaj_user_plan', userPlan); } catch (_) { }
       }
 
       channelName = cleanUsername(username);
@@ -657,9 +778,14 @@
       setText('connectedChannelName', channelName || 'DemoKanal');
       setText('wfoChannelName', channelName || 'DemoKanal');
 
-      if (channelName) await resolveKickChatroom(channelName);
+      if (channelName && !chatroomId) await resolveKickChatroom(channelName);
 
       await syncStateFromSupabase(channelName);
+
+      // Asinhrono ucitaj obavestenja i changelog odmah na startu identicno Kickot-u
+      Promise.allSettled([loadNotifications(), loadChangelogs()]).then(() => {
+        initNotificationRealtime();
+      });
 
       // Asinhrono popuni nedostajuce avatare
       fetchMissingAvatars();
@@ -727,8 +853,18 @@
         roleClass = 'cdm-role-custom';
       }
 
+      const isCustom = (ch.role === 'custom');
+      const removeBtnHtml = isCustom ? `
+        <button type="button" class="cdm-remove-btn" title="Ukloni kanal" aria-label="Ukloni kanal" onclick="event.stopPropagation(); window.removeCustomChannel('${escHtml(ch.username)}')">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      ` : '';
+
       html += `
-        <button type="button" class="cdm-item ${isActive ? 'active' : ''}" onclick="window.selectChannel(this.dataset.channel)" data-channel="${escHtml(ch.username)}">
+        <div class="cdm-item ${isActive ? 'active' : ''}" onclick="window.selectChannel(this.dataset.channel)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.selectChannel(this.dataset.channel);}" data-channel="${escHtml(ch.username)}" role="button" tabindex="0">
           <div class="cdm-item-left">
             <div class="cdm-avatar" style="${avatarStyle}">${safeAvatar ? '' : initial}</div>
             <div class="cdm-name-wrap">
@@ -736,13 +872,86 @@
               <span class="cdm-role-badge ${roleClass}">${roleLabel}</span>
             </div>
           </div>
-          ${isActive ? checkSvg : ''}
-        </button>
+          <div class="cdm-item-right">
+            ${isActive ? checkSvg : ''}
+            ${removeBtnHtml}
+          </div>
+        </div>
       `;
     });
 
     listEl.innerHTML = html;
   }
+
+  function resolveChannelPlan(targetObj) {
+    if (!targetObj) {
+      const myTier = currentUserProfile ? String(currentUserProfile.plan || currentUserProfile.plan_tier || currentUserProfile.tier || 'free').toLowerCase() : userPlan;
+      return (myTier.includes('elite') || myTier.includes('business')) ? 'elite' : (myTier.includes('pro') ? 'pro' : 'free');
+    }
+    if (targetObj.is_managed || targetObj.role === 'managed') {
+      const ownerTier = String(targetObj.owner_plan || 'free').toLowerCase();
+      return (ownerTier.includes('elite') || ownerTier.includes('business')) ? 'elite' : (ownerTier.includes('pro') ? 'pro' : 'free');
+    }
+    const myTier = currentUserProfile ? String(currentUserProfile.plan || currentUserProfile.plan_tier || currentUserProfile.tier || 'free').toLowerCase() : userPlan;
+    const resolved = (myTier.includes('elite') || myTier.includes('business')) ? 'elite' : (myTier.includes('pro') ? 'pro' : 'free');
+    targetObj.owner_plan = resolved;
+    return resolved;
+  }
+  window.resolveChannelPlan = resolveChannelPlan;
+
+  window.removeCustomChannel = async function (uname) {
+    if (!uname) return;
+    const clean = cleanUsername(uname).toLowerCase();
+    const target = userChannels.find(c => c.username.toLowerCase() === clean);
+    if (!target) return;
+    // Dozvoljeno je brisanje ISKLJUČIVO za dodate (custom) kanale!
+    if (target.role !== 'custom') return;
+
+    // Zatvori dropdown meni da ne smeta iza modala
+    const dropdown = document.getElementById('channelDropdownMenu');
+    if (dropdown) dropdown.classList.remove('open');
+
+    const confirmed = await showConfirmDialog({
+      title: 'Uklanjanje kanala',
+      message: `Da li ste sigurni da želite da uklonite kanal @${target.username}?`,
+      confirmText: 'Ukloni kanal',
+      cancelText: 'Odustani',
+      danger: true
+    });
+    if (!confirmed) return;
+
+    userChannels = userChannels.filter(c => c.username.toLowerCase() !== clean);
+
+    try {
+      const customOnly = userChannels.filter(c => c.role === 'custom');
+      localStorage.setItem('kickaj_custom_channels_list', JSON.stringify(customOnly));
+    } catch (_) { }
+
+    // Ako je obrisan trenutno aktivan kanal, automatski prebaci na sledeci dostupan
+    if (channelName.toLowerCase() === clean) {
+      const nextCandidate = userChannels.find(c => c.is_primary) || userChannels[0];
+      if (nextCandidate) {
+        await setActiveChannel(nextCandidate, true);
+        if (typeof showToast === 'function') {
+          showToast(`Kanal ${target.username} uklonjen. Prebačeno na: ${nextCandidate.username}`, 'info');
+        }
+      } else {
+        channelName = '';
+        activeChannelObj = null;
+        renderChannelDropdown();
+        setText('connectedChannelName', 'Izaberi kanal');
+        setText('wfoChannelName', 'Izaberi kanal');
+        if (typeof showToast === 'function') {
+          showToast(`Kanal ${target.username} je uklonjen.`, 'info');
+        }
+      }
+    } else {
+      renderChannelDropdown();
+      if (typeof showToast === 'function') {
+        showToast(`Kanal ${target.username} je uklonjen.`, 'info');
+      }
+    }
+  };
 
   async function setActiveChannel(channelInput, reconnectIfRunning = true) {
     if (!channelInput) return;
@@ -784,13 +993,8 @@
     chatroomId = targetObj.chatroom_id || null;
 
     // Prilagodi plan: za menadžerske kanale koristi plan vlasnika, za sopstvene uvek stvarni plan
-    if (targetObj.role === 'managed' && targetObj.owner_plan) {
-      userPlan = targetObj.owner_plan.includes('elite') ? 'elite' : (targetObj.owner_plan.includes('pro') ? 'pro' : 'free');
-    } else {
-      const myTier = currentUserProfile ? String(currentUserProfile.plan || currentUserProfile.plan_tier || currentUserProfile.tier || 'free').toLowerCase() : userPlan;
-      userPlan = (myTier.includes('elite') || myTier.includes('business')) ? 'elite' : (myTier.includes('pro') ? 'pro' : 'free');
-      targetObj.owner_plan = userPlan;
-    }
+    userPlan = resolveChannelPlan(targetObj);
+    try { localStorage.setItem('kickaj_user_plan', userPlan); } catch (_) { }
 
     // Snimi u LocalStorage
     try {
@@ -812,7 +1016,7 @@
     drawVisualizerStage();
 
     // Razresi Chatroom ID za novi kanal
-    await resolveKickChatroom(channelName);
+    if (!chatroomId) await resolveKickChatroom(channelName);
 
     // Sinhronizuj iz baze za izabrani kanal
     await syncStateFromSupabase(channelName);
@@ -828,10 +1032,23 @@
       });
     }
 
-    // Ako je giveaway aktivan, rekonektuj chatroom na novi kanal
-    if (reconnectIfRunning && isRunning) {
-      showToast(`Prebacujem chat konekciju na kanal "${channelName}"...`, 'info');
-      await connectKickChat();
+    // Ako je giveaway aktivan, automatski povezi ili prebaci chatroom na izabrani kanal
+    if (isRunning) {
+      if (reconnectIfRunning) {
+        showToast(`Prebacujem chat konekciju na kanal "${channelName}"...`, 'info');
+      }
+      connectKickChat().then(ok => {
+        if (ok) {
+          updateStartButtonUI();
+          updateStateBadge();
+          updateActionStates();
+        } else {
+          isRunning = false;
+          updateStartButtonUI();
+          updateStateBadge();
+          updateActionStates();
+        }
+      });
     }
 
     saveState();
@@ -931,24 +1148,45 @@
     });
   }
 
+  function updateSidebarUserPlanAndRole() {
+    const sidebarPlanEl = document.getElementById('userPlanLabel');
+    if (!sidebarPlanEl) return;
+
+    const isManaged = Boolean(activeChannelObj?.is_managed || activeChannelObj?.role === 'managed');
+    const roleLabel = isManaged ? 'Menadžer' : 'Vlasnik';
+    const roleClass = isManaged ? 'role-badge-managed' : 'role-badge-owner';
+
+    const roleIcon = isManaged
+      ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`
+      : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>`;
+
+    const planClass = 'plan-badge-' + userPlan;
+    const planText = userPlan.toUpperCase();
+
+    sidebarPlanEl.innerHTML = `
+      <span class="plan-badge ${planClass}" id="planBadge">${planText}</span>
+      <span class="role-badge ${roleClass}">${roleIcon}<span>${roleLabel}</span></span>
+    `;
+
+    const heroPlanBadge = document.getElementById('heroPlanBadge');
+    if (heroPlanBadge) {
+      heroPlanBadge.textContent = planText;
+      heroPlanBadge.className = 'hero-plan-badge plan-' + userPlan;
+    }
+  }
+
   function applyPlanRestrictions() {
     const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
 
-    /* Plan badges */
-    const planBadgeEl    = document.getElementById('planBadge');
-    const heroPlanBadge  = document.getElementById('heroPlanBadge');
-    const planClass      = 'plan-' + userPlan;
-    const planText       = userPlan.toUpperCase();
-
-    if (planBadgeEl)   { planBadgeEl.textContent = planText; planBadgeEl.className = 'sidebar-plan-badge ' + planClass; }
-    if (heroPlanBadge) { heroPlanBadge.textContent = planText; heroPlanBadge.className = 'hero-plan-badge ' + planClass; }
+    /* Plan & Role badges - identično sa Kickot */
+    updateSidebarUserPlanAndRole();
 
     /* Animation lock */
     const animLock = document.getElementById('animationLock');
     const animSelect = document.getElementById('selectAnimation');
     if (animLock) animLock.style.display = userPlan === 'free' ? 'inline-flex' : 'none';
     if (animSelect) {
-      Array.from(animSelect.options).forEach(opt => {
+      Array.from(animSelect.options || []).forEach(opt => {
         opt.disabled = !limits.animations.includes(opt.value);
       });
       if (!limits.animations.includes(settings.animation)) {
@@ -1017,6 +1255,7 @@
     const sidebar = document.getElementById('sidebar');
 
     bindClick('btnStartGiveaway', toggleStart);
+    bindClick('btnStopGiveaway',  resetGiveaway);
     bindClick('btnResetGiveaway', resetGiveaway);
     bindClick('btnStageDraw',     triggerDraw);
 
@@ -1077,8 +1316,9 @@
   /* ── Notifications & Changelog iz Baze (identično Kickot) ── */
   let notifications = [];
   let changelogs    = [];
-  let activeNotifTab = 'obavestenja';
+  let activeNotifTab = 'obaveštenja';
   let readNotifIds   = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+  let realtimeNotifSub = null;
 
   function formatRelativeTime(isoString) {
     if (!isoString) return '';
@@ -1145,22 +1385,36 @@
     } catch (_) {}
   }
 
+  function initNotificationRealtime() {
+    if (sb && !realtimeNotifSub) {
+      try {
+        realtimeNotifSub = sb.channel('public:notifications_sub_kickaj')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
+            loadNotifications();
+          })
+          .subscribe();
+      } catch (_) {}
+    }
+  }
+
   function updateNotifBadgeUI() {
     const unreadCount = notifications.filter(n => !readNotifIds.includes(String(n.id))).length;
     const badge = document.getElementById('notifBadge');
     const btn   = document.getElementById('notifBellBtn');
 
     if (badge) {
-      badge.style.display = unreadCount > 0 ? 'flex' : 'none';
-      badge.textContent   = unreadCount > 99 ? '99+' : String(unreadCount);
+      badge.style.setProperty('display', unreadCount > 0 ? 'flex' : 'none', 'important');
+      badge.innerText = unreadCount > 99 ? '99+' : String(unreadCount);
     }
     if (btn) {
       if (unreadCount > 0) {
-        btn.style.borderColor = 'var(--aj-red, #ef4444)';
-        btn.style.color       = 'var(--aj-red, #ef4444)';
+        btn.style.setProperty('border-color', '#EF4444', 'important');
+        btn.style.setProperty('color', '#EF4444', 'important');
+        btn.style.setProperty('box-shadow', '0 0 14px rgba(239, 68, 68, 0.45)', 'important');
       } else {
-        btn.style.borderColor = '';
-        btn.style.color       = '';
+        btn.style.setProperty('border-color', 'rgba(255, 255, 255, 0.12)', 'important');
+        btn.style.setProperty('color', '#cbd5e1', 'important');
+        btn.style.setProperty('box-shadow', 'none', 'important');
       }
     }
   }
@@ -1169,21 +1423,25 @@
     const list = document.getElementById('notifContentList');
     if (!list) return;
 
-    if (activeNotifTab === 'obavestenja') {
+    const isObavestenja = (activeNotifTab === 'obaveštenja' || activeNotifTab === 'obavestenja');
+
+    if (isObavestenja) {
       if (notifications.length === 0) {
         list.innerHTML = `
-          <div style="color: var(--aj-muted); text-align: center; padding: 28px 14px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <div style="color: var(--aj-muted, #94a3b8); text-align: center; padding: 32px 16px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.5;"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
             <span>Trenutno nema novih obaveštenja.</span>
           </div>`;
         return;
       }
 
-      const sorted = [...notifications].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      list.innerHTML = sorted.map(n => {
+      const sortedNotifications = [...notifications].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      list.innerHTML = sortedNotifications.map(n => {
         const isRead = readNotifIds.includes(String(n.id));
         let color = '#3B82F6';
-        let iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+        let iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+
         if (n.type === 'success') {
           color = '#10B981';
           iconSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -1198,7 +1456,7 @@
         const formattedTime = formatRelativeTime(n.timestamp);
 
         return `
-          <div onclick="window.markNotifAsRead('${n.id}')" style="padding: 12px 14px; border-radius: 12px; ${bgStyle} ${borderStyle} transition: all 0.2s; cursor: pointer; ${opacityStyle} margin-bottom: 6px;">
+          <div onclick="window.markNotifAsRead('${n.id}')" style="padding: 12px 14px; border-radius: 12px; ${bgStyle} ${borderStyle} transition: all 0.2s; cursor: pointer; ${opacityStyle}">
             <div style="display: flex; gap: 10px; align-items: flex-start; text-align: left;">
               <div style="width: 24px; height: 24px; border-radius: 50%; background: ${color}20; color: ${color}; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; border: 1px solid ${color}35;">
                 ${iconSvg}
@@ -1206,9 +1464,9 @@
               <div style="flex-grow: 1;">
                 <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px;">
                   <div style="font-size: 0.83rem; font-weight: 700; color: #fff; line-height: 1.3;">${escHtml(n.title)}</div>
-                  <div style="font-size: 0.68rem; color: var(--aj-muted); white-space: nowrap;">${formattedTime}</div>
+                  <div style="font-size: 0.68rem; color: var(--aj-muted, #94A3B8); white-space: nowrap;">${formattedTime}</div>
                 </div>
-                <div style="font-size: 0.77rem; color: #cbd5e1; margin-top: 4px; line-height: 1.45;">${escHtml(n.desc)}</div>
+                <div style="font-size: 0.77rem; color: var(--aj-text-secondary, #CBD5E1); margin-top: 4px; line-height: 1.45;">${escHtml(n.desc)}</div>
               </div>
             </div>
           </div>
@@ -1217,7 +1475,7 @@
     } else {
       if (changelogs.length === 0) {
         list.innerHTML = `
-          <div style="color: var(--aj-muted); text-align: center; padding: 28px 14px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+          <div style="color: var(--aj-muted, #94a3b8); text-align: center; padding: 32px 16px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity: 0.5;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             <span>Trenutno nema novih changelog informacija.</span>
           </div>`;
@@ -1225,16 +1483,16 @@
       }
 
       list.innerHTML = changelogs.map(c => `
-        <div style="padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); transition: all 0.2s; margin-bottom: 6px;">
+        <div style="padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06); transition: all 0.2s;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
             <span style="font-size: 0.72rem; font-weight: 800; color: #a78bfa; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); padding: 2px 8px; border-radius: 6px; letter-spacing: 0.5px;">${escHtml(c.version)}</span>
-            <span style="font-size: 0.68rem; color: var(--aj-muted); display: flex; align-items: center; gap: 4px;">
+            <span style="font-size: 0.68rem; color: var(--aj-muted, #94A3B8); display: flex; align-items: center; gap: 4px;">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               ${escHtml(c.date)}
             </span>
           </div>
           <div style="font-size: 0.84rem; font-weight: 700; color: #fff; margin-bottom: 4px; text-align: left;">${escHtml(c.title)}</div>
-          <div style="font-size: 0.77rem; color: #cbd5e1; line-height: 1.45; text-align: left;">${escHtml(c.details)}</div>
+          <div style="font-size: 0.77rem; color: var(--aj-text-secondary, #CBD5E1); line-height: 1.45; text-align: left;">${escHtml(c.details)}</div>
         </div>
       `).join('');
     }
@@ -1246,9 +1504,9 @@
     if (!readNotifIds.includes(strId)) {
       readNotifIds.push(strId);
       localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
+      updateNotifBadgeUI();
+      renderNotifContent();
     }
-    updateNotifBadgeUI();
-    renderNotifContent();
   };
 
   window.markAllNotifsAsRead = function () {
@@ -1259,15 +1517,50 @@
     localStorage.setItem('read_notif_ids', JSON.stringify(readNotifIds));
     updateNotifBadgeUI();
     renderNotifContent();
-    window.toastSystem.info('Sva obaveštenja su označena kao pročitana.');
+    if (typeof showToast === 'function') {
+      showToast('success', 'Sva obaveštenja su označena kao pročitana.');
+    } else if (window.toastSystem?.info) {
+      window.toastSystem.info('Sva obaveštenja su označena kao pročitana.');
+    }
   };
 
-  window.switchNotifTab = function (tabId) {
-    activeNotifTab = tabId;
-    const btn1 = document.getElementById('notifTabObavestenja');
-    const btn2 = document.getElementById('notifTabChangelog');
-    if (btn1) btn1.classList.toggle('active', tabId === 'obavestenja');
-    if (btn2) btn2.classList.toggle('active', tabId === 'changelog');
+  window.switchNotifTab = function (tab) {
+    activeNotifTab = tab;
+    const tabOb = document.getElementById('notifTabObavestenja') || document.getElementById('notifTabObaveštenja');
+    const tabCh = document.getElementById('notifTabChangelog');
+    if (!tabOb || !tabCh) return;
+
+    const isObavestenja = (tab === 'obaveštenja' || tab === 'obavestenja');
+    if (isObavestenja) {
+      tabOb.classList.add('active');
+      tabCh.classList.remove('active');
+      tabOb.style.setProperty('background', 'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1))', 'important');
+      tabOb.style.setProperty('border', '1px solid rgba(139, 92, 246, 0.3)', 'important');
+      tabOb.style.setProperty('color', '#fff', 'important');
+      tabOb.style.setProperty('box-shadow', '0 2px 8px rgba(139, 92, 246, 0.2)', 'important');
+      tabOb.style.setProperty('font-weight', '700', 'important');
+
+      tabCh.style.setProperty('background', 'transparent', 'important');
+      tabCh.style.setProperty('border', '1px solid transparent', 'important');
+      tabCh.style.setProperty('color', 'var(--aj-muted, #94A3B8)', 'important');
+      tabCh.style.setProperty('box-shadow', 'none', 'important');
+      tabCh.style.setProperty('font-weight', '600', 'important');
+    } else {
+      tabCh.classList.add('active');
+      tabOb.classList.remove('active');
+      tabCh.style.setProperty('background', 'linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(139, 92, 246, 0.1))', 'important');
+      tabCh.style.setProperty('border', '1px solid rgba(139, 92, 246, 0.3)', 'important');
+      tabCh.style.setProperty('color', '#fff', 'important');
+      tabCh.style.setProperty('box-shadow', '0 2px 8px rgba(139, 92, 246, 0.2)', 'important');
+      tabCh.style.setProperty('font-weight', '700', 'important');
+
+      tabOb.style.setProperty('background', 'transparent', 'important');
+      tabOb.style.setProperty('border', '1px solid transparent', 'important');
+      tabOb.style.setProperty('color', 'var(--aj-muted, #94A3B8)', 'important');
+      tabOb.style.setProperty('box-shadow', 'none', 'important');
+      tabOb.style.setProperty('font-weight', '600', 'important');
+    }
+
     renderNotifContent();
   };
 
@@ -1290,7 +1583,13 @@
 
   window.refreshDatabase = async function() {
     if (isRunning) {
-      const confirmSync = window.confirm('Giveaway je trenutno aktivan! Osvežavanje podataka iz baze će prekinuti trenutnu sesiju prijava. Želite li da nastavite?');
+      const confirmSync = await showConfirmDialog({
+        title: 'Sinhronizacija u toku',
+        message: 'Giveaway je trenutno aktivan! Osvežavanje podataka iz baze će prekinuti trenutnu sesiju prijava. Želite li da nastavite?',
+        confirmText: 'Prekini i osveži',
+        cancelText: 'Odustani',
+        danger: true
+      });
       if (!confirmSync) return;
       isRunning = false;
       updateStartButtonUI();
@@ -1336,11 +1635,13 @@
   function updateProfileUI(username, avatarUrl) {
     const nameEl   = document.getElementById('userNameDisplay');
     const avatarEl = document.getElementById('userAvatarDisplay');
-    const clean    = cleanUsername(username);
+    const name = currentUser?.user_metadata?.display_name || currentUser?.email?.split('@')[0] || username || channelName || 'Streamer';
+    const avatarSrc = currentUser?.user_metadata?.avatar_url || avatarUrl || (activeChannelObj && activeChannelObj.avatar) || null;
+    const clean    = cleanUsername(name);
     if (nameEl) nameEl.textContent = clean;
     if (avatarEl) {
-      if (avatarUrl && /^https?:\/\//i.test(avatarUrl)) {
-        const safeUrl = encodeURI(avatarUrl).replace(/["'()<>]/g, '');
+      if (avatarSrc && /^https?:\/\//i.test(avatarSrc)) {
+        const safeUrl = encodeURI(avatarSrc).replace(/["'()<>]/g, '');
         avatarEl.style.backgroundImage = `url("${safeUrl}")`;
         avatarEl.style.backgroundSize  = 'cover';
         avatarEl.style.backgroundPosition = 'center';
@@ -1373,15 +1674,23 @@
       refreshAll();
     });
 
+    bindInput('inputSubDuration', 'input', () => {
+      updateInputSuffixes();
+    });
     bindInput('inputSubDuration', 'change', (v) => {
       settings.subDuration = Math.min(60, Math.max(0, parseInt(v, 10) || 0));
       setVal('inputSubDuration', settings.subDuration);
+      updateInputSuffixes();
       refreshAll();
     });
 
+    bindInput('inputFollowDuration', 'input', () => {
+      updateInputSuffixes();
+    });
     bindInput('inputFollowDuration', 'change', (v) => {
       settings.followDuration = Math.min(365, Math.max(0, parseInt(v, 10) || 0));
       setVal('inputFollowDuration', settings.followDuration);
+      updateInputSuffixes();
       refreshAll();
     });
 
@@ -1614,6 +1923,36 @@
     });
   }
 
+  function formatMonthSuffix(val) {
+    const n = Math.abs(parseInt(val, 10)) || 0;
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return 'mesec';
+    if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'meseca';
+    return 'meseci';
+  }
+
+  function formatDaySuffix(val) {
+    const n = Math.abs(parseInt(val, 10)) || 0;
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    if (mod10 === 1 && mod100 !== 11) return 'dan';
+    return 'dana';
+  }
+
+  function updateInputSuffixes() {
+    const subEl = document.getElementById('inputSubDuration');
+    const subSuf = document.getElementById('subDurationSuffix');
+    if (subEl && subSuf) {
+      subSuf.textContent = formatMonthSuffix(subEl.value);
+    }
+    const followEl = document.getElementById('inputFollowDuration');
+    const followSuf = document.getElementById('followDurationSuffix');
+    if (followEl && followSuf) {
+      followSuf.textContent = formatDaySuffix(followEl.value);
+    }
+  }
+
   function updateSpinTimeLabel() {
     setText('statSpinTime', formatSpinTime(settings.spinTime));
   }
@@ -1634,12 +1973,19 @@
   ════════════════════════════════════════ */
   function setupListControls() {
     const searchInput = document.getElementById('inputSearchParticipants');
-    if (searchInput) searchInput.addEventListener('input', () => updateParticipantsUI());
+    if (searchInput) searchInput.addEventListener('input', debounce(() => updateParticipantsUI(), 120));
 
-    bindClick('btnClearParticipants', () => {
+    bindClick('btnClearParticipants', async () => {
       if (isSpinning) return;
       if (participantsMap.size === 0) return;
-      if (!confirm('Da li ste sigurni da želite da obrišete sve učesnike?')) return;
+      const confirmed = await showConfirmDialog({
+        title: 'Brisanje učesnika',
+        message: 'Da li ste sigurni da želite da obrišete sve prijavljene učesnike?',
+        confirmText: 'Obriši učesnike',
+        cancelText: 'Odustani',
+        danger: true
+      });
+      if (!confirmed) return;
       participantsMap.clear();
       lastWinningWheelPool = null;
       lastRouletteOffsetInCard = null;
@@ -1650,10 +1996,17 @@
       showToast('Lista učesnika je očišćena.', 'info');
     });
 
-    bindClick('btnClearWinners', () => {
+    bindClick('btnClearWinners', async () => {
       if (isSpinning) return;
       if (winnersList.length === 0) return;
-      if (!confirm('Da li ste sigurni da želite da obrišete sve pobednike?')) return;
+      const confirmed = await showConfirmDialog({
+        title: 'Brisanje pobednika',
+        message: 'Da li ste sigurni da želite da obrišete sve izvučene pobednike?',
+        confirmText: 'Obriši pobednike',
+        cancelText: 'Odustani',
+        danger: true
+      });
+      if (!confirmed) return;
       winnersList.forEach(w => { if (w.timerId) clearInterval(w.timerId); });
       winnersList = [];
       updateWinnersUI();
@@ -1670,11 +2023,15 @@
         const isConf = !!w.isConfirmed;
         const isExp = !isConf && (!!w.isExpired || (typeof w.confirmSeconds === 'number' && w.confirmSeconds <= 0));
         const status = isConf ? '[Potvrđeno]' : (isExp ? '[Nije potvrđeno]' : '[Čeka potvrdu]');
-        return `${i + 1}. ${w.username} — ${w.prize} ${status}`;
+        return `${i + 1}. ${w.username} - ${w.prize} ${status}`;
       }).join('\n');
       navigator.clipboard.writeText(text)
         .then(() => showToast('Lista pobednika kopirana u clipboard!', 'success'))
         .catch(() => showToast(`Pobednici:\n${text}`, 'info'));
+    });
+
+    bindClick('winnerRevealOkBtn', () => {
+      if (typeof window.confirmActiveWinner === 'function') window.confirmActiveWinner();
     });
   }
 
@@ -1727,12 +2084,20 @@
     bindClick('btnOpenFullscreen', openFullscreen);
     bindClick('btnCloseFullscreen', closeFullscreen);
     bindClick('wfoBtnStart', toggleStart);
+    bindClick('wfoBtnStop',  resetGiveaway);
     bindClick('wfoBtnDraw', triggerDraw);
     bindClick('wfoBtnReset', resetGiveaway);
 
     document.addEventListener('keydown', (e) => {
-      /* Esc closes winner modal first if open, otherwise closes fullscreen overlay */
+      /* Esc closes dialogs in order: confirm modal -> winner modal -> custom channel modal -> fullscreen overlay */
       if (e.key === 'Escape') {
+        const confirmModal = document.getElementById('kickajConfirmModal');
+        if (confirmModal && (confirmModal.classList.contains('open') || confirmModal.style.display === 'flex')) {
+          if (typeof window.closeConfirmDialog === 'function') {
+            window.closeConfirmDialog(false);
+          }
+          return;
+        }
         const winnerOv = document.getElementById('winnerRevealOverlay');
         if (winnerOv && (winnerOv.classList.contains('open') || winnerOv.style.display === 'flex')) {
           if (typeof window.closeWinnerOverlay === 'function') {
@@ -1740,11 +2105,18 @@
           }
           return;
         }
+        const customModal = document.getElementById('customChannelModal');
+        if (customModal && (customModal.classList.contains('open') || customModal.style.display === 'flex')) {
+          if (typeof window.closeModal === 'function') {
+            window.closeModal('customChannelModal');
+          }
+          return;
+        }
         const ov = document.getElementById('wheelFullscreenOverlay');
         if (ov && ov.style.display !== 'none') closeFullscreen();
         return;
       }
-      /* F key toggles fullscreen — skip if user is typing in an input */
+      /* F key toggles fullscreen - skip if user is typing in an input */
       if ((e.key === 'f' || e.key === 'F') && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const tag = (document.activeElement || {}).tagName || '';
         if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
@@ -1771,6 +2143,8 @@
   window.toggleStart     = toggleStart;
   window.triggerDraw     = triggerDraw;
   window.resetGiveaway   = resetGiveaway;
+  window.getEffectiveUserId = getEffectiveUserId;
+  window.getChannelOwnerId  = getChannelOwnerId;
 
   window.openModal = function (id) {
     const el = document.getElementById(id);
@@ -1794,6 +2168,85 @@
     if (e.target === e.currentTarget) window.closeModal(id);
   };
 
+  let _confirmResolve = null;
+
+  function showConfirmDialog({
+    title = 'Potvrda akcije',
+    message = 'Da li ste sigurni da želite da nastavite?',
+    confirmText = 'Potvrdi',
+    cancelText = 'Odustani',
+    danger = true
+  } = {}) {
+    return new Promise(resolve => {
+      _confirmResolve = resolve;
+      const modal = document.getElementById('kickajConfirmModal');
+      const titleEl = document.getElementById('confirmModalTitle');
+      const descEl = document.getElementById('confirmModalDesc');
+      const acceptBtn = document.getElementById('confirmModalAcceptBtn');
+      const cancelBtn = document.getElementById('confirmModalCancelBtn');
+      const iconWrap = document.getElementById('confirmModalIconWrap');
+
+      if (!modal) {
+        return resolve(true);
+      }
+
+      if (titleEl) titleEl.textContent = title;
+      if (descEl) descEl.textContent = message;
+      if (acceptBtn) {
+        acceptBtn.innerHTML = `<span>${escHtml(confirmText)}</span>`;
+        acceptBtn.className = danger ? 'btn btn-danger confirm-accept-btn' : 'btn btn-primary confirm-accept-btn';
+        acceptBtn.onclick = () => closeConfirmDialog(true);
+      }
+      if (cancelBtn) {
+        cancelBtn.innerHTML = `<span>${escHtml(cancelText)}</span>`;
+        cancelBtn.onclick = () => closeConfirmDialog(false);
+      }
+      if (iconWrap) {
+        iconWrap.className = danger ? 'confirm-modal-icon-wrap is-danger' : 'confirm-modal-icon-wrap is-info';
+      }
+
+      modal.style.display = 'flex';
+      void modal.offsetWidth;
+      modal.classList.add('open');
+      document.body.style.overflow = 'hidden';
+    });
+  }
+  window.showConfirmDialog = showConfirmDialog;
+
+  function closeConfirmDialog(result = false) {
+    const modal = document.getElementById('kickajConfirmModal');
+    if (modal) {
+      modal.classList.remove('open');
+      setTimeout(() => {
+        if (!modal.classList.contains('open')) {
+          modal.style.display = 'none';
+          document.body.style.overflow = '';
+        }
+      }, 200);
+    }
+    if (typeof _confirmResolve === 'function') {
+      const cb = _confirmResolve;
+      _confirmResolve = null;
+      cb(result);
+    }
+  }
+  window.closeConfirmDialog = closeConfirmDialog;
+
+  window.handleConfirmModalBg = function (e) {
+    if (e.target && (e.target.id === 'kickajConfirmModal' || e.target.classList.contains('confirm-modal-backdrop'))) {
+      closeConfirmDialog(false);
+    }
+  };
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('kickajConfirmModal');
+      if (modal && modal.classList.contains('open')) {
+        closeConfirmDialog(false);
+      }
+    }
+  });
+
   window.openHelpModal     = function () { window.openModal('helpModal'); };
 
   window.handleSignOut = async function () {
@@ -1811,18 +2264,19 @@
     const ov = document.getElementById('wheelFullscreenOverlay');
     if (!ov) return;
     ov.style.display = 'flex';
-    void ov.offsetWidth;
-    ov.classList.add('open');
-    ov.removeAttribute('aria-hidden');
+    requestAnimationFrame(() => {
+      ov.classList.add('open');
+      ov.removeAttribute('aria-hidden');
+    });
 
     /* Request native browser fullscreen so the overlay takes the ENTIRE screen
-       (no address bar, taskbar, browser chrome) — perfect for stream overlays */
-    if (!document.fullscreenElement) {
+       (no address bar, taskbar, browser chrome) - perfect for stream overlays */
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => {
         nativeFSActive = true;
         ov.classList.add('native-fs');
       }).catch(() => {
-        /* Browser blocked native FS (e.g. no user gesture on load) — overlay mode still works */
+        /* Browser blocked native FS (e.g. no user gesture on load) - overlay mode still works */
         nativeFSActive = false;
       });
     }
@@ -1852,7 +2306,10 @@
       ov.classList.remove('native-fs');
       ov.setAttribute('aria-hidden', 'true');
       setTimeout(() => {
-        if (!ov.classList.contains('open')) ov.style.display = 'none';
+        if (!ov.classList.contains('open')) {
+          ov.style.display = 'none';
+          drawVisualizerStage();
+        }
       }, 300);
     }
     /* Exit native browser fullscreen if we triggered it */
@@ -1871,12 +2328,12 @@
     else { badge.textContent = 'Standby'; }
   }
 
-  /* Init HiDPI (Retina / 4K) canvas — scales backing store by devicePixelRatio
-     so text and arcs render crisply on high-density screens */
+  /* Init HiDPI (Retina / 4K) canvas - scales backing store by devicePixelRatio
+     so text and arcs render crisply on high-density screens (capped at 2x to avoid huge buffers) */
   function initHiDPICanvas(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
-    const dpr  = window.devicePixelRatio || 1;
+    const dpr  = Math.min(window.devicePixelRatio || 1, 2);
     const wrap = canvas.parentElement;
     if (!wrap) return;
     const rect = wrap.getBoundingClientRect();
@@ -1887,12 +2344,11 @@
       canvas.height = size * dpr;
       canvas.style.width  = size + 'px';
       canvas.style.height = size + 'px';
-      // Do not call ctx.scale(dpr, dpr) here because drawWheelOnCanvas scales within its own ctx.save()/ctx.restore() block
     }
   }
 
   /* ════════════════════════════════════════
-     WEB AUDIO — Sound System & Master Gain
+     WEB AUDIO - Sound System & Master Gain
   ════════════════════════════════════════ */
   function getAudioCtx() {
     if (!audioCtx) {
@@ -2196,7 +2652,12 @@
     });
   }
 
+  let lastTickSoundTime = 0;
   function playSoundTick() {
+    const perfNow = performance.now();
+    if (perfNow - lastTickSoundTime < 22) return;
+    lastTickSoundTime = perfNow;
+
     if (!settings.soundEnabled || !getVolume()) return;
     const ctx = getAudioCtx();
     if (!ctx) return;
@@ -2235,22 +2696,75 @@
     let s = String(slug).trim().toLowerCase().replace(/^https?:\/\/(www\.)?kick\.com\//, '').replace(/\/$/, '');
     if (/^\d+$/.test(s)) { chatroomId = parseInt(s, 10); return; }
 
-    // Primarno i jedino: sopstveni Bot proxy endpoint (/api/kick/channel) sa retry mehanizmom
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const botRes = await fetch(resolveApiUrl(`/api/kick/channel?username=${encodeURIComponent(s)}`));
-        if (botRes.ok) {
-          const data = await botRes.json();
-          const id = data?.chatroom?.id || data?.chatroom_id;
-          if (id) { chatroomId = parseInt(id, 10); return; }
-        }
-      } catch (e) {
-        console.warn(`[Kickaj] Bot proxy channel lookup pokusaj ${attempt} neuspesan:`, e);
-      }
-      if (attempt < 3) {
-        await new Promise(r => setTimeout(r, 600 * attempt));
-      }
+    // 0. Proveri da li aktivni objekat ili lista kanala već imaju chatroom_id
+    if (activeChannelObj && activeChannelObj.username && activeChannelObj.username.toLowerCase() === s && activeChannelObj.chatroom_id) {
+      chatroomId = parseInt(activeChannelObj.chatroom_id, 10);
+      return;
     }
+    const chInList = userChannels.find(c => c.username && c.username.toLowerCase() === s && c.chatroom_id);
+    if (chInList) {
+      chatroomId = parseInt(chInList.chatroom_id, 10);
+      if (activeChannelObj && !activeChannelObj.chatroom_id) activeChannelObj.chatroom_id = chatroomId;
+      return;
+    }
+
+    // 1. Primarno: Bot /api/avatar endpoint koji javno i bez autorizacije vraća chatroom_id i avatar
+    try {
+      const apiBase = getBotApiBase().replace(/\/+$/, '');
+      const avRes = await fetch(`${apiBase}/api/avatar?username=${encodeURIComponent(s)}`, { signal: AbortSignal.timeout(3500) });
+      if (avRes.ok) {
+        const data = await avRes.json();
+        const cid = data?.chatroom_id || data?.chatroom?.id;
+        if (cid) {
+          chatroomId = parseInt(cid, 10);
+          if (data.id && !channelId) channelId = String(data.id);
+          if (activeChannelObj && !activeChannelObj.chatroom_id) activeChannelObj.chatroom_id = chatroomId;
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('[Kickaj] Bot avatar lookup neuspešan:', e);
+    }
+
+    // 2. Sekundarno: Netlify proxy funkcija za Kick v2 API
+    try {
+      const targetUrl = `https://kick.com/api/v2/channels/${encodeURIComponent(s)}`;
+      const netlifyRes = await fetch(`/.netlify/functions/api-proxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUrl }),
+        signal: AbortSignal.timeout(3500)
+      });
+      if (netlifyRes.ok) {
+        const data = await netlifyRes.json();
+        const cid = data?.chatroom?.id || data?.chatroom_id;
+        if (cid) {
+          chatroomId = parseInt(cid, 10);
+          if (data.user?.id && !channelId) channelId = String(data.user.id);
+          if (activeChannelObj && !activeChannelObj.chatroom_id) activeChannelObj.chatroom_id = chatroomId;
+          return;
+        }
+      }
+    } catch (_) { }
+
+    // 3. Tercijarno: AllOrigins proxy fallback
+    try {
+      const targetUrl = `https://kick.com/api/v2/channels/${encodeURIComponent(s)}`;
+      const proxyBase = window.CONFIG?.API?.PROXY_ALLORIGINS
+        ? window.CONFIG.API.PROXY_ALLORIGINS.replace(/\/get$/, '/raw?url=')
+        : 'https://api.allorigins.win/raw?url=';
+      const proxyRes = await fetch(`${proxyBase}${encodeURIComponent(targetUrl)}`, { cache: 'no-store' });
+      if (proxyRes.ok) {
+        const data = await proxyRes.json();
+        const cid = data?.chatroom?.id || data?.chatroom_id;
+        if (cid) {
+          chatroomId = parseInt(cid, 10);
+          if (data.user?.id && !channelId) channelId = String(data.user.id);
+          if (activeChannelObj && !activeChannelObj.chatroom_id) activeChannelObj.chatroom_id = chatroomId;
+          return;
+        }
+      }
+    } catch (_) { }
   }
 
   async function connectKickChat() {
@@ -2418,58 +2932,72 @@
     if (isConnecting) return;
 
     if (isRunning) {
-      isRunning = false;
-      wsReconnectAttempts = 0;
-      if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
-      try { kickWebSocket?.close(); } catch (e) { /* */ }
-      kickWebSocket = null;
-      if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
-      updateStartButtonUI();
-      showToast('Prijave iz chata su pauzirane.', 'info');
-    } else {
-      isConnecting = true;
-      setStartButtonsConnecting(true);
-
-      const ok = await connectKickChat();
-      isConnecting = false;
-      setStartButtonsConnecting(false);
-
-      if (ok) {
-        isRunning = true;
-        showToast(`Giveaway je aktivan! Prijave iz chata su otvorene.`, 'success');
-        if (settings.announceStart) {
-          sendGiveawayStartAnnouncement();
-        }
-      } else {
-        isRunning = false;
-      }
-      updateStartButtonUI();
+      await resetGiveaway();
+      return;
     }
+
+    isConnecting = true;
+    setStartButtonsConnecting(true);
+
+    const ok = await connectKickChat();
+    isConnecting = false;
+    setStartButtonsConnecting(false);
+
+    if (ok) {
+      isRunning = true;
+      const cLower = (channelName || '').toLowerCase();
+      if (cLower) {
+        try { localStorage.setItem(`kickaj_active_${cLower}`, 'true'); } catch (e) { /* */ }
+      }
+      try { localStorage.setItem('kickaj_active_general', 'true'); } catch (e) { /* */ }
+      saveState();
+      showToast('Giveaway je uspešno pokrenut! Prijave iz chata su otvorene.', 'success');
+      if (settings.announceStart) {
+        sendGiveawayStartAnnouncement();
+      }
+    } else {
+      isRunning = false;
+    }
+    updateStartButtonUI();
+    updateStateBadge();
+    updateActionStates();
     drawVisualizerStage();
     refreshAll();
   }
 
   function updateStartButtonUI() {
     const playSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
-    const pauseSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+    const playSvgSm = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+    const stopSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
+    const stopSvgSm = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>`;
 
     const startBtn    = document.getElementById('btnStartGiveaway');
     const wfoStartBtn = document.getElementById('wfoBtnStart');
+    const stopBtn     = document.getElementById('btnStopGiveaway');
+    const wfoStopBtn  = document.getElementById('wfoBtnStop') || document.getElementById('wfoBtnReset');
+    const hasData     = participantsMap.size > 0 || winnersList.length > 0;
 
-    [startBtn, wfoStartBtn].forEach(btn => {
-      if (!btn) return;
-      if (isRunning) {
-        btn.classList.add('is-active');
-        btn.innerHTML = `${pauseSvg}<span>Pauziraj giveaway</span>`;
-        btn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
-        btn.style.color = '#07050f';
-      } else {
-        btn.classList.remove('is-active');
-        btn.innerHTML = `${playSvg}<span>Pokreni giveaway</span>`;
-        btn.style.background = 'linear-gradient(135deg, #53fc18, #3de810)';
-        btn.style.color = '#07050f';
-      }
-    });
+    if (startBtn) {
+      startBtn.innerHTML = `${playSvg}<span>Pokreni giveaway</span>`;
+      startBtn.style.display = isRunning ? 'none' : 'inline-flex';
+      startBtn.disabled = isSpinning;
+    }
+    if (wfoStartBtn) {
+      wfoStartBtn.innerHTML = `${playSvgSm}<span>Pokreni giveaway</span>`;
+      wfoStartBtn.style.display = isRunning ? 'none' : 'inline-flex';
+      wfoStartBtn.disabled = isSpinning;
+    }
+
+    if (stopBtn) {
+      stopBtn.innerHTML = `${stopSvg}<span>Zaustavi giveaway</span>`;
+      stopBtn.style.display = (isRunning || hasData) ? 'inline-flex' : 'none';
+      stopBtn.disabled = isSpinning;
+    }
+    if (wfoStopBtn) {
+      wfoStopBtn.innerHTML = `${stopSvgSm}<span>Zaustavi giveaway</span>`;
+      wfoStopBtn.style.display = (isRunning || hasData) ? 'inline-flex' : 'none';
+      wfoStopBtn.disabled = isSpinning;
+    }
   }
 
   const DOMESTIC_GAMER_BASES = [
@@ -2639,6 +3167,7 @@
     if (uiRefreshTimer) return;
     uiRefreshTimer = setTimeout(() => {
       uiRefreshTimer = null;
+      if (isSpinning) return;
       updateParticipantsUI();
       drawVisualizerStage();
       refreshAll();
@@ -2717,6 +3246,7 @@
       isTest: !!isTest,
       joinedAt: user.joinedAt || Date.now()
     });
+    invalidateWheelCache();
 
     if (triggerPopin) {
       triggerFullscreenParticipantPopin(user);
@@ -2755,14 +3285,23 @@
     }, 3500);
   }
 
-  function resetGiveaway() {
-    if (participantsMap.size > 0 || winnersList.length > 0 || isSpinning) {
-      if (!confirm('Da li ste sigurni da želite da resetujete celo giveaway izvlačenje? Ovo će obrisati sve prijavljene učesnike i pobednike.')) {
+  async function resetGiveaway() {
+    if (participantsMap.size > 0 || winnersList.length > 0 || isSpinning || isRunning) {
+      const confirmed = await showConfirmDialog({
+        title: 'Zaustavi giveaway',
+        message: 'Da li ste sigurni da želite da zaustavite giveaway? Ovo će prekinuti prikupljanje poruka iz chata i resetovati listu učesnika.',
+        confirmText: 'Zaustavi giveaway',
+        cancelText: 'Odustani',
+        danger: true
+      });
+      if (!confirmed) {
         return;
       }
     }
 
     currentSpinId++; // Momentalno prekida bilo koju animaciju izvlačenja u toku
+    AnimationManager.clear();
+    invalidateWheelCache();
     isSpinning = false;
     isRunning  = false;
     stopSpinSound();
@@ -2790,19 +3329,26 @@
     drawWheelOnCanvas('wheelCanvas');
     drawWheelOnCanvas('wheelCanvasFullscreen');
 
-    updateStartButtonUI();
-    
-    // Ukloni stanje za trenutni kanal
+    // Ukloni stanje za trenutni kanal i resetuj aktivnost
+    const cLower = (channelName || '').toLowerCase();
     try {
       localStorage.removeItem(STATE_KEY);
-      if (channelName) localStorage.removeItem(`${STATE_KEY}_${channelName.toLowerCase()}`);
+      localStorage.setItem('kickaj_active_general', 'false');
+      if (cLower) {
+        localStorage.removeItem(`${STATE_KEY}_${cLower}`);
+        localStorage.setItem(`kickaj_active_${cLower}`, 'false');
+      }
     } catch (e) { /* */ }
 
+    saveState();
+    updateStartButtonUI();
+    updateStateBadge();
+    updateActionStates();
     updateParticipantsUI();
     updateWinnersUI();
     drawVisualizerStage();
     refreshAll();
-    showToast('Giveaway je uspešno resetovan na početno stanje.', 'success');
+    showToast('Giveaway je uspešno zaustavljen i resetovan.', 'success');
   }
 
   /* ════════════════════════════════════════
@@ -2850,10 +3396,19 @@
       : html;
   }
 
-  window.removeParticipant = function (key) {
+  window.removeParticipant = async function (key) {
     if (!participantsMap.has(key)) return;
     const p = participantsMap.get(key);
+    const confirmed = await showConfirmDialog({
+      title: 'Uklanjanje učesnika',
+      message: `Da li ste sigurni da želite da uklonite učesnika @${p.username}?`,
+      confirmText: 'Ukloni',
+      cancelText: 'Odustani',
+      danger: true
+    });
+    if (!confirmed) return;
     participantsMap.delete(key);
+    invalidateWheelCache();
     updateParticipantsUI();
     drawVisualizerStage();
     refreshAll();
@@ -3014,7 +3569,10 @@
       if (!isFollowing) {
         try {
           const directKickUrl = `https://kick.com/api/v2/channels/${encodeURIComponent(ch)}/users/${encodeURIComponent(targetUser)}`;
-          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(directKickUrl)}`;
+          const proxyBase = window.CONFIG?.API?.PROXY_ALLORIGINS
+            ? window.CONFIG.API.PROXY_ALLORIGINS.replace(/\/get$/, '/raw?url=')
+            : 'https://api.allorigins.win/raw?url=';
+          const proxyUrl = `${proxyBase}${encodeURIComponent(directKickUrl)}`;
           const resProxy = await fetch(proxyUrl, { cache: 'no-store' });
           if (resProxy.ok) {
             const proxyData = await resProxy.json();
@@ -3213,12 +3771,12 @@
     saveState();
   };
 
-  window.redrawWinner = function (index) {
+  window.redrawWinner = async function (index) {
     const idx = parseInt(index, 10);
     if (isNaN(idx) || idx < 0 || idx >= winnersList.length) return;
     const w = winnersList[idx];
     const removedName = w ? w.username : '';
-    window.removeWinner(idx);
+    await window.removeWinner(idx, true);
     window.closeWinnerOverlay();
     showToast(`Izvlačenje poništeno za @${removedName}. Započeto novo izvlačenje...`, 'info');
     setTimeout(() => {
@@ -3347,10 +3905,7 @@
       }
 
       if (fill) {
-        fill.style.setProperty('transition', 'none', 'important');
-        fill.style.setProperty('width', '100%', 'important');
-        void fill.offsetWidth;
-        fill.style.setProperty('transition', 'width 0.1s linear', 'important');
+        fill.style.transform = 'scaleX(1)';
       }
 
       const startTs  = Date.now();
@@ -3360,7 +3915,7 @@
       const tick = () => {
         const remMs  = Math.max(0, totalMs - (Date.now() - startTs));
         const pct    = Math.max(0, Math.min(100, (remMs / totalMs) * 100));
-        if (fill) fill.style.setProperty('width', pct + '%', 'important');
+        if (fill) fill.style.transform = `scaleX(${pct / 100})`;
 
         const remSec = Math.ceil(remMs / 1000);
         if (remSec !== lastSec) {
@@ -3371,7 +3926,7 @@
         if (remMs <= 0) {
           clearInterval(overlayTimerId);
           overlayTimerId = null;
-          if (fill) fill.style.setProperty('width', '0%', 'important');
+          if (fill) fill.style.transform = 'scaleX(0)';
           if (lbl)  lbl.textContent  = 'Nije potvrđeno (Vreme za javljanje je isteklo)';
           const dots = document.getElementById('winnerChatlogDots');
           const content = document.getElementById('winnerChatlogContent');
@@ -3419,8 +3974,7 @@
       else              top5Badge.textContent = 'POBEDNIK GIVEAWAYA';
     }
 
-    ov.classList.remove('is-top5', 'is-final-champ', 'open');
-    void ov.offsetWidth;
+    ov.classList.remove('is-top5', 'is-final-champ');
     if (isFinalChamp) ov.classList.add('is-final-champ');
     else if (isTop5)  ov.classList.add('is-top5');
     ov.classList.add('open');
@@ -3451,15 +4005,18 @@
     const canvas = document.getElementById('particleCanvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-    if (particleResizeHandler) {
-      window.removeEventListener('resize', particleResizeHandler);
-      particleResizeHandler = null;
-    }
-    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    const resize = () => {
+      canvas.width  = Math.round(window.innerWidth * dpr);
+      canvas.height = Math.round(window.innerHeight * dpr);
+      canvas.style.width  = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
     resize();
-    particleResizeHandler = resize;
-    window.addEventListener('resize', particleResizeHandler);
+    particleResizeHandler = debounce(resize, 100);
+    window.addEventListener('resize', particleResizeHandler, { passive: true });
 
     const colors = isFinalChamp
       ? ['#ffd700', '#ff8c00', '#ec4899', '#53fc18', '#06b6d4', '#ffffff', '#c084fc']
@@ -3468,12 +4025,14 @@
         : ['#53fc18','#06b6d4','#9333ea','#ffffff','#53fc18','#3de810']);
 
     const particles = [];
-    const count = isFinalChamp ? 220 : (isTop5 ? 140 : 80);
+    const count = isFinalChamp ? 180 : (isTop5 ? 120 : 70);
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
 
     for (let i = 0; i < count; i++) {
       particles.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height - canvas.height,
+        x: Math.random() * winW,
+        y: Math.random() * winH - winH,
         vx: (Math.random() - 0.5) * 3,
         vy: Math.random() * 3 + 2,
         w: Math.random() * 8 + 6,
@@ -3487,17 +4046,23 @@
       });
     }
 
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      particles.forEach(p => {
-        p.flip += p.flipSpeed;
-        p.rotation += p.rotSpeed;
-        p.x += p.vx + Math.sin(p.y * p.oscFreq) * 1.2;
-        p.y += p.vy;
+    AnimationManager.add('particles', (dt) => {
+      const curW = window.innerWidth;
+      const curH = window.innerHeight;
+      const factor = Math.min(dt / 16.666, 3);
 
-        if (p.y > canvas.height + 20) {
-          p.y = -20 - Math.random() * 100;
-          p.x = Math.random() * canvas.width;
+      ctx.clearRect(0, 0, curW, curH);
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.flip += p.flipSpeed * factor;
+        p.rotation += p.rotSpeed * factor;
+        p.x += (p.vx + Math.sin(p.y * p.oscFreq) * 1.2) * factor;
+        p.y += p.vy * factor;
+
+        if (p.y > curH + 20) {
+          p.y = -20 - Math.random() * 80;
+          p.x = Math.random() * curW;
           p.vy = Math.random() * 3 + 2;
         }
 
@@ -3508,13 +4073,13 @@
         ctx.fillStyle = p.color;
         ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
         ctx.restore();
-      });
-      particleAnimId = requestAnimationFrame(draw);
-    };
-    particleAnimId = requestAnimationFrame(draw);
+      }
+      return true;
+    });
   }
 
   function stopParticles() {
+    AnimationManager.remove('particles');
     if (particleAnimId) { cancelAnimationFrame(particleAnimId); particleAnimId = null; }
     if (particleResizeHandler) {
       window.removeEventListener('resize', particleResizeHandler);
@@ -3584,7 +4149,7 @@
     if (barEl) {
       const total = w.initialConfirmSeconds || settings.confirmTime || 60;
       const pct   = isConf ? 100 : (isExp ? 0 : Math.max(0, (w.confirmSeconds / total) * 100));
-      barEl.style.width = pct + '%';
+      barEl.style.transform = `scaleX(${pct / 100})`;
       barEl.classList.toggle('is-expired', isExp);
       barEl.classList.toggle('is-confirmed', isConf);
     }
@@ -3684,7 +4249,7 @@
                 </button>
               ` : ''}
               ${isExp ? `
-                <button type="button" class="winner-redraw-btn" onclick="window.redrawWinner(${idx})" title="Nije se javio — ponovi izvlačenje">
+                <button type="button" class="winner-redraw-btn" onclick="window.redrawWinner(${idx})" title="Nije se javio - ponovi izvlačenje">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                   <span>Ponovi</span>
                 </button>
@@ -3696,16 +4261,26 @@
           </div>
           <div class="winner-prize-tag">${giftSvg} <span>Nagrada: <strong>${escHtml(w.prize)}</strong></span></div>
           ${followBadgeHtml}
-          <div class="timer-bar-wrap"><div class="timer-bar-fill ${isConf ? 'is-confirmed' : (isExp ? 'is-expired' : '')}" id="w-bar-${winnerKey}" style="width:${pct}%;"></div></div>
+          <div class="timer-bar-wrap"><div class="timer-bar-fill ${isConf ? 'is-confirmed' : (isExp ? 'is-expired' : '')}" id="w-bar-${winnerKey}" style="transform:scaleX(${pct / 100});"></div></div>
         </div>`;
     });
     container.innerHTML = html;
   }
 
-  window.removeWinner = function (index) {
+  window.removeWinner = async function (index, skipConfirm = false) {
     const idx = parseInt(index, 10);
-    if (isNaN(idx) || idx < 0 || idx >= winnersList.length) return;
+    if (isNaN(idx) || idx < 0 || idx >= winnersList.length) return false;
     const removed = winnersList[idx];
+    if (!skipConfirm) {
+      const confirmed = await showConfirmDialog({
+        title: 'Uklanjanje pobednika',
+        message: `Da li ste sigurni da želite da uklonite pobednika @${removed?.username || ''}?`,
+        confirmText: 'Ukloni',
+        cancelText: 'Odustani',
+        danger: true
+      });
+      if (!confirmed) return false;
+    }
     if (removed && removed.timerId) {
       clearInterval(removed.timerId);
       removed.timerId = null;
@@ -3714,7 +4289,10 @@
     updateWinnersUI();
     refreshAll();
     saveState();
-    showToast(`Pobednik ${removed?.username || ''} je uklonjen.`, 'info');
+    if (!skipConfirm) {
+      showToast(`Pobednik ${removed?.username || ''} je uklonjen.`, 'info');
+    }
+    return true;
   };
 
   /* ════════════════════════════════════════
@@ -3837,7 +4415,7 @@
     show('wheelStageFrame',    isWheel);
     show('slotStageFrame',     isSlot);
     show('rouletteStageFrame', isRoulette);
-    show('btnStageDraw', !isWheel);
+    show('btnStageDraw',       true);
 
     // Fullscreen stage
     show('wfoWheelFrame',    isWheel);
@@ -3873,108 +4451,141 @@
     drawVisualizerStage();
   }
 
-  /* ── Wheel Draw ── */
-  function drawWheelOnCanvas(canvasId) {
-    const canvas = document.getElementById(canvasId);
-    if (!canvas) return;
-    const ctx    = canvas.getContext('2d');
-    /* Always draw in CSS pixel space.
-       - If initHiDPICanvas was called, canvas.width = cssSize * dpr, ctx already has a cumulative scale.
-         We must NOT apply it again — just use cssSize directly.
-       - If initHiDPICanvas was NOT called (e.g. regular wheelCanvas on page load),
-         canvas.width === canvas.clientWidth (1:1), DPR doesn't matter.
-       Strategy: compute CSS display size from style/clientWidth, use that for all coords.  */
-    const cssW   = canvas.clientWidth  || canvas.width;
-    const cssH   = canvas.clientHeight || canvas.height;
-    /* Scale backing store once — idempotent: if canvas is already correctly sized, does nothing */
-    const dpr    = window.devicePixelRatio || 1;
-    const bsW    = Math.round(cssW * dpr);
-    const bsH    = Math.round(cssH * dpr);
-    if (canvas.width !== bsW || canvas.height !== bsH) {
-      canvas.width  = bsW;
-      canvas.height = bsH;
-    }
-    ctx.save();
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, cssW, cssH);
-    const cx     = cssW / 2;
-    const cy     = cssH / 2;
-    const r      = Math.min(cssW, cssH) / 2 - 10;
-    const pool   = getWheelDisplayPool();
+  /* ── Wheel Draw & 240fps Offscreen Cache ── */
+  function getWheelCache(canvasId, cssW, cssH, dpr, pool) {
+    const key = canvasId;
+    const poolSig = pool.length + ':' + (pool[0] || '') + ':' + (pool[pool.length - 1] || '');
+    let entry = wheelCaches.get(key);
 
-    if (pool.length === 0) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(18,14,38,0.95)';
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = '#53fc18';
-      ctx.stroke();
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.max(14, r * 0.055)}px 'Space Grotesk', sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(isRunning ? 'Čekanje poruka iz chata...' : 'Pokreni giveaway...', cx, cy);
-      ctx.restore(); /* DPR scale restore — early return path */
-      return;
+    if (entry && entry.width === cssW && entry.height === cssH && entry.dpr === dpr && entry.sig === poolSig) {
+      return entry;
     }
 
-    const n = pool.length;
+    let offCanvas = entry ? entry.offCanvas : null;
+    if (!offCanvas) {
+      offCanvas = document.createElement('canvas');
+    }
+    const bsW = Math.round(cssW * dpr);
+    const bsH = Math.round(cssH * dpr);
+    if (offCanvas.width !== bsW || offCanvas.height !== bsH) {
+      offCanvas.width = bsW;
+      offCanvas.height = bsH;
+    }
+
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    offCtx.clearRect(0, 0, cssW, cssH);
+
+    const cx = cssW / 2;
+    const cy = cssH / 2;
+    const r  = Math.min(cssW, cssH) / 2 - 10;
+    const n  = pool.length;
     const sliceAngle = (Math.PI * 2) / n;
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(wheelAngle);
+
+    offCtx.save();
+    offCtx.translate(cx, cy);
 
     for (let i = 0; i < n; i++) {
       const a0 = i * sliceAngle;
       const a1 = a0 + sliceAngle;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, r, a0, a1);
-      ctx.fillStyle = SLICE_COLORS[i % SLICE_COLORS.length];
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = '#07050f';
-      ctx.stroke();
+      offCtx.beginPath();
+      offCtx.moveTo(0, 0);
+      offCtx.arc(0, 0, r, a0, a1);
+      offCtx.fillStyle = SLICE_COLORS[i % SLICE_COLORS.length];
+      offCtx.fill();
+      offCtx.lineWidth = 1.5;
+      offCtx.strokeStyle = '#07070D';
+      offCtx.stroke();
 
-      ctx.save();
-      ctx.rotate(a0 + sliceAngle / 2);
-      ctx.textAlign = 'right';
+      offCtx.save();
+      offCtx.rotate(a0 + sliceAngle / 2);
+      offCtx.textAlign = 'right';
       const fontSize = Math.max(10, Math.min(15, r * 0.06 - n * 0.1));
-      ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
-      ctx.fillStyle = '#07050f';
+      offCtx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+      const sliceCol = SLICE_COLORS[i % SLICE_COLORS.length];
+      offCtx.fillStyle = (sliceCol === '#53fc18' || sliceCol === '#eab308') ? '#07070D' : '#FFFFFF';
       const label = pool[i].length > 16 ? pool[i].substring(0, 14) + '..' : pool[i];
-      ctx.fillText(label, r - 16, 4);
-      ctx.restore();
+      offCtx.fillText(label, r - 16, 4);
+      offCtx.restore();
+    }
+    offCtx.restore();
+
+    entry = { offCanvas, width: cssW, height: cssH, dpr, sig: poolSig, cx, cy, r };
+    wheelCaches.set(key, entry);
+    return entry;
+  }
+
+  function drawWheelOnCanvas(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+
+    // Visibility filter: skip drawing hidden canvas
+    const isFs = (canvasId === 'wheelCanvasFullscreen');
+    const fsOpen = isFullscreenOverlayOpen();
+    if (isFs && !fsOpen) return;
+    if (!isFs && fsOpen) return;
+
+    const ctx  = canvas.getContext('2d');
+    const cssW = canvas.clientWidth  || canvas.width;
+    const cssH = canvas.clientHeight || canvas.height;
+    const dpr  = Math.min(window.devicePixelRatio || 1, 2);
+    const bsW  = Math.round(cssW * dpr);
+    const bsH  = Math.round(cssH * dpr);
+
+    if (canvas.width !== bsW || canvas.height !== bsH) {
+      canvas.width  = bsW;
+      canvas.height = bsH;
     }
 
-    const capRadius = Math.max(28, r * 0.18);
-    ctx.beginPath();
-    ctx.arc(0, 0, capRadius, 0, Math.PI * 2);
-    ctx.fillStyle = '#07050f';
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#53fc18';
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(0, 0, capRadius * 0.85, 0, Math.PI * 2);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(83, 252, 24, 0.4)';
-    ctx.stroke();
-
     ctx.save();
-    ctx.rotate(-wheelAngle);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#53fc18';
-    const fontSz = Math.max(10, Math.round(capRadius * 0.38));
-    ctx.font = `800 ${fontSz}px 'Outfit', sans-serif`;
-    ctx.fillText('IZVUCI', 0, 1);
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const cx   = cssW / 2;
+    const cy   = cssH / 2;
+    const r    = Math.min(cssW, cssH) / 2 - 10;
+    const pool = getWheelDisplayPool();
+    const isPreview = (pool.length === 0);
+    const displayPool = isPreview
+      ? ['KICKAJ', 'GIVEAWAY', 'NAGRADA', 'SUB x2', 'KICKAJ', 'GIVEAWAY', 'NAGRADA', 'SREĆNO']
+      : pool;
+
+    const cache = getWheelCache(canvasId, cssW, cssH, dpr, displayPool);
+
+    // Blazing-fast GPU texture blit
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(wheelAngle);
+    if (isPreview) {
+      ctx.globalAlpha = 0.92;
+    }
+    ctx.drawImage(cache.offCanvas, -cx, -cy, cssW, cssH);
     ctx.restore();
 
-    ctx.restore(); /* translate+rotate restore (inner save) */
-    ctx.restore(); /* DPR scale restore (outer save) */
+    // Center cap ("IZVUCI" / "KICKAJ")
+    const capRadius = Math.max(28, r * 0.18);
+    ctx.beginPath();
+    ctx.arc(cx, cy, capRadius, 0, Math.PI * 2);
+    ctx.fillStyle = '#0A0A16';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = isPreview ? '#8B5CF6' : '#53fc18';
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, capRadius * 0.85, 0, Math.PI * 2);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = isPreview ? 'rgba(139, 92, 246, 0.5)' : 'rgba(83, 252, 24, 0.5)';
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = isPreview ? '#8B5CF6' : '#53fc18';
+    const fontSz = Math.max(10, Math.round(capRadius * 0.38));
+    ctx.font = `800 ${fontSz}px 'Space Grotesk', sans-serif`;
+    ctx.fillText(isPreview ? 'KICKAJ' : 'IZVUCI', cx, cy + 1);
+
+    ctx.restore();
   }
 
   /* ── Slot Draw Preview ── */
@@ -4044,7 +4655,16 @@
       if (!strip) return;
       if (pool.length === 0) {
         strip.style.transform = 'translate3d(0,0,0)';
-        strip.innerHTML = '<div class="roulette-card"><span class="roulette-card-name">Čekanje učesnika...</span></div>';
+        let phHtml = '';
+        for (let i = 0; i < 24; i++) {
+          phHtml += `
+            <div class="roulette-card roulette-card-placeholder">
+              <div class="roulette-card-bar" style="background:rgba(255,255,255,0.12);"></div>
+              <div class="roulette-card-avatar" style="border-color:rgba(255,255,255,0.18); color:var(--aj-muted2);">?</div>
+              <span class="roulette-card-name">Čekanje učesnika</span>
+            </div>`;
+        }
+        strip.innerHTML = phHtml;
         return;
       }
 
@@ -4088,8 +4708,11 @@
   /* ════════════════════════════════════════
      DRAW WINNER
   ════════════════════════════════════════ */
+  let drawClickLock = false;
   function triggerDraw() {
-    if (isSpinning) return;
+    if (isSpinning || drawClickLock) return;
+    drawClickLock = true;
+    setTimeout(() => { drawClickLock = false; }, 400);
 
     const pool = getPoolList();
     if (pool.length === 0) {
@@ -4149,15 +4772,15 @@
 
     const activePool = baseSampled;
     activeWheelDisplayPool = activePool;
+    invalidateWheelCache();
+
     const extraSpins = 6 + Math.floor(Math.random() * 3);
     const sliceAngle = (Math.PI * 2) / activePool.length;
     // Strelica staje na potpuno nasumičnoj poziciji od 6% do 94% unutar segmenta
-    // Zaustavljanje bilo gde u polju, nikada uvek na sredini
     const landOffset = 0.06 + Math.random() * 0.88;
     const targetOffset = (Math.PI * 1.5) - (winIdx + landOffset) * sliceAngle;
 
     const finalNormalized = ((targetOffset % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-
     const currentNorm = ((wheelAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
     let delta = finalNormalized - currentNorm;
     if (delta <= 0) delta += Math.PI * 2;
@@ -4168,13 +4791,14 @@
     const startTime = performance.now();
     let lastTick = 0;
 
-    function frame(now) {
+    AnimationManager.add('spin-wheel-' + spinId, (dt, now) => {
       if (spinId !== currentSpinId || !isSpinning) {
         activeWheelDisplayPool = null;
-        return;
+        return false;
       }
 
-      const t = Math.min((now - startTime) / durMs, 1);
+      const elapsed = Math.min(now - startTime, durMs);
+      const t = durMs > 0 ? elapsed / durMs : 1;
       const ease = 1 - Math.pow(1 - t, 4);
 
       wheelAngle = startAngle + (targetAngle - startAngle) * ease;
@@ -4183,35 +4807,39 @@
 
       if (settings.animation === 'wheel' && activePool.length > 1) {
         const tickIndex = Math.floor((((wheelAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) / sliceAngle);
-        if (tickIndex !== lastTick) { playSoundTick(); lastTick = tickIndex; }
+        if (tickIndex !== lastTick) {
+          playSoundTick();
+          lastTick = tickIndex;
+        }
       }
 
       if (t < 1) {
-        requestAnimationFrame(frame);
-      } else {
-        if (spinId !== currentSpinId || !isSpinning) {
-          activeWheelDisplayPool = null;
-          return;
-        }
-        wheelAngle = targetAngle;
-        drawWheelOnCanvas('wheelCanvas');
-        drawWheelOnCanvas('wheelCanvasFullscreen');
-        stopSpinSound();
-        isSpinning = false;
-        activeWheelDisplayPool = null;
-        lastWinningWheelPool = activePool; // Zadržava tačan prikaz točka i pobednika pod strelicom bez naglog preskakanja na N-1
-
-        addWinner(winner);
-        participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
-        updateParticipantsUI();
-        drawVisualizerStage();
-        refreshAll();
+        return true;
       }
-    }
-    requestAnimationFrame(frame);
+
+      if (spinId !== currentSpinId || !isSpinning) {
+        activeWheelDisplayPool = null;
+        return false;
+      }
+      wheelAngle = targetAngle;
+      drawWheelOnCanvas('wheelCanvas');
+      drawWheelOnCanvas('wheelCanvasFullscreen');
+      stopSpinSound();
+      isSpinning = false;
+      activeWheelDisplayPool = null;
+      lastWinningWheelPool = activePool;
+
+      addWinner(winner);
+      participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
+      invalidateWheelCache();
+      updateParticipantsUI();
+      drawVisualizerStage();
+      refreshAll();
+      return false;
+    });
   }
 
-  /* ── Slot Machine Draw Animation ── */
+  /* ── Slot Machine Draw Animation (Batch Reads & Hardware Transforms) ── */
   function animateSlotDraw(pool, durMs, spinId) {
     const eligiblePool = getEligibleWinnerPool();
     if (eligiblePool.length === 0) {
@@ -4229,14 +4857,12 @@
       return candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : pool[0];
     };
 
-    // Dinamički broj rotacija po reel-u za svako pojedinačno izvlačenje
     const stopIndices = [
       22 + Math.floor(Math.random() * 8),
       30 + Math.floor(Math.random() * 8),
       38 + Math.floor(Math.random() * 8)
     ];
 
-    // Organski mehanički offset za svaki reel (od -7px do +7px) da ne staju neprirodno u sterilni centar
     const reelJitters = [
       (Math.random() - 0.5) * 14,
       (Math.random() - 0.5) * 14,
@@ -4253,9 +4879,9 @@
       const bottomOther = bottomCandidates.length > 0
         ? bottomCandidates[Math.floor(Math.random() * bottomCandidates.length)]
         : pickOther(winner);
-      items.push(topOther);          // targetIdx - 1 (iznad: zamalo!)
-      items.push(winner);            // targetIdx (pobednik na payline-u!)
-      items.push(bottomOther);       // targetIdx + 1 (ispod: zamalo!)
+      items.push(topOther);
+      items.push(winner);
+      items.push(bottomOther);
       items.push(pool[Math.floor(Math.random() * pool.length)]);
       items.push(pool[Math.floor(Math.random() * pool.length)]);
       return { targetIdx, items };
@@ -4271,13 +4897,17 @@
         const html = data.items.map((name, i) => {
           return `<div class="slot-symbol" data-idx="${i}">${escHtml(name)}</div>`;
         }).join('');
-        r.innerHTML = `<div class="slot-reel-track" style="transform:translate3d(0,0,0);">${html}</div>`;
+        r.innerHTML = `<div class="slot-reel-track is-animating" style="transform:translate3d(0,0,0);">${html}</div>`;
         const track = r.querySelector('.slot-reel-track');
+        // Pre-read clientHeight ONCE (Read Phase)
+        const itemH = (r.clientHeight / 3) || 52;
         reelInstances.push({
           reelEl: r,
           trackEl: track,
           targetIdx: data.targetIdx,
-          reelIdx: idx
+          reelIdx: idx,
+          itemH: itemH,
+          finalY: -((data.targetIdx - 1) * itemH) + reelJitters[idx]
         });
       });
     });
@@ -4285,19 +4915,23 @@
     const stopTimes = [durMs * 0.58, durMs * 0.78, durMs * 1.0];
     const locked = [false, false, false];
     const lastTick = [0, 0, 0];
+    let lastWinTextState = '';
     const startTime = performance.now();
 
-    function frame(now) {
-      if (spinId !== currentSpinId || !isSpinning) return;
+    AnimationManager.add('spin-slot-' + spinId, (dt, now) => {
+      if (spinId !== currentSpinId || !isSpinning) {
+        reelInstances.forEach(inst => inst.trackEl?.classList.remove('is-animating'));
+        return false;
+      }
 
       const elapsed = Math.min(now - startTime, durMs);
 
-      reelInstances.forEach(inst => {
+      // Batch WRITE phase only
+      for (let j = 0; j < reelInstances.length; j++) {
+        const inst = reelInstances[j];
         const i = inst.reelIdx;
         const stopTime = stopTimes[i];
-        const itemH = (inst.reelEl.clientHeight / 3) || 52;
-        const baseTargetY = -((inst.targetIdx - 1) * itemH);
-        const finalY = baseTargetY + reelJitters[i];
+        const finalY = inst.finalY;
 
         if (elapsed < stopTime) {
           const progress = elapsed / stopTime;
@@ -4305,7 +4939,7 @@
           const currentY = finalY * ease;
           inst.trackEl.style.transform = `translate3d(0, ${currentY}px, 0)`;
 
-          const curRow = Math.floor(Math.abs(currentY) / itemH);
+          const curRow = Math.floor(Math.abs(currentY) / inst.itemH);
           if (curRow !== lastTick[i]) {
             playSoundTick();
             lastTick[i] = curRow;
@@ -4315,13 +4949,12 @@
             locked[i] = true;
             inst.reelEl.classList.add('reel-locked');
             playSoundTick();
-            const syms = inst.trackEl.querySelectorAll('.slot-symbol');
-            if (syms[inst.targetIdx]) {
-              syms[inst.targetIdx].classList.add('payline-active', 'win-reel');
+            const sym = inst.trackEl.children[inst.targetIdx];
+            if (sym) {
+              sym.classList.add('payline-active', 'win-reel');
             }
           }
 
-          // Elastični mehanički trzaj opruge (spring recoil) 180ms nakon udara u kočnicu
           const bounceElapsed = elapsed - stopTime;
           if (bounceElapsed < 180) {
             const bp = bounceElapsed / 180;
@@ -4331,34 +4964,46 @@
             inst.trackEl.style.transform = `translate3d(0, ${finalY}px, 0)`;
           }
         }
-      });
+      }
 
-      reelGroups.forEach(({ wt }) => {
-        if (!wt) return;
-        if (locked[0] && !locked[1]) wt.textContent = 'Reel 1 zaključan...';
-        else if (locked[0] && locked[1] && !locked[2]) wt.textContent = 'Napetost raste... ko dobija?!';
-        else if (locked[2]) {
-          wt.textContent = `JACKPOT: ${winner}!`;
-          wt.className = 'slot-win-display is-jackpot';
-        }
-      });
+      let newTextState = '';
+      if (locked[2]) newTextState = 'jackpot';
+      else if (locked[0] && locked[1]) newTextState = 'reel2';
+      else if (locked[0]) newTextState = 'reel1';
+
+      if (newTextState !== lastWinTextState) {
+        lastWinTextState = newTextState;
+        reelGroups.forEach(({ wt }) => {
+          if (!wt) return;
+          if (newTextState === 'reel1') wt.textContent = 'Reel 1 zaključan...';
+          else if (newTextState === 'reel2') wt.textContent = 'Napetost raste... ko dobija?!';
+          else if (newTextState === 'jackpot') {
+            wt.textContent = `JACKPOT: ${winner}!`;
+            wt.className = 'slot-win-display is-jackpot';
+          }
+        });
+      }
 
       if (elapsed < durMs) {
-        requestAnimationFrame(frame);
-      } else {
-        if (spinId !== currentSpinId || !isSpinning) return;
-        stopSpinSound();
-        isSpinning = false;
-        addWinner(winner);
-        participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
-        updateParticipantsUI();
-        refreshAll();
+        return true;
       }
-    }
-    requestAnimationFrame(frame);
+
+      if (spinId !== currentSpinId || !isSpinning) {
+        reelInstances.forEach(inst => inst.trackEl?.classList.remove('is-animating'));
+        return false;
+      }
+      stopSpinSound();
+      isSpinning = false;
+      reelInstances.forEach(inst => inst.trackEl?.classList.remove('is-animating'));
+      addWinner(winner);
+      participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
+      updateParticipantsUI();
+      refreshAll();
+      return false;
+    });
   }
 
-  /* ── CS:GO Case Opening Neon Roulette Animation ── */
+  /* ── CS:GO Case Opening Neon Roulette Animation (No Forced Reflow) ── */
   function animateRouletteDraw(pool, durMs, spinId) {
     const eligiblePool = getEligibleWinnerPool();
     if (eligiblePool.length === 0) {
@@ -4378,7 +5023,6 @@
       ? rightCandidates[Math.floor(Math.random() * rightCandidates.length)]
       : (candidates.length > 0 ? candidates[0] : pool[0]);
 
-    // Varijabilna dužina trake na svakom izvlačenju: WIN_INDEX se kreće od 42 do 57
     const WIN_INDEX = 42 + Math.floor(Math.random() * 16);
     const TOTAL_CARDS = WIN_INDEX + 18;
     const cards = [];
@@ -4386,19 +5030,21 @@
       if (i === WIN_INDEX) {
         cards.push(winner);
       } else if (i === WIN_INDEX - 1) {
-        cards.push(almostLeft); // Kartica tik levo od pobednika (zamalo!)
+        cards.push(almostLeft);
       } else if (i === WIN_INDEX + 1) {
-        cards.push(almostRight); // Kartica tik desno od pobednika (zamalo!)
+        cards.push(almostRight);
       } else {
         cards.push(pool[Math.floor(Math.random() * pool.length)]);
       }
     }
 
-    const cardPitch = 152; // 140px kartica + 12px razmak
+    const cardPitch = 152;
     const cardWidth = 140;
 
-    strips.forEach(strip => {
+    // Pre-measure viewport width ONCE (Read Phase)
+    const stripConfigs = strips.map(strip => {
       strip.style.transform = 'translate3d(0,0,0)';
+      strip.classList.add('is-animating');
       strip.innerHTML = cards.map((name, i) => {
         const col = SLICE_COLORS[i % SLICE_COLORS.length];
         const initial = name.charAt(0).toUpperCase();
@@ -4409,10 +5055,14 @@
             <span class="roulette-card-name">${escHtml(name)}</span>
           </div>`;
       }).join('');
+
+      const viewportW = strip.parentElement ? (strip.parentElement.clientWidth || 600) : 600;
+      return {
+        strip,
+        viewportW
+      };
     });
 
-    // Tenziona nasumična pozicija zaustavljanja duž čitave širine polja kartice:
-    // Može stati bilo gde unutar polja (od 10px do 130px), nikada fiksirano na sredini (70px)
     const landInCard = 10 + Math.random() * (cardWidth - 20);
     lastRouletteOffsetInCard = landInCard;
     lastRouletteWinner = winner;
@@ -4421,55 +5071,69 @@
     const startTime = performance.now();
     let lastCardIdx = -1;
 
-    function frame(now) {
-      if (spinId !== currentSpinId || !isSpinning) return;
+    AnimationManager.add('spin-roulette-' + spinId, (dt, now) => {
+      if (spinId !== currentSpinId || !isSpinning) {
+        strips.forEach(s => s.classList.remove('is-animating'));
+        return false;
+      }
 
       const elapsed = Math.min(now - startTime, durMs);
-      const progress = elapsed / durMs;
+      const progress = durMs > 0 ? elapsed / durMs : 1;
       const ease = 1 - Math.pow(1 - progress, 4.2);
 
-      strips.forEach(strip => {
-        const viewportW = strip.parentElement.clientWidth || 600;
-        const targetX = winnerCardX - (viewportW / 2);
+      // Batch WRITE phase
+      for (let s = 0; s < stripConfigs.length; s++) {
+        const cfg = stripConfigs[s];
+        const targetX = winnerCardX - (cfg.viewportW / 2);
         const currentX = targetX * ease;
-        strip.style.transform = `translate3d(-${currentX}px, 0, 0)`;
+        cfg.strip.style.transform = `translate3d(-${currentX}px, 0, 0)`;
 
-        const pointerInStrip = currentX + (viewportW / 2);
+        const pointerInStrip = currentX + (cfg.viewportW / 2);
         const curCardIdx = Math.floor(pointerInStrip / cardPitch);
         if (curCardIdx !== lastCardIdx && curCardIdx >= 0) {
-          playSoundTick();
           lastCardIdx = curCardIdx;
           triggerRouletteTickerBounce();
         }
-      });
+      }
 
       if (progress < 1) {
-        requestAnimationFrame(frame);
-      } else {
-        if (spinId !== currentSpinId || !isSpinning) return;
-        stopSpinSound();
-        isSpinning = false;
-
-        strips.forEach(strip => {
-          const winCard = strip.querySelector(`.roulette-card[data-idx="${WIN_INDEX}"]`);
-          if (winCard) winCard.classList.add('winner-card-active');
-        });
-
-        addWinner(winner);
-        participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
-        updateParticipantsUI();
-        refreshAll();
+        return true;
       }
-    }
-    requestAnimationFrame(frame);
+
+      if (spinId !== currentSpinId || !isSpinning) {
+        strips.forEach(s => s.classList.remove('is-animating'));
+        return false;
+      }
+      stopSpinSound();
+      isSpinning = false;
+      strips.forEach(s => s.classList.remove('is-animating'));
+
+      strips.forEach(strip => {
+        const winCard = strip.querySelector(`.roulette-card[data-idx="${WIN_INDEX}"]`);
+        if (winCard) winCard.classList.add('winner-card-active');
+      });
+
+      addWinner(winner);
+      participantsMap.delete(String(winner).toLowerCase().replace(/^@/, '').trim());
+      updateParticipantsUI();
+      refreshAll();
+      return false;
+    });
   }
 
   function triggerRouletteTickerBounce() {
+    playSoundTick();
     const tickers = document.querySelectorAll('.roulette-ticker-top, .roulette-ticker-bottom');
     tickers.forEach(t => {
-      t.classList.remove('tick-bounce');
-      void t.offsetWidth;
-      t.classList.add('tick-bounce');
+      if (typeof t.animate === 'function') {
+        t.animate([
+          { transform: 'translateX(-50%) scale(1.25)' },
+          { transform: 'translateX(-50%) scale(1)' }
+        ], { duration: 90, easing: 'ease-out' });
+      } else {
+        t.classList.add('tick-bounce');
+        setTimeout(() => t.classList.remove('tick-bounce'), 90);
+      }
     });
   }
 
@@ -4487,6 +5151,7 @@
 
   function updateSummary() {
     setText('summaryPrize',     settings.prize || 'Misteriozna Nagrada');
+    setText('statPrizeDisplay', settings.prize || 'Misteriozna Nagrada');
     setText('summaryKeyword',   settings.keyword || 'Sve poruke');
     setText('summaryAnimation', ANIM_LABELS[settings.animation] || ANIM_LABELS.wheel);
     setText('stageEligibilityLabel', getEligibilitySummary());
@@ -4509,28 +5174,34 @@
   function updateStateBadge() {
     const badge = document.getElementById('stageStateBadge');
     const dot   = document.getElementById('channelDot');
+    const wfoDot = document.getElementById('wfoChannelDot');
     const nameEl = document.getElementById('connectedChannelName');
     const safe  = escHtml(channelName || 'DemoKanal');
 
     if (nameEl) nameEl.textContent = safe;
 
+    const setDots = (bg, shadow) => {
+      [dot, wfoDot].forEach(d => {
+        if (!d) return;
+        d.style.background = bg;
+        d.style.boxShadow = shadow || 'none';
+      });
+    };
+
     if (!badge) return;
     badge.className = 'stage-state-badge';
 
     if (isSpinning) {
-      badge.textContent = 'Izvlačenje u toku';
+      badge.innerHTML = `<span class="badge-dot dot-spinning"></span><span>Izvlačenje u toku</span>`;
       badge.classList.add('is-spinning');
-      if (dot) dot.style.background = '#c084fc';
+      setDots('#c084fc');
     } else if (isRunning) {
-      badge.textContent = 'Live Chat Aktivan';
+      badge.innerHTML = `<span class="badge-dot dot-live"></span><span>Live Chat Aktivan</span>`;
       badge.classList.add('is-live');
-      if (dot) { dot.style.background = 'var(--aj-green)'; dot.style.boxShadow = '0 0 8px var(--aj-green)'; }
-    } else if (participantsMap.size > 0 || winnersList.length > 0) {
-      badge.textContent = 'Pauzirano';
-      badge.classList.add('is-paused');
-      if (dot) dot.style.background = 'var(--aj-amber)';
+      setDots('var(--aj-green)', '0 0 8px var(--aj-green)');
     } else {
-      badge.textContent = 'Standby';
+      badge.innerHTML = `<span>Standby</span>`;
+      setDots('var(--aj-muted2)', 'none');
     }
   }
 
@@ -4554,14 +5225,16 @@
       }
     });
 
-    const resetBtn    = document.getElementById('btnResetGiveaway');
-    const wfoResetBtn = document.getElementById('wfoBtnReset');
-    const isResetDisabled = !isRunning && participantsMap.size === 0 && winnersList.length === 0 && !isSpinning;
-    [resetBtn, wfoResetBtn].forEach(btn => {
+    const stopBtn    = document.getElementById('btnStopGiveaway');
+    const wfoStopBtn = document.getElementById('wfoBtnStop') || document.getElementById('wfoBtnReset');
+    const canStop    = isRunning || hasParticipants || winnersList.length > 0;
+
+    [stopBtn, wfoStopBtn].forEach(btn => {
       if (!btn) return;
-      btn.disabled = isResetDisabled;
-      btn.style.opacity = isResetDisabled ? '0.5' : '1';
-      btn.style.pointerEvents = isResetDisabled ? 'none' : 'auto';
+      btn.style.display = canStop ? 'inline-flex' : 'none';
+      btn.disabled = isSpinning;
+      btn.style.opacity = isSpinning ? '0.5' : '1';
+      btn.style.pointerEvents = isSpinning ? 'none' : 'auto';
     });
 
     const animSelect = document.getElementById('selectAnimation');
@@ -4593,9 +5266,30 @@
   /* ════════════════════════════════════════
      TOAST
   ════════════════════════════════════════ */
-  function showToast(msg, type = 'success', dur = null) {
-    const known = ['success','error','info','warning'];
-    if (!known.includes(type)) type = 'success';
+  function showToast(a, b, c, d) {
+    if (window.toastSystem && typeof window.toastSystem.show === 'function' && window.toastSystem.show !== showToast) {
+      const types = ['success', 'error', 'warning', 'info'];
+      let message = b;
+      let type = a;
+      let duration = typeof c === 'number' ? c : (typeof d === 'number' ? d : 5000);
+
+      if (!types.includes(a)) {
+        message = a;
+        type = types.includes(b) ? b : 'info';
+      }
+      return window.toastSystem.show(message, type, duration);
+    } else if (typeof window.showToast === 'function' && window.showToast !== showToast) {
+      return window.showToast(a, b, c);
+    }
+
+    const known = ['success', 'error', 'info', 'warning'];
+    let message = b;
+    let type = a;
+    let dur = typeof c === 'number' ? c : (typeof d === 'number' ? d : null);
+    if (!known.includes(a)) {
+      message = a;
+      type = known.includes(b) ? b : 'success';
+    }
 
     let container = document.getElementById('toastContainer');
     if (!container) {
@@ -4605,7 +5299,7 @@
       document.body.appendChild(container);
     }
 
-    const textLen = (msg || '').length;
+    const textLen = (message || '').length;
     const base    = Math.max(2500, Math.min(8000, 2200 + textLen * 55));
     if (!dur) dur = (type === 'error' || type === 'warning') ? base + 1000 : base;
 
@@ -4622,13 +5316,15 @@
     };
 
     el.innerHTML = `
-      <div style="flex-shrink:0;">${icons[type]}</div>
-      <div class="toast-msg">${escHtml(msg)}</div>
-      <button class="toast-close" onclick="window.removeToast(${id})" aria-label="Zatvori">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>`;
+      <div class="toast-content">
+        <div class="toast-icon-wrap toast-icon" style="flex-shrink:0;">${icons[type] || icons.info}</div>
+        <div class="toast-msg toast-message">${escHtml(message || '')}</div>
+        <button class="toast-close" onclick="window.removeToast(${id})" aria-label="Zatvori">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>`;
 
     const active = Array.from(container.children).filter(c => !c.classList.contains('toast-leaving'));
     if (active.length >= 3) {
@@ -4648,13 +5344,15 @@
     if (el) { el.classList.remove('toast-show'); el.classList.add('toast-leaving'); setTimeout(() => el.remove(), 250); }
   };
 
-  window.toastSystem = {
-    show: showToast,
-    success: (m, d) => showToast(m, 'success', d),
-    error:   (m, d) => showToast(m, 'error', d),
-    warning: (m, d) => showToast(m, 'warning', d),
-    info:    (m, d) => showToast(m, 'info', d)
-  };
+  if (!window.toastSystem) {
+    window.toastSystem = {
+      show: showToast,
+      success: (m, d) => showToast(m, 'success', d),
+      error:   (m, d) => showToast(m, 'error', d),
+      warning: (m, d) => showToast(m, 'warning', d),
+      info:    (m, d) => showToast(m, 'info', d)
+    };
+  }
 
   // Cross-tab sinhronizacija stanja
   window.addEventListener('storage', (e) => {
@@ -4666,6 +5364,17 @@
       drawVisualizerStage();
       updateWinnersUI();
     }
+  });
+
+  // Globalni cleanup za sprečavanje memory leak-ova
+  window.addEventListener('pagehide', () => {
+    AnimationManager.clear();
+    stopParticles();
+    stopSpinSound();
+    if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+    if (uiRefreshTimer) { clearTimeout(uiRefreshTimer); uiRefreshTimer = null; }
+    if (wsReconnectTimer) { clearTimeout(wsReconnectTimer); wsReconnectTimer = null; }
+    winnersList.forEach(w => { if (w.timerId) clearInterval(w.timerId); });
   });
 
   /* ════════════════════════════════════════

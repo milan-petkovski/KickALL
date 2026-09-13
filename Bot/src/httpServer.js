@@ -1,7 +1,6 @@
 // HTTP Server i API rute za komunikaciju sa dashboard-om i webhook servisima
 
 const http = require('http');
-const config = require('./config');
 const state = require('./state');
 const utils = require('./utils');
 const database = require('./database');

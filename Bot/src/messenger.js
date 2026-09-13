@@ -146,11 +146,19 @@ async function pinujPoruku(chatroomId, messageId) {
 
         if (res.statusCode >= 200 && res.statusCode < 300) {
             log('INFO', `[${channelUsername}] Poruka uspešno pinovana na lajvu!`);
+        } else if (res.statusCode === 401 || res.statusCode === 403) {
+            kickAuth.obrisiKeshSesije();
+            log('WARN', `[${channelUsername}] Neuspešan pin poruke (HTTP ${res.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao. Pinovanje poruka zahteva aktivan session_cookie.`);
         } else {
             log('ERR', `[${channelUsername}] Neuspešan pin poruke: HTTP ${res.statusCode} - ${JSON.stringify(res.body)}`);
         }
     } catch (err) {
-        log('ERR', `[${channelUsername}] Greška pri pinovanju poruke: ${err.message}`);
+        if (err.response && (err.response.statusCode === 401 || err.response.statusCode === 403)) {
+            kickAuth.obrisiKeshSesije();
+            log('WARN', `[${channelUsername}] Neuspešan pin poruke (HTTP ${err.response.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao.`);
+        } else {
+            log('ERR', `[${channelUsername}] Greška pri pinovanju poruke: ${err.message}`);
+        }
     }
 }
 
@@ -170,11 +178,19 @@ async function odpinujPoruku(chatroomId) {
 
         if (res.statusCode >= 200 && res.statusCode < 300) {
             log('INFO', `[${channelUsername}] Poruka uspešno odpinovana sa lajva!`);
+        } else if (res.statusCode === 401 || res.statusCode === 403) {
+            kickAuth.obrisiKeshSesije();
+            log('WARN', `[${channelUsername}] Neuspešan unpin poruke (HTTP ${res.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao.`);
         } else {
             log('ERR', `[${channelUsername}] Neuspešan unpin poruke: HTTP ${res.statusCode} - ${JSON.stringify(res.body)}`);
         }
     } catch (err) {
-        log('ERR', `[${channelUsername}] Greška pri unpinovanju poruke: ${err.message}`);
+        if (err.response && (err.response.statusCode === 401 || err.response.statusCode === 403)) {
+            kickAuth.obrisiKeshSesije();
+            log('WARN', `[${channelUsername}] Neuspešan unpin poruke (HTTP ${err.response.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao.`);
+        } else {
+            log('ERR', `[${channelUsername}] Greška pri unpinovanju poruke: ${err.message}`);
+        }
     }
 }
 

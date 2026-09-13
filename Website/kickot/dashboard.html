@@ -226,7 +226,7 @@
 </svg>
           Ljubav i brakovi
         </button>
-<button class="nav-item" data-panel="minigames" onclick="switchPanel('minigames')" tabindex="0">
+<button class="nav-item" data-panel="minigames" onclick="switchPanel('minigames', true)" tabindex="0">
 <svg fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="16">
 <rect height="12" rx="3" width="20" x="2" y="6"></rect>
 <line x1="6" x2="10" y1="12" y2="12"></line>
@@ -1099,7 +1099,10 @@
 </label>
 </div>
 <div class="config-field kx-40">
-<input class="form-input" id="cfgAnnounceInterval" max="1440" min="1" onchange="saveBotConfig(true)" oninput="debouncedAutoSaveAnnounces()" placeholder="Minuta" type="number" value="15"/>
+<div class="input-with-suffix">
+<input class="form-input" id="cfgAnnounceInterval" max="1440" min="1" onchange="saveBotConfig(true)" oninput="debouncedAutoSaveAnnounces()" placeholder="15" type="number" value="15"/>
+<span class="input-suffix">minuta</span>
+</div>
 <span class="config-hint">Koliko minuta treba da prođe između dve automatske poruke (1 - 1440 min).</span>
 </div>
 </div>
@@ -1112,22 +1115,25 @@
 <span class="toggle-track"></span>
 </label>
 </div>
-<div class="config-field kx-40">
-<input class="form-input" id="cfgAnnounceThreshold" max="1000" min="1" onchange="saveBotConfig(true)" oninput="debouncedAutoSaveAnnounces()" placeholder="Broj poruka" type="number" value="30"/>
-<span class="config-hint">Koliko novih poruka četa treba da prođe pre slanja nove poruke (1 - 1000 poruka).</span>
-</div>
-</div>
-</div>
-<div class="info-banner">
-<svg fill="none" height="16" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="16">
-<circle cx="12" cy="12" r="10"></circle>
-<path d="M12 16v-4M12 8h.01"></path>
-</svg>
-<span>Preporučeno je držanje oba pravila uključenim kako bi bot slao poruke tačno na vreme, ali
+                <div class="config-field kx-40">
+                  <div class="input-with-suffix input-with-suffix--wide">
+                    <input class="form-input" id="cfgAnnounceThreshold" max="1000" min="1" onchange="saveBotConfig(true)" oninput="debouncedAutoSaveAnnounces()" placeholder="30" type="number" value="30"/>
+                    <span class="input-suffix">broj poruka</span>
+                  </div>
+                  <span class="config-hint">Koliko novih poruka četa treba da prođe pre slanja nove poruke (1 - 1000 poruka).</span>
+                </div>
+              </div>
+            </div>
+            <div class="info-banner">
+              <svg fill="none" height="16" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="16">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 16v-4M12 8h.01"></path>
+              </svg>
+              <span>Preporučeno je držanje oba pravila uključenim kako bi bot slao poruke tačno na vreme, ali
                     isključivo ukoliko je čet aktivan.</span>
-</div>
-</div>
-</div>
+            </div>
+          </div>
+        </div>
 <!-- Lista poruka -->
 <div class="config-section">
 <h3 class="config-section-title kx-83">
@@ -2068,9 +2074,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('slots')" title="Isprobaj igru u live simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('slots')" title="Isprobaj igru u live simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2101,9 +2106,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('roulette')" title="Isprobaj igru u live simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('roulette')" title="Isprobaj igru u live simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2134,9 +2138,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('coinflip')" title="Isprobaj igru u live simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('coinflip')" title="Isprobaj igru u live simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2167,9 +2170,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('wheel')" title="Isprobaj igru u live simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('wheel')" title="Isprobaj igru u live simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2200,9 +2202,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('duel')" title="Isprobaj igru u live simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('duel')" title="Isprobaj igru u live simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2249,9 +2250,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('fun', 'iq')" title="Isprobaj bot reakciju u simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('fun', 'iq')" title="Isprobaj bot reakciju u simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2282,9 +2282,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('fun', 'samar')" title="Isprobaj bot reakciju u simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('fun', 'samar')" title="Isprobaj bot reakciju u simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2315,9 +2314,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('fun', 'roll')" title="Isprobaj bot reakciju u simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('fun', 'roll')" title="Isprobaj bot reakciju u simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2348,9 +2346,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('fun', 'rr')" title="Isprobaj bot reakciju u simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('fun', 'rr')" title="Isprobaj bot reakciju u simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2381,9 +2378,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('fun', 'alkotest')" title="Isprobaj bot reakciju u simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('fun', 'alkotest')" title="Isprobaj bot reakciju u simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -2414,9 +2410,8 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
-          <button class="mg-try-btn" onclick="testGameInSimulator('fun', 'cinjenica')" title="Isprobaj bot reakciju u simulatoru" type="button">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-            <span>Isprobaj</span>
+          <button aria-label="Isprobaj igru u live simulatoru" class="mg-try-btn" onclick="testGameInSimulator('fun', 'cinjenica')" title="Isprobaj bot reakciju u simulatoru" type="button">
+            <svg fill="currentColor" height="13" viewbox="0 0 24 24" width="13"><polygon points="6 4 20 12 6 20 6 4"></polygon></svg>
           </button>
         </div>
       </div>
@@ -3991,32 +3986,43 @@ Sledeća ›
 </div>
 </div>
 </div>
-<!-- Spam Control -->
-<div class="config-section kx-154">
-<h3 class="config-section-title kx-234">
-<svg class="kx-243" fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="18">
-<circle cx="12" cy="12" r="10"></circle>
-<line x1="4.93" x2="19.07" y1="4.93" y2="19.07"></line>
-</svg>
-                Zaštita od spama
-              </h3>
-<div class="config-fields kx-215">
-<div class="config-field">
-<label class="config-label kx-235">Limit ponavljanja
-                    poruka</label>
-<input class="form-input" id="cfgSpamThreshold" max="20" min="1" onchange="saveBotConfig()" oninput="debouncedAutoSaveConfig()" type="number" value="3">
-<span class="config-hint">Koliko puta zaredom isti korisnik sme da pošalje identičnu poruku pre nego
-                    što bot to prepozna kao spam.</span>
-</input></div>
-<div class="config-field">
-<label class="config-label kx-235">Vremenski prozor provere
-                    (ms)</label>
-<input class="form-input" id="cfgSpamWindow" max="120000" min="1000" onchange="saveBotConfig()" oninput="debouncedAutoSaveConfig()" type="number" value="15000">
-<span class="config-hint">Maksimalan vremenski prozor u kom se proverava ponavljanje (npr.
-                    <code>15000ms = 15 sekundi</code>).</span>
-</input></div>
-</div>
-</div>
+            <!-- Spam Control -->
+            <div class="config-section kx-154">
+              <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;">
+                <h3 class="config-section-title kx-234" style="margin-bottom: 0;">
+                  <svg class="kx-243" fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="18">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="4.93" x2="19.07" y1="4.93" y2="19.07"></line>
+                  </svg>
+                  <span>Zaštita od spama (Anti-Flood bota)</span>
+                </h3>
+                <span class="badge" style="font-size: 0.72rem; padding: 3px 8px; border-radius: 6px; background: rgba(239, 68, 68, 0.12); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.25); font-weight: 700;">
+                  Različito od Moderacije
+                </span>
+              </div>
+              <div class="info-banner" style="margin-bottom: 16px; background: rgba(139, 92, 246, 0.08); border-color: rgba(139, 92, 246, 0.25); color: #d8b4fe;">
+                <svg fill="none" height="16" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24" width="16" style="flex-shrink: 0;">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" x2="12" y1="8" y2="12"></line>
+                  <line x1="12" x2="12.01" y1="16" y2="16"></line>
+                </svg>
+                <span style="font-size: 0.82rem; line-height: 1.45;">
+                  <strong>Važna razlika:</strong> Ovo podešavanje je <strong>interna tehnička zaštita bota od spamovanja i flood-ovanja komandi</strong> u kratkom vremenskom intervalu (kako bot ne bi bio privremeno blokiran od strane Kick servera). Za pravila moderacije korisničkih poruka u četu (linkovi, velika slova, emotikoni, zabranjene reči i automatske timeout/ban kazne), koristite poseban panel <strong>Moderacija</strong> u levom meniju.
+                </span>
+              </div>
+              <div class="config-fields kx-215">
+                <div class="config-field">
+                  <label class="config-label kx-235">Limit ponavljanja poruka</label>
+                  <input class="form-input" id="cfgSpamThreshold" max="20" min="1" onchange="saveBotConfig()" oninput="debouncedAutoSaveConfig()" type="number" value="3"/>
+                  <span class="config-hint">Koliko puta zaredom isti korisnik sme da pošalje identičnu poruku pre nego što bot to prepozna kao spam i ignoriše.</span>
+                </div>
+                <div class="config-field">
+                  <label class="config-label kx-235">Vremenski prozor provere (ms)</label>
+                  <input class="form-input" id="cfgSpamWindow" max="120000" min="1000" onchange="saveBotConfig()" oninput="debouncedAutoSaveConfig()" type="number" value="15000"/>
+                  <span class="config-hint">Maksimalan vremenski prozor u kom se proverava ponavljanje (npr. <code>15000ms = 15 sekundi</code>).</span>
+                </div>
+              </div>
+            </div>
 <!-- Custom Bot Account (Sopstveno ime bota) -->
 <div class="config-section locked-feature-container kx-244" id="customBotCard">
 <div class="kx-245">
@@ -4254,7 +4260,7 @@ Sledeća ›
             <line x1="12" x2="12" y1="8" y2="12"></line>
             <line x1="12" x2="12.01" y1="16" y2="16"></line>
           </svg>
-          Kaznena mera za Caps
+          <span>Kaznena mera za Caps</span>
         </label>
         <select class="mod-penalty-select" id="cfgModPenaltyCaps" onchange="saveModerationSettings(true)">
           <option value="default">Globalna kazna (Podrazumevano)</option>
@@ -4304,7 +4310,7 @@ Sledeća ›
             <line x1="12" x2="12" y1="8" y2="12"></line>
             <line x1="12" x2="12.01" y1="16" y2="16"></line>
           </svg>
-          Kaznena mera za Linkove
+          <span>Kaznena mera za Linkove</span>
         </label>
         <select class="mod-penalty-select" id="cfgModPenaltyLinks" onchange="saveModerationSettings(true)">
           <option value="default">Globalna kazna (Podrazumevano)</option>
@@ -4350,7 +4356,7 @@ Sledeća ›
             <line x1="12" x2="12" y1="8" y2="12"></line>
             <line x1="12" x2="12.01" y1="16" y2="16"></line>
           </svg>
-          Kaznena mera za Emotikone
+          <span>Kaznena mera za Emotikone</span>
         </label>
         <select class="mod-penalty-select" id="cfgModPenaltyEmotes" onchange="saveModerationSettings(true)">
           <option value="default">Globalna kazna (Podrazumevano)</option>
@@ -4403,7 +4409,7 @@ Sledeća ›
             <line x1="12" x2="12" y1="8" y2="12"></line>
             <line x1="12" x2="12.01" y1="16" y2="16"></line>
           </svg>
-          Kaznena mera za Simbole
+          <span>Kaznena mera za Simbole</span>
         </label>
         <select class="mod-penalty-select" id="cfgModPenaltySymbols" onchange="saveModerationSettings(true)">
           <option value="default">Globalna kazna (Podrazumevano)</option>
@@ -4448,7 +4454,7 @@ Sledeća ›
             <line x1="12" x2="12" y1="8" y2="12"></line>
             <line x1="12" x2="12.01" y1="16" y2="16"></line>
           </svg>
-          Kaznena mera za Zabranjene reči
+          <span>Kaznena mera za Zabranjene reči</span>
         </label>
         <select class="mod-penalty-select" id="cfgModPenaltyWords" onchange="saveModerationSettings(true)">
           <option value="default">Globalna kazna (Podrazumevano)</option>
@@ -4492,7 +4498,7 @@ Sledeća ›
             <line x1="12" x2="12" y1="8" y2="12"></line>
             <line x1="12" x2="12.01" y1="16" y2="16"></line>
           </svg>
-          Kaznena mera za Duplirani spam
+          <span>Kaznena mera za Duplirani spam</span>
         </label>
         <select class="mod-penalty-select" id="cfgModPenaltySpam" onchange="saveModerationSettings(true)">
           <option value="default">Globalna kazna (Podrazumevano)</option>
@@ -4537,7 +4543,7 @@ Sledeća ›
             <line x1="12" x2="12" y1="8" y2="12"></line>
             <line x1="12" x2="12.01" y1="16" y2="16"></line>
           </svg>
-          Kaznena mera za Dužinu
+          <span>Kaznena mera za Dužinu</span>
         </label>
         <select class="mod-penalty-select" id="cfgModPenaltyMaxLen" onchange="saveModerationSettings(true)">
           <option value="default">Globalna kazna (Podrazumevano)</option>
@@ -4581,7 +4587,7 @@ Sledeća ›
             <line x1="12" x2="12" y1="8" y2="12"></line>
             <line x1="12" x2="12.01" y1="16" y2="16"></line>
           </svg>
-          Kaznena mera za Tagove
+          <span>Kaznena mera za Tagove</span>
         </label>
         <select class="mod-penalty-select" id="cfgModPenaltyMentions" onchange="saveModerationSettings(true)">
           <option value="default">Globalna kazna (Podrazumevano)</option>
@@ -4894,44 +4900,130 @@ Sledeća ›
 </div>
 <!-- Botrix Import Modal -->
 <div aria-labelledby="botrixModalTitle" aria-modal="true" class="modal-backdrop" id="botrixImportModal" onclick="handleModalBg(event, 'botrixImportModal')" role="dialog">
-<div class="modal-box pm-modal" style="max-width: 480px; text-align: center; padding: 32px 24px; position: relative;">
-<div class="pm-modal-header" style="display: flex; flex-direction: column; align-items: center; justify-content: center; border-bottom: none; padding-bottom: 0; position: static;">
-<div class="pm-modal-icon pm-icon-purple" style="width: 56px; height: 56px; margin: 0 auto 16px auto; border-radius: 16px; background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.35); color: #c4b5fd; display: flex; align-items: center; justify-content: center;">
-<svg fill="none" height="28" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="28">
-<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-<polyline points="17 8 12 3 7 8"></polyline>
-<line x1="12" x2="12" y1="3" y2="15"></line>
-</svg>
-</div>
-<button aria-label="Zatvori modal" class="pm-modal-close" onclick="closeModal('botrixImportModal')" type="button" style="position: absolute; top: 18px; right: 18px;">
-<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="14">
-<line x1="18" x2="6" y1="6" y2="18"></line>
-<line x1="6" x2="18" y1="6" y2="18"></line>
-</svg>
-</button>
-</div>
-<div class="pm-modal-body" style="padding-top: 0;">
-<span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; background: rgba(234, 179, 8, 0.15); color: #FBBF24; border: 1px solid rgba(234, 179, 8, 0.3); margin-bottom: 12px;">
-    DOLAZI USKORO
-  </span>
-<h3 class="pm-modal-title" id="botrixModalTitle" style="font-size: 1.35rem; font-weight: 800; color: #fff; margin-bottom: 8px;">Uvoz iz Botrix-a</h3>
-<p class="pm-modal-subtitle" style="font-size: 0.88rem; color: var(--text-secondary); line-height: 1.6; max-width: 400px; margin: 0 auto 20px auto;">
-    Automatska migracija komandi, najava, watchtime-a i podešavanja sa Botrix-a u 1-kliku trenutno se razvija i biće dostupna u narednom ažuriranju!
-  </p>
-<div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 14px 16px; text-align: left; font-size: 0.8rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 24px;">
-<div style="font-weight: 700; color: #fff; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-<svg fill="none" height="14" stroke="#53fc18" stroke-width="2.5" viewbox="0 0 24 24" width="14"><polyline points="20 6 9 17 4 12"></polyline></svg>
-      Šta pripremamo za tebe:
+  <div class="modal-box pm-modal botrix-modal-box">
+    <!-- Header Hero Banner -->
+    <div class="botrix-modal-hero">
+      <button aria-label="Zatvori modal" class="pm-modal-close" onclick="closeModal('botrixImportModal')" type="button" style="position: absolute; top: 16px; right: 16px;">
+        <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="14">
+          <line x1="18" x2="6" y1="6" y2="18"></line>
+          <line x1="6" x2="18" y1="6" y2="18"></line>
+        </svg>
+      </button>
+
+      <div class="botrix-icon-halo">
+        <svg fill="none" height="34" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="34">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" x2="12" y1="3" y2="15"></line>
+        </svg>
+      </div>
+
+      <div class="botrix-badge-pill">
+        <span class="botrix-pulse-dot"></span>
+        <span>Uskoro Dostupno</span>
+      </div>
+
+      <h3 class="botrix-modal-hero-title" id="botrixModalTitle">Uvoz Podataka iz Botrix-a</h3>
+      <p class="botrix-modal-hero-sub">
+        Pripremamo moćan 1-klik alat za bezbednu i automatsku migraciju svih tvojih bot postavki direktno u Kickot.
+      </p>
     </div>
-    • Automatski uvoz svih tvojih komandi i aliasa<br/>
-    • Prebacivanje watchtime bodova i ranga gledalaca<br/>
-    • Konverzija Botrix varijabli <code>{user}</code> u Kickot format
+
+    <!-- Content Body -->
+    <div class="botrix-modal-content">
+      <!-- 2x2 Feature Cards -->
+      <div class="botrix-feature-grid">
+        <!-- Feature 1 -->
+        <div class="botrix-feature-card">
+          <div class="botrix-feat-icon green">
+            <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18">
+              <polyline points="4 17 10 11 4 5"></polyline>
+              <line x1="12" x2="20" y1="19" y2="19"></line>
+            </svg>
+          </div>
+          <div class="botrix-feat-info">
+            <div class="botrix-feat-title">Prilagođene Komande</div>
+            <div class="botrix-feat-desc">Automatski prenos svih !komandi, aliasa, dozvola i cooldown limita.</div>
+          </div>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="botrix-feature-card">
+          <div class="botrix-feat-icon blue">
+            <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <div class="botrix-feat-info">
+            <div class="botrix-feat-title">Watchtime & Poeni</div>
+            <div class="botrix-feat-desc">Zadrži sate gledanja i Koins poene svojih gledalaca bez gubitka istorije.</div>
+          </div>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="botrix-feature-card">
+          <div class="botrix-feat-icon yellow">
+            <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
+            </svg>
+          </div>
+          <div class="botrix-feat-info">
+            <div class="botrix-feat-title">Konverzija Promenljivih</div>
+            <div class="botrix-feat-desc">Pametno mapiranje Botrix varijabli <code>{user}</code> i <code>$(count)</code> u Kickot.</div>
+          </div>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="botrix-feature-card">
+          <div class="botrix-feat-icon purple">
+            <svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="18">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
+          <div class="botrix-feat-info">
+            <div class="botrix-feat-title">Filteri & Najave</div>
+            <div class="botrix-feat-desc">Brz uvoz crne liste zabranjenih reči i podešenih tajmer poruka.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Roadmap Progress Bar -->
+      <div class="botrix-roadmap-box">
+        <div class="botrix-roadmap-header">
+          <span class="botrix-roadmap-title">
+            <svg fill="none" height="14" stroke="#53FC18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="14">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+            Status razvoja: Završno testiranje parsera
+          </span>
+          <span class="botrix-roadmap-percent">90%</span>
+        </div>
+        <div class="botrix-progress-track">
+          <div class="botrix-progress-fill"></div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="botrix-actions-wrap">
+        <button class="btn btn-outline" onclick="closeModal('botrixImportModal'); openModal('feedbackModal')" type="button">
+          Predloži opciju
+        </button>
+        <button class="btn btn-primary" onclick="closeModal('botrixImportModal')" type="button">
+          Jasno, sačekaću
+        </button>
+      </div>
+
+      <!-- Security Notice -->
+      <div class="botrix-security-note">
+        <svg fill="none" height="13" stroke="#53FC18" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="13">
+          <rect height="11" rx="2" ry="2" width="18" x="3" y="11"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+        <span>Tvoji postojeći Kickot podaci su bezbedni i neće biti prepisani.</span>
+      </div>
+    </div>
   </div>
-<button class="btn btn-primary" onclick="closeModal('botrixImportModal')" type="button" style="width: 100%; justify-content: center; padding: 10px 16px; font-weight: 700;">
-    Razumem
-  </button>
-</div>
-</div>
 </div>
 <!-- Predlozi Komandu Modal -->
 <div class="modal-backdrop" id="feedbackModal" onclick="handleModalBg(event, 'feedbackModal')">
@@ -5126,226 +5218,258 @@ Sledeća ›
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">1</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Prvo pokretanje bota</div>
-<p class="pm-docs-text">Da bi bot mogao da reaguje na chat poruke, <strong>morate postaviti bota za
-                  moderatora</strong> na kanalu:</p>
+<div class="pm-docs-step-title">Prvo pokretanje bota i priprema kanala</div>
+<p class="pm-docs-text">Da bi Kickot bot mogao da čita i šalje poruke u tvom Kick četu, <strong>obavezno ga postavi za moderatora</strong> na svom kanalu. Otvori svoj Kick chat i ukucaj:</p>
 <div class="pm-code-block">/mod kickot</div>
-<p class="pm-docs-text kx-394">Ukoliko bot nije moderator ili strim nije pokrenut, bot
-                se neće povezati na chat. Takođe uključite bot preko toggle dugmeta u gornjem desnom uglu.</p>
+<p class="pm-docs-text kx-394">Nakon što bot dobije mod status, uključi ga klikom na glavni toggle prekidač u gornjem desnom uglu zaglavlja dashboarda (status mora prikazati zelenu oznaku <strong>Online</strong>). Bot se u realnom vremenu povezuje preko Kick WebSocket-a čim započneš live stream.</p>
+<p class="pm-docs-text" style="margin-top:6px; font-size:0.78rem; color:#94a3b8;">
+<strong style="color:#FBBF24;">Rešavanje problema:</strong> Ako bot ne odgovara na komande, proveri u podešavanjima Kick kanala (<em>Settings &gt; Moderation</em>) da li je <code>kickot</code> na listi moderatora, te proveri da čet nije u <em>Emote-Only</em> ili <em>Followers-Only</em> režimu.
+</p>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">2</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Overview Panel</div>
-<p class="pm-docs-text">Pregled panel prikazuje:</p>
+<div class="pm-docs-step-title">Overview Panel i Telemetrija Kanala</div>
+<p class="pm-docs-text">Glavna kontrolna tabla pruža kompletan uvid u stanje tvog strima u realnom vremenu:</p>
 <ul class="pm-docs-list">
-<li><strong>Bot status</strong> - Da li je bot aktivan i online</li>
-<li><strong>Moduli</strong> - Brzo uključivanje/isključivanje funkcija (Leaderboard, Komande, Ljubav,
-                  Igre, Song Request)</li>
-<li><strong>Statistika</strong> - Ukupno poruka, gledalaca, vreme gledanja</li>
-<li><strong>Mini leaderboard</strong> - Top 3 korisnika po četu i watchtime-u</li>
+<li><strong>Status servisa</strong> — Prikaz aktivne WebSocket veze sa Kick platformom i latencije servisa.</li>
+<li><strong>Brzi prekidači modula</strong> — Trenutno uključivanje ili pauziranje pojedinačnih modula (Leaderboard, Komande, Ljubav, Igre, Song Request) jednim klikom.</li>
+<li><strong>Živa telemetrija</strong> — Brojač ukupno obrađenih chat poruka u sesiji, broj jedinstvenih chatters-a, watchtime u minutima i opticaj Koins valute.</li>
+<li><strong>Mini Leaderboard</strong> — Instant pregled top 3 gledaoca po aktivnosti u četu i vremenu provedenom na strimu.</li>
+<li><strong>Selektor kanala</strong> — Jednostavno prebacivanje između primarnog kanala i kanala gde poseduješ ulogu menadžera.</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">3</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Leaderboard</div>
-<p class="pm-docs-text">Rang lista prikazuje najaktivnije korisnike:</p>
+<div class="pm-docs-step-title">Leaderboard, Bodovanje i Mesečni CSV Export</div>
+<p class="pm-docs-text">Sistem rangiranja koji motiviše publiku na maksimalnu aktivnost i interakciju:</p>
 <ul class="pm-docs-list">
-<li><strong>Combined</strong> - Kombinovana lista (poruke + watchtime)</li>
-<li><strong>Chatters</strong> - Lista po broju poruka</li>
-<li><strong>Watchtime</strong> - Lista po vremenu gledanja</li>
-<li><strong>Mesečni filter</strong> - Izaberi mesec za prikaz</li>
-<li><strong>Export</strong> - Preuzmi leaderboard kao CSV fajl</li>
+<li><strong>Combined lista</strong> — Ponderisano kombinovano rangiranje koje nagrađuje i chat aktivnost i sate provedene na strimu.</li>
+<li><strong>Chatters lista</strong> — Rangiranje gledalaca isključivo prema broju poslatih poruka u četu.</li>
+<li><strong>Watchtime lista</strong> — Rangiranje po tačnom broju minuta i sati provedenih prateći tvoj strim.</li>
+<li><strong>Mesečna arhiva</strong> — Padajući meni omogućava izbor bilo kog prethodnog meseca za pregled istorijskih rezultata.</li>
+<li><strong>CSV Export</strong> — Preuzimanje kompletne rang liste u <code>.csv</code> tabelarnom formatu za potrebe nagradnih igara (giveaway) ili analiza.</li>
 </ul>
-<p class="pm-docs-text kx-394">Reset leaderboard komanda: <code>!resetleaderboard</code>
-                (samo za strimera)</p>
+<p class="pm-docs-text kx-394">Arhivski presek se automatski vrši svakog 1. u mesecu. Vlasnik kanala takođe može u bilo kom trenutku resetovati listu komandom: <code class="pm-code" style="padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.08); color:#53FC18;">!resetleaderboard</code></p>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">4</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Prilagođene Komande</div>
-<p class="pm-docs-text">Kreiraj svoje komande:</p>
+<div class="pm-docs-step-title">Prilagođene Komande, Aliasi i Promenljive</div>
+<p class="pm-docs-text">Kreiraj neograničen broj sopstvenih komandi prilagođenih tvom stilu i zajednici:</p>
 <ul class="pm-docs-list">
-<li><strong>Komanda i aliasi</strong> - npr. <code>!instagram, !insta, !ig</code></li>
-<li><strong>Odgovor bota</strong> - Šta bot šalje kada se koristi komanda</li>
-<li><strong>Cooldown</strong> - Vreme čekanja u milisekundama (default: 5000ms)</li>
-<li><strong>Rang</strong> - Ko može koristiti (Svi, VIP, Sub, Mod, Strimer)</li>
+<li><strong>Višestruki aliasi</strong> — Možeš navesti više aliasa odvojenih zarezom (npr. <code>!instagram, !insta, !ig</code>) i svi će aktivirati isti odgovor.</li>
+<li><strong>Dinamičke promenljive</strong> u odgovoru:
+<div style="display:flex; flex-wrap:wrap; gap:6px; margin:6px 0;">
+<span style="font-family:var(--font-mono, monospace); font-size:0.74rem; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd; padding:2px 6px; border-radius:4px;">{user}</span>
+<span style="font-family:var(--font-mono, monospace); font-size:0.74rem; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd; padding:2px 6px; border-radius:4px;">{target}</span>
+<span style="font-family:var(--font-mono, monospace); font-size:0.74rem; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd; padding:2px 6px; border-radius:4px;">{count}</span>
+<span style="font-family:var(--font-mono, monospace); font-size:0.74rem; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd; padding:2px 6px; border-radius:4px;">{points}</span>
+<span style="font-family:var(--font-mono, monospace); font-size:0.74rem; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd; padding:2px 6px; border-radius:4px;">{rank}</span>
+</div>
+</li>
+<li><strong>Cooldown podešavanje</strong> — Vreme čekanja u milisekundama uz brza dugmad: 3s, 5s, 10s, 15s, 30s, 60s.</li>
+<li><strong>Nivo ovlašćenja (Rang)</strong> — Ograniči upotrebu komande na: Svi, Subovi, VIP, OG, Moderatori ili samo Strimer.</li>
+<li><strong>Live Simulator</strong> — Unutar prozora za unos nalazi se simulator u realnom vremenu koji prikazuje tačan izgled odgovora u četu pre čuvanja.</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">5</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Ugrađene Komande</div>
-<p class="pm-docs-text">Sistem komande koje su već ugrađene:</p>
+<div class="pm-docs-step-title">Ugrađene Sistemske Komande i Editovanje</div>
+<p class="pm-docs-text">Kickot dolazi sa fabrički balansiranim komandama spremnim za upotrebu:</p>
 <ul class="pm-docs-list">
-<li><strong>Zabava</strong> - !iq, !samar, !8ball, !roll, !coinflip</li>
-<li><strong>Statistika</strong> - !top, !watchtime, !me, !followage</li>
-<li><strong>Ekonomija</strong> - !rank, !points, !give, !bet</li>
-<li><strong>Socijalno</strong> - !marry, !divorce, !love</li>
+<li><strong>Zabava i interakcija</strong> — <code>!iq</code>, <code>!samar @user</code>, <code>!8ball [pitanje]</code>, <code>!roll</code>, <code>!coinflip</code>, <code>!hug @user</code></li>
+<li><strong>Statistika i info</strong> — <code>!top</code>, <code>!watchtime</code>, <code>!me</code>, <code>!followage</code>, <code>!uptime</code></li>
+<li><strong>Ekonomija i bodovi</strong> — <code>!rank</code>, <code>!points</code>, <code>!give @user [iznos]</code>, <code>!bet [opcija] [iznos]</code></li>
+<li><strong>Socijalno i brak</strong> — <code>!marry @user</code>, <code>!accept</code>, <code>!divorce</code>, <code>!love @user</code>, <code>!posaljiljubav @user</code></li>
 </ul>
-<p class="pm-docs-text kx-394">Sve ugrađene komande možeš editovati - promeniti
-                cooldown, rang ili isključiti.</p>
+<p class="pm-docs-text kx-394">Svaku od ugrađenih komandi možeš prilagoditi: promeniti joj cooldown, definisati koji rang ima pristup ili je potpuno isključiti ukoliko ti nije potrebna.</p>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">6</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Automatske Poruke</div>
-<p class="pm-docs-text">Postavi automatske poruke:</p>
+<div class="pm-docs-step-title">Automatske Poruke (Timers &amp; Announcements)</div>
+<p class="pm-docs-text">Pametno periodično slanje obaveštenja, linkova ka mrežama i pravila kanala uz 2 uslova okidanja:</p>
 <ul class="pm-docs-list">
-<li><strong>Na vremenski interval</strong> - npr. svakih 10 minuta</li>
-<li><strong>Na broj poruka</strong> - npr. svakih 100 poruka</li>
-<li><strong>Više poruka</strong> - Dodaj koliko god želiš</li>
+<li><strong>Vremenski interval (minuta)</strong> — Vreme u minutima koje mora proteći pre nego što bot pošalje sledeću najavu.</li>
+<li><strong>Prag novih poruka (broj poruka)</strong> — Broj poruka koji gledaoci moraju poslati u četu pre nego što bot objavi poruku. Ovaj mehanizam sprečava bot da piše sam sa sobom kada je čet u mirovanju.</li>
+<li><strong>Kružna rotacija</strong> — Ako definišeš više poruka, Kickot ih šalje ravnomerno redom (Round-Robin).</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">7</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Bot Interakcija</div>
-<p class="pm-docs-text">Automatski odgovori na ključne reči:</p>
+<div class="pm-docs-step-title">Bot Interakcija (Smart Triggers)</div>
+<p class="pm-docs-text">Automatsko reagovanje na ključne reči i fraze unutar redovnog razgovora u četu (bez prefiksa <code>!</code>):</p>
 <ul class="pm-docs-list">
-<li><strong>Trigger</strong> - Reč ili fraza koja aktivira odgovor</li>
-<li><strong>Odgovor</strong> - Šta bot šalje</li>
-<li><strong>Case sensitive</strong> - Razlikuje mala/velika slova</li>
+<li><strong>Okidač (Trigger)</strong> — Reč ili fraza na koju bot reaguje (npr. <code>discord</code>, <code>tiktok</code>, <code>pozz</code>, <code>pravila</code>).</li>
+<li><strong>Odgovor bota</strong> — Šta bot šalje u chat kada detektuje okidač (npr. direktan link ka Discord serveru).</li>
+<li><strong>Case-Sensitive opcija</strong> — Mogućnost definisanja da li bot razlikuje velika i mala slova.</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">8</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Ljubav i Brakovi</div>
-<p class="pm-docs-text">Sistem za brakove:</p>
+<div class="pm-docs-step-title">Sistem Ljubavi, Brakova i Automatsko Brisanje na 0%</div>
+<p class="pm-docs-text">Interaktivni sistem socijalne zabave gledalaca sa optimizovanim upravljanjem resursima:</p>
 <ul class="pm-docs-list">
-<li><strong>!marry @user</strong> - Zatraži brak</li>
-<li><strong>!accept</strong> - Prihvati brak</li>
-<li><strong>!divorce</strong> - Razvod</li>
-<li><strong>!love @user</strong> - Proveri ljubavni status</li>
+<li><strong>Komande za brak</strong> — <code>!marry @korisnik</code> (ponuda za brak sa rokom od 60s), <code>!accept</code> (prihvatanje braka), <code>!divorce</code> (razvod).</li>
+<li><strong>Ljubavni afinitet</strong> — <code>!love @korisnik</code> (kompatibilnost 0-100% uz unikatne duhovite komentare), <code>!posaljiljubav @korisnik</code> (menjanje afiniteta).</li>
+<li><strong>Automatska nivelacija ka 0%</strong> — Afinitet parova vremenom postepeno opada (nivelira se) ka nuli.</li>
+<li><strong>Pametno brisanje na 0% (Auto-Cleanup)</strong> — Ako se status partnera koji <strong>nisu u braku</strong> izniveliše na <strong>0%</strong>, Kickot automatski <strong>briše zapis iz baze podataka</strong>. Time se sprečava preopterećenje baze, a ukoliko gledaoci ponovo pokrenu interakciju, automatski se kreira novi zapis.</li>
+<li><strong>Admin razvod</strong> — Strimer i menadžeri mogu kroz panel pregledati sve venčane parove i izvršiti prinudni razvod.</li>
 </ul>
-<p class="pm-docs-text kx-394">Admin može ručno da rastavlja parove kroz dashboard.</p>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">9</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Mini Igre</div>
-<p class="pm-docs-text">Ugrađene mini igre:</p>
+<div class="pm-docs-step-title">Mini Igre i Live Simulator (Play Dugme)</div>
+<p class="pm-docs-text">Sistem kazino i zabavnih igara sa ulozima u Koins poenima:</p>
 <ul class="pm-docs-list">
-<li><strong>!duel @user [iznos]</strong> - Duel za poene</li>
-<li><strong>!slots [iznos]</strong> - Slot mašina</li>
-<li><strong>!roulette [crvena/crna] [iznos]</strong> - Rulet</li>
+<li><strong>!slots [iznos]</strong> — Automat sa voćkicama i multiplikatorima do 25x uloga.</li>
+<li><strong>!roulette [boja/broj] [iznos]</strong> — Evropski rulet (crvena/crna donose 2x, zelena nula 14x).</li>
+<li><strong>!dice [iznos]</strong> — Bacanje kockica protiv bota; veći zbir odnosi pobedu.</li>
+<li><strong>!coinflip [pismo/glava] [iznos]</strong> — Klasično bacanje novčića sa šansom 50/50.</li>
+<li><strong>!duel @korisnik [iznos]</strong> — 1-na-1 borba između dva gledaoca u četu gde pobednik uzima pot.</li>
+<li><strong>Zabavne igre</strong> — <code>!8ball</code>, <code>!iq</code>, <code>!samar</code>, <code>!roll</code>.</li>
+<li><strong>Live Simulator</strong> — Svaka kartica igre na kontrolnoj tabli sadrži namensko <strong>Play</strong> dugme. Klikom na Play pokreće se simulator u realnom vremenu za trenutnu proveru mehanike i izgleda rezultata.</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">10</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Song Request</div>
-<p class="pm-docs-text">Sistem za zahtevanje pesama:</p>
+<div class="pm-docs-step-title">Song Request &amp; Integrisani Plejer</div>
+<p class="pm-docs-text">Omogući gledaocima da naručuju muziku direktno kroz chat preko YouTube integracije:</p>
 <ul class="pm-docs-list">
-<li><strong>!sr [pesma]</strong> - Zatraži pesmu</li>
-<li><strong>!songqueue</strong> - Pogledaj red čekanja</li>
-<li><strong>!skipsong</strong> - Preskoči trenutnu (mod)</li>
+<li><strong>!sr [naziv pesme ili YouTube URL]</strong> — Dodavanje numere u red za reprodukciju.</li>
+<li><strong>!songqueue</strong> — Prikaz pesama koje trenutno čekaju u redu.</li>
+<li><strong>!currentsong</strong> — Prikaz naziva pesme koja trenutno svira.</li>
+<li><strong>!skipsong</strong> — Preskakanje numere (rezervisano za moderatore ili putem glasanja).</li>
+<li><strong>Dashboard Plejer</strong> — Ugrađeni audio plejer sa kontrolom jačine zvuka, pauziranjem i brisanjem numera iz reda.</li>
+<li><strong>Sigurnosna ograničenja</strong> — Definisanje maksimalne dužine trajanja pesme u minutima i limita numera po gledaocu.</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">11</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Ranking Sistem</div>
-<p class="pm-docs-text">XP i nivoi:</p>
+<div class="pm-docs-step-title">Ranking Sistem, Koins Ekonomija i Loyalty Prodavnica</div>
+<p class="pm-docs-text">Kompletna virtuelna ekonomija prilagođena tvom kanalu:</p>
 <ul class="pm-docs-list">
-<li><strong>!rank</strong> - Prikazi tvoj nivo i XP</li>
-<li><strong>!points</strong> - Prikazi tvoje poene</li>
-<li><strong>!give @user [iznos]</strong> - Daj poene drugom</li>
-<li><strong>!leaderboard</strong> - Rang lista po poenima</li>
+<li><strong>Sticanje Koins-a</strong> — +5 Koins svakih 5 minuta aktivnog gledanja, +1 Koins po poslatoj chat poruci, uz posebne multiplikatore za pretplatnike.</li>
+<li><strong>Rangovi i XP nivoi</strong> — Gledaoci stiču nivoe, sakupljaju iskustvo i otključavaju vizuelne značke.</li>
+<li><strong>Loyalty Prodavnica (Custom Rewards)</strong> — Kreiraj sopstvene nagrade koje gledaoci otkupljuju za Koins (npr. <em>VIP status 30 dana</em>, <em>Izaberi igru za strim</em>, <em>Zvučni efekat</em>). Kupljene nagrade se evidentiraju u kontrolnoj tabli gde ih strimer označava kao ispunjene.</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">12</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Bot Config</div>
-<p class="pm-docs-text">Globalna podešavanja:</p>
+<div class="pm-docs-step-title">Bot Konfiguracija vs Auto-Moderacija (Važna Razlika)</div>
+<p class="pm-docs-text">Ove dve sekcije imaju potpuno različite uloge u sistemu:</p>
 <ul class="pm-docs-list">
-<li><strong>Prefix</strong> - Komandni prefix (default: !)</li>
-<li><strong>Language</strong> - Jezik bota</li>
-<li><strong>Cooldown</strong> - Globalni cooldown</li>
-<li><strong>Moduli</strong> - Uključi/isključi funkcije</li>
+<li><strong>Bot Konfiguracija (Interna zaštita bota)</strong>:
+<p class="pm-docs-text" style="margin-top:2px; font-size:0.8rem;">Podešava komandni prefiks (podrazumevano <code>!</code>), jezik bota i zaštitu od spama. Zaštita od spama u ovoj sekciji predstavlja <strong>Anti-Flood mehanizam samog bota</strong> — ako više korisnika pošalje komande u istoj sekundi, bot ih privremeno pauzira kako Kick ne bi blokirao bota. <strong>Ovo NE moderira poruke gledalaca i NE primenjuje kazne!</strong></p>
+</li>
+<li><strong>Moderacija (Čet Policajac)</strong>:
+<p class="pm-docs-text" style="margin-top:2px; font-size:0.8rem;">Aktivni sistem od 8 specijalizovanih filtara koji u realnom vremenu nadgleda sve poruke u četu i primenjuje stvarne kaznene mere (upozorenje, brisanje, timeout, ban) nad gledaocima koji krše pravila.</p>
+</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">13</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Moderacija</div>
-<p class="pm-docs-text">Automatska moderacija:</p>
+<div class="pm-docs-step-title">8 Filtara Auto-Moderacije, Kaznene Mere i !permit</div>
+<p class="pm-docs-text">Napredna zaštita tvog četa od spama i neprimerenog ponašanja:</p>
 <ul class="pm-docs-list">
-<li><strong>Velika slova</strong> - Caps lock filter</li>
-<li><strong>Linkovi</strong> - URL filter</li>
-<li><strong>Emotikoni</strong> - Emoji spam filter</li>
-<li><strong>Dužina poruke</strong> - Long message filter</li>
-<li><strong>Globalne kazne</strong> - Isti penalty za sve filtere</li>
+<li><strong>1. Linkovi (URL filter)</strong> — Blokira neovlašćene linkove, uz podršku za Belu listu (Whitelist) dozvoljenih domena.</li>
+<li><strong>2. Velika slova (Caps Lock)</strong> — Sprečava vrištanje u četu na osnovu procenta i dužine teksta.</li>
+<li><strong>3. Emotikoni</strong> — Ograničava maksimalan broj smajlija u jednoj poruci.</li>
+<li><strong>4. Ponavljanje teksta</strong> — Sprečava spam uzastopno istim rečima ili slovima.</li>
+<li><strong>5. Dužina poruke</strong> — Blokira predugačke "zidove teksta".</li>
+<li><strong>6. Zabranjene reči</strong> — Automatska cenzura psovki i reči unetih u crnu listu.</li>
+<li><strong>7. Masovna pominjanja</strong> — Sprečava neželjeno tagovanje većeg broja korisnika.</li>
+<li><strong>8. Simboli i Unicode</strong> — Blokira Zalgo i ASCII grafički spam.</li>
+<li><strong>Kaznene mere</strong> — Za svaki filter biraš meru: Upozorenje, Brisanje poruke, Timeout (od 1m do 24h) ili Trajni Ban.</li>
 </ul>
+<p class="pm-docs-text kx-394">Komanda za dozvolu slanja linka: <code class="pm-code" style="padding:2px 6px; border-radius:4px; background:rgba(255,255,255,0.08); color:#53FC18;">!permit @korisnik [vreme]</code> omogućava gledaocu slanje jednog linka unutar zadatog vremena bez aktiviranja kazne.</p>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">14</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Alerti</div>
-<p class="pm-docs-text">Automatski alerti za događaje:</p>
+<div class="pm-docs-step-title">Chat Alerti i Obaveštenja u Realnom Vremenu</div>
+<p class="pm-docs-text">Automatsko slanje poruka i zahvalnica u četu za ključne događaje na kanalu:</p>
 <ul class="pm-docs-list">
-<li><strong>Dobrodošlica</strong> - Novi gledaoci</li>
-<li><strong>Follow</strong> - Novi pratioci</li>
-<li><strong>Subscribe</strong> - Novi subovi</li>
-<li><strong>Resubscribe</strong> - Resubovi</li>
-<li><strong>Gift sub</strong> - Gift subscripcije</li>
-<li><strong>KICKs donacija</strong> - Donacije</li>
-<li><strong>Raid/Host</strong> - Raidovi i hostovi</li>
+<li><strong>Novi pratilac (Follower)</strong> — Pozdravna poruka za nove članove zajednice.</li>
+<li><strong>Nova pretplata (Subscriber)</strong> — Čestitka za novog subskrajbera uz dodelu bonusa.</li>
+<li><strong>Obnovljena pretplata (Resub)</strong> — Prikaz broja meseci uzastopne podrške.</li>
+<li><strong>Poklonjene pretplate (Gift Subs)</strong> — Isticanje darodavca i broja poklonjenih subova.</li>
+<li><strong>KICKs donacije</strong> — Obaveštenje o doniranim KICKs poenima uz poruku podrške.</li>
+<li><strong>Host &amp; Raid događaji</strong> — Topla dobrodošlica gledaocima i strimeru koji hostuje tvoj kanal.</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">15</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Podešavanja Naloga &amp; Custom Bot</div>
-<p class="pm-docs-text">Upravljanje nalogom i brendiranjem:</p>
+<div class="pm-docs-step-title">Podešavanja Naloga, Kick Kanali i Menadžeri</div>
+<p class="pm-docs-text">Upravljanje administratorskim pravima, profilom i povezanim nalozima:</p>
 <ul class="pm-docs-list">
-<li><strong>Profil &amp; Kanali</strong> - Dodaj ili ukloni Kick kanale</li>
-<li><strong>Menadžeri</strong> - Dodeljivanje prava pristupa menadžerima</li>
-<li><strong>Custom Bot Account</strong> - Povežite sopstveni bot nalog (npr. @MojKanalBot) u PRO i ELITE
-                  paketu</li>
+<li><strong>Sinhronizacija avatara</strong> — Klikom na "Preuzmi sliku sa Kicka" trenutno preuzimaš sliku direktno sa svog zvaničnog profila.</li>
+<li><strong>Povezivanje dodatnih kanala</strong> — Autorizacija dodatnih Kick kanala putem zvaničnog Kick OAuth protokola.</li>
+<li><strong>Menadžeri kanala</strong> — Dodeljivanje pristupa ovlašćenim moderatorima ili pomoćnicima koji mogu konfigurisati bota bez uvida u tvoje privatne pristupne podatke.</li>
+<li><strong>Fungies Portal</strong> — Direktan pristup portalu za upravljanje pretplatom gde u svakom trenutku možeš zameniti karticu ili otkazati paket.</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">16</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Referral Program &amp; Zarada</div>
-<p class="pm-docs-text">Zaradi proviziju preporučivanjem sistema:</p>
+<div class="pm-docs-step-title">Uvoznik Podataka iz Botrix-a (Botrix Importer)</div>
+<p class="pm-docs-text">Jednostavna migracija sa servisa Botrix na Kickot u nekoliko klikova:</p>
 <ul class="pm-docs-list">
-<li><strong>Moj Kod &amp; Link</strong> - Generišite ili prilagodite sopstveni referral kod</li>
-<li><strong>20% Provizije</strong> - Ostvarite 20% zarade od svih pretplata vaših preporučenih korisnika
-                </li>
-<li><strong>Isplata sredstava</strong> - Isplatite zaradu direktno kada pređete €5.00</li>
+<li><strong>Automatski uvoz komandi</strong> — Prebacivanje svih postojećih prilagođenih komandi i aliasa bez ručnog prepisivanja.</li>
+<li><strong>Očuvanje bodova i rangova</strong> — Prenos watchtime bodova i lojalnosti tvojih gledalaca.</li>
+<li><strong>Automatska konverzija varijabli</strong> — Botrix promenljive (poput <code>{user}</code>) se automatski prilagođavaju Kickot sintaksi.</li>
 </ul>
 </div>
 </div>
 <div class="pm-docs-step">
 <div class="pm-docs-step-num">17</div>
 <div class="pm-docs-step-content">
-<div class="pm-docs-step-title">Korisni Saveti</div>
+<div class="pm-docs-step-title">Referral Program, Zarada i Isplate Provizije</div>
+<p class="pm-docs-text">Ostvari pasivnu zaradu preporučivanjem Kickot bota drugim strimerima:</p>
 <ul class="pm-docs-list">
-<li>Koristi <strong>Tab</strong> i <strong>Shift+Tab</strong> za navigaciju tastaturom</li>
-<li><strong>Escape</strong> zatvara sve modalne prozore</li>
-<li>Sve promene se automatski čuvaju i primenjuju u realnom vremenu</li>
-<li>Bot se automatski reload-uje nakon promena u konfiguraciji</li>
-<li>Leaderboard se resetuje svakog 1. u mesecu</li>
+<li><strong>Unikatan kod i link</strong> — Preuzmi sopstveni personalizovani referal link u sekciji Preporuke.</li>
+<li><strong>20% trajne provizije</strong> — Ostvaruješ 20% zarade od svake prve uplate i svih narednih mesečnih obnova korisnika koje preporučiš.</li>
+<li><strong>Transparentna analitika</strong> — Praćenje poseta, registracija i sakupljene provizije u realnom vremenu.</li>
+<li><strong>Isplata već od €5.00</strong> — Čim dostigneš minimalni prag od samo 5 evra, možeš zatražiti isplatu na PayPal ili tekući račun.</li>
+</ul>
+</div>
+</div>
+<div class="pm-docs-step">
+<div class="pm-docs-step-num">18</div>
+<div class="pm-docs-step-content">
+<div class="pm-docs-step-title">Prečice, Saveti i Korisnička Podrška</div>
+<p class="pm-docs-text">Brzi trikovi za najefikasnije korišćenje sistema:</p>
+<ul class="pm-docs-list">
+<li><strong>Tastaturna navigacija</strong> — Koristi <strong>Tab</strong> i <strong>Shift+Tab</strong> za brzo kretanje kroz polja forme.</li>
+<li><strong>Instant zatvaranje</strong> — Taster <strong>Escape</strong> zatvara bilo koji otvoreni modalni prozor.</li>
+<li><strong>Čuvanje u oblaku</strong> — Sve izmene se trenutno automatski čuvaju u Supabase Cloud bazi podataka.</li>
+<li><strong>Direktna podrška</strong> — Ukoliko imaš predlog nove funkcije ili ti je potrebna tehnička pomoć, klikni na dugme <strong>Predloži komandu / Prijavi bug</strong> ili nam piši na <a class="pm-link" href="mailto:contact@milanwebportal.com" style="color:#53fc18;">contact@milanwebportal.com</a>.</li>
 </ul>
 </div>
 </div>

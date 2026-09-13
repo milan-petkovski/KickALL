@@ -99,6 +99,44 @@
     "winnerLabel": "POBEDNIK!",
     "wonText": "Osvojio je: <span id='winnerPrize'>Subscribe</span>"
   },
+  "kickajStudio": {
+    "title": "KICKAJ - Giveaway Studio",
+    "subtitle": "Interaktivno izvlačenje pobednika uživo iz live chata",
+    "btnStart": "Pokreni giveaway",
+    "btnPause": "Pauziraj giveaway",
+    "btnDraw": "Izvuci pobednika",
+    "btnReset": "Resetuj giveaway",
+    "fullscreen": "Fullscreen prikaz točka za stream",
+    "participants": "Učesnici",
+    "winners": "Pobednici",
+    "prize": "Nagrada",
+    "keyword": "Ključna reč za ulaz",
+    "spinTime": "Trajanje spina",
+    "numWinners": "Broj pobednika",
+    "subscribersOnly": "Samo pretplatnici",
+    "followDuration": "Minimalno praćenje (dani)",
+    "subDuration": "Minimalna pretplata (meseci)",
+    "subMultiplier": "Multiplikator za pretplatnike",
+    "blacklist": "Crna lista korisnika",
+    "confirmTime": "Vreme za potvrdu (sekunde)",
+    "animation": "Stil animacije",
+    "wheel": "Točak Sreće",
+    "slot": "Slot Mašina",
+    "roulette": "Neon Rulet",
+    "sound": "Zvučni efekti",
+    "volume": "Jačina zvuka",
+    "statusLive": "Live Chat Aktivan",
+    "statusSpinning": "Izvlačenje u toku",
+    "statusPaused": "Pauzirano",
+    "statusStandby": "Standby",
+    "noParticipants": "Nema učesnika za izvlačenje! Sačekajte prijavu gledalaca iz chata.",
+    "allWinnersDrawn": "Već je izvučeno svih {count} pobednika!",
+    "winnerConfirmed": "Pobednik se uspešno javio i potvrđen je.",
+    "winnerExpired": "Pobednik se nije javio u zadatom vremenu. Nije potvrđeno.",
+    "chatDisconnected": "Veza sa Kick chatom je prekinuta. Pokušaj ponovnog povezivanja ({attempt}/3)...",
+    "chatDisconnectedFinal": "Veza sa Kick chatom je prekinuta nakon više pokušaja.",
+    "copied": "Uspešno kopirano!"
+  },
   "kickov": {
     "heading": "Prelepi Strim Overlayi",
     "desc": "Isprobaj kako izgledaju naši moderni i tečni alerti na ekranu tokom tvog streama. Promeni teme i stilove uživo.",
@@ -169,6 +207,7 @@
     "catOverlay": "Overlay",
     "catOauth": "OAuth & Bezbednost",
     "catPricing": "Cene",
+    "catGiveaway": "Giveaway",
     "q1": {
       "question": "Kako da povežem Kickot chatbot sa mojim Kick kanalom?",
       "answer": "Dovoljno je da klikneš na dugme \"Prijavi se preko Kicka\", autorizuješ nalog i u Dashboard-u aktiviraš Kickot bota. Bot će se automatski pridružiti tvom chatu."
@@ -188,6 +227,10 @@
     "q5": {
       "question": "Mogu li praviti sopstvene komande i alertove?",
       "answer": "Da! Kroz Dashboard možete kreirati do 50 komandi na besplatnom planu, 200 na pro planu i neograničeno na elite planu. Samo posetite komande panel u okviru Dashboard-a!"
+    },
+    "q6": {
+      "question": "Šta je Kickaj i kako radi Kickaj giveaway alat?",
+      "answer": "Kickaj je specijalizovani studio za nagradne igre (giveaway) na Kick.com platformi. Povezuje se na Kick čet u realnom vremenu, automatski beleži učesnike preko zadate ključne reči, primenjuje filtere za pratioce i pretplatnike, i vizualizuje izvlačenje pobednika kroz ultra-glatke animacije: Točak Sreće, Slot Mašinu ili Neon Rulet na 240 FPS uz zvučne efekte i automatsku verifikaciju."
     }
   },
   "support": {

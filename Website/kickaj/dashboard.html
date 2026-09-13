@@ -10,7 +10,7 @@
   <title>Kickaj Giveaway Studio</title>
   <meta name="description" content="Izvlaci pobednike nagradnih igara uzivo iz chat poruka gledalaca uz Tocak Srece, Slot Masinu i Neon Rulet." />
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="theme-color" content="#07050f" />
+  <meta name="theme-color" content="#07070D" />
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -55,7 +55,7 @@
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </a>
-        <a class="sidebar-logo" href="#" title="Kickaj — Giveaway Studio">
+        <a class="sidebar-logo" href="#" title="Kickaj - Giveaway Studio">
           <img alt="Kickaj Logo" class="logo-img" src="../assets/kickaj.webp" />
         </a>
         <a class="sidebar-header-btn coffee-btn" href="https://paypal.me/milanwebportal/5EUR" rel="noopener noreferrer" target="_blank" title="Kupi mi kafu">
@@ -133,17 +133,18 @@
           </summary>
           <div class="sc-accordion-body">
             <div class="sc-form-group">
-              <label class="sc-label" for="inputSubDuration">Min. Sub meseci</label>
-              <input type="number" id="inputSubDuration" class="sc-input" min="0" max="60" value="0" placeholder="0" />
+              <label class="sc-label" for="inputSubDuration">Min. Sub</label>
+              <div class="sc-input-suffix-wrap">
+                <input type="number" id="inputSubDuration" class="sc-input" min="0" max="60" value="0" placeholder="0" />
+                <span class="sc-input-suffix" id="subDurationSuffix">meseci</span>
+              </div>
             </div>
             <div class="sc-form-group">
-              <label class="sc-label" for="inputFollowDuration">
-                Verifikacija praćenja (dani)
-                <span class="sc-plan-lock-icon" title="Automatska provera dužine praćenja kanala pri izvlačenju pobednika (0 = bez provere).">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-                </span>
-              </label>
-              <input type="number" id="inputFollowDuration" class="sc-input" min="0" max="365" value="0" placeholder="0" />
+              <label class="sc-label" for="inputFollowDuration">Dužina praćenja</label>
+              <div class="sc-input-suffix-wrap">
+                <input type="number" id="inputFollowDuration" class="sc-input" min="0" max="365" value="0" placeholder="0" />
+                <span class="sc-input-suffix" id="followDurationSuffix">dana</span>
+              </div>
             </div>
             <div class="sc-toggle-row">
               <div class="sc-toggle-title">Samo subscriberi</div>
@@ -200,8 +201,11 @@
             </div>
             <div class="sc-form-group">
               <div class="sc-spin-label-row">
-                <label class="sc-label" for="inputSpinTime">Trajanje vrtenja (s)</label>
-                <input type="number" id="inputSpinTimeNum" class="sc-input-num" min="1" max="300" value="5" title="Unesi sekunde od 1 do 300 (max 5 min)" />
+                <label class="sc-label" for="inputSpinTime">Trajanje vrtenja</label>
+                <div class="sc-input-badge-wrap">
+                  <input type="number" id="inputSpinTimeNum" class="sc-input-num" min="1" max="300" value="5" title="Unesi sekunde od 1 do 300 (max 5 min)" />
+                  <span class="sc-badge-unit">s</span>
+                </div>
               </div>
               <input type="range" id="inputSpinTime" class="sc-slider" min="0" max="100" value="3.4" step="0.1" />
               <div class="sc-slider-ticks">
@@ -213,8 +217,11 @@
               </div>
             </div>
             <div class="sc-form-group">
-              <label class="sc-label" for="inputConfirmTime">Vreme potvrde pobednika (s)</label>
-              <input type="number" id="inputConfirmTime" class="sc-input" min="5" max="300" value="60" />
+              <label class="sc-label" for="inputConfirmTime">Vreme potvrde pobednika</label>
+              <div class="sc-input-suffix-wrap">
+                <input type="number" id="inputConfirmTime" class="sc-input" min="5" max="300" value="60" />
+                <span class="sc-input-suffix" id="confirmTimeSuffix">s</span>
+              </div>
             </div>
           </div>
         </details>
@@ -269,8 +276,8 @@
           <div class="sc-accordion-body">
             <div class="sc-toggle-row">
               <div>
-                <div class="sc-toggle-title">Objava početka u chat</div>
-                <div class="sc-toggle-sub">KickOT šalje najavu kad otvoriš prijave</div>
+                <div class="sc-toggle-title">Objava početka</div>
+                <div class="sc-toggle-sub">KickOT šalje najavu u chat kad otvoriš prijave</div>
               </div>
               <label class="sc-toggle">
                 <input type="checkbox" id="toggleAnnounceStart" checked />
@@ -279,8 +286,8 @@
             </div>
             <div class="sc-toggle-row">
               <div>
-                <div class="sc-toggle-title">Objava pobednika u chat</div>
-                <div class="sc-toggle-sub">KickOT čestita i taguje pobednika</div>
+                <div class="sc-toggle-title">Objava pobednika</div>
+                <div class="sc-toggle-sub">KickOT čestita i taguje pobednika u chatu</div>
               </div>
               <label class="sc-toggle">
                 <input type="checkbox" id="toggleAnnounceWinner" checked />
@@ -302,29 +309,30 @@
           </svg>
           <span>Pokreni giveaway</span>
         </button>
+        <button class="sc-btn sc-btn-stop" id="btnStopGiveaway" style="display:none;" title="Zaustavi i resetuj giveaway" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+          </svg>
+          <span>Zaustavi giveaway</span>
+        </button>
       </div>
 
-      <!-- Sidebar Footer — identican sa kickot -->
+      <!-- Sidebar Footer - identican sa kickot -->
       <div class="sidebar-footer">
         <div class="user-pill" id="userPill" onclick="window.toggleUserMenu()">
           <div class="user-avatar-sm" id="userAvatarDisplay">K</div>
           <div class="user-info">
             <div class="user-display-name" id="userNameDisplay">Streamer</div>
             <div class="user-plan" id="userPlanLabel">
-              <span class="sidebar-plan-badge" id="planBadge">FREE</span>
+              <span class="plan-badge plan-badge-free" id="planBadge">FREE</span>
+              <span class="role-badge role-badge-owner" id="roleBadge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>
+                <span>Vlasnik</span>
+              </span>
             </div>
           </div>
-          <!-- Popup dropdown — gore -->
-          <div class="user-menu-sm" id="userMenuSm">
-            <button class="dropdown-item" onclick="event.stopPropagation(); document.getElementById('sidebarConfig')?.scrollIntoView({ behavior: 'smooth' });">
-              <svg class="dropdown-icon" fill="none" height="14" stroke="#06b6d4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="16" x2="12" y2="12"/>
-                <line x1="12" y1="8" x2="12.01" y2="8"/>
-              </svg>
-              <span>Podešavanja giveaway-a</span>
-            </button>
-            <div class="dropdown-divider"></div>
+          <!-- Popup dropdown - gore -->
+          <div class="user-menu-sm" id="userMenuSm" onclick="event.stopPropagation()">
             <button class="dropdown-item" onclick="event.stopPropagation(); window.openHelpModal()">
               <svg class="dropdown-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14">
                 <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
@@ -434,14 +442,14 @@
                 </button>
               </div>
               
-              <!-- Popover Tabs -->
+              <!-- Popover Tabs (Segmented Control) -->
               <div class="notif-tabs">
-                <button class="notif-tab active" id="notifTabObavestenja" onclick="window.switchNotifTab('obavestenja')">Obaveštenja</button>
+                <button class="notif-tab active" id="notifTabObavestenja" onclick="window.switchNotifTab('obaveštenja')">Obaveštenja</button>
                 <button class="notif-tab" id="notifTabChangelog" onclick="window.switchNotifTab('changelog')">Changelog</button>
               </div>
               
-              <!-- Content List -->
-              <div class="notif-content-list" id="notifContentList">
+              <!-- Popover Content Area -->
+              <div class="notif-content-list custom-scroll" id="notifContentList">
                 <div class="notif-empty">Nema novih obaveštenja.</div>
               </div>
             </div>
@@ -459,68 +467,131 @@
 
       <div class="main-scroll">
 
-        <!-- Hero Strip -->
-        <section class="main-hero" aria-label="Pregled Giveaway Studio">
-          <div class="hero-left">
-            <div class="hero-module-tag">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <!-- Page Header -->
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <div class="panel-icon-box" title="Giveaway Studio">
+              <svg fill="currentColor" fill-opacity="0.2" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewBox="0 0 24 24" width="22">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
               </svg>
-              Ultimativni sistem za giveaway
             </div>
-            <h1 class="hero-title">
-              <span class="hero-grad">Kickaj</span> Giveaway Studio
-              <span id="heroPlanBadge" class="hero-plan-badge is-free">FREE</span>
-            </h1>
-            <p class="hero-subtitle">Izvlačenje pobednika iz live chata uz animacije, točak i bonus šanse za pretplatnike.</p>
-          </div>
-          <div class="hero-summary-cards">
-            <div class="hsc-card">
-              <span class="hsc-label">Učesnici</span>
-              <strong class="hsc-val" id="statParticipantsCount">0</strong>
-            </div>
-            <div class="hsc-card">
-              <span class="hsc-label">Pobednici</span>
-              <strong class="hsc-val" id="statWinnersCount">0</strong>
-            </div>
-            <div class="hsc-card">
-              <span class="hsc-label">Sub bonus</span>
-              <strong class="hsc-val" id="statSubMultiplierDisplay">1x</strong>
-            </div>
-            <div class="hsc-card">
-              <span class="hsc-label">Trajanje vrtenja</span>
-              <strong class="hsc-val" id="statSpinTime">5s</strong>
+            <div class="panel-heading-content">
+              <div class="panel-title-row">
+                <h1 class="panel-title">Giveaway Studio</h1>
+                <span id="heroPlanBadge" class="hero-plan-badge plan-free">FREE</span>
+              </div>
+              <p class="panel-desc">Izvlačenje pobednika iz live chata uz animacije, točak i bonus šanse za pretplatnike.</p>
             </div>
           </div>
-        </section>
+        </div>
 
-        <!-- Stage Viewport -->
+        <!-- 5 Stats Kartica u nizu (Identicno sa Kickot) -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon stat-purple">
+              <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="20">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value" id="statParticipantsCount">0</div>
+              <div class="stat-label">Prijavljeni učesnici</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-green">
+              <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="20">
+                <circle cx="12" cy="8" r="7"/>
+                <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value" id="statWinnersCount">0</div>
+              <div class="stat-label">Izvučeno pobednika</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-blue">
+              <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="20">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value" id="statSubMultiplierDisplay">1x</div>
+              <div class="stat-label">Sub množilac šanse</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-pink">
+              <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="20">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value" id="statSpinTime">15s</div>
+              <div class="stat-label">Trajanje animacije</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon stat-amber">
+              <svg fill="none" height="20" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="20">
+                <polyline points="20 12 20 22 4 22 4 12"/>
+                <rect x="2" y="7" width="20" height="5"/>
+                <line x1="12" y1="22" x2="12" y2="7"/>
+                <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+                <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+              </svg>
+            </div>
+            <div class="stat-info">
+              <div class="stat-value" id="statPrizeDisplay">50 robuxa</div>
+              <div class="stat-label">Aktivna nagrada</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ STAGE CARD (FULL WIDTH) ══ -->
         <section class="stage-card" id="giveawayStageViewport" aria-label="Scena za izvlačenje">
-          <div class="stage-topbar">
-            <div class="stage-meta-row">
-              <div class="stage-meta-item">
-                <span class="stage-meta-label">Nagrada</span>
-                <strong id="summaryPrize">Misteriozna Nagrada</strong>
+          <div class="stage-header">
+            <div class="stage-title-wrap">
+              <div class="stage-icon-box">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 9.17 4.24-4.24"/><path d="m14.83 14.83 4.24 4.24"/><path d="m9.17 14.83-4.24 4.24"/><circle cx="12" cy="12" r="4"/>
+                </svg>
               </div>
-              <div class="stage-meta-item">
-                <span class="stage-meta-label">Status</span>
-                <strong id="summaryRunState">Spremno</strong>
-              </div>
-              <div class="stage-meta-item">
-                <span class="stage-meta-label">Ključna reč</span>
-                <strong id="summaryKeyword">Sve poruke</strong>
-              </div>
-              <div class="stage-meta-item">
-                <span class="stage-meta-label">Animacija</span>
-                <strong id="summaryAnimation">Točak Sreće</strong>
-              </div>
-              <div class="stage-meta-item">
-                <span class="stage-meta-label">Uslovi</span>
-                <strong id="stageEligibilityLabel">Otvoreno za sve</strong>
+              <div>
+                <h2 class="stage-title">Scena za izvlačenje</h2>
+                <div class="stage-meta-badges">
+                  <span class="stage-meta-badge badge-prize">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <polyline points="20 12 20 22 4 22 4 12"/>
+                      <rect x="2" y="7" width="20" height="5"/>
+                      <line x1="12" y1="22" x2="12" y2="7"/>
+                      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/>
+                      <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+                    </svg>
+                    Nagrada: <strong id="summaryPrize">Misteriozna Nagrada</strong>
+                  </span>
+                  <span class="stage-meta-badge badge-keyword">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    Reč: <strong id="summaryKeyword">Sve poruke</strong>
+                  </span>
+                  <span class="stage-meta-badge badge-animation">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <strong id="summaryAnimation">Točak Sreće</strong>
+                  </span>
+                  <span class="stage-meta-badge badge-eligibility">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    <strong id="stageEligibilityLabel">Otvoreno za sve</strong>
+                  </span>
+                </div>
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-              <div class="stage-state-badge" id="stageStateBadge">Standby</div>
+              <span class="stage-state-badge" id="stageStateBadge">Standby</span>
               <button class="stage-reset-btn" id="btnResetGiveaway" onclick="window.resetGiveaway()" title="Resetuj giveaway i učesnike" type="button">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -538,7 +609,7 @@
 
           <!-- Wheel Stage -->
           <div class="wheel-stage-frame" id="wheelStageFrame">
-            <svg class="wheel-pointer" viewBox="0 0 24 24" fill="#53fc18" stroke="#07050f" stroke-width="1.5">
+            <svg class="wheel-pointer" viewBox="0 0 24 24" fill="#53fc18" stroke="#07070D" stroke-width="1.5">
               <polygon points="12 24 4 0 20 0 12 24"/>
             </svg>
             <div class="wheel-canvas-container">
@@ -588,7 +659,11 @@
               <div class="roulette-fade-left"></div>
               <div class="roulette-fade-right"></div>
               <div class="roulette-strip" id="rouletteStrip">
-                <div class="roulette-card"><span class="roulette-card-name">Čekanje...</span></div>
+                <div class="roulette-card roulette-card-placeholder">
+                  <div class="roulette-card-bar" style="background:rgba(255,255,255,0.12);"></div>
+                  <div class="roulette-card-avatar" style="border-color:rgba(255,255,255,0.18); color:var(--aj-muted2);">?</div>
+                  <span class="roulette-card-name">Čekanje učesnika</span>
+                </div>
               </div>
             </div>
           </div>
@@ -600,17 +675,16 @@
             </svg>
             <span>Izvuci pobednika</span>
           </button>
-
         </section><!-- /stage-card -->
 
-        <!-- Lists -->
-        <section class="lists-grid" aria-label="Liste učesnika i pobednika">
+        <!-- ══ BOTTOM 2-COLUMN GRID (Učesnici i Pobednici) ══ -->
+        <div class="giveaway-bottom-grid">
 
           <!-- Participants -->
-          <div class="list-card">
+          <div class="list-card" id="participantsCard">
             <div class="list-head">
               <div class="list-head-title">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--aj-green)" stroke-width="2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--aj-green)" stroke-width="2.5">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
                 </svg>
                 Učesnici
@@ -622,7 +696,7 @@
                       <polyline points="6 9 12 15 18 9"/>
                     </svg>
                   </button>
-                  <div class="bulk-test-dropdown" id="bulkTestDropdown" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#13111c;border:1px solid rgba(255,255,255,0.12);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:99;min-width:145px;padding:4px 0;">
+                  <div class="bulk-test-dropdown" id="bulkTestDropdown" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:#12121E;border:1px solid rgba(255,255,255,0.12);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.6);z-index:99;min-width:145px;padding:4px 0;">
                     <button type="button" class="bulk-test-item" data-count="1">+1 učesnik</button>
                     <button type="button" class="bulk-test-item" data-count="10">+10 učesnika</button>
                     <button type="button" class="bulk-test-item" data-count="25">+25 učesnika</button>
@@ -653,10 +727,10 @@
           </div>
 
           <!-- Winners -->
-          <div class="list-card">
+          <div class="list-card" id="winnersCard">
             <div class="list-head">
               <div class="list-head-title">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--aj-amber)" stroke-width="2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--aj-amber)" stroke-width="2.5">
                   <circle cx="12" cy="8" r="7"/>
                   <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
                 </svg>
@@ -683,7 +757,7 @@
             </div>
           </div>
 
-        </section><!-- /lists-grid -->
+        </div><!-- /giveaway-bottom-grid -->
 
       </div><!-- /main-scroll -->
     </main><!-- /main -->
@@ -720,18 +794,17 @@
             </svg>
             <span>Pokreni giveaway</span>
           </button>
+          <button class="wfo-btn sc-btn sc-btn-stop" id="wfoBtnStop" style="display:none;" title="Zaustavi giveaway" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <rect x="4" y="4" width="16" height="16" rx="2"/>
+            </svg>
+            <span>Zaustavi giveaway</span>
+          </button>
           <button class="wfo-btn sc-btn sc-btn-draw" id="wfoBtnDraw">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
             </svg>
             <span>Izvuci</span>
-          </button>
-          <button class="wfo-btn sc-btn sc-btn-reset" id="wfoBtnReset">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-              <path d="M3 3v5h5"/>
-            </svg>
-            <span>Reset</span>
           </button>
         </div>
         <button class="wfo-close-btn" id="btnCloseFullscreen" onclick="window.closeFullscreen()" title="Zatvori Fullscreen (Esc)">
@@ -747,7 +820,7 @@
 
       <!-- Tocak Srece -->
       <div class="wfo-wheel-frame" id="wfoWheelFrame">
-        <svg class="wfo-wheel-pointer" viewBox="0 0 24 24" fill="#53fc18" stroke="#07050f" stroke-width="1.5">
+        <svg class="wfo-wheel-pointer" viewBox="0 0 24 24" fill="#53fc18" stroke="#07070D" stroke-width="1.5">
           <polygon points="12 24 4 0 20 0 12 24"/>
         </svg>
         <div class="wfo-canvas-wrap">
@@ -797,7 +870,11 @@
           <div class="roulette-fade-left"></div>
           <div class="roulette-fade-right"></div>
           <div class="roulette-strip" id="rouletteStripFullscreen">
-            <div class="roulette-card"><span class="roulette-card-name">Čekanje...</span></div>
+            <div class="roulette-card roulette-card-placeholder">
+              <div class="roulette-card-bar" style="background:rgba(255,255,255,0.12);"></div>
+              <div class="roulette-card-avatar" style="border-color:rgba(255,255,255,0.18); color:var(--aj-muted2);">?</div>
+              <span class="roulette-card-name">Čekanje učesnika</span>
+            </div>
           </div>
         </div>
       </div>
@@ -953,6 +1030,34 @@
       </div>
     </div>
   </div>
+
+  <!-- Reusable Confirmation Dialog Modal -->
+  <div class="confirm-modal-backdrop" id="kickajConfirmModal" onclick="window.handleConfirmModalBg(event)" role="dialog" aria-modal="true" style="display:none;">
+    <div class="confirm-modal-box" onclick="event.stopPropagation();">
+      <div class="confirm-modal-icon-wrap is-danger" id="confirmModalIconWrap">
+        <svg id="confirmModalIcon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </div>
+      <div class="confirm-modal-body">
+        <h3 class="confirm-modal-title" id="confirmModalTitle">Potvrda akcije</h3>
+        <p class="confirm-modal-desc" id="confirmModalDesc">Da li ste sigurni da želite da nastavite?</p>
+      </div>
+      <div class="confirm-modal-actions">
+        <button type="button" class="btn btn-secondary confirm-cancel-btn" id="confirmModalCancelBtn">
+          <span>Odustani</span>
+        </button>
+        <button type="button" class="btn btn-danger confirm-accept-btn" id="confirmModalAcceptBtn">
+          <span>Potvrdi</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
   <script src="js/kickaj-dashboard.js?v=20260910s" defer></script>
 </body>

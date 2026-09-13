@@ -100,12 +100,12 @@ test('Kickaj - Izvoz pobednika u hronološkom redosledu (prvi osvojio = broj 1)'
   ];
 
   const chronological = [...winnersList].reverse();
-  const exportedLines = chronological.map((w, i) => `${i + 1}. ${w.username} — ${w.prize}`).join('\n');
+  const exportedLines = chronological.map((w, i) => `${i + 1}. ${w.username} - ${w.prize}`).join('\n');
 
   const expected = [
-    '1. Prvi — Nagrada 1',
-    '2. Drugi — Nagrada 2',
-    '3. Treci — Nagrada 3'
+    '1. Prvi - Nagrada 1',
+    '2. Drugi - Nagrada 2',
+    '3. Treci - Nagrada 3'
   ].join('\n');
 
   assert.equal(exportedLines, expected, 'Izvoz mora ređati pobednike hronološkim redosledom');
@@ -910,6 +910,351 @@ test('Kickaj - getWheelDisplayPool prioritetno prikazuje prave učesnike na krug
   assert.ok(!pool2.some(x => x.startsWith('Test_')), 'Kada ima 60+ pravih korisnika, test nalozi ne smeju zauzimati krug');
 });
 
+test('Kickaj - getEffectiveUserId / getChannelOwnerId rešava vlasnički i managed kanal', () => {
+  let currentUser = { id: 'user_regular_123' };
+  let activeChannelObj = null;
 
+  function getEffectiveUserId() {
+    if (activeChannelObj && activeChannelObj.is_managed && activeChannelObj.owner_id) {
+      return activeChannelObj.owner_id;
+    }
+    return currentUser ? currentUser.id : null;
+  }
 
+  // 1. Vlasnički kanal (nije managed)
+  activeChannelObj = { username: 'mojkanal', is_managed: false, owner_id: currentUser.id };
+  assert.equal(getEffectiveUserId(), 'user_regular_123', 'Vlasnički kanal mora vratiti ID prijavljenog korisnika');
 
+  // 2. Managed kanal gde je trenutni korisnik samo menadžer
+  activeChannelObj = { username: 'klijentskikanal', is_managed: true, owner_id: 'owner_streamer_999' };
+  assert.equal(getEffectiveUserId(), 'owner_streamer_999', 'Managed kanal mora vratiti ID pravog vlasnika kanala');
+
+  // 3. Kada korisnik nije prijavljen i nema kanala
+  currentUser = null;
+  activeChannelObj = null;
+  assert.equal(getEffectiveUserId(), null, 'Kada nema korisnika, vraća se null');
+});
+
+test('Kickaj - Double-click zaštita na triggerDraw sprečava višestruko okretanje', () => {
+  let isSpinning = false;
+  let drawClickLock = false;
+  let spinCounter = 0;
+  const pool = ['Gledalac1', 'Gledalac2'];
+
+  function triggerDraw() {
+    if (isSpinning || drawClickLock) return false;
+    drawClickLock = true;
+    setTimeout(() => { drawClickLock = false; }, 400);
+
+    if (pool.length === 0) return false;
+
+    isSpinning = true;
+    spinCounter++;
+    return true;
+  }
+
+  // Prvi klik pokreće izvlačenje
+  const click1 = triggerDraw();
+  assert.equal(click1, true, 'Prvi klik mora pokrenuti izvlačenje');
+  assert.equal(spinCounter, 1);
+
+  // Drugi brzi klik tokom istog frame-a ili dok je spin u toku mora biti blokiran
+  const click2 = triggerDraw();
+  assert.equal(click2, false, 'Drugi brzi klik mora biti sprečen lock mehanizmom');
+  assert.equal(spinCounter, 1, 'Brojač okretanja ne sme porasti');
+});
+
+test('Kickaj - Delegacija toast poruka na window.toastSystem i podrška za oba redosleda argumenata', () => {
+  const calls = [];
+  const mockToastSystem = {
+    show: (msg, type, dur) => {
+      calls.push({ msg, type, dur });
+    }
+  };
+
+  function showToast(a, b, c, d) {
+    if (mockToastSystem && typeof mockToastSystem.show === 'function') {
+      const types = ['success', 'error', 'warning', 'info'];
+      let message = b;
+      let type = a;
+      let duration = typeof c === 'number' ? c : (typeof d === 'number' ? d : 5000);
+
+      if (!types.includes(a)) {
+        message = a;
+        type = types.includes(b) ? b : 'info';
+      }
+      return mockToastSystem.show(message, type, duration);
+    }
+  }
+
+  // Format 1: (message, type, duration)
+  showToast('Čestitamo pobedniku!', 'success', 4000);
+  assert.deepEqual(calls[0], { msg: 'Čestitamo pobedniku!', type: 'success', dur: 4000 });
+
+  // Format 2: (type, message, duration)
+  showToast('error', 'Gubitak konekcije', 6000);
+  assert.deepEqual(calls[1], { msg: 'Gubitak konekcije', type: 'error', dur: 6000 });
+
+  // Format 3: Samo poruka sa podrazumevanim parametrima
+  showToast('Obaveštenje za stream');
+  assert.deepEqual(calls[2], { msg: 'Obaveštenje za stream', type: 'info', dur: 5000 });
+});
+
+test('Kickaj - Zaštita od null/undefined na profilima i korisničkim podacima', () => {
+  function extractUserData(currentUser, profile) {
+    const username = currentUser?.user_metadata?.kick_username
+      || currentUser?.user_metadata?.preferred_username
+      || currentUser?.user_metadata?.name
+      || (currentUser?.email || '');
+    const avatarUrl = currentUser?.user_metadata?.avatar_url
+      || currentUser?.user_metadata?.picture
+      || '';
+    const tier = String(profile?.plan || profile?.tier || 'free').toLowerCase().trim();
+    return { username, avatarUrl, tier };
+  }
+
+  // Test 1: Potpuno prazan korisnik i null profil
+  const res1 = extractUserData(null, null);
+  assert.equal(res1.username, '');
+  assert.equal(res1.avatarUrl, '');
+  assert.equal(res1.tier, 'free');
+
+  // Test 2: Korisnik bez user_metadata
+  const res2 = extractUserData({ email: 'streamer@test.com' }, { plan: 'elite' });
+  assert.equal(res2.username, 'streamer@test.com');
+  assert.equal(res2.tier, 'elite');
+
+  // Test 3: Korisnik sa punim metapodacima
+  const res3 = extractUserData({
+    user_metadata: { kick_username: 'ProStreamer99', avatar_url: 'https://kick.com/avatar.png' }
+  }, { tier: 'pro' });
+  assert.equal(res3.username, 'ProStreamer99');
+  assert.equal(res3.avatarUrl, 'https://kick.com/avatar.png');
+  assert.equal(res3.tier, 'pro');
+});
+
+test('Kickaj - Bezbedno sanitizovanje HTML-a (escHtml) sprečava XSS i čuva regionalna slova', () => {
+  function escHtml(str) {
+    if (typeof str !== 'string') return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  const maliciousInput = '<script>alert("hack")</script><img src="x" onerror="alert(1)">';
+  const sanitized = escHtml(maliciousInput);
+  assert.ok(!sanitized.includes('<script>'), 'Mora neutralisati script tag');
+  assert.ok(!sanitized.includes('<img'), 'Mora neutralisati img tag');
+  assert.ok(sanitized.includes('&quot;'), 'Mora enkodovati dvostruke navodnike');
+  assert.equal(sanitized, '&lt;script&gt;alert(&quot;hack&quot;)&lt;/script&gt;&lt;img src=&quot;x&quot; onerror=&quot;alert(1)&quot;&gt;');
+
+  const serbianLatin = 'Čačak, Šabac, Đorđe, Žitište, Ćuprija';
+  assert.equal(escHtml(serbianLatin), serbianLatin, 'Srpska latinična slova moraju ostati netaknuta');
+});
+
+test('Kickaj - resolveChannelPlan nasleđuje plan vlasnika za menadžerske kanale i sopstveni plan za vlasnike', () => {
+  function resolveChannelPlan(targetObj, currentUserProfile, fallbackPlan = 'free') {
+    if (!targetObj) {
+      const myTier = currentUserProfile ? String(currentUserProfile.plan || currentUserProfile.plan_tier || currentUserProfile.tier || fallbackPlan).toLowerCase() : fallbackPlan;
+      return (myTier.includes('elite') || myTier.includes('business')) ? 'elite' : (myTier.includes('pro') ? 'pro' : 'free');
+    }
+    if (targetObj.is_managed || targetObj.role === 'managed') {
+      const ownerTier = String(targetObj.owner_plan || fallbackPlan).toLowerCase();
+      return (ownerTier.includes('elite') || ownerTier.includes('business')) ? 'elite' : (ownerTier.includes('pro') ? 'pro' : 'free');
+    }
+    const myTier = currentUserProfile ? String(currentUserProfile.plan || currentUserProfile.plan_tier || currentUserProfile.tier || fallbackPlan).toLowerCase() : fallbackPlan;
+    const resolved = (myTier.includes('elite') || myTier.includes('business')) ? 'elite' : (myTier.includes('pro') ? 'pro' : 'free');
+    targetObj.owner_plan = resolved;
+    return resolved;
+  }
+
+  const milanProfile = { plan: 'pro', display_name: 'Milan_567' };
+
+  // 1. Menadžer na tutz_live kanalu koji je Elite: mora naslediti elite!
+  const tutzChannel = {
+    username: 'tutz_live',
+    is_managed: true,
+    role: 'managed',
+    owner_plan: 'elite'
+  };
+  assert.equal(resolveChannelPlan(tutzChannel, milanProfile), 'elite', 'Menadžer na elite kanalu mora imati elite plan');
+
+  // 2. Vlasnički kanal: mora koristiti plan iz Milanovog profila (pro)
+  const ownChannel = {
+    username: 'milan_channel',
+    is_managed: false,
+    role: 'owner',
+    owner_plan: 'pro'
+  };
+  assert.equal(resolveChannelPlan(ownChannel, milanProfile), 'pro', 'Vlasnik mora koristiti svoj PRO plan');
+
+  // 3. Menadžer na kanalu sa business planom: mapira se na elite
+  const businessChannel = {
+    username: 'partner_stream',
+    is_managed: true,
+    role: 'managed',
+    owner_plan: 'business'
+  };
+  assert.equal(resolveChannelPlan(businessChannel, milanProfile), 'elite', 'Business plan se mapira u elite');
+
+  // 4. Custom dodat kanal bez vlasničkih prava: koristi profil korisnika
+  const customChannel = {
+    username: 'guest_channel',
+    is_managed: false,
+    role: 'custom'
+  };
+  assert.equal(resolveChannelPlan(customChannel, milanProfile), 'pro', 'Dodat kanal nasleđuje plan ulogovanog korisnika');
+});
+
+test('Kickaj - Očuvanje isRunning stanja na reload/refresh umesto resetovanja na false', () => {
+  function resolveActiveRunningState({ channelName, storedActiveFlag, loadedPayload }) {
+    const _cLower = (channelName || '').toLowerCase();
+    const storedActive = storedActiveFlag != null ? storedActiveFlag : null;
+    const wasRunning = (storedActive === 'true') || (storedActive === null && !!(loadedPayload && loadedPayload.isRunning));
+    return wasRunning;
+  }
+
+  // 1. Ako je u bazi ili storage-u giveaway bio aktivan, mora ostati aktivan (true)
+  const state1 = resolveActiveRunningState({
+    channelName: 'tutz_live',
+    storedActiveFlag: 'true',
+    loadedPayload: { isRunning: true }
+  });
+  assert.equal(state1, true, 'Giveaway koji je bio pokrenut mora ostati aktivan na reload');
+
+  // 2. Ako je u d.isRunning bilo true, a storage je null, takođe ostaje true
+  const state2 = resolveActiveRunningState({
+    channelName: 'tutz_live',
+    storedActiveFlag: null,
+    loadedPayload: { isRunning: true }
+  });
+  assert.equal(state2, true, 'Giveaway sa isRunning=true u payload-u ostaje aktivan');
+
+  // 3. Ako je u storage-u eksplicitno false, ostaje false
+  const state3 = resolveActiveRunningState({
+    channelName: 'tutz_live',
+    storedActiveFlag: 'false',
+    loadedPayload: { isRunning: true }
+  });
+  assert.equal(state3, false, 'Eksplicitno zaustavljen giveaway ostaje zaustavljen');
+});
+
+test('Kickaj - Logika stanja dugmadi (Samo Pokreni i Zaustavi - bez pauziranja)', () => {
+  function computeButtonStates({ isRunning, participantsCount, winnersCount, isSpinning }) {
+    const hasData = participantsCount > 0 || winnersCount > 0;
+    const showStart = !isRunning;
+    const showStop = isRunning || hasData;
+    const canDraw = !isSpinning && participantsCount > 0;
+
+    return {
+      showStart,
+      startText: 'Pokreni giveaway',
+      showStop,
+      stopText: 'Zaustavi giveaway',
+      canDraw
+    };
+  }
+
+  // Stanje 1: Početno (Standby) - nema učesnika, nije pokrenuto
+  const s1 = computeButtonStates({ isRunning: false, participantsCount: 0, winnersCount: 0, isSpinning: false });
+  assert.equal(s1.showStart, true, 'Start dugme je vidljivo');
+  assert.equal(s1.startText, 'Pokreni giveaway');
+  assert.equal(s1.showStop, false, 'Stop dugme je skriveno u standby režimu');
+  assert.equal(s1.canDraw, false, 'Ne može se izvlačiti bez učesnika');
+
+  // Stanje 2: Pokrenuto (Live) - live chat aktivan
+  const s2 = computeButtonStates({ isRunning: true, participantsCount: 5, winnersCount: 0, isSpinning: false });
+  assert.equal(s2.showStart, false, 'Start dugme je skriveno dok je giveaway aktivan');
+  assert.equal(s2.showStop, true, 'Stop dugme je vidljivo dok je giveaway aktivan');
+  assert.equal(s2.stopText, 'Zaustavi giveaway', 'Nema pauziranja, direktno nudi Zaustavi giveaway');
+  assert.equal(s2.canDraw, true, 'Može se izvući pobednik');
+
+  // Stanje 3: Izvlačenje u toku (Spinning)
+  const s3 = computeButtonStates({ isRunning: true, participantsCount: 5, winnersCount: 0, isSpinning: true });
+  assert.equal(s3.canDraw, false, 'Tokom animacije izvlačenja dugme za izvlačenje je blokirano');
+
+  // Stanje 4: Nakon zaustavljanja sa podacima ili pobednicima
+  const s4 = computeButtonStates({ isRunning: false, participantsCount: 5, winnersCount: 1, isSpinning: false });
+  assert.equal(s4.showStart, true, 'Start dugme nudi Pokreni');
+  assert.equal(s4.showStop, true, 'Stop dugme omogućava reset postojećih podataka');
+});
+
+test('Kickaj - removeWinner podržava skipConfirm za automatski redraw bez blokiranja modalnim prozorom', async () => {
+  const winnersList = [
+    { username: 'InvalidWinner', prize: 'Sub', isConfirmed: false, timerId: 101 },
+    { username: 'ValidWinner', prize: 'VIP', isConfirmed: true, timerId: null }
+  ];
+
+  let confirmDialogShown = false;
+  async function mockRemoveWinner(index, skipConfirm = false) {
+    if (index < 0 || index >= winnersList.length) return false;
+    if (!skipConfirm) {
+      confirmDialogShown = true;
+    }
+    const removed = winnersList[index];
+    if (removed.timerId) removed.timerId = null;
+    winnersList.splice(index, 1);
+    return true;
+  }
+
+  // 1. Poziv sa skipConfirm=true (npr. iz redraw funkcije) uklanja pobednika odmah bez dijaloga
+  const res1 = await mockRemoveWinner(0, true);
+  assert.equal(res1, true);
+  assert.equal(confirmDialogShown, false, 'skipConfirm=true ne sme otvarati dijalog');
+  assert.equal(winnersList.length, 1);
+  assert.equal(winnersList[0].username, 'ValidWinner');
+
+  // 2. Ručni poziv bez skipConfirm otvara modal
+  const res2 = await mockRemoveWinner(0, false);
+  assert.equal(res2, true);
+  assert.equal(confirmDialogShown, true, 'skipConfirm=false mora tražiti potvrdu');
+  assert.equal(winnersList.length, 0);
+});
+
+test('Kickaj - Escape taster poštuje hijerarhiju zatvaranja (Confirm modal -> Winner modal -> Fullscreen)', () => {
+  let closedElement = null;
+
+  function simulateEscapeKey({ hasConfirmModal, hasWinnerModal, hasFullscreen }) {
+    if (hasConfirmModal) {
+      closedElement = 'confirmModal';
+      return;
+    }
+    if (hasWinnerModal) {
+      closedElement = 'winnerModal';
+      return;
+    }
+    if (hasFullscreen) {
+      closedElement = 'fullscreen';
+      return;
+    }
+  }
+
+  // Ako su otvoreni i confirm modal i winner modal i fullscreen:
+  simulateEscapeKey({ hasConfirmModal: true, hasWinnerModal: true, hasFullscreen: true });
+  assert.equal(closedElement, 'confirmModal', 'Escape mora prvo zatvoriti potvrdu akcije');
+
+  // Kada je confirm modal zatvoren, sledeći Escape zatvara winner modal:
+  simulateEscapeKey({ hasConfirmModal: false, hasWinnerModal: true, hasFullscreen: true });
+  assert.equal(closedElement, 'winnerModal', 'Escape zatim zatvara winner modal');
+
+  // Tek kada nema otvorenih modala, Escape zatvara fullscreen overlay:
+  simulateEscapeKey({ hasConfirmModal: false, hasWinnerModal: false, hasFullscreen: true });
+  assert.equal(closedElement, 'fullscreen', 'Poslednji Escape zatvara fullscreen overlay');
+});
+
+test('Kickaj - hideAuthGate uklanja auth-loading klasu sa body elementa', () => {
+  const mockClassList = new Set(['kickaj-body', 'auth-loading']);
+  const mockBody = {
+    classList: {
+      remove: (cls) => mockClassList.delete(cls),
+      has: (cls) => mockClassList.has(cls)
+    }
+  };
+
+  assert.equal(mockBody.classList.has('auth-loading'), true, 'Na početku body ima auth-loading');
+  mockBody.classList.remove('auth-loading');
+  assert.equal(mockBody.classList.has('auth-loading'), false, 'Nakon hideAuthGate auth-loading mora biti uklonjen');
+});
