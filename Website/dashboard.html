@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html lang="sr">
-<script>
-  // Load saved language before rendering
-  try {
-    const savedLang = localStorage.getItem('kickall_lang') || 'sr';
-    document.documentElement.lang = savedLang;
-  } catch (e) {
-    console.warn('LocalStorage not available:', e);
-  }
-</script>
 
 <head>
   <meta charset="UTF-8" />
+  <script nonce="kickall-inline-core">
+    // Load saved language before rendering
+    try {
+      const savedLang = localStorage.getItem('kickall_lang') || 'sr';
+      document.documentElement.lang = savedLang;
+    } catch (e) {
+      console.warn('LocalStorage not available:', e);
+    }
+  </script>
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -26,11 +26,11 @@
     content="Centralni dashboard za KickAll ekosistem. Izaberi modul, prati referral nagrade i upravljaj svojim strimom." />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="canonical" href="https://kickall.app/dashboard.html" />
-  <meta name="theme-color" content="#0B0816" />
+  <meta name="theme-color" content="#080612" />
 
   <!-- Google Analytics (GA4) -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZNGNF6TEM"></script>
-  <script>
+  <script nonce="kickall-inline-core">
     window.dataLayer = window.dataLayer || [];
     function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
@@ -39,17 +39,28 @@
   </script>
   <!-- End Google Analytics -->
 
-  <!-- Optimozacija mrežnih resursa i baze -->
+  <!-- Optimizacija mrežnih resursa i baze -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://rcukparptzzyssqdmydt.supabase.co" crossorigin />
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
+  <link rel="dns-prefetch" href="https://rcukparptzzyssqdmydt.supabase.co" />
+  <link rel="dns-prefetch" href="https://milanwebportal.app.fungies.io" />
+  <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
+  <link rel="dns-prefetch" href="https://www.youtube.com" />
+
+  <!-- Preload kritičnih stilova -->
+  <link rel="preload" href="css/base.css?v=20260915-v4" as="style" />
+  <link rel="preload" href="css/dashboard.css?v=20260915-v6" as="style" />
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="/manifest.json" />
 
   <!-- Service Worker Registration -->
-  <script>
+  <script nonce="kickall-inline-core">
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
@@ -61,25 +72,25 @@
   </script>
 
   <!-- Mobile Performance Optimizations -->
-  <script src="js/mobile-optimization.js" defer></script>
+  <script src="js/mobile-optimization.js?v=20260915-v4" defer></script>
 
   <!-- Toast Notification System -->
-  <script src="js/toast.js" defer></script>
+  <script src="js/toast.js?v=20260915-v4" defer></script>
 
   <!-- Fontovi -->
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet" />
 
-  <!-- Lenis Smooth Scroll -->
-  <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+  <!-- Lenis Smooth Scroll sa SRI hešom -->
+  <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js" integrity="sha384-li4UtcFCH6QeUqR4JyV58/VgTprMuz9aauj+oWtew7V4Y7ZVjnvz5px9Y3UCG0Ea" crossorigin="anonymous" defer></script>
 
   <!-- Favicon i Stilovi -->
   <link rel="icon" href="/assets/favicon.ico" sizes="48x48" type="image/x-icon" />
   <link rel="shortcut icon" href="/assets/favicon.ico" />
-  <link rel="stylesheet" href="css/base.css" />
-  <link rel="stylesheet" href="css/style.css" />
-  <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="css/base.css?v=20260915-v4" />
+  <link rel="stylesheet" href="css/style.css?v=20260915-v4" />
+  <link rel="stylesheet" href="css/dashboard.css?v=20260915-v6" />
 </head>
 
 <body class="auth-loading">
@@ -101,14 +112,14 @@
           fetchpriority="high" />
       </div>
       <div class="auth-gate-spinner"></div>
-      <p id="authGateMsg" class="auth-gate-msg">Proveravamo sesiju...</p>
+      <p id="authGateMsg" class="auth-gate-msg" aria-live="polite">Proveravamo sesiju...</p>
     </div>
   </div>
 
   <!-- Header / Navigation -->
   <header class="header" role="banner">
     <div class="container nav-container">
-      <a href="index.html" class="logo" id="navLogo">
+      <a href="index.html" class="logo" id="navLogo" aria-label="KickALL Početna">
         <img src="assets/kickall.webp" alt="KickALL Logo" class="logo-img" width="160" height="48" fetchpriority="high">
       </a>
       <nav class="nav-menu" id="navMenu">
@@ -197,60 +208,91 @@
     <div class="container dashboard-main-container">
 
       <!-- Welcome Header -->
-      <section class="welcome-section">
-        <h1 class="welcome-title">
-          <span data-i18n="dashboard.ecosystem">Ekosistem <span class="gradient-text">KickALL</span></span>
+      <section class="welcome-section" aria-labelledby="welcomeTitle">
+        <h1 class="welcome-title" id="welcomeTitle">
+          <span id="welcomeGreeting"><span data-i18n="dashboard.ecosystem">Ekosistem <span class="gradient-text">KickALL</span></span></span>
         </h1>
         <p class="welcome-subtitle">
-          <span data-i18n="dashboard.subtitle">Izaberi modul sa kojim želiš da upravljaš i podesi svoj stream za
-            nekoliko trenutaka.</span>
+          <span data-i18n="dashboard.subtitle">Izaberi modul sa kojim želiš da upravljaš i podesi svoj stream za nekoliko trenutaka.</span>
         </p>
       </section>
 
       <!-- Grid of Modules -->
-      <section class="module-grid">
+      <section class="module-grid" aria-label="KickALL Moduli">
 
         <!-- kickot Card -->
-        <div class="module-dashboard-card card-kickot"
-          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } location.href='/kickot/dashboard'">
-          <div class="card-laser-glow"></div>
+        <article class="module-dashboard-card card-kickot" id="moduleCard-kickot"
+          role="link" tabindex="0" data-module="kickot"
+          aria-label="Kickot - Chatbot asistent, moderacija, komande i mini-igre"
+          onclick="navigateToModule('kickot')"
+          onkeydown="handleModuleKeydown(event, 'kickot')">
+          <div class="card-laser-glow" aria-hidden="true"></div>
+          <div class="card-ambient-bg card-ambient-kickot" aria-hidden="true">
+            <svg viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M0 60 H90 L120 90 H220 L250 60 H300" stroke="rgba(83, 252, 24, 0.22)" stroke-width="1.5" stroke-dasharray="4 6"/>
+              <path d="M20 150 H130 L160 120 H280" stroke="rgba(83, 252, 24, 0.16)" stroke-width="1.5" stroke-dasharray="3 5"/>
+              <circle cx="120" cy="90" r="3.5" fill="rgba(83, 252, 24, 0.5)"/>
+              <circle cx="220" cy="90" r="3.5" fill="rgba(83, 252, 24, 0.5)"/>
+              <circle cx="160" cy="120" r="3" fill="rgba(83, 252, 24, 0.4)"/>
+            </svg>
+          </div>
           <div class="card-header-row">
-            <span class="card-status-badge status-active">
-              <span class="status-pulse-dot"></span>
-              <span data-i18n="dashboard.active">Aktivan</span>
-            </span>
-            <div class="card-icon-wrap">
+            <div class="card-status-pill status-active" id="statusPill-kickot" role="status">
+              <span class="status-pulse-dot" aria-hidden="true"></span>
+              <span class="status-pill-text" id="statusText-kickot" data-i18n="dashboard.active">Aktivan</span>
+              <span class="status-pill-tooltip" id="statusTooltip-kickot" aria-hidden="true">100% operativno</span>
+            </div>
+            <div class="card-icon-wrap" aria-hidden="true">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 8V4H8" />
-                <rect x="4" y="8" width="16" height="12" rx="2" />
-                <path d="M9 12v2" />
-                <path d="M15 12v2" />
-                <path d="M19 12h2" />
-                <path d="M3 12h2" />
+                <rect x="3" y="11" width="18" height="10" rx="2" />
+                <circle cx="12" cy="5" r="2" />
+                <path d="M12 7v4" />
+                <line x1="8" y1="16" x2="8.01" y2="16" stroke-width="3" />
+                <line x1="16" y1="16" x2="16.01" y2="16" stroke-width="3" />
               </svg>
             </div>
           </div>
-          <h2 class="card-title">Kickot</h2>
-          <p class="card-description">
-            <span data-i18n="dashboard.kickotDesc">Tvoj glavni pametni chatbot asistent. Prilagođene komande, automatska moderacija chata, poeni gledanosti, rangovi i mini-igre za publiku.</span>
-          </p>
-          <a href="#" class="card-btn btn-green-fill"
-            onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); window.location.href = '/kickot/dashboard'; } catch(e) { console.error('Failed to set navigation flags:', e); } return false;">
-            <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
-          </a>
-        </div>
+          <div class="card-body">
+            <h2 class="card-title">Kickot</h2>
+            <p class="card-description">
+              <span data-i18n="dashboard.kickotDesc">Tvoj glavni pametni chatbot asistent. Prilagođene komande, automatska moderacija chata, poeni gledanosti, rangovi i mini-igre za publiku.</span>
+            </p>
+          </div>
+          <div class="card-action-row">
+            <button type="button" class="card-btn btn-kickot" aria-label="Otvori Kickot Dashboard"
+              onclick="event.stopPropagation(); navigateToModule('kickot');">
+              <span class="card-btn-text" data-i18n="dashboard.openDashboard">Otvori Dashboard</span>
+              <svg class="card-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </button>
+          </div>
+        </article>
 
         <!-- kickaj Card -->
-        <div class="module-dashboard-card card-kickaj"
-          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } location.href='/kickaj/dashboard'">
-          <div class="card-laser-glow"></div>
+        <article class="module-dashboard-card card-kickaj" id="moduleCard-kickaj"
+          role="link" tabindex="0" data-module="kickaj"
+          aria-label="Kickaj - Giveaway studio, točak sreće, rulet i darivanja"
+          onclick="navigateToModule('kickaj')"
+          onkeydown="handleModuleKeydown(event, 'kickaj')">
+          <div class="card-laser-glow" aria-hidden="true"></div>
+          <div class="card-ambient-bg card-ambient-kickaj" aria-hidden="true">
+            <svg viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="250" cy="45" r="85" stroke="rgba(192, 132, 252, 0.2)" stroke-width="1.5" stroke-dasharray="4 6"/>
+              <circle cx="250" cy="45" r="50" stroke="rgba(192, 132, 252, 0.22)" stroke-width="1.5"/>
+              <path d="M250 45 L175 10 M250 45 L170 65 M250 45 L205 115" stroke="rgba(192, 132, 252, 0.16)" stroke-width="1.5"/>
+              <polygon points="120,45 124,53 133,56 124,59 120,67 116,59 107,56 116,53" fill="rgba(192, 132, 252, 0.3)"/>
+            </svg>
+          </div>
           <div class="card-header-row">
-            <span class="card-status-badge status-active">
-              <span class="status-pulse-dot"></span>
-              <span data-i18n="dashboard.active">Aktivan</span>
-            </span>
-            <div class="card-icon-wrap">
+            <div class="card-status-pill status-active" id="statusPill-kickaj" role="status">
+              <span class="status-pulse-dot" aria-hidden="true"></span>
+              <span class="status-pill-text" id="statusText-kickaj" data-i18n="dashboard.active">Aktivan</span>
+              <span class="status-pill-tooltip" id="statusTooltip-kickaj" aria-hidden="true">100% operativno</span>
+            </div>
+            <div class="card-icon-wrap" aria-hidden="true">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 12 20 22 4 22 4 12" />
@@ -261,55 +303,99 @@
               </svg>
             </div>
           </div>
-          <h2 class="card-title">Kickaj</h2>
-          <p class="card-description">
-            <span data-i18n="dashboard.kickajDesc">Kompletan interaktivni studio za nagradne igre. Brzo izvlačenje pobednika uživo iz live chata uz točak sreće, slot mašinu i neon rulet.</span>
-          </p>
-          <a href="#" class="card-btn btn-green-fill"
-            onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } window.location.href='/kickaj/dashboard'; return false;">
-            <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
-          </a>
-        </div>
+          <div class="card-body">
+            <h2 class="card-title">Kickaj</h2>
+            <p class="card-description">
+              <span data-i18n="dashboard.kickajDesc">Kompletan interaktivni studio za nagradne igre. Brzo izvlačenje pobednika uživo iz live chata uz točak sreće, slot mašinu i neon rulet.</span>
+            </p>
+          </div>
+          <div class="card-action-row">
+            <button type="button" class="card-btn btn-kickaj" aria-label="Otvori Kickaj Dashboard"
+              onclick="event.stopPropagation(); navigateToModule('kickaj');">
+              <span class="card-btn-text" data-i18n="dashboard.openDashboard">Otvori Dashboard</span>
+              <svg class="card-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </button>
+          </div>
+        </article>
 
         <!-- kickan Card -->
-        <div class="module-dashboard-card card-kickan"
-          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } location.href='/kickan/dashboard'">
-          <div class="card-laser-glow"></div>
+        <article class="module-dashboard-card card-kickan" id="moduleCard-kickan"
+          role="link" tabindex="0" data-module="kickan"
+          aria-label="Kickan - Analitika strima, statistika i praćenje rasta gledanosti"
+          onclick="navigateToModule('kickan')"
+          onkeydown="handleModuleKeydown(event, 'kickan')">
+          <div class="card-laser-glow" aria-hidden="true"></div>
+          <div class="card-ambient-bg card-ambient-kickan" aria-hidden="true">
+            <svg viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 160 Q80 140, 140 100 T270 30" stroke="rgba(245, 158, 11, 0.25)" stroke-width="2" stroke-linecap="round"/>
+              <path d="M10 160 Q80 140, 140 100 T270 30 L270 190 L10 190 Z" fill="url(#kickanAmbientGrad)"/>
+              <circle cx="270" cy="30" r="4" fill="rgba(245, 158, 11, 0.65)"/>
+              <defs>
+                <linearGradient id="kickanAmbientGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="rgba(245, 158, 11, 0.16)"/>
+                  <stop offset="100%" stop-color="rgba(245, 158, 11, 0)"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
           <div class="card-header-row">
-            <span class="card-status-badge status-active">
-              <span class="status-pulse-dot"></span>
-              <span data-i18n="dashboard.active">Aktivan</span>
-            </span>
-            <div class="card-icon-wrap">
+            <div class="card-status-pill status-active" id="statusPill-kickan" role="status">
+              <span class="status-pulse-dot" aria-hidden="true"></span>
+              <span class="status-pill-text" id="statusText-kickan" data-i18n="dashboard.active">Aktivan</span>
+              <span class="status-pill-tooltip" id="statusTooltip-kickan" aria-hidden="true">100% operativno</span>
+            </div>
+            <div class="card-icon-wrap" aria-hidden="true">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="20" x2="18" y2="10" />
                 <line x1="12" y1="20" x2="12" y2="4" />
                 <line x1="6" y1="20" x2="6" y2="14" />
+                <path d="M3 20h18" />
               </svg>
             </div>
           </div>
-          <h2 class="card-title">Kickan</h2>
-          <p class="card-description">
-            <span data-i18n="dashboard.kickanDesc">Napredna analitika i statistika kanala. Praćenje rasta gledanosti, novih pratilaca i metrika strima u realnom vremenu.</span>
-          </p>
-          <a href="#" class="card-btn btn-green-fill"
-            onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } window.location.href='/kickan/dashboard'; return false;">
-            <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
-          </a>
-        </div>
+          <div class="card-body">
+            <h2 class="card-title">Kickan</h2>
+            <p class="card-description">
+              <span data-i18n="dashboard.kickanDesc">Napredna analitika i statistika kanala. Praćenje rasta gledanosti, novih pratilaca i metrika strima u realnom vremenu.</span>
+            </p>
+          </div>
+          <div class="card-action-row">
+            <button type="button" class="card-btn btn-kickan" aria-label="Otvori Kickan Dashboard"
+              onclick="event.stopPropagation(); navigateToModule('kickan');">
+              <span class="card-btn-text" data-i18n="dashboard.openDashboard">Otvori Dashboard</span>
+              <svg class="card-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </button>
+          </div>
+        </article>
 
         <!-- kickov Card -->
-        <div class="module-dashboard-card card-kickov"
-          onclick="try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } location.href='/kickov/dashboard'">
-          <div class="card-laser-glow"></div>
+        <article class="module-dashboard-card card-kickov" id="moduleCard-kickov"
+          role="link" tabindex="0" data-module="kickov"
+          aria-label="Kickov - OBS overleji, alerti i interaktivni vidžeti"
+          onclick="navigateToModule('kickov')"
+          onkeydown="handleModuleKeydown(event, 'kickov')">
+          <div class="card-laser-glow" aria-hidden="true"></div>
+          <div class="card-ambient-bg card-ambient-kickov" aria-hidden="true">
+            <svg viewBox="0 0 300 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="155" y="25" width="125" height="85" rx="6" stroke="rgba(6, 182, 212, 0.22)" stroke-width="1.5" stroke-dasharray="6 4"/>
+              <path d="M145 20 L155 20 L155 30 M290 20 L280 20 L280 30 M145 115 L155 115 L155 105 M290 115 L280 115 L280 105" stroke="rgba(6, 182, 212, 0.45)" stroke-width="2"/>
+              <circle cx="217" cy="67" r="6" stroke="rgba(6, 182, 212, 0.35)" stroke-width="1.5"/>
+            </svg>
+          </div>
           <div class="card-header-row">
-            <span class="card-status-badge status-active"
-              style="background: rgba(6, 182, 212, 0.12); color: #06b6d4; border-color: rgba(6, 182, 212, 0.35);">
-              <span class="status-pulse-dot" style="background:#06b6d4; box-shadow:0 0 8px #06b6d4;"></span>
-              <span data-i18n="dashboard.active">Aktivan</span>
-            </span>
-            <div class="card-icon-wrap">
+            <div class="card-status-pill status-active" id="statusPill-kickov" role="status">
+              <span class="status-pulse-dot" aria-hidden="true"></span>
+              <span class="status-pill-text" id="statusText-kickov" data-i18n="dashboard.active">Aktivan</span>
+              <span class="status-pill-tooltip" id="statusTooltip-kickov" aria-hidden="true">100% operativno</span>
+            </div>
+            <div class="card-icon-wrap" aria-hidden="true">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
@@ -318,15 +404,23 @@
               </svg>
             </div>
           </div>
-          <h2 class="card-title">Kickov</h2>
-          <p class="card-description">
-            <span data-i18n="dashboard.kickovDesc">Prilagodljivi OBS alerti i moderni stream vidžeti u realnom vremenu. Chat box, vizuelni ciljevi i direktne donacije sa nula posto provizije.</span>
-          </p>
-          <a href="#" class="card-btn btn-green-fill"
-            onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickall', 'true'); localStorage.setItem('kick_origin_site', 'kickall'); } catch(e) { console.error('Failed to set navigation flags:', e); } window.location.href='/kickov/dashboard'; return false;">
-            <span data-i18n="dashboard.openDashboard">Otvori Dashboard →</span>
-          </a>
-        </div>
+          <div class="card-body">
+            <h2 class="card-title">Kickov</h2>
+            <p class="card-description">
+              <span data-i18n="dashboard.kickovDesc">Prilagodljivi OBS alerti i moderni stream vidžeti u realnom vremenu. Chat box, vizuelni ciljevi i direktne donacije sa nula posto provizije.</span>
+            </p>
+          </div>
+          <div class="card-action-row">
+            <button type="button" class="card-btn btn-kickov" aria-label="Otvori Kickov Dashboard"
+              onclick="event.stopPropagation(); navigateToModule('kickov');">
+              <span class="card-btn-text" data-i18n="dashboard.openDashboard">Otvori Dashboard</span>
+              <svg class="card-btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </button>
+          </div>
+        </article>
 
       </section>
 
@@ -533,7 +627,7 @@
           <label class="form-label" id="paymentDetailsLabel">
             <span data-i18n="dashboard.paypalEmail">PayPal Email</span>
           </label>
-          <input type="text" id="paymentDetails" class="form-input" placeholder="your@email.com" required>
+          <input type="text" id="paymentDetails" class="form-input" placeholder="your@email.com" autocomplete="email" aria-describedby="paymentDetailsHint" required>
           <p class="form-hint" id="paymentDetailsHint">
             <span data-i18n="dashboard.paypalEmailHint">Unesi svoj PayPal email adresu</span>
           </p>
@@ -706,15 +800,15 @@
 
   <!-- Supabase & Custom Script -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/config.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/dashboard.js"></script>
+  <script src="js/config.js?v=20260915-v4"></script>
+  <script src="js/app.js?v=20260915-v4"></script>
+  <script src="js/dashboard.js?v=20260915-v4"></script>
 
   <!-- KickALL Data Layer & Analytics -->
-  <script src="js/data-layer.js"></script>
-  <script src="js/route-tracking.js"></script>
-  <script src="js/consent-banner.js"></script>
-  <script src="js/analytics.js"></script>
+  <script src="js/data-layer.js?v=20260915-v4" defer></script>
+  <script src="js/route-tracking.js?v=20260915-v4" defer></script>
+  <script src="js/consent-banner.js?v=20260915-v4" defer></script>
+  <script src="js/analytics.js?v=20260915-v4" defer></script>
 </body>
 
 </html>

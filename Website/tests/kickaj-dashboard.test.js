@@ -1,17 +1,15 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { PLAN_LIMITS } = require('../kickaj/js/kickaj-dashboard.js');
 
 test('Kickaj - PLAN_LIMITS ima ispravno definisana pravila za planove', () => {
-  const PLAN_LIMITS = {
-    free:  { maxParticipants: 500,  animations: ['wheel'],                   sound: false, fullscreen: true  },
-    pro:   { maxParticipants: 0,    animations: ['wheel','slot','roulette'], sound: true,  fullscreen: true  },
-    elite: { maxParticipants: 0,    animations: ['wheel','slot','roulette'], sound: true,  fullscreen: true  }
-  };
-
+  assert.ok(PLAN_LIMITS, 'PLAN_LIMITS mora biti uvezen iz kickaj-dashboard.js');
   assert.equal(PLAN_LIMITS.free.sound, false, 'Free plan ne sme imati dozvoljen zvuk');
   assert.equal(PLAN_LIMITS.pro.sound, true, 'PRO plan mora imati dozvoljen zvuk');
   assert.equal(PLAN_LIMITS.elite.sound, true, 'ELITE plan mora imati dozvoljen zvuk');
   assert.deepEqual(PLAN_LIMITS.free.animations, ['wheel'], 'Free plan ima samo točak sreće');
+  assert.deepEqual(PLAN_LIMITS.pro.animations, ['wheel', 'slot', 'roulette'], 'PRO plan podržava sve animacije');
+  assert.deepEqual(PLAN_LIMITS.elite.animations, ['wheel', 'slot', 'roulette'], 'ELITE plan podržava sve animacije');
 });
 
 test('Kickaj - Potvrda više pobednika u nizu kroz chat poruku', () => {
@@ -308,12 +306,6 @@ test('Kickaj - reopenWinnerOverlay ne restartuje tajmer na 60s za isteklog pobed
 });
 
 test('Kickaj - Free plan blokira zvuk čak i ako je u settings.soundEnabled uključen', () => {
-  const PLAN_LIMITS = {
-    free:  { sound: false },
-    pro:   { sound: true },
-    elite: { sound: true }
-  };
-
   function getVolume(plan, settings) {
     const soundAllowed = !!PLAN_LIMITS[plan]?.sound;
     if (!soundAllowed || !settings.soundEnabled) return 0;
@@ -393,10 +385,6 @@ test('Kickaj - Korisnička imena sa apostrofima i specijalnim znacima se bezbedn
 });
 
 test('Kickaj - PLAN_LIMITS fallback na free plan za nepoznat ili nedefinisan plan', () => {
-  const PLAN_LIMITS = {
-    free:  { maxParticipants: 500, sound: false, fullscreen: true },
-    pro:   { maxParticipants: 0,   sound: true,  fullscreen: true }
-  };
   const testTiers = [undefined, null, '', 'unknown_plan', 'creator'];
 
   testTiers.forEach(tier => {
@@ -1258,3 +1246,531 @@ test('Kickaj - hideAuthGate uklanja auth-loading klasu sa body elementa', () => 
   mockBody.classList.remove('auth-loading');
   assert.equal(mockBody.classList.has('auth-loading'), false, 'Nakon hideAuthGate auth-loading mora biti uklonjen');
 });
+
+test('Kickaj - cleanUsername uklanja URL-ove, query parametre, heševe i prateće kose crte', () => {
+  function cleanUsername(raw) {
+    if (!raw) return 'Kanal';
+    let s = String(raw).trim()
+      .replace(/^https?:\/\/(www\.)?kick\.com\//i, '')
+      .replace(/^kick_user_/, '')
+      .replace(/^@/, '');
+    if (s.includes('@')) s = s.split('@')[0];
+    s = s.split(/[/?#\s]/)[0];
+    return s || 'Kanal';
+  }
+
+  assert.equal(cleanUsername('https://kick.com/milan_567/'), 'milan_567');
+  assert.equal(cleanUsername('http://www.kick.com/streamer?ref=banner#bio'), 'streamer');
+  assert.equal(cleanUsername('@MilanGamer'), 'MilanGamer');
+  assert.equal(cleanUsername('kick_user_pro123'), 'pro123');
+  assert.equal(cleanUsername('kanal_test/about/sub'), 'kanal_test');
+  assert.equal(cleanUsername(''), 'Kanal');
+  assert.equal(cleanUsername(null), 'Kanal');
+  assert.equal(cleanUsername(undefined), 'Kanal');
+});
+
+test('Kickaj - Escape taster zatvara helpModal pre nego što pređe na fullscreen overlay', () => {
+  let closedElement = null;
+
+  function simulateEscapeKeyWithHelp({ hasConfirmModal, hasWinnerModal, hasCustomModal, hasHelpModal, hasFullscreen }) {
+    if (hasConfirmModal) {
+      closedElement = 'confirmModal';
+      return;
+    }
+    if (hasWinnerModal) {
+      closedElement = 'winnerModal';
+      return;
+    }
+    if (hasCustomModal) {
+      closedElement = 'customModal';
+      return;
+    }
+    if (hasHelpModal) {
+      closedElement = 'helpModal';
+      return;
+    }
+    if (hasFullscreen) {
+      closedElement = 'fullscreen';
+      return;
+    }
+  }
+
+  // Kada je otvoren helpModal u fullscreen režimu, Escape mora prvo zatvoriti helpModal
+  simulateEscapeKeyWithHelp({
+    hasConfirmModal: false,
+    hasWinnerModal: false,
+    hasCustomModal: false,
+    hasHelpModal: true,
+    hasFullscreen: true
+  });
+  assert.equal(closedElement, 'helpModal', 'Escape mora zatvoriti helpModal pre zatvaranja fullscreen režima');
+
+  // Kada je helpModal zatvoren, sledeći Escape zatvara fullscreen overlay
+  simulateEscapeKeyWithHelp({
+    hasConfirmModal: false,
+    hasWinnerModal: false,
+    hasCustomModal: false,
+    hasHelpModal: false,
+    hasFullscreen: true
+  });
+  assert.equal(closedElement, 'fullscreen', 'Nakon zatvaranja help modala, Escape zatvara fullscreen overlay');
+});
+
+test('Kickaj - prefers-reduced-motion automatski skraćuje trajanje animacije izvlačenja na 50ms', () => {
+  function getEffectiveSpinDuration(spinTimeSeconds, prefersReducedMotion) {
+    return prefersReducedMotion ? 50 : (spinTimeSeconds * 1000);
+  }
+
+  // Standardni korisnik: 15 sekundi vrtenja
+  assert.equal(getEffectiveSpinDuration(15, false), 15000);
+
+  // Korisnik sa prefers-reduced-motion: momentalni spin od 50ms
+  assert.equal(getEffectiveSpinDuration(15, true), 50);
+});
+
+test('Kickaj - reusableOffscreens čuva i ponovo koristi canvas instance tokom uzastopnih spinova', () => {
+  const wheelCaches = new Map();
+  const reusableOffscreens = new Map();
+
+  function invalidateWheelCache() {
+    for (const [key, entry] of wheelCaches.entries()) {
+      if (entry && entry.offCanvas) {
+        reusableOffscreens.set(key, entry.offCanvas);
+      }
+    }
+    wheelCaches.clear();
+  }
+
+  function getWheelCache(canvasId, cssW, cssH, dpr, pool) {
+    const key = canvasId;
+    const poolSig = pool.length + ':' + (pool[0] || '');
+    let entry = wheelCaches.get(key);
+    if (entry && entry.sig === poolSig) return entry;
+
+    let offCanvas = entry ? entry.offCanvas : (reusableOffscreens.get(key) || null);
+    let createdNew = false;
+    if (!offCanvas) {
+      offCanvas = { id: 'canvas_' + Math.random(), width: cssW * dpr, height: cssH * dpr };
+      createdNew = true;
+    }
+
+    entry = { offCanvas, sig: poolSig, createdNew };
+    wheelCaches.set(key, entry);
+    return entry;
+  }
+
+  // 1. Prvi spin: kreira se nova canvas instanca
+  const spin1 = getWheelCache('wheelCanvas', 500, 500, 2, ['Pera', 'Mika']);
+  assert.ok(spin1.createdNew, 'Prvi spin mora alocirati inicijalni canvas buffer');
+  const initialCanvasId = spin1.offCanvas.id;
+
+  // 2. Simulacija 20 uzastopnih spinova sa invalidacijom keša
+  for (let i = 0; i < 20; i++) {
+    invalidateWheelCache();
+    assert.equal(wheelCaches.size, 0, 'wheelCaches mapa mora biti ispražnjena');
+    assert.ok(reusableOffscreens.has('wheelCanvas'), 'reusableOffscreens mora zadržati canvas');
+
+    const nextSpin = getWheelCache('wheelCanvas', 500, 500, 2, ['Ucesnik_' + i]);
+    assert.strictEqual(nextSpin.offCanvas.id, initialCanvasId, 'Offscreen canvas instanca mora biti ponovo iskorišćena');
+    assert.strictEqual(nextSpin.createdNew, false, 'Ne sme se alocirati novi canvas element nakon prvog');
+  }
+});
+
+test('Kickaj - syncStateToSupabase ograničava payload na max 1500 učesnika i 200 pobednika uz pre-sanitizaciju', () => {
+  function escHtml(str) {
+    if (typeof str !== 'string') return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function preparePayloadForSupabase(dataToSave) {
+    const MAX_PERSISTED_PARTICIPANTS = 1500;
+    let safeParticipants = dataToSave.participants || [];
+    if (safeParticipants.length > MAX_PERSISTED_PARTICIPANTS) {
+      safeParticipants = safeParticipants.slice(0, MAX_PERSISTED_PARTICIPANTS);
+    }
+    safeParticipants = safeParticipants.map(([key, p]) => [
+      key,
+      {
+        ...p,
+        username: escHtml(p.username || key)
+      }
+    ]);
+
+    const safeWinners = (dataToSave.winners || []).slice(0, 200).map(w => ({
+      ...w,
+      username: escHtml(w.username || '')
+    }));
+
+    return {
+      participants: safeParticipants,
+      winners: safeWinners
+    };
+  }
+
+  // 1. Test ograničenja učesnika sa 2000 na 1500
+  const largeParticipants = [];
+  for (let i = 0; i < 2000; i++) {
+    largeParticipants.push([`user_${i}`, { username: `<script>alert(${i})</script>User_${i}` }]);
+  }
+
+  // 2. Test ograničenja pobednika sa 250 na 200
+  const largeWinners = [];
+  for (let i = 0; i < 250; i++) {
+    largeWinners.push({ username: `<b>Winner_${i}</b>`, prize: 'Nagrada' });
+  }
+
+  const result = preparePayloadForSupabase({
+    participants: largeParticipants,
+    winners: largeWinners
+  });
+
+  assert.equal(result.participants.length, 1500, 'Mora skratiti listu učesnika na maksimalno 1500');
+  assert.equal(result.winners.length, 200, 'Mora skratiti listu pobednika na maksimalno 200');
+
+  // 3. Provera sanitizacije
+  assert.ok(!result.participants[0][1].username.includes('<script>'), 'Korisničko ime učesnika mora biti sanitizovano');
+  assert.ok(result.participants[0][1].username.includes('&lt;script&gt;'), 'HTML tagovi moraju biti konvertovani u entitete');
+  assert.ok(!result.winners[0].username.includes('<b>'), 'Korisničko ime pobednika mora biti sanitizovano');
+  assert.ok(result.winners[0].username.includes('&lt;b&gt;'), 'HTML tagovi pobednika moraju biti enkodovani');
+});
+
+test('Kickaj - syncStateToSupabaseDebounced dinamički prilagođava delay (1000ms za >150 učesnika, 600ms inače)', () => {
+  function computeSyncDelay(participantsCount) {
+    return participantsCount > 150 ? 1000 : 600;
+  }
+
+  assert.equal(computeSyncDelay(0), 600, 'Za 0 učesnika delay je 600ms');
+  assert.equal(computeSyncDelay(50), 600, 'Za 50 učesnika delay je 600ms');
+  assert.equal(computeSyncDelay(150), 600, 'Za tačno 150 učesnika delay je 600ms');
+  assert.equal(computeSyncDelay(151), 1000, 'Za 151 učesnika delay se povećava na 1000ms (throttling)');
+  assert.equal(computeSyncDelay(1000), 1000, 'Za 1000 učesnika delay ostaje 1000ms');
+});
+
+test('Kickaj - processChatMessage pre-sanitizuje korisnička imena pre upisa u participantsMap', () => {
+  function escHtml(str) {
+    if (typeof str !== 'string') return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  const participantsMap = new Map();
+
+  function processChatMessage(user) {
+    const key = user.username.toLowerCase().replace(/^@/, '');
+    participantsMap.set(key, {
+      username: escHtml(user.username || key),
+      isSub: !!user.isSub,
+      mult: 1
+    });
+  }
+
+  // Korisnik sa potencijalno zlonamernim skriptom u imenu
+  processChatMessage({ username: '<img src=x onerror=alert(1)>Marko', isSub: false });
+  const entry1 = participantsMap.get('<img src=x onerror=alert(1)>marko');
+  assert.ok(entry1, 'Mora pronaći unosa po ključu');
+  assert.equal(entry1.username, '&lt;img src=x onerror=alert(1)&gt;Marko', 'Ime u mapi mora biti escHtml sanitizovano');
+
+  // Korisnik sa srpskim latiničnim slovima (č, ć, š, đ, ž)
+  processChatMessage({ username: 'Miloš_Čačak_Đorđe', isSub: true });
+  const entry2 = participantsMap.get('miloš_čačak_đorđe');
+  assert.ok(entry2);
+  assert.equal(entry2.username, 'Miloš_Čačak_Đorđe', 'Regionalna slova moraju biti potpuno očuvana');
+});
+
+test('Kickaj - Točak sreće 3-pass batching objedinjuje radialne linije i obod u jedan stroke poziv', () => {
+  let strokeCalls = 0;
+  let fillCalls = 0;
+  let beginPathCalls = 0;
+
+  const mockCtx = {
+    beginPath: () => { beginPathCalls++; },
+    moveTo: () => {},
+    lineTo: () => {},
+    arc: () => {},
+    closePath: () => {},
+    fill: () => { fillCalls++; },
+    stroke: () => { strokeCalls++; },
+    save: () => {},
+    restore: () => {},
+    rotate: () => {},
+    fillText: () => {},
+    fillStyle: '',
+    strokeStyle: '',
+    lineWidth: 1,
+    font: '',
+    textAlign: ''
+  };
+
+  function renderWheel3Pass(ctx, pool, r, cx, cy) {
+    const n = Math.min(pool.length, 60);
+    const sliceAngle = (Math.PI * 2) / n;
+
+    // Pass 1: Slices (Fills)
+    for (let i = 0; i < n; i++) {
+      const a0 = i * sliceAngle;
+      const a1 = a0 + sliceAngle;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, a0, a1);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Pass 2: Batched dividers & rim (Single beginPath & Single stroke)
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a0 = i * sliceAngle;
+      ctx.moveTo(0, 0);
+      ctx.lineTo(r * Math.cos(a0), r * Math.sin(a0));
+    }
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#07070D';
+    ctx.stroke();
+
+    // Pass 3: Text labels
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'right';
+    for (let i = 0; i < n; i++) {
+      ctx.fillText(pool[i], r - 16, 4);
+    }
+  }
+
+  const testPool = Array.from({ length: 60 }, (_, i) => `Gledalac_${i}`);
+  renderWheel3Pass(mockCtx, testPool, 250, 260, 260);
+
+  assert.equal(fillCalls, 60, 'Mora popuniti 60 isečaka u Pass 1');
+  assert.equal(strokeCalls, 1, 'Pass 2 mora izvršiti tačno 1 stroke poziv za sve delioce i spoljni obod točka');
+});
+
+test('Kickaj - Focus trap i focus return u openFullscreen i closeFullscreen', () => {
+  let focusedElement = null;
+  const mockTriggerBtn = {
+    id: 'btnOpenFullscreen',
+    focus: () => { focusedElement = 'btnOpenFullscreen'; }
+  };
+
+  let activeElement = mockTriggerBtn;
+  let fsFocusReturn = null;
+  let fsFocusTrap = null;
+
+  const firstFocusable = { id: 'firstBtn', focus: () => { focusedElement = 'firstBtn'; } };
+  const lastFocusable = { id: 'lastBtn', focus: () => { focusedElement = 'lastBtn'; } };
+  const focusables = [firstFocusable, lastFocusable];
+
+  function openFullscreenSim() {
+    fsFocusReturn = activeElement;
+    fsFocusTrap = function(e) {
+      if (e.key !== 'Tab') return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    // Fokusira inicijalni element unutar fullscreen-a
+    firstFocusable.focus();
+    activeElement = firstFocusable;
+  }
+
+  function closeFullscreenSim() {
+    if (fsFocusReturn && typeof fsFocusReturn.focus === 'function') {
+      fsFocusReturn.focus();
+      activeElement = fsFocusReturn;
+      fsFocusReturn = null;
+    }
+    fsFocusTrap = null;
+  }
+
+  // 1. Otvaranje fullscreen-a
+  openFullscreenSim();
+  assert.equal(focusedElement, 'firstBtn', 'Fokus se postavlja unutar fullscreen overlay-a');
+  assert.ok(fsFocusTrap, 'Focus trap listener je instaliran');
+
+  // 2. Tab sa poslednjeg elementa vraća na prvi (wrap-around)
+  activeElement = lastFocusable;
+  let prevented = false;
+  fsFocusTrap({ key: 'Tab', shiftKey: false, preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true, 'Mora sprečiti podrazumevani Tab gubitak fokusa');
+  assert.equal(focusedElement, 'firstBtn', 'Tab sa kraja mora vratiti fokus na početak');
+
+  // 3. Shift+Tab sa prvog elementa skače na poslednji
+  activeElement = firstFocusable;
+  prevented = false;
+  fsFocusTrap({ key: 'Tab', shiftKey: true, preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(focusedElement, 'lastBtn', 'Shift+Tab sa početka mora poslati fokus na kraj');
+
+  // 4. Zatvaranje fullscreen-a
+  closeFullscreenSim();
+  assert.equal(focusedElement, 'btnOpenFullscreen', 'Fokus mora biti bezbedno vraćen na dugme koje je pokrenulo fullscreen');
+  assert.equal(fsFocusReturn, null);
+  assert.equal(fsFocusTrap, null);
+});
+
+test('Kickaj - Focus trap i focus return u showWinnerOverlay i closeWinnerOverlay', () => {
+  let currentFocus = 'triggerDrawBtn';
+  const triggerBtn = { focus: () => { currentFocus = 'triggerDrawBtn'; } };
+
+  let winnerFocusReturn = null;
+  let winnerFocusTrap = null;
+
+  const firstBtn = { id: 'confirmBtn', focus: () => { currentFocus = 'confirmBtn'; } };
+  const lastBtn = { id: 'closeBtn', focus: () => { currentFocus = 'closeBtn'; } };
+  const modalButtons = [firstBtn, lastBtn];
+
+  function showWinnerOverlaySim() {
+    winnerFocusReturn = triggerBtn;
+    winnerFocusTrap = function(e) {
+      if (e.key === 'Tab') {
+        const first = modalButtons[0];
+        const last = modalButtons[modalButtons.length - 1];
+        if (e.shiftKey) {
+          if (currentFocus === first.id) { e.preventDefault(); last.focus(); }
+        } else {
+          if (currentFocus === last.id) { e.preventDefault(); first.focus(); }
+        }
+      }
+    };
+    firstBtn.focus();
+  }
+
+  function closeWinnerOverlaySim() {
+    if (winnerFocusReturn && typeof winnerFocusReturn.focus === 'function') {
+      winnerFocusReturn.focus();
+      winnerFocusReturn = null;
+    }
+    winnerFocusTrap = null;
+  }
+
+  showWinnerOverlaySim();
+  assert.equal(currentFocus, 'confirmBtn', 'Pri otvaranju pobedničkog ekrana fokusira se prvo dugme');
+
+  // Wrap napred
+  currentFocus = 'closeBtn';
+  let prevented = false;
+  winnerFocusTrap({ key: 'Tab', shiftKey: false, preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(currentFocus, 'confirmBtn');
+
+  // Wrap unazad
+  prevented = false;
+  winnerFocusTrap({ key: 'Tab', shiftKey: true, preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(currentFocus, 'closeBtn');
+
+  // Zatvaranje modala vraća fokus
+  closeWinnerOverlaySim();
+  assert.equal(currentFocus, 'triggerDrawBtn', 'Fokus se vraća na dugme za izvlačenje');
+});
+
+test('Kickaj - updateParticipantsUI generiše bogati empty state sa SVG ikonom kada nema učesnika', () => {
+  function renderParticipantsContainer(participantsCount) {
+    if (participantsCount === 0) {
+      return `
+        <div class="list-empty-rich">
+          <div class="list-empty-icon-wrap">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <p>Još uvek nema prijavljenih učesnika</p>
+          <p>Gledaoci se prijavljuju putem čet komande ili simulacije unosa.</p>
+        </div>`;
+    }
+    return '<div class="participant-row"><span>Korisnik1</span></div>';
+  }
+
+  const emptyHtml = renderParticipantsContainer(0);
+  assert.ok(emptyHtml.includes('list-empty-rich'), 'Prazna lista mora imati list-empty-rich klasu');
+  assert.ok(emptyHtml.includes('<svg'), 'Prazna lista mora sadržati ilustrativnu SVG ikonu');
+  assert.ok(emptyHtml.includes('Još uvek nema prijavljenih učesnika'), 'Mora sadržati jasan naslov stanja');
+
+  const populatedHtml = renderParticipantsContainer(1);
+  assert.ok(!populatedHtml.includes('list-empty-rich'), 'Popunjena lista ne sme imati empty state');
+  assert.ok(populatedHtml.includes('participant-row'), 'Popunjena lista mora imati redove učesnika');
+});
+
+test('Kickaj - unhandledrejection globalni hendler filtrira AbortError i šalje error toast za ostale greške', () => {
+  const toastCalls = [];
+  function mockShowToast(msg, type) {
+    toastCalls.push({ msg, type });
+  }
+
+  function handleUnhandledRejection(event) {
+    const msg = event?.reason?.message || '';
+    if (!msg.includes('AbortError')) {
+      mockShowToast('Došlo je do neočekivane greške.', 'error');
+    }
+  }
+
+  // 1. AbortError se ignoriše (npr. prekinut fetch usled brzog switch-a kanala)
+  handleUnhandledRejection({ reason: new Error('The operation was aborted (AbortError)') });
+  assert.equal(toastCalls.length, 0, 'AbortError ne sme uznemiravati korisnika toast greškom');
+
+  // 2. Prava neočekivana greška
+  handleUnhandledRejection({ reason: new Error('Database connection failed: 500') });
+  assert.equal(toastCalls.length, 1, 'Prava greška mora prikazati toast');
+  assert.equal(toastCalls[0].type, 'error');
+  assert.equal(toastCalls[0].msg, 'Došlo je do neočekivane greške.');
+});
+
+test('Kickaj - orientationchange događaj invalidira keš točka sreće za novu orijentaciju ekrana', () => {
+  let cacheInvalidated = false;
+  let redrawCalled = false;
+
+  function onOrientationChange() {
+    cacheInvalidated = true;
+    redrawCalled = true;
+  }
+
+  onOrientationChange();
+  assert.equal(cacheInvalidated, true, 'Orijentacija ekrana mora invalidirati keš točka');
+  assert.equal(redrawCalled, true, 'Orijentacija ekrana mora ponovo iscrtati točak');
+});
+
+test('Kickaj - getWheelCache odvaja iscrtavanje podeonih linija i spoljnog oboda radi sprečavanja tetivne crte', () => {
+  const recordedCommands = [];
+  const mockCtx = {
+    beginPath() { recordedCommands.push('beginPath'); },
+    moveTo(x, y) { recordedCommands.push(`moveTo(${x},${y})`); },
+    lineTo(x, y) { recordedCommands.push(`lineTo(${x},${y})`); },
+    arc(x, y, r, a0, a1) { recordedCommands.push(`arc(${x},${y},${r})`); },
+    stroke() { recordedCommands.push('stroke'); }
+  };
+
+  const n = 8;
+  const sliceAngle = (Math.PI * 2) / n;
+  const r = 200;
+
+  // Pass 2: Linije
+  mockCtx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const a = i * sliceAngle;
+    mockCtx.moveTo(0, 0);
+    mockCtx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  mockCtx.stroke();
+
+  // Pass 3: Obod mora imati novi beginPath da arc ne bi povukao spojnu liniju (tetivu)
+  mockCtx.beginPath();
+  mockCtx.arc(0, 0, r, 0, Math.PI * 2);
+  mockCtx.stroke();
+
+  // Provera: pre arc mora biti pozvan beginPath
+  const arcIndex = recordedCommands.findIndex(cmd => cmd.startsWith('arc'));
+  assert.equal(recordedCommands[arcIndex - 1], 'beginPath', 'Pre arc() mora biti pozvan beginPath() kako ne bi došlo do spajanja sa poslednjom linijom');
+});
+

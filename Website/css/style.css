@@ -3,9 +3,6 @@
    Tema: Cyberpunk Dark Neon (Violet & Green)
    Boje: #8B5CF6 (Ljubičasta), #53FC18 (Neon zelena)
 */
-
-@import url('base.css');
-
 /* Landing page specific styles */
 html {
     scroll-behavior: smooth;
@@ -3288,12 +3285,6 @@ section {
     border-top-color: transparent;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
 }
 
 /* ─────────────────────────────────────────────────────────────

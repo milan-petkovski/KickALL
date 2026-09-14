@@ -49,20 +49,27 @@ async function ucitajTokene() {
 async function sacuvajTokene(data) {
     keshTokeni = data;
 
-    try {
-        const { error } = await supabase
-            .from(TABELA)
-            .upsert({
-                id: RED_ID,
-                access_token: data.access_token,
-                refresh_token: data.refresh_token,
-                expires_at: new Date(data.expires_at).toISOString(),
-                updated_at: new Date().toISOString()
-            });
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            const { error } = await supabase
+                .from(TABELA)
+                .upsert({
+                    id: RED_ID,
+                    access_token: data.access_token,
+                    refresh_token: data.refresh_token,
+                    expires_at: new Date(data.expires_at).toISOString(),
+                    updated_at: new Date().toISOString()
+                });
 
-        if (error) throw error;
-    } catch (err) {
-        log('ERR', `[AUTH] Greška pri čuvanju Kick tokena u Supabase: ${err.message}`);
+            if (error) throw error;
+            return;
+        } catch (err) {
+            if (attempt === 3) {
+                log('ERR', `[AUTH] Greška pri čuvanju Kick tokena u Supabase nakon 3 pokušaja: ${err.message}`);
+            } else {
+                await new Promise(r => setTimeout(r, attempt * 1000));
+            }
+        }
     }
 }
 

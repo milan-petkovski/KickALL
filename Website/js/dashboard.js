@@ -21,12 +21,17 @@
   }
 })();
 
+// ── Imenovane konstante za Dashboard ──────────────────────
+const MIN_WITHDRAWAL_AMOUNT = 5; // Minimalni iznos za isplatu provizije (EUR)
+const NOTIFICATION_DURATION_MS = 5000; // Vreme prikaza in-app notifikacije (ms)
+const NOTIFICATION_FADEOUT_MS = 500; // Vreme animacije nestanka notifikacije (ms)
+
 // ── Supabase Configuration ────────────────────────────────
 let sb;
 // Use Supabase client from app.js if available, otherwise create new one
 if (window.sb) {
   sb = window.sb;
-} else {
+} else if (window.supabase && window.CONFIG && window.CONFIG.SUPABASE) {
   sb = window.supabase.createClient(window.CONFIG.SUPABASE.URL, window.CONFIG.SUPABASE.ANON_KEY, {
     auth: {
       persistSession: true,
@@ -35,6 +40,8 @@ if (window.sb) {
     }
   });
   window.sb = sb;
+} else {
+  sb = null;
 }
 
 // ── Fetch Kick Channel Data ───────────────────────────────
@@ -48,7 +55,9 @@ async function fetchKickChannelData(username) {
         return { chatroom_id: d.chatroom_id || null, slug: d.slug || username, avatar: d.avatar || null };
       }
     }
-  } catch (_) { }
+  } catch (err) {
+    console.debug('[Dashboard] Local avatar fetch fallback:', err);
+  }
 
   const apiUrl = `${window.CONFIG.API.KICK_API}/channels/${username}`;
   const proxies = [
@@ -92,7 +101,7 @@ async function fetchKickChannelData(username) {
             }
           }
         })
-        .catch(() => { })
+        .catch((err) => { console.debug('[Dashboard] Preload failed:', err); })
         .finally(() => {
           completed++;
           if (completed === proxies.length && !resolved) {
@@ -189,6 +198,9 @@ function playSound(freq, type = 'sine', duration = 0.1, gainVal = 0.1) {
 
 // ── Auth Flow & Check ─────────────────────────────────────
 async function checkAuth() {
+  if (typeof window === 'undefined' || !window.CONFIG || !sb) {
+    return;
+  }
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
   
@@ -318,6 +330,18 @@ async function checkAuth() {
   }
 }
 
+// Pomoćna funkcija za finalizaciju prijave, čišćenje tokena i inicijalizaciju dashboarda
+function finalizeLoginAndInit(user) {
+  localStorage.removeItem('kick_access_token');
+  try {
+    localStorage.removeItem('user_referral_code');
+  } catch (e) {
+    console.debug('Failed to remove ref code:', e);
+  }
+  cleanQueryParams();
+  initDashboardWithRetry(user);
+}
+
 // Handle Kick OAuth login inside KickAll
 async function handleKickOAuthSession(accessToken) {
   const gateMsg = document.getElementById('authGateMsg');
@@ -382,10 +406,7 @@ async function handleKickOAuthSession(accessToken) {
     }
     await ensureUserHasReferralCode(currentUser.id);
     
-    localStorage.removeItem('kick_access_token');
-    try { localStorage.removeItem('user_referral_code'); } catch(e) {}
-    cleanQueryParams();
-    initDashboardWithRetry(currentUser);
+    finalizeLoginAndInit(currentUser);
     return;
   }
 
@@ -452,10 +473,7 @@ async function handleKickOAuthSession(accessToken) {
     password: oauthPassword
   });
 
-  localStorage.removeItem('kick_access_token');
-  try { localStorage.removeItem('user_referral_code'); } catch(e) {}
-  cleanQueryParams();
-  initDashboardWithRetry(currentUser);
+  finalizeLoginAndInit(currentUser);
 }
 
 async function upsertKickProfile(userId, kickUsername, kickAvatar, kickUserId, accessToken) {
@@ -572,9 +590,9 @@ function showReferralNotification() {
   document.body.appendChild(notification);
   
   setTimeout(() => {
-    notification.style.animation = 'slideOut 0.5s ease-in forwards';
-    setTimeout(() => notification.remove(), 500);
-  }, 5000);
+    notification.style.animation = `slideOut ${NOTIFICATION_FADEOUT_MS / 1000}s ease-in forwards`;
+    setTimeout(() => notification.remove(), NOTIFICATION_FADEOUT_MS);
+  }, NOTIFICATION_DURATION_MS);
 }
 
 async function getReferralStats(userId) {
@@ -724,6 +742,157 @@ function cleanQueryParams() {
   window.history.replaceState({}, '', cleanUrl);
 }
 
+// ── Global HTML Escaping & Utilities ──────────────────────
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+}
+
+// ── Time-of-day Dynamic Greeting ──────────────────────────
+function getGreetingTime(date = new Date(), lang = currentLang) {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) {
+    return lang === 'sr' ? 'Dobro jutro' : 'Good morning';
+  } else if (hour >= 12 && hour < 18) {
+    return lang === 'sr' ? 'Dobar dan' : 'Good afternoon';
+  } else if (hour >= 18 && hour < 23) {
+    return lang === 'sr' ? 'Dobro veče' : 'Good evening';
+  } else {
+    return lang === 'sr' ? 'Laku noć' : 'Good night';
+  }
+}
+
+function updateWelcomeSection(user, lang = currentLang) {
+  const greetingTimeEl = document.getElementById('welcomeGreetingTime');
+  const greetingEl = document.getElementById('welcomeGreeting');
+  const systemStatusEl = document.getElementById('systemStatusSummary');
+
+  const greetingTime = getGreetingTime(new Date(), lang);
+  if (greetingTimeEl) {
+    greetingTimeEl.textContent = greetingTime;
+  }
+
+  const rawName = user?.user_metadata?.display_name || user?.user_metadata?.kick_username || user?.email?.split('@')[0] || '';
+  const safeName = escapeHtml(rawName);
+
+  if (greetingEl) {
+    if (safeName) {
+      greetingEl.innerHTML = `${greetingTime}, <span class="gradient-text">@${safeName}</span>`;
+    } else {
+      greetingEl.innerHTML = `<span data-i18n="dashboard.ecosystem">Ekosistem <span class="gradient-text">KickALL</span></span>`;
+    }
+  }
+
+  if (systemStatusEl) {
+    systemStatusEl.textContent = lang === 'sr' 
+      ? 'Svi sistemi su u funkciji • 100% operativno' 
+      : 'All systems operational • 100% online';
+  }
+}
+
+// ── Navigation with Origin Flags & Keyboard Support ───────
+function navigateToModule(moduleSlug) {
+  const allowed = ['kickot', 'kickaj', 'kickan', 'kickov'];
+  if (!allowed.includes(moduleSlug)) {
+    console.error('Invalid module slug:', moduleSlug);
+    return;
+  }
+  try {
+    sessionStorage.setItem('from_kickall', 'true');
+    localStorage.setItem('kick_origin_site', 'kickall');
+  } catch (e) {
+    console.warn('Failed to set navigation origin flags:', e);
+  }
+  window.location.href = `/${moduleSlug}/dashboard`;
+}
+
+function handleModuleKeydown(event, moduleSlug) {
+  if (event.key === 'Enter' || event.key === ' ' || event.code === 'Space') {
+    event.preventDefault();
+    navigateToModule(moduleSlug);
+  }
+}
+
+// ── Module Status Evaluation with 5s Timeout Fallback ─────
+async function checkModulesStatus(user) {
+  const defaultStatus = {
+    kickot: { state: 'active', text: currentLang === 'sr' ? 'Aktivan' : 'Active', tooltip: currentLang === 'sr' ? '100% operativno' : '100% operational' },
+    kickaj: { state: 'active', text: currentLang === 'sr' ? 'Aktivan' : 'Active', tooltip: currentLang === 'sr' ? 'Spreman za darivanja' : 'Ready for giveaways' },
+    kickan: { state: 'active', text: currentLang === 'sr' ? 'Aktivan' : 'Active', tooltip: currentLang === 'sr' ? 'Telemetrija u realnom vremenu' : 'Real-time telemetry' },
+    kickov: { state: 'active', text: currentLang === 'sr' ? 'Aktivan' : 'Active', tooltip: currentLang === 'sr' ? 'Vidžeti i alerti operativni' : 'Widgets & alerts operational' }
+  };
+
+  try {
+    if (!user || !sb) {
+      applyModuleStatuses(defaultStatus);
+      return;
+    }
+
+    // 5-second graceful timeout prevents hung UI loaders
+    const profilePromise = sb.from('user_profiles')
+      .select('kick_channels, plan')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 5000));
+
+    const result = await Promise.race([profilePromise, timeoutPromise]);
+
+    if (result && !result.timeout && result.data) {
+      const channels = result.data.kick_channels || [];
+      const primaryChannel = channels.find(c => c.is_primary) || channels[0];
+
+      if (primaryChannel && primaryChannel.username) {
+        const safeChannel = escapeHtml(primaryChannel.username);
+        defaultStatus.kickot.tooltip = currentLang === 'sr' 
+          ? `Povezan kanal: @${safeChannel}` 
+          : `Connected channel: @${safeChannel}`;
+      } else {
+        defaultStatus.kickot.tooltip = currentLang === 'sr' 
+          ? 'Poveži Kick kanal u podešavanjima' 
+          : 'Connect Kick channel in settings';
+      }
+    }
+  } catch (err) {
+    console.warn('Non-critical: Module status check error:', err);
+  } finally {
+    applyModuleStatuses(defaultStatus);
+  }
+}
+
+function applyModuleStatuses(statusMap) {
+  for (const [moduleKey, info] of Object.entries(statusMap)) {
+    const pill = document.getElementById(`statusPill-${moduleKey}`);
+    const text = document.getElementById(`statusText-${moduleKey}`);
+    const tooltip = document.getElementById(`statusTooltip-${moduleKey}`);
+    const card = document.getElementById(`moduleCard-${moduleKey}`);
+
+    if (pill) {
+      pill.className = `card-status-pill status-${info.state}`;
+      if (typeof pill.removeAttribute === 'function') {
+        pill.removeAttribute('title');
+      } else {
+        pill.title = '';
+      }
+    }
+    if (text) {
+      text.textContent = info.text;
+    }
+    if (tooltip) {
+      tooltip.textContent = info.tooltip;
+    }
+    if (card) {
+      const moduleName = moduleKey.charAt(0).toUpperCase() + moduleKey.slice(1);
+      card.setAttribute('aria-label', `${moduleName} - ${info.text}. ${info.tooltip || ''}`.trim());
+    }
+  }
+}
+
 // ── UI Initialization ─────────────────────────────────────
 function initDashboard(user) {
   const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'User';
@@ -744,6 +913,12 @@ function initDashboard(user) {
       avatar.textContent = name.charAt(0).toUpperCase();
     }
   }
+
+  // Dynamic Welcome Section Update
+  updateWelcomeSection(user, currentLang);
+
+  // Dynamic Module Status Check
+  checkModulesStatus(user);
 
   // Show profile menu
   const userMenuEl = document.getElementById('userMenu');
@@ -844,10 +1019,6 @@ function updateRewardsList(rewards) {
     `;
     return;
   }
-
-function escapeHtml(str) {
-  return String(str || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
 
   rewardsList.innerHTML = rewards.map(reward => `
     <div class="reward-item">
@@ -1008,7 +1179,7 @@ function setupWithdrawalModal() {
     const method = paymentMethod.value;
     const details = document.getElementById('paymentDetails').value;
 
-    if (!amount || amount < 5) {
+    if (!amount || amount < MIN_WITHDRAWAL_AMOUNT) {
       if (window.toastSystem) {
         window.toastSystem.warning(t('dashboard.minWithdrawal'));
       }
@@ -1086,15 +1257,23 @@ function setLang(lang) {
   document.body.className = `lang-${lang}`;
   document.documentElement.lang = lang;
 
-  document.getElementById('btn-sr').classList.toggle('active', lang === 'sr');
-  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+  const btnSrEl = document.getElementById('btn-sr');
+  const btnEnEl = document.getElementById('btn-en');
+  if (btnSrEl) btnSrEl.classList.toggle('active', lang === 'sr');
+  if (btnEnEl) btnEnEl.classList.toggle('active', lang === 'en');
 
   // Reload translations
   loadTranslations(lang);
+
+  // Update dynamic welcome section & modules
+  updateWelcomeSection(currentUser, lang);
+  checkModulesStatus(currentUser);
 }
 
-document.getElementById('btn-sr').addEventListener('click', () => setLang('sr'));
-document.getElementById('btn-en').addEventListener('click', () => setLang('en'));
+const btnSr = document.getElementById('btn-sr');
+if (btnSr) btnSr.addEventListener('click', () => setLang('sr'));
+const btnEn = document.getElementById('btn-en');
+if (btnEn) btnEn.addEventListener('click', () => setLang('en'));
 
 // Logout Action
 const btnLogout = document.getElementById('btnLogout');
@@ -1181,7 +1360,7 @@ function notifyGlobalLogout(userId) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: userId })
-    }).catch(() => {});
+    }).catch((err) => { console.debug('[Dashboard] Notification sound or animation error:', err); });
   }
 }
 
@@ -1215,14 +1394,12 @@ window.addEventListener('storage', (event) => {
   }
 });
 
-// Set Initial Language
-setLang(currentLang);
-
-// Load translations
-loadTranslations(currentLang);
-
-// Run Auth Verification
-checkAuth();
+// Auto-run in browser environment
+if (typeof window !== 'undefined' && window.CONFIG) {
+  setLang(currentLang);
+  loadTranslations(currentLang);
+  checkAuth();
+}
 
 // ── Modal Helpers ─────────────────────────────────────
 function openModal(id) {
@@ -1510,4 +1687,17 @@ function animateAnalyticsBars() {
     playSound(600, 'sine', 0.05, 0.02);
     setTimeout(() => playSound(800, 'sine', 0.05, 0.02), 150);
   }, 100);
+}
+
+// ── Node Unit Test Exports ────────────────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    escapeHtml,
+    getGreetingTime,
+    updateWelcomeSection,
+    navigateToModule,
+    handleModuleKeydown,
+    checkModulesStatus,
+    applyModuleStatuses
+  };
 }

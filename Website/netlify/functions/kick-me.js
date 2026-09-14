@@ -1,8 +1,19 @@
 const { isRateLimited } = require('./utils/rate-limiter');
 
 exports.handler = async (event) => {
+  const requestOrigin = (event.headers && (event.headers.origin || event.headers.Origin)) || '';
+  const allowedOrigins = [
+    'https://kickall.app',
+    'https://kickall.netlify.app',
+    'http://localhost:5500',
+    'http://127.0.0.1:5500',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000'
+  ];
+  const allowOrigin = allowedOrigins.includes(requestOrigin) ? requestOrigin : (process.env.ALLOWED_ORIGIN || 'https://kickall.app');
+
   const headers = {
-    'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://kickall.app',
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json'

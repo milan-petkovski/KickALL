@@ -412,7 +412,7 @@
     "tryDemo": "Try demo →",
     "ecosystem": "KickALL <span class=\"gradient-text\">Ecosystem</span>",
     "subtitle": "Choose the module you want to manage and set up your stream in a few moments.",
-    "openDashboard": "Open Dashboard →",
+    "openDashboard": "Open Dashboard",
     "kickotDesc": "Your main intelligent chatbot assistant. Custom commands, automated chat moderation, watchtime points, ranks, and mini-games for viewers.",
     "kickajDesc": "Complete interactive giveaway studio. Fast live winner draws directly from chat with spinning wheel, slot machine, and neon roulette.",
     "kickanDesc": "Advanced analytics and channel statistics. Track viewer growth, new followers, and stream metrics in real-time.",

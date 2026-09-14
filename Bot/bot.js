@@ -140,13 +140,34 @@ const STARTUP_LOCK_RETRY_INTERVAL_MS = 2500;
 let lastLockErrorLogTime = 0;
 let consecutiveLockErrors = 0;
 
+function formatNetworkError(rawMsg) {
+    if (!rawMsg) return 'Nepoznata mrežna greška';
+    const str = String(rawMsg);
+    if (str.includes('525: SSL handshake failed') || str.includes('SSL handshake failed')) {
+        return 'Cloudflare 525: SSL handshake failed (privremeni prekid veze sa Supabase)';
+    }
+    if (str.includes('<!DOCTYPE html>') || str.includes('<html')) {
+        const titleMatch = str.match(/<title>([^<]+)<\/title>/i);
+        if (titleMatch && titleMatch[1]) {
+            return `Cloudflare Gateway greška: ${titleMatch[1].trim()}`;
+        }
+        return 'Cloudflare Gateway HTTP greška (odgovor u HTML formatu)';
+    }
+    if (str.length > 120) {
+        return str.substring(0, 117) + '...';
+    }
+    return str;
+}
+
 function logLockWarningDebounced(msg) {
     consecutiveLockErrors++;
     const now = Date.now();
-    // Ne spamuj konzolu: loguj samo ako je greška nova i traje, najviše jednom u 5 minuta
-    if (now - lastLockErrorLogTime > 5 * 60 * 1000 || consecutiveLockErrors === 3) {
+    const cleanMsg = formatNetworkError(msg);
+    // Pojedinačni prolazni timeout na 15s heartbeatu je bezopasan (lease traje 60s).
+    // Upozori samo ako se greška ponovi bar 2x zaredom i prošlo je 5 minuta, ili ako traje 3x uzastopno.
+    if (consecutiveLockErrors >= 2 && (now - lastLockErrorLogTime > 5 * 60 * 1000 || consecutiveLockErrors === 3)) {
         lastLockErrorLogTime = now;
-        utils.log('WARN', `[DISTRIBUTED-LOCK] ${msg} (ponovljeno ${consecutiveLockErrors}x)`);
+        utils.log('WARN', `[DISTRIBUTED-LOCK] ${cleanMsg} (ponovljeno ${consecutiveLockErrors}x)`);
     }
 }
 
@@ -168,6 +189,31 @@ async function acquireOrRenewLeaderLock(options = {}) {
     const expiresAtIso = new Date(Date.now() + LEASE_DURATION_MS).toISOString();
 
     try {
+        // Brza obnova postojećeg lock-a: ako smo već lider, uradi direktan uslovni UPDATE
+        // Ovo štedi 50% upita ka bazi jer izbegava nepotreban SELECT pri svakom 15s heartbeatu
+        if (state.isLeader && !options.force) {
+            const { data: updatedRows, error: quickUpdateError } = await database.supabase
+                .from('bot_cluster_lock')
+                .update({
+                    heartbeat_at: nowIso,
+                    expires_at: expiresAtIso,
+                    updated_at: nowIso
+                })
+                .eq('lock_id', CLUSTER_LOCK_ID)
+                .eq('leader_instance_id', state.instanceId)
+                .select('lock_id');
+
+            if (!quickUpdateError && updatedRows && updatedRows.length > 0) {
+                resetLockErrorCount();
+                return true;
+            }
+            if (quickUpdateError) {
+                logLockWarningDebounced(`Greška pri obnovi lock-a: ${quickUpdateError.message}`);
+                return true; // I dalje smo lider u okviru trajanja lease-a
+            }
+            // Ako je update vratio 0 redova (lock je istekao ili ga je neko preuzeo), nastavi ispod
+        }
+
         const { data: existingLock, error: readError } = await database.supabase
             .from('bot_cluster_lock')
             .select('*')
@@ -495,17 +541,25 @@ async function start() {
                 const userId = (newRow || oldRow).id;
                 if (!userId) return;
 
-                // Reagujemo samo ako se zaista promenio plan ili pretplata (eliminiše spam pri izmeni settings-a, tema, kickaj_state, itd.)
-                if (newRow && oldRow) {
-                    const planIsti = newRow.plan === oldRow.plan;
-                    const statusIsti = newRow.subscription_status === oldRow.subscription_status;
-                    const endsIsti = newRow.ends_at === oldRow.ends_at;
-                    if (planIsti && statusIsti && endsIsti) {
-                        return;
+                // Proveri da li se zaista promenio plan za neki od kanala ovog korisnika
+                let imaPromenePlana = false;
+                for (const chatroomId of Object.keys(state.channels)) {
+                    const channelState = state.channels[chatroomId];
+                    if (channelState && channelState.userId === userId) {
+                        const noviPlan = newRow?.plan || 'free';
+                        const noviStatus = newRow?.subscription_status || 'active';
+                        if (noviPlan !== channelState.userPlan || noviStatus !== channelState.subscriptionStatus) {
+                            imaPromenePlana = true;
+                            break;
+                        }
                     }
                 }
+                // Ako nijedan kanal ovog korisnika nema stvarnu izmenu plana/statusa, preskoči (eliminiše spam pri izmeni settings-a, tema, kickaj_state, itd.)
+                if (!imaPromenePlana) {
+                    return;
+                }
 
-                // Debounce po korisniku (1.5s) da se spreči flood i Gateway Timeout
+                // Debounce po korisniku (2.5s) da se spreči flood i Gateway Timeout
                 if (!state.userProfileDebounceTimers) {
                     state.userProfileDebounceTimers = new Map();
                 }
@@ -525,7 +579,7 @@ async function start() {
                             await database.ucitajCustomKomande(chatroomId);
                         }
                     }
-                }, 1500);
+                }, 2500);
 
                 state.userProfileDebounceTimers.set(userId, timer);
             })

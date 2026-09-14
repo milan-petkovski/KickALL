@@ -1,6 +1,17 @@
 {
   "public": ".",
   "cleanUrls": true,
+  "headers": [
+    {
+      "source": "**/*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, must-revalidate"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/dashboard", "destination": "/dashboard.html" },
     { "source": "/pricing", "destination": "/pricing.html" },

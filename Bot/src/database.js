@@ -398,7 +398,9 @@ async function ucitajLjubav(chatroomId) {
                 const rawMod = Number(row.modifier || 0);
                 if (rawMod === 0 && !row.is_married) {
                     // Ako u bazi postoji zaostali nivelisani zapis na 0% bez braka, ukloni ga
-                    sbPanels.from('love_and_marriages').delete().eq('channel_id', chatroomId).eq('user1', row.user1).eq('user2', row.user2).catch(() => {});
+                    Promise.resolve(
+                        sbPanels.from('love_and_marriages').delete().eq('channel_id', chatroomId).eq('user1', row.user1).eq('user2', row.user2)
+                    ).catch(() => {});
                     return;
                 }
                 if (row.modifier !== null && row.modifier !== undefined) {

@@ -14,10 +14,22 @@
 <title>Kickot Dashboard</title>
 <meta content="Kickot bot control panel. Upravljaj komandama, leaderboard tabelom i podešavanjima bota." name="description"/>
 <meta content="noindex, nofollow" name="robots"/>
+<link rel="canonical" href="https://kickall.app/kickot/dashboard"/>
 <meta content="#0b0716" name="theme-color"/>
+<!-- Open Graph / Social Sharing -->
+<meta content="Kickot Dashboard" property="og:title"/>
+<meta content="Kickot bot control panel. Upravljaj komandama, leaderboard tabelom i podešavanjima bota." property="og:description"/>
+<meta content="website" property="og:type"/>
+<meta content="https://kickall.app/kickot/dashboard" property="og:url"/>
+<meta content="https://kickall.app/assets/og-kickot.webp" property="og:image"/>
+<meta content="Kickot Dashboard" name="twitter:title"/>
+<meta content="Kickot bot control panel. Upravljaj komandama, leaderboard tabelom i podešavanjima bota." name="twitter:description"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="https://kickall.app/assets/og-kickot.webp" name="twitter:image"/>
+
 <!-- Google Analytics (GA4) -->
 <script async="" src="https://www.googletagmanager.com/gtag/js?id=G-KZNGNF6TEM"></script>
-<script>
+<script nonce="kickall-inline-core">
     window.dataLayer = window.dataLayer || [];
     function gtag() { dataLayer.push(arguments); }
     gtag('js', new Date());
@@ -31,38 +43,52 @@
 <link crossorigin="" href="https://cdn.jsdelivr.net" rel="preconnect"/>
 <link crossorigin="" href="https://milanwebportal.app.fungies.io" rel="preconnect"/>
 <link crossorigin="" href="https://rcukparptzzyssqdmydt.supabase.co" rel="preconnect"/>
+<link href="https://fonts.googleapis.com" rel="dns-prefetch"/>
+<link href="https://fonts.gstatic.com" rel="dns-prefetch"/>
+<link href="https://cdn.jsdelivr.net" rel="dns-prefetch"/>
+<link href="https://milanwebportal.app.fungies.io" rel="dns-prefetch"/>
+<link href="https://rcukparptzzyssqdmydt.supabase.co" rel="dns-prefetch"/>
+<link href="https://www.youtube.com" rel="dns-prefetch"/>
+
+<!-- Early Auth Check (zero delay redirect for unauthenticated visitors) -->
+<script nonce="kickall-inline-core">
+  try {
+    var isOAuth = window.location.search.indexOf('code=') !== -1 || window.location.hash.indexOf('access_token=') !== -1;
+    var hasSession = localStorage.getItem('kickbot-supabase-auth') || localStorage.getItem('kick_access_token');
+    if (!hasSession && !isOAuth) {
+      window.location.replace('../index.html?login=1');
+    }
+  } catch (e) {}
+</script>
+
+<!-- Preload i definicija kritičnih stilova -->
+<link href="css/kickot.css?v=20260915-v2" rel="preload" as="style"/>
+<link href="css/kickot.css?v=20260915-v2" rel="stylesheet"/>
+<link href="/assets/favicon.ico" rel="icon" type="image/x-icon"/>
+
 <!-- PWA Manifest -->
 <link href="../manifest.json" rel="manifest"/>
 <link href="/assets/logo.webp" rel="apple-touch-icon"/>
-<!-- Service Worker Registration -->
-<script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .catch(registrationError => {
-            // Silent fail - SW registration not critical
-          });
-      });
-    }
-  </script>
-<!-- Mobile Performance Optimizations & Toast System -->
-<script defer="" src="../js/mobile-optimization.js"></script>
-<script src="../js/toast.js"></script>
-<!-- Fontovi (Inter, JetBrains Mono, Space Grotesk) -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
-<!-- KickALL Root Configuration (seta window.CONFIG sa Supabase URL, ANON_KEY, OAuth itd.) -->
-<script src="../js/config.js"></script>
-<!-- Dynamic Configuration (Kickot-specifican, seta window.KickotConfig) -->
-<script src="js/config.js"></script>
-<!-- Favicon i Stilovi -->
-<link href="/assets/favicon.ico" rel="icon" type="image/x-icon"/>
-<link href="css/kickot.css" rel="stylesheet"/>
 
-<!-- Supabase JS -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- Avatar Cache Module (IndexedDB) -->
-<script src="js/avatar-cache.js"></script>
-<script>
+<!-- Service Worker Registration -->
+<script nonce="kickall-inline-core">
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .catch(registrationError => {
+          // Silent fail - SW registration not critical
+        });
+    });
+  }
+</script>
+
+<!-- Mobile Performance Optimizations -->
+<script defer="" src="../js/mobile-optimization.js?v=20260915-v2"></script>
+
+<!-- Optimizovani fontovi (samo korišćene težine sa display=swap) -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet"/>
+
+<script nonce="kickall-inline-core">
   window.proceedToCheckout = window.proceedToCheckout || function() {
     if (window._realProceedToCheckout) return window._realProceedToCheckout();
   };
@@ -74,6 +100,8 @@
 </script>
 </head>
 <body>
+<!-- Skip to Content Link -->
+<a href="#mainContent" class="skip-link sr-only">Preskoči na glavni sadržaj</a>
 <!-- ══════════ MOBILE UNSUPPORTED OVERLAY (<=768px) ══════════ -->
 <div aria-describedby="mobileOverlayDesc" aria-labelledby="mobileOverlayTitle" class="mobile-unsupported-overlay" role="alertdialog">
 <div class="mobile-unsupported-card">
@@ -133,7 +161,7 @@
 <polyline points="12 19 5 12 12 5"></polyline>
 </svg>
 </a>
-<a class="sidebar-logo" href="#" onclick="event.stopPropagation(); try { sessionStorage.setItem('from_kickot', 'true'); localStorage.setItem('kick_origin_site', 'kickot'); window.location.href = window.KickotConfig.paths.kickallIndex; } catch(e) { console.error('Failed to set navigation flags:', e); } return false;">
+<a class="sidebar-logo" href="/kickot/dashboard" onclick="event.preventDefault(); switchPanel('overview');" title="Kickot Pregled">
 <img alt="Kickot Logo" class="logo-img" loading="lazy" src="assets/kickot.webp"/>
 </a>
 <a class="sidebar-header-btn coffee-btn" href="https://paypal.me/milanwebportal/5EUR" rel="noopener noreferrer" target="_blank" title="Kupi mi kafu">
@@ -334,6 +362,13 @@
 <!-- TOP BAR -->
 <header class="topbar kx-2">
 <div class="topbar-left kx-3">
+<button class="topbar-btn sidebar-toggle-btn" id="sidebarToggleBtn" onclick="toggleSidebar()" aria-controls="sidebar" aria-expanded="false" aria-label="Navigacija">
+<svg fill="none" height="18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="18">
+<line x1="3" y1="12" x2="21" y2="12"></line>
+<line x1="3" y1="6" x2="21" y2="6"></line>
+<line x1="3" y1="18" x2="21" y2="18"></line>
+</svg>
+</button>
 <div class="breadcrumb kx-4" id="breadcrumb">
 <span class="kx-5">
 <svg fill="none" height="14" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="14">
@@ -360,7 +395,7 @@
 <div class="kx-11" id="topbarUpgradeWrap"></div>
 <!-- Notifications Bell -->
 <div class="kx-12">
-<button class="topbar-btn kx-13" id="notifBellBtn" onclick="toggleNotifCenter()" title="Obaveštenja">
+<button aria-label="Obaveštenja" class="topbar-btn kx-13" id="notifBellBtn" onclick="toggleNotifCenter()" title="Obaveštenja">
 <svg fill="none" height="17" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="17">
 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -400,7 +435,7 @@
 </div>
 </div>
 <!-- Refresh Button -->
-<button class="topbar-btn topbar-refresh-btn kx-24" onclick="refreshAllData()" title="Osveži podatke">
+<button aria-label="Osveži podatke" class="topbar-btn topbar-refresh-btn kx-24" onclick="refreshAllData()" title="Osveži podatke">
 <svg class="refresh-icon kx-25" fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="16">
 <polyline points="23 4 23 10 17 10"></polyline>
 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
@@ -977,15 +1012,15 @@
     </select>
   </div>
   <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-    <button class="btn btn-sm btn-secondary" onclick="batchToggleBuiltins(true)" title="Uključi sve komande u prikazanom filteru" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
+    <button class="btn btn-sm btn-secondary" onclick="batchToggleBuiltins(true)" title="Uključi sve komande u prikazanom filteru" aria-label="Uključi sve komande u prikazanom filteru" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
       Uključi sve
     </button>
-    <button class="btn btn-sm btn-secondary" onclick="batchToggleBuiltins(false)" title="Isključi sve komande u prikazanom filteru" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
+    <button class="btn btn-sm btn-secondary" onclick="batchToggleBuiltins(false)" title="Isključi sve komande u prikazanom filteru" aria-label="Isključi sve komande u prikazanom filteru" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg>
       Isključi sve
     </button>
-    <button class="btn btn-sm btn-secondary" onclick="resetBuiltinUsageConfirm()" title="Resetuj brojač korišćenja za sve ugrađene komande" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
+    <button class="btn btn-sm btn-secondary" onclick="resetBuiltinUsageConfirm()" title="Resetuj brojač korišćenja za sve ugrađene komande" aria-label="Resetuj brojač korišćenja za sve ugrađene komande" style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem;">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
       Resetuj korišćenje
     </button>
@@ -2033,19 +2068,20 @@
     </div>
 
     <!-- Grupa 1: Kazino Igre (Sa Poenima) -->
-    <div class="mg-catalog-section" data-category="casino" style="display: flex; align-items: center; justify-content: space-between; margin: 18px 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
-      <div class="mg-catalog-heading-wrap">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="8"></circle>
-          <path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"></path>
-        </svg>
-        <span class="mg-catalog-heading-title">Kazino Igre (Sa Poenima)</span>
-        <span class="mg-catalog-pill-badge" style="background: rgba(234, 179, 8, 0.15); color: #eab308;">5 Igara</span>
+    <div class="kx-131" id="allGamesCasinoWrap" style="position: relative; border-radius: 14px; margin-bottom: 24px;">
+      <div class="mg-catalog-section" data-category="casino" style="display: flex; align-items: center; justify-content: space-between; margin: 18px 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+        <div class="mg-catalog-heading-wrap">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="8"></circle>
+            <path d="M12 8v8M9.5 9.5h5a1.5 1.5 0 0 1 0 3h-5a1.5 1.5 0 0 0 0 3h5"></path>
+          </svg>
+          <span class="mg-catalog-heading-title">Kazino Igre (Sa Poenima)</span>
+          <span class="mg-catalog-pill-badge" style="background: rgba(234, 179, 8, 0.15); color: #eab308;">7 Igara</span>
+        </div>
+        <button class="btn btn-xs btn-outline" onclick="switchMinigamesTab('casino')" style="font-size: 0.75rem;" type="button">
+          Podešavanja Kazina →
+        </button>
       </div>
-      <button class="btn btn-xs btn-outline" onclick="switchMinigamesTab('casino')" style="font-size: 0.75rem;" type="button">
-        Podešavanja Kazina →
-      </button>
-    </div>
 
     <div class="mg-games-grid" style="margin-bottom: 24px;">
       <!-- 1. Slot Mašina -->
@@ -2070,7 +2106,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!slot &lt;ulog&gt;</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!slot 250', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!slot 250', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2102,7 +2138,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!rulet crvena 500</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!rulet crvena 500', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!rulet crvena 500', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2134,7 +2170,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!coinflip glava 1000</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!coinflip glava 1000', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!coinflip glava 1000', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2166,7 +2202,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!tocak 500</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!tocak 500', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!tocak 500', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2198,7 +2234,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!duel @korisnik 1000</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!duel @korisnik 1000', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!duel @korisnik 1000', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2208,6 +2244,7 @@
         </div>
       </div>
     </div>
+  </div>
 
     <!-- Grupa 2: Čet Igre (Zabava) -->
     <div class="mg-catalog-section" data-category="fun" style="display: flex; align-items: center; justify-content: space-between; margin: 18px 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
@@ -2246,7 +2283,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!iq @korisnik</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!iq @korisnik', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!iq @korisnik', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2278,7 +2315,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!samar @korisnik</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!samar @korisnik', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!samar @korisnik', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2310,7 +2347,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!roll @korisnik</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!roll @korisnik', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!roll @korisnik', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2342,7 +2379,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!ruskirulet (ili !rr)</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!rr', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!rr', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2374,7 +2411,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!alkotest [@korisnik]</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!alkotest', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!alkotest', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2406,7 +2443,7 @@
         <div class="mg-card-actions-row">
           <div class="mg-cmd-chip">
             <span>!cinjenica (ili !fact)</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!cinjenica', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!cinjenica', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2461,7 +2498,7 @@
           </div>
           <div class="mg-cmd-chip">
             <span>!slot &lt;ulog&gt;</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!slot 250', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!slot 250', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2488,7 +2525,7 @@
           </div>
           <div class="mg-cmd-chip">
             <span>!rulet crvena 500</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!rulet crvena 500', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!rulet crvena 500', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2515,7 +2552,7 @@
           </div>
           <div class="mg-cmd-chip">
             <span>!coinflip glava 1000</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!coinflip glava 1000', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!coinflip glava 1000', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2542,7 +2579,7 @@
           </div>
           <div class="mg-cmd-chip">
             <span>!tocak 500</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!tocak 500', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!tocak 500', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2569,7 +2606,7 @@
           </div>
           <div class="mg-cmd-chip">
             <span>!duel @korisnik 1000</span>
-            <button class="mg-copy-btn" onclick="copyMiniCommand('!duel @korisnik 1000', this)" title="Kopiraj komandu" type="button">
+            <button class="mg-copy-btn" onclick="copyMiniCommand('!duel @korisnik 1000', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
           </div>
@@ -2609,7 +2646,7 @@
         </div>
         <div class="mg-cmd-chip">
           <span>!iq @korisnik</span>
-          <button class="mg-copy-btn" onclick="copyMiniCommand('!iq @korisnik', this)" title="Kopiraj komandu" type="button">
+          <button class="mg-copy-btn" onclick="copyMiniCommand('!iq @korisnik', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </button>
         </div>
@@ -2631,7 +2668,7 @@
         </div>
         <div class="mg-cmd-chip">
           <span>!samar @korisnik</span>
-          <button class="mg-copy-btn" onclick="copyMiniCommand('!samar @korisnik', this)" title="Kopiraj komandu" type="button">
+          <button class="mg-copy-btn" onclick="copyMiniCommand('!samar @korisnik', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </button>
         </div>
@@ -2653,7 +2690,7 @@
         </div>
         <div class="mg-cmd-chip">
           <span>!roll @korisnik</span>
-          <button class="mg-copy-btn" onclick="copyMiniCommand('!roll @korisnik', this)" title="Kopiraj komandu" type="button">
+          <button class="mg-copy-btn" onclick="copyMiniCommand('!roll @korisnik', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </button>
         </div>
@@ -2675,7 +2712,7 @@
         </div>
         <div class="mg-cmd-chip">
           <span>!ruskirulet (ili !rr)</span>
-          <button class="mg-copy-btn" onclick="copyMiniCommand('!rr', this)" title="Kopiraj komandu" type="button">
+          <button class="mg-copy-btn" onclick="copyMiniCommand('!rr', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </button>
         </div>
@@ -2697,7 +2734,7 @@
         </div>
         <div class="mg-cmd-chip">
           <span>!alkotest [@korisnik]</span>
-          <button class="mg-copy-btn" onclick="copyMiniCommand('!alkotest', this)" title="Kopiraj komandu" type="button">
+          <button class="mg-copy-btn" onclick="copyMiniCommand('!alkotest', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </button>
         </div>
@@ -2719,7 +2756,7 @@
         </div>
         <div class="mg-cmd-chip">
           <span>!cinjenica (ili !fact)</span>
-          <button class="mg-copy-btn" onclick="copyMiniCommand('!cinjenica', this)" title="Kopiraj komandu" type="button">
+          <button class="mg-copy-btn" onclick="copyMiniCommand('!cinjenica', this)" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
           </button>
         </div>
@@ -2952,7 +2989,7 @@
             <span class="mg-kick-stream-badge">Kick Chat</span>
             <span style="font-size: 0.75rem; color: var(--text-muted, #94a3b8);">Live Preview</span>
           </div>
-          <button class="btn btn-sm btn-outline" onclick="copySimChatResult()" style="padding: 3px 8px; font-size: 0.72rem;" title="Kopiraj poruku bota" type="button">
+          <button class="btn btn-sm btn-outline" onclick="copySimChatResult()" style="padding: 3px 8px; font-size: 0.72rem;" title="Kopiraj poruku bota" aria-label="Kopiraj poruku bota" type="button">
             Kopiraj Tekst
           </button>
         </div>
@@ -3155,7 +3192,7 @@
     <div class="sr-player-card">
       <!-- Album Art & YouTube Player Container -->
       <div class="sr-cover-wrapper" id="playerCoverWrap">
-        <iframe allow="autoplay; encrypted-media; picture-in-picture" class="kx-167" frameborder="0" id="ytAudioPlayer" src="https://www.youtube.com/embed/?enablejsapi=1&amp;autoplay=1&amp;playsinline=1"></iframe>
+        <iframe allow="autoplay; encrypted-media; picture-in-picture" class="kx-167" frameborder="0" id="ytAudioPlayer" src="https://www.youtube.com/embed/?enablejsapi=1&amp;autoplay=1&amp;playsinline=1" title="YouTube Audio Player"></iframe>
         <img alt="Album Cover" class="sr-cover-img" id="playerCoverImg" src="" />
         <div class="sr-disk-placeholder" id="playerDisk">
           <svg fill="none" height="54" stroke="rgba(255,255,255,0.75)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="54">
@@ -3185,18 +3222,18 @@
 
       <!-- Playback Control Buttons -->
       <div class="sr-controls-row">
-        <button class="sr-control-btn" onclick="previousSong()" title="Prethodna pesma" type="button">
+        <button class="sr-control-btn" onclick="previousSong()" title="Prethodna pesma" aria-label="Prethodna pesma" type="button">
           <svg fill="none" height="18" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="18">
             <polygon points="19 20 9 12 19 4 19 20"></polygon>
             <line x1="5" x2="5" y1="19" y2="5"></line>
           </svg>
         </button>
-        <button class="sr-play-btn" id="playBtn" onclick="togglePlayback()" title="Pusti / Pauziraj" type="button">
+        <button class="sr-play-btn" id="playBtn" onclick="togglePlayback()" title="Pusti / Pauziraj" aria-label="Pusti / Pauziraj" type="button">
           <svg fill="none" height="22" id="playIcon" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="22">
             <polygon points="5 3 19 12 5 21 5 3"></polygon>
           </svg>
         </button>
-        <button class="sr-control-btn" onclick="skipSong()" title="Preskoči pesmu" type="button">
+        <button class="sr-control-btn" onclick="skipSong()" title="Preskoči pesmu" aria-label="Preskoči pesmu" type="button">
           <svg fill="none" height="18" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="18">
             <polygon points="5 4 15 12 5 20 5 4"></polygon>
             <line x1="19" x2="19" y1="5" y2="19"></line>
@@ -3259,7 +3296,7 @@
         </div>
         <div style="display: flex; align-items: center; gap: 10px;">
           <span style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600; background: rgba(255,255,255,0.05); padding: 3px 9px; border-radius: 12px;" id="queueCount">0 pesama</span>
-          <button class="btn btn-sm btn-text danger" onclick="clearSongQueue()" style="font-size: 0.75rem; padding: 4px 8px; color: #EF4444; border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; cursor: pointer;" title="Očisti ceo red" type="button">Očisti red</button>
+          <button class="btn btn-sm btn-text danger" onclick="clearSongQueue()" style="font-size: 0.75rem; padding: 4px 8px; color: #EF4444; border: 1px solid rgba(239,68,68,0.25); border-radius: 6px; cursor: pointer;" title="Očisti ceo red" aria-label="Očisti ceo red" type="button">Očisti red</button>
         </div>
       </h3>
       <div class="sr-queue-scroll" id="songQueueList">
@@ -3609,7 +3646,7 @@
 <!-- SUB-PANEL 2: STORE & REDEMPTIONS -->
 <div class="eco-subpanel" id="ecoSubPanelStore">
 <!-- Store Limit Banner -->
-<div class="plan-limit-banner kx-222" id="storeLimitBanner"></div>
+<div class="plan-limit-banner kx-62" id="storeLimitBanner"></div>
 <div class="kx-223">
 <h3 class="kx-224">
 <svg fill="none" height="18" stroke="#3b82f6" stroke-width="2.5" viewbox="0 0 24 24" width="18">
@@ -4128,7 +4165,7 @@ Sledeća ›
                     </p>
 <div class="kx-269">
 <code class="kx-270" id="customBotModCmdText">/mod MojKanalBot</code>
-<button class="btn btn-secondary kx-271" onclick="copyCustomBotModCmd()" title="Kopiraj komandu" type="button">
+<button class="btn btn-secondary kx-271" onclick="copyCustomBotModCmd()" title="Kopiraj komandu" aria-label="Kopiraj komandu" type="button">
 <svg fill="none" height="12" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="12">
 <rect height="13" rx="2" ry="2" width="13" x="9" y="9"></rect>
 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -4191,7 +4228,7 @@ Sledeća ›
 </div>
 </div>
 <!-- Moderation Penalty Settings Banner -->
-<div class="plan-limit-banner kx-222" id="modPenaltyBanner"></div>
+<div class="plan-limit-banner kx-62" id="modPenaltyBanner"></div>
 <div class="config-grid">
 <!-- Warning notice when moderation is disabled -->
 <div class="config-section kx-274" id="modDisabledNotice">
@@ -4785,7 +4822,7 @@ Sledeća ›
 </div><!-- /app -->
 <!-- ══════════ MODALS ══════════ -->
 <!-- Command Modal -->
-<div class="modal-backdrop" id="cmdModal" onclick="handleModalBg(event, 'cmdModal')">
+<div aria-labelledby="cmdModalTitle" aria-modal="true" class="modal-backdrop" id="cmdModal" onclick="handleModalBg(event, 'cmdModal')" role="dialog">
 <div class="modal-box kx-333">
 <div class="modal-head kx-334">
 <h3 class="kx-335">
@@ -4797,7 +4834,7 @@ Sledeća ›
 </div>
 <span id="cmdModalTitle">Nova komanda</span>
 </h3>
-<button class="modal-close" onclick="closeModal('cmdModal')" type="button">
+<button aria-label="Zatvori modal" class="modal-close" onclick="closeModal('cmdModal')" type="button">
 <svg fill="none" height="12" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="12">
 <line x1="18" x2="6" y1="6" y2="18"></line>
 <line x1="6" x2="18" y1="6" y2="18"></line>
@@ -5026,7 +5063,7 @@ Sledeća ›
   </div>
 </div>
 <!-- Predlozi Komandu Modal -->
-<div class="modal-backdrop" id="feedbackModal" onclick="handleModalBg(event, 'feedbackModal')">
+<div aria-labelledby="feedbackModalTitle" aria-modal="true" class="modal-backdrop" id="feedbackModal" onclick="handleModalBg(event, 'feedbackModal')" role="dialog">
 <div class="modal-box pm-modal kx-386">
 <div class="pm-modal-header">
 <div class="pm-modal-icon pm-icon-purple">
@@ -5035,10 +5072,10 @@ Sledeća ›
 </svg>
 </div>
 <div class="pm-modal-title-wrap">
-<h3 class="pm-modal-title">Predloži komandu</h3>
+<h3 class="pm-modal-title" id="feedbackModalTitle">Predloži komandu</h3>
 <p class="pm-modal-subtitle">Pomozi nam da unapredimo Kickot bota</p>
 </div>
-<button class="pm-modal-close" onclick="closeModal('feedbackModal')" type="button">
+<button aria-label="Zatvori modal" class="pm-modal-close" onclick="closeModal('feedbackModal')" type="button">
 <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="14">
 <line x1="18" x2="6" y1="6" y2="18"></line>
 <line x1="6" x2="18" y1="6" y2="18"></line>
@@ -5059,7 +5096,7 @@ Sledeća ›
 </svg>
 <span>Direktan kontakt: <a class="pm-link" href="mailto:contact@milanwebportal.com">contact@milanwebportal.com</a></span>
 </div>
-<button class="btn btn-outline kx-388" onclick="copyCustomRefEmail(this)" title="Kopiraj mejl adresu" type="button">
+<button class="btn btn-outline kx-388" onclick="copyCustomRefEmail(this)" title="Kopiraj mejl adresu" aria-label="Kopiraj mejl adresu" type="button">
 <svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.3" viewbox="0 0 24 24" width="14">
 <rect height="13" rx="2" ry="2" width="13" x="9" y="9"></rect>
 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
@@ -5103,7 +5140,7 @@ Sledeća ›
           </button>
 </div>
 </form>
-<iframe class="kx-221" id="feedbackHiddenIframe" name="feedbackHiddenIframe"></iframe>
+<iframe class="kx-221" id="feedbackHiddenIframe" name="feedbackHiddenIframe" title="Feedback Submission Frame"></iframe>
 </div>
 </div>
 <!-- Pomoc Modal -->
@@ -5541,6 +5578,53 @@ Sledeća ›
 </div>
 </div>
 </div>
+<!-- Downgrade to Free Confirmation Modal -->
+<div aria-labelledby="downgradeFreeModalTitle" aria-modal="true" class="modal-backdrop" id="downgradeFreeModal" onclick="handleModalBg(event, 'downgradeFreeModal')" role="dialog" style="z-index: 1300 !important;">
+<div class="modal-box pm-modal" style="max-width: 500px;">
+<div class="pm-modal-header">
+<div class="pm-modal-icon" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.03 0z"></path>
+<line x1="12" y1="9" x2="12" y2="13"></line>
+<line x1="12" y1="17" x2="12.01" y2="17"></line>
+</svg>
+</div>
+<div class="pm-modal-title-wrap">
+<h3 class="pm-modal-title" id="downgradeFreeModalTitle" style="color: #fff; font-size: 1.15rem; font-weight: 800;">Povratak na Besplatni Paket</h3>
+<p class="pm-modal-subtitle" style="color: var(--text-muted); font-size: 0.8rem;">Potvrdi prelazak sa trenutnog plaćenog paketa</p>
+</div>
+<button aria-label="Zatvori modal" class="pm-modal-close" onclick="closeModal('downgradeFreeModal')" type="button">
+<svg fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24" width="14">
+<line x1="18" x2="6" y1="6" y2="18"></line>
+<line x1="6" x2="18" y1="6" y2="18"></line>
+</svg>
+</button>
+</div>
+<div class="pm-modal-body" style="padding: 20px 24px;">
+<div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 10px; padding: 14px 16px; margin-bottom: 18px;">
+<div style="font-size: 0.86rem; font-weight: 700; color: #ef4444; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+<span>Sledeće funkcije će biti zaključane na Free paketu:</span>
+</div>
+<ul style="margin: 0; padding-left: 20px; font-size: 0.82rem; color: #e4e4e7; line-height: 1.6;">
+<li>Kazino igre sa poenima (Slot, Rulet, Coinflip, Točak Sreće, Blackjack...)</li>
+<li>Individualna podešavanja kazni po filteru moderacije</li>
+<li>Povezivanje više od 1 Kick kanala (maksimalno 1)</li>
+<li>Preko 50 prilagođenih komandi i 5 automatskih poruka</li>
+</ul>
+</div>
+<p style="margin: 0; font-size: 0.84rem; color: var(--text-muted); line-height: 1.5;">
+Da li si siguran da želiš da prebaciš nalog na <strong style="color: #fff;">Besplatni (Free) paket</strong>? Uvek se možeš ponovo nadograditi.
+</p>
+</div>
+<div class="pm-modal-footer" style="padding: 16px 24px; display: flex; align-items: center; justify-content: flex-end; gap: 10px;">
+<button class="btn btn-outline" onclick="closeModal('downgradeFreeModal')" type="button">Zadrži trenutni paket</button>
+<button class="btn btn-danger" id="confirmDowngradeFreeBtn" onclick="confirmDowngradeToFree()" type="button" style="background: #ef4444; border-color: #ef4444; font-weight: 700;">
+Potvrdi i Pređi na Free
+</button>
+</div>
+</div>
+</div>
 <!-- Settings Modal -->
 <div aria-labelledby="settingsModalTitle" aria-modal="true" class="modal-backdrop" id="settingsModal" onclick="handleSettingsModalBackdropClick(event)" role="dialog">
 <div class="modal-box pm-modal kx-402">
@@ -5628,6 +5712,7 @@ Sledeća ›
 </div>
 <div class="kx-419">
 <label class="pm-label">Aktivni povezani kanali</label>
+<div id="settingsChannelsLimitBannerWrap"></div>
 <div class="kx-420" id="settingsChannelList">
 <!-- Dinamički učitano -->
 </div>
@@ -5648,6 +5733,7 @@ Sledeća ›
 </div>
 <div class="kx-424">
 <label class="pm-label">Aktivni menadžeri</label>
+<div id="settingsManagersLimitBannerWrap"></div>
 <div class="kx-420" id="settingsManagerList">
 <!-- Dinamički učitano -->
 </div>
@@ -6005,7 +6091,7 @@ Sledeća ›
 </div>
 <div class="form-group kx-462">
 <label class="form-label" id="paymentDetailsLabel">PayPal Email Adresa</label>
-<input class="form-input kx-341" id="paymentDetails" name="Detalji Isplate (Email/IBAN/Adresa)" placeholder="tvoj@email.com" required="" type="text"/>
+<input class="form-input kx-341" id="paymentDetails" name="Detalji Isplate (Email/IBAN/Adresa)" placeholder="tvoj@email.com" autocomplete="email" required="" type="text"/>
 </div>
 <div class="kx-463">
 <button class="btn btn-outline" onclick="closeModal('withdrawalModal')" type="button">Otkaži</button>
@@ -6047,7 +6133,7 @@ Sledeća ›
 <!-- Monthly Pricing -->
 <div class="upgrade-modal-grid kx-474" id="monthlyPricing">
 <!-- Free Plan -->
-<div class="upgrade-plan-card kx-475">
+<div class="upgrade-plan-card kx-475" data-plan="free">
 <div>
 <div class="kx-476">
               OSNOVNI</div>
@@ -6080,10 +6166,10 @@ Sledeća ›
               </div>
 </div>
 </div>
-<button class="btn btn-outline kx-481" disabled="" type="button">Tvoj trenutni paket</button>
+<button class="btn btn-outline kx-481" id="monthlyFreeCheckoutBtn" disabled="" type="button">Tvoj trenutni paket</button>
 </div>
 <!-- Pro Plan -->
-<div class="upgrade-plan-card popular kx-482">
+<div class="upgrade-plan-card popular kx-482" data-plan="pro">
 <div class="kx-483">
             POPULARNO</div>
 <div>
@@ -6117,7 +6203,7 @@ Sledeća ›
             Pro →</a>
 </div>
 <!-- Elite Plan -->
-<div class="upgrade-plan-card elite kx-486">
+<div class="upgrade-plan-card elite kx-486" data-plan="elite">
 <div>
 <div class="kx-487">
               VIP ULTRA</div>
@@ -6148,7 +6234,7 @@ Sledeća ›
 <!-- Yearly Pricing -->
 <div class="upgrade-modal-grid kx-489" id="yearlyPricing">
 <!-- Free Plan Yearly -->
-<div class="upgrade-plan-card kx-475">
+<div class="upgrade-plan-card kx-475" data-plan="free">
 <div>
 <div class="kx-476">
               OSNOVNI</div>
@@ -6181,10 +6267,10 @@ Sledeća ›
               </div>
 </div>
 </div>
-<button class="btn btn-outline kx-481" disabled="" type="button">Tvoj trenutni paket</button>
+<button class="btn btn-outline kx-481" id="yearlyFreeCheckoutBtn" disabled="" type="button">Tvoj trenutni paket</button>
 </div>
 <!-- Pro Plan Yearly -->
-<div class="upgrade-plan-card popular kx-482">
+<div class="upgrade-plan-card popular kx-482" data-plan="pro">
 <div class="kx-483">
             POPULARNO</div>
 <div>
@@ -6222,7 +6308,7 @@ Sledeća ›
             Pro Godišnje →</a>
 </div>
 <!-- Elite Plan Yearly -->
-<div class="upgrade-plan-card elite kx-486">
+<div class="upgrade-plan-card elite kx-486" data-plan="elite">
 <div>
 <div class="kx-487">
               VIP ULTRA</div>
@@ -6348,13 +6434,24 @@ Podesite novo stanje poena za gledaoca.
 </div>
 <!-- Toast Container -->
 <div aria-atomic="true" aria-live="polite" class="toast-container" id="toastContainer"></div>
+<!-- Toast System & Optimization -->
+<script src="../js/toast.js?v=20260915-v2" defer></script>
+<!-- KickALL Root Configuration -->
+<script src="../js/config.js?v=20260915-v2"></script>
+<!-- Dynamic Configuration (Kickot-specifičan) -->
+<script src="js/config.js?v=20260915-v2"></script>
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Avatar Cache Module (IndexedDB) -->
+<script src="js/avatar-cache.js?v=20260915-v2"></script>
 <!-- YouTube Iframe API for Audio Player -->
-<script src="https://www.youtube.com/iframe_api"></script>
-<script src="js/dashboard.js?v=20260913-perf-final"></script>
+<script src="https://www.youtube.com/iframe_api" defer></script>
+<!-- Main Dashboard Core Script -->
+<script src="js/dashboard.js?v=20260915-v2"></script>
 <!-- KickALL Data Layer & Analytics -->
-<script src="../js/data-layer.js"></script>
-<script src="../js/route-tracking.js"></script>
-<script src="../js/consent-banner.js"></script>
-<script src="../js/analytics.js"></script>
+<script src="../js/data-layer.js?v=20260915-v2" defer></script>
+<script src="../js/route-tracking.js?v=20260915-v2" defer></script>
+<script src="../js/consent-banner.js?v=20260915-v2" defer></script>
+<script src="../js/analytics.js?v=20260915-v2" defer></script>
 </body>
 </html>

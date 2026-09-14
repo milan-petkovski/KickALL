@@ -46,6 +46,24 @@
     --shadow-green: 0 0 25px rgba(83, 252, 24, 0.3);
     --shadow-glass: 0 8px 32px 0 rgba(4, 3, 8, 0.5);
 
+    /* Border Radius Scale */
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-full: 9999px;
+
+    /* Typographic Scale */
+    --text-xs: 0.75rem;    /* 12px */
+    --text-sm: 0.875rem;   /* 14px */
+    --text-base: 1rem;     /* 16px */
+    --text-lg: 1.125rem;   /* 18px */
+    --text-xl: 1.25rem;    /* 20px */
+    --text-2xl: 1.5rem;    /* 24px */
+    --text-3xl: 1.875rem;  /* 30px */
+    --text-4xl: 2.25rem;   /* 36px */
+
     /* Z-Index Scale */
     --z-bg: -1;
     --z-content: 1;
@@ -282,19 +300,38 @@ button {
     font-family: inherit;
 }
 
-button {
+button,
+[role="button"],
+.btn {
     cursor: pointer;
     -webkit-appearance: none;
     appearance: none;
+    transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
 button:focus {
     outline: none;
 }
 
-button:focus-visible {
-    outline: 2px solid rgba(139, 92, 246, 0.55);
+button:focus-visible,
+[role="button"]:focus-visible,
+.btn:focus-visible {
+    outline: 2px solid var(--color-violet, #8b5cf6);
     outline-offset: 2px;
+}
+
+button:active:not(:disabled),
+[role="button"]:active:not([aria-disabled="true"]),
+.btn:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+/* Obavezna polja u formama */
+.form-label.required::after,
+label.required::after,
+.form-label[data-required="true"]::after {
+    content: " *";
+    color: #ef4444;
 }
 
 /* ═══════════════════════════════════════════════════════════
