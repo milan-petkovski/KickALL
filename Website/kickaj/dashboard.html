@@ -8,23 +8,70 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="color-scheme" content="dark" />
   <title>Kickaj Giveaway Studio</title>
-  <meta name="description" content="Izvlaci pobednike nagradnih igara uzivo iz chat poruka gledalaca uz Tocak Srece, Slot Masinu i Neon Rulet." />
+  <meta name="description" content="Izvlači pobednike nagradnih igara uživo iz chat poruka gledalaca uz Točak Sreće, Slot Mašinu i Neon Rulet." />
   <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://kickall.app/kickaj/dashboard" />
   <meta name="theme-color" content="#07070D" />
 
-  <!-- Fonts -->
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:title" content="Kickaj Giveaway Studio" />
+  <meta property="og:description" content="Izvlači pobednike nagradnih igara uživo iz chat poruka gledalaca uz Točak Sreće, Slot Mašinu i Neon Rulet." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://kickall.app/kickaj/dashboard" />
+  <meta property="og:image" content="https://kickall.app/assets/og-kickaj.webp" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Kickaj Giveaway Studio" />
+  <meta name="twitter:description" content="Izvlači pobednike nagradnih igara uživo iz chat poruka gledalaca uz Točak Sreće, Slot Mašinu i Neon Rulet." />
+  <meta name="twitter:image" content="https://kickall.app/assets/og-kickaj.webp" />
+
+  <!-- Google Analytics (GA4) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-KZNGNF6TEM"></script>
+  <script nonce="kickall-inline-core">
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+    gtag('config', 'G-KZNGNF6TEM');
+  </script>
+
+  <!-- PWA Manifest & Icons -->
+  <link rel="manifest" href="../manifest.json" />
+  <link rel="apple-touch-icon" href="/assets/logo.webp" />
+
+
+  <!-- Service Worker Registration -->
+  <script nonce="kickall-inline-core">
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+
+  <!-- Mrežna optimizacija -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://rcukparptzzyssqdmydt.supabase.co" crossorigin />
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
+  <link rel="dns-prefetch" href="https://rcukparptzzyssqdmydt.supabase.co" />
+  <link rel="dns-prefetch" href="https://milanwebportal.app.fungies.io" />
 
-  <link rel="stylesheet" href="css/kickaj.css?v=20260910i" />
+  <!-- Preload kritičnih stilova -->
+  <link rel="preload" href="css/kickaj.css?v=20260915-v2" as="style" />
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/kickaj.css?v=20260915-v2" />
   <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon" />
 
   <!-- Supabase + Core -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="../js/config.js"></script>
-  <script src="../js/toast.js" defer></script>
-  <script src="../js/mobile-optimization.js" defer></script>
+  <script src="../js/config.js?v=20260915-v2"></script>
+  <script src="../js/toast.js?v=20260915-v2" defer></script>
+  <script src="../js/mobile-optimization.js?v=20260915-v2" defer></script>
 </head>
 <body class="kickaj-body auth-loading">
   <!-- Skip to Content Link -->
@@ -55,7 +102,7 @@
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </a>
-        <a class="sidebar-logo" href="#" title="Kickaj - Giveaway Studio">
+        <a class="sidebar-logo" href="/kickaj/dashboard" title="Kickaj - Giveaway Studio">
           <img alt="Kickaj Logo" class="logo-img" src="../assets/kickaj.webp" />
         </a>
         <a class="sidebar-header-btn coffee-btn" href="https://paypal.me/milanwebportal/5EUR" rel="noopener noreferrer" target="_blank" title="Kupi mi kafu">
@@ -309,7 +356,7 @@
           </svg>
           <span>Pokreni giveaway</span>
         </button>
-        <button class="sc-btn sc-btn-stop" id="btnStopGiveaway" style="display:none;" title="Zaustavi i resetuj giveaway" type="button">
+        <button class="sc-btn sc-btn-stop" id="btnStopGiveaway" style="display:none;" title="Zaustavi i resetuj giveaway" type="button" aria-hidden="true" tabindex="-1">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <rect x="4" y="4" width="16" height="16" rx="2"/>
           </svg>
@@ -345,6 +392,24 @@
               <svg class="dropdown-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               <span>Odjavi se</span>
             </button>
+            <div class="dropdown-divider"></div>
+            <div class="user-menu-notice" style="padding: 10px 12px; margin-top: 4px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.22); border-radius: 10px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.74rem; font-weight: 700; color: #a78bfa;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <span>Paketi &amp; Podešavanja</span>
+              </div>
+              <p style="margin: 0; font-size: 0.72rem; color: var(--text-muted, #94a3b8); line-height: 1.45;">
+                Podešavanje naloga, kanala i kupovina paketa vrše se u <strong style="color: #fff;">Kickot</strong> kontrolnoj tabli.
+              </p>
+              <a href="/kickot/dashboard" style="display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 10px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 7px; color: #c4b5fd; font-size: 0.72rem; font-weight: 700; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.background='rgba(139,92,246,0.35)';this.style.color='#fff';" onmouseout="this.style.background='rgba(139,92,246,0.2)';this.style.color='#c4b5fd;'">
+                <span>Otvori Kickot Dashboard</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" x2="21" y1="14" y2="3"></line></svg>
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -404,7 +469,7 @@
         </div>
         <div class="topbar-right">
           <!-- Mute Button -->
-          <button class="topbar-btn topbar-mute-btn" id="btnMuteSound" title="Isključi/uključi zvuk">
+          <button class="topbar-btn topbar-mute-btn" id="btnMuteSound" title="Isključi/uključi zvuk" aria-label="Isključi ili uključi zvuk">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="muteIcon">
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
               <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
@@ -413,7 +478,7 @@
           
           <div class="topbar-notif-wrap" style="position: relative;">
             <!-- Notifications Bell -->
-            <button class="topbar-btn" id="notifBellBtn" onclick="window.toggleNotifCenter()" title="Obaveštenja">
+            <button class="topbar-btn" id="notifBellBtn" onclick="window.toggleNotifCenter()" title="Obaveštenja" aria-label="Obaveštenja">
               <svg fill="none" height="17" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewBox="0 0 24 24" width="17">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -456,7 +521,7 @@
           </div>
           
           <!-- Refresh Button -->
-          <button class="topbar-btn topbar-refresh-btn" onclick="window.refreshDatabase()" title="Osveži podatke iz baze">
+          <button class="topbar-btn topbar-refresh-btn" onclick="window.refreshDatabase()" title="Osveži podatke iz baze" aria-label="Osveži podatke iz baze">
             <svg class="refresh-icon" fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" width="16">
               <polyline points="23 4 23 10 17 10"></polyline>
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
@@ -599,7 +664,7 @@
                 </svg>
                 <span>Reset</span>
               </button>
-              <button class="stage-fullscreen-btn" id="btnOpenFullscreen" onclick="window.openFullscreen()" title="Fullscreen prikaz točka za stream" type="button">
+              <button class="stage-fullscreen-btn" id="btnOpenFullscreen" onclick="window.openFullscreen()" title="Fullscreen prikaz točka za stream" aria-label="Fullscreen prikaz točka za stream" type="button">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                   <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
                 </svg>
@@ -613,7 +678,7 @@
               <polygon points="12 24 4 0 20 0 12 24"/>
             </svg>
             <div class="wheel-canvas-container">
-              <canvas id="wheelCanvas" width="520" height="520"></canvas>
+              <canvas id="wheelCanvas" width="520" height="520" role="img" aria-label="Točak Sreće sa učesnicima nagradne igre"></canvas>
             </div>
           </div>
 
@@ -669,7 +734,7 @@
           </div>
 
           <!-- Izvuci dugme: prikazano samo za Slot i Neon Rulet (Tocak se izvlaci klikom na tocak) -->
-          <button class="sc-btn sc-btn-draw stage-draw-btn" id="btnStageDraw" style="display:none;">
+          <button class="sc-btn sc-btn-draw stage-draw-btn" id="btnStageDraw" style="display:none;" aria-hidden="true" tabindex="-1">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
             </svg>
@@ -706,7 +771,7 @@
                     <button type="button" class="bulk-test-item" data-count="random-100-200">Nasumično (100-200)</button>
                   </div>
                 </div>
-                <button class="list-action-btn" id="btnClearParticipants" title="Očisti učesnike">
+                <button class="list-action-btn" id="btnClearParticipants" title="Očisti učesnike" aria-label="Očisti učesnike">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"/>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -737,13 +802,13 @@
                 Pobednici
               </div>
               <div style="display:flex;align-items:center;gap:8px;">
-                <button class="list-action-btn" id="btnExportWinners" title="Izvezi pobednike u clipboard">
+                <button class="list-action-btn" id="btnExportWinners" title="Izvezi pobednike u clipboard" aria-label="Izvezi pobednike u clipboard">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
                     <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
                   </svg>
                 </button>
-                <button class="list-action-btn" id="btnClearWinners" title="Obriši sve pobednike">
+                <button class="list-action-btn" id="btnClearWinners" title="Obriši sve pobednike" aria-label="Obriši sve pobednike">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="3 6 5 6 21 6"/>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -794,7 +859,7 @@
             </svg>
             <span>Pokreni giveaway</span>
           </button>
-          <button class="wfo-btn sc-btn sc-btn-stop" id="wfoBtnStop" style="display:none;" title="Zaustavi giveaway" type="button">
+          <button class="wfo-btn sc-btn sc-btn-stop" id="wfoBtnStop" style="display:none;" title="Zaustavi giveaway" type="button" aria-hidden="true" tabindex="-1">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <rect x="4" y="4" width="16" height="16" rx="2"/>
             </svg>
@@ -807,7 +872,7 @@
             <span>Izvuci</span>
           </button>
         </div>
-        <button class="wfo-close-btn" id="btnCloseFullscreen" onclick="window.closeFullscreen()" title="Zatvori Fullscreen (Esc)">
+        <button class="wfo-close-btn" id="btnCloseFullscreen" onclick="window.closeFullscreen()" title="Zatvori Fullscreen (Esc)" aria-label="Zatvori Fullscreen (Esc)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
@@ -824,7 +889,7 @@
           <polygon points="12 24 4 0 20 0 12 24"/>
         </svg>
         <div class="wfo-canvas-wrap">
-          <canvas id="wheelCanvasFullscreen" width="680" height="680"></canvas>
+          <canvas id="wheelCanvasFullscreen" width="680" height="680" role="img" aria-label="Točak Sreće uvećani prikaz"></canvas>
         </div>
       </div>
 
@@ -899,7 +964,7 @@
   </div>
 
   <!-- Winner Reveal Celebration Overlay -->
-  <div class="winner-reveal-overlay" id="winnerRevealOverlay" onclick="window.handleModalBg(event, 'winnerRevealOverlay')" role="dialog" aria-modal="true">
+  <div class="winner-reveal-overlay" id="winnerRevealOverlay" onclick="window.handleModalBg(event, 'winnerRevealOverlay')" role="dialog" aria-modal="true" aria-labelledby="winnerRevealName" aria-label="Pobednik nagradne igre">
     <canvas id="particleCanvas" class="particle-canvas"></canvas>
 
     <div class="winner-reveal-card" onclick="event.stopPropagation();">
@@ -955,7 +1020,7 @@
   </div>
 
   <!-- Custom Channel Modal -->
-  <div class="modal-backdrop" id="customChannelModal" onclick="window.handleModalBg(event, 'customChannelModal')" role="dialog" aria-modal="true">
+  <div class="modal-backdrop" id="customChannelModal" onclick="window.handleModalBg(event, 'customChannelModal')" role="dialog" aria-modal="true" aria-labelledby="customChannelModalTitle">
     <div class="modal-box">
       <div class="modal-head">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -964,7 +1029,7 @@
             <line x1="8" y1="21" x2="16" y2="21"/>
             <line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
-          <h3>Promena Kick Kanala</h3>
+          <h3 id="customChannelModalTitle">Promena Kick Kanala</h3>
         </div>
         <button type="button" class="modal-close-btn" onclick="window.closeModal('customChannelModal')" aria-label="Zatvori">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -999,7 +1064,7 @@
   </div>
 
   <!-- Help Modal -->
-  <div class="modal-backdrop" id="helpModal" onclick="window.handleModalBg(event, 'helpModal')" role="dialog" aria-modal="true">
+  <div class="modal-backdrop" id="helpModal" onclick="window.handleModalBg(event, 'helpModal')" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
     <div class="modal-box">
       <div class="modal-head">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -1008,7 +1073,7 @@
             <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
             <line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
-          <h3>Pomoć i Tehnička Podrška</h3>
+          <h3 id="helpModalTitle">Pomoć i Tehnička Podrška</h3>
         </div>
         <button type="button" class="modal-close-btn" onclick="window.closeModal('helpModal')" aria-label="Zatvori">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -1059,6 +1124,6 @@
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="true"></div>
 
-  <script src="js/kickaj-dashboard.js?v=20260910s" defer></script>
+  <script src="js/kickaj-dashboard.js?v=20260915-v2" defer></script>
 </body>
 </html>

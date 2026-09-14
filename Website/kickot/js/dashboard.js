@@ -26,6 +26,19 @@
   }
 })();
 
+// ── Global Error Handling for Unhandled Promise Rejections ──
+if (typeof window !== 'undefined') {
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    if (typeof showToast === 'function') {
+      const msg = event?.reason?.message || '';
+      if (!msg.includes('AbortError')) {
+        showToast('error', 'Došlo je do neočekivane greške.');
+      }
+    }
+  });
+}
+
 // ── Performance & Memory Lifecycle Utilities ──────────────────
 const TimerRegistry = {
   _timers: new Map(),
@@ -204,7 +217,14 @@ const PLAN_LIMITS = {
     maxChannels: 1,
     maxManagers: 5,
     maxStoreItems: 10,
-    customPenaltySettings: false
+    customPenaltySettings: false,
+    minCooldownMs: 3000,
+    allowGambling: false,
+    allowLove: true,
+    allowLeaderboard: true,
+    allowWatchtime: true,
+    allowAdvancedModeration: false,
+    allowSongRequest: false
   },
   pro: {
     name: 'Pro',
@@ -219,7 +239,14 @@ const PLAN_LIMITS = {
     maxChannels: 5,
     maxManagers: 10,
     maxStoreItems: 50,
-    customPenaltySettings: true
+    customPenaltySettings: true,
+    minCooldownMs: 1000,
+    allowGambling: true,
+    allowLove: true,
+    allowLeaderboard: true,
+    allowWatchtime: true,
+    allowAdvancedModeration: true,
+    allowSongRequest: true
   },
   elite: {
     name: 'Elite',
@@ -234,7 +261,14 @@ const PLAN_LIMITS = {
     maxChannels: Infinity,
     maxManagers: Infinity,
     maxStoreItems: Infinity,
-    customPenaltySettings: true
+    customPenaltySettings: true,
+    minCooldownMs: 500,
+    allowGambling: true,
+    allowLove: true,
+    allowLeaderboard: true,
+    allowWatchtime: true,
+    allowAdvancedModeration: true,
+    allowSongRequest: true
   },
   vip: {
     name: 'Elite',
@@ -249,7 +283,14 @@ const PLAN_LIMITS = {
     maxChannels: Infinity,
     maxManagers: Infinity,
     maxStoreItems: Infinity,
-    customPenaltySettings: true
+    customPenaltySettings: true,
+    minCooldownMs: 500,
+    allowGambling: true,
+    allowLove: true,
+    allowLeaderboard: true,
+    allowWatchtime: true,
+    allowAdvancedModeration: true,
+    allowSongRequest: true
   }
 };
 
@@ -282,8 +323,8 @@ function openUpgradeModal(feature) {
     if (modalNote) modalNote.textContent = 'Dostignut je limit kanala za tvoj paket (Free: 1 | Pro: 5 | Elite: Neograničeno). Nadogradi nalog za više kanala!';
   } else if (feature === 'managers') {
     if (modalNote) modalNote.textContent = 'Dostignut je limit menadžera za tvoj paket (Free: 5 | Pro: 10 | Elite: Neograničeno). Nadogradi nalog za više menadžera!';
-  } else if (feature === 'customPenalty') {
-    if (modalNote) modalNote.textContent = 'Individualne kazne za moderacijske filtere su dostupne samo za PRO i ELITE paket!';
+  } else if (feature === 'customPenalty' || feature === 'moderation') {
+    if (modalNote) modalNote.textContent = 'Individualne kazne za filtere i napredna pravila moderacije su dostupni samo za PRO i ELITE paket!';
   } else if (feature === 'storeItems') {
     if (modalNote) modalNote.textContent = 'Dostignut je limit artikala u prodavnici za tvoj paket (Free: 10 | Pro: 50 | Elite: Neograničeno). Nadogradi nalog za više artikala!';
   } else {
@@ -298,108 +339,149 @@ function openUpgradeModal(feature) {
   openModal('upgradeModal');
 }
 
+function selectFreePlan() {
+  const currentPlan = (currentUserPlan || 'free').toLowerCase();
+  if (currentPlan === 'free') {
+    showToast('info', 'Već se nalaziš na Besplatnom (Free) paketu.');
+    return;
+  }
+
+  // Open custom dark-themed confirmation modal
+  openModal('downgradeFreeModal');
+}
+window.selectFreePlan = selectFreePlan;
+
+async function confirmDowngradeToFree() {
+  const btn = document.getElementById('confirmDowngradeFreeBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Prebacivanje...`;
+  }
+
+  try {
+    if (currentUser && currentUser.id) {
+      await sb.from('user_profiles')
+        .update({ plan: 'free', updated_at: new Date().toISOString() })
+        .eq('id', currentUser.id);
+    }
+
+    currentUserPlan = 'free';
+    if (currentUserProfileData) currentUserProfileData.plan = 'free';
+    if (activeChannel) {
+      activeChannel.owner_plan = 'free';
+    }
+
+    updateSidebarUserPlanAndRole();
+    renderPlanLimitBanners();
+    applyPenaltySettingsRestrictions();
+    updatePlanButtons();
+
+    closeModal('downgradeFreeModal');
+    closeModal('upgradeModal');
+    showToast('success', 'Uspešno prebačeno na Besplatni (Free) paket!');
+  } catch (err) {
+    console.error('Greška pri promeni paketa na free:', err);
+    showToast('error', 'Došlo je do greške pri promeni paketa.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Potvrdi i Pređi na Free';
+    }
+  }
+}
+window.confirmDowngradeToFree = confirmDowngradeToFree;
+
 function updatePlanButtons() {
   let currentPlan = (currentUserPlan || 'free').toLowerCase();
   if (currentPlan === 'business') currentPlan = 'elite';
 
-  // Monthly pricing buttons
-  const monthlyFreeBtn = document.querySelector('#monthlyPricing .upgrade-plan-card:nth-child(1) button');
-  const monthlyProBtn = document.querySelector('#monthlyPricing .upgrade-plan-card:nth-child(2) a');
-  const monthlyEliteBtn = document.querySelector('#monthlyPricing .upgrade-plan-card:nth-child(3) a');
+  // --- Monthly pricing buttons (resolved by ID, not fragile :nth-child) ---
+  const monthlyFreeBtn  = document.getElementById('monthlyFreeCheckoutBtn');
+  const monthlyProBtn   = document.getElementById('monthlyProCheckoutBtn');
+  const monthlyEliteBtn = document.getElementById('monthlyEliteCheckoutBtn');
 
-  // Yearly pricing buttons
-  const yearlyFreeBtn = document.querySelector('#yearlyPricing .upgrade-plan-card:nth-child(1) button');
-  const yearlyProBtn = document.querySelector('#yearlyPricing .upgrade-plan-card:nth-child(2) a');
-  const yearlyEliteBtn = document.querySelector('#yearlyPricing .upgrade-plan-card:nth-child(3) a');
+  // --- Yearly pricing buttons ---
+  const yearlyFreeBtn  = document.getElementById('yearlyFreeCheckoutBtn');
+  const yearlyProBtn   = document.getElementById('yearlyProCheckoutBtn');
+  const yearlyEliteBtn = document.getElementById('yearlyEliteCheckoutBtn');
 
-  // Update Free button
-  if (monthlyFreeBtn) {
+  // Helper: turn an <a> into a disabled "current plan" <button> in-place.
+  // The orphan-guard (tagName check) prevents a crash when called twice on the
+  // same node (after the first call the anchor is already replaced with a button).
+  function markCurrent(el, extraStyle) {
+    if (!el) return;
+    if (el.tagName === 'A') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.id = el.id; // preserve ID so subsequent calls find the button by ID
+      btn.className = 'btn btn-primary';
+      btn.style.cssText = 'width:100%;margin-top:auto;text-align:center;padding:12px;font-weight:600;opacity:0.6;cursor:default;' + (extraStyle || '');
+      btn.disabled = true;
+      btn.textContent = 'Tvoj trenutni paket';
+      el.parentNode.replaceChild(btn, el);
+    } else if (el.tagName === 'BUTTON') {
+      // Already replaced – just keep it disabled
+      el.disabled = true;
+      el.textContent = 'Tvoj trenutni paket';
+      el.style.opacity = '0.6';
+      el.style.cursor = 'default';
+    }
+  }
+
+  function markAvailable(el, defaultText, checkoutAction) {
+    if (!el) return;
+    el.style.display = 'inline-flex';
+    el.disabled = false;
+    el.style.opacity = '1';
+    el.style.cursor = 'pointer';
+    el.style.pointerEvents = 'auto';
+    el.style.background = '';
+    el.style.color = '';
+    if (defaultText) el.textContent = defaultText;
+    if (checkoutAction) {
+      el.onclick = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        checkoutAction();
+      };
+    }
+  }
+
+  // --- Free plan ---
+  [monthlyFreeBtn, yearlyFreeBtn].forEach(btn => {
+    if (!btn) return;
     if (currentPlan === 'free') {
-      monthlyFreeBtn.textContent = 'Tvoj trenutni paket';
-      monthlyFreeBtn.disabled = true;
-      monthlyFreeBtn.style.opacity = '0.6';
-      monthlyFreeBtn.style.cursor = 'default';
+      btn.textContent = 'Tvoj trenutni paket';
+      btn.disabled = true;
+      btn.style.opacity = '0.6';
+      btn.style.cursor = 'default';
+      btn.style.pointerEvents = 'none';
+      btn.onclick = null;
     } else {
-      monthlyFreeBtn.textContent = 'Izaberi Free';
-      monthlyFreeBtn.disabled = false;
-      monthlyFreeBtn.style.opacity = '';
-      monthlyFreeBtn.style.cursor = '';
+      markAvailable(btn, 'Izaberi Free', () => selectFreePlan());
     }
+  });
+
+  // --- Pro plan ---
+  if (currentPlan === 'pro') {
+    markCurrent(monthlyProBtn);
+    markCurrent(yearlyProBtn);
+  } else {
+    markAvailable(monthlyProBtn, 'Izaberi Pro →', () => openCheckout('pro', 'monthly'));
+    markAvailable(yearlyProBtn, 'Izaberi Pro →', () => openCheckout('pro', 'yearly'));
   }
 
-  if (yearlyFreeBtn) {
-    if (currentPlan === 'free') {
-      yearlyFreeBtn.textContent = 'Tvoj trenutni paket';
-      yearlyFreeBtn.disabled = true;
-      yearlyFreeBtn.style.opacity = '0.6';
-      yearlyFreeBtn.style.cursor = 'default';
-    } else {
-      yearlyFreeBtn.textContent = 'Izaberi Free';
-      yearlyFreeBtn.disabled = false;
-      yearlyFreeBtn.style.opacity = '';
-      yearlyFreeBtn.style.cursor = '';
-    }
-  }
-
-  // Update Pro button
-  if (monthlyProBtn) {
-    if (currentPlan === 'pro') {
-      // Replace anchor with button
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'btn btn-primary';
-      button.style.cssText = 'width: 100%; margin-top: auto; text-align: center; padding: 12px; font-weight: 600; opacity: 0.6; cursor: default;';
-      button.disabled = true;
-      button.textContent = 'Tvoj trenutni paket';
-      monthlyProBtn.parentNode.replaceChild(button, monthlyProBtn);
-    } else {
-      monthlyProBtn.style.display = 'inline-flex';
-    }
-  }
-
-  if (yearlyProBtn) {
-    if (currentPlan === 'pro') {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'btn btn-primary';
-      button.style.cssText = 'width: 100%; margin-top: auto; text-align: center; padding: 12px; font-weight: 600; opacity: 0.6; cursor: default;';
-      button.disabled = true;
-      button.textContent = 'Tvoj trenutni paket';
-      yearlyProBtn.parentNode.replaceChild(button, yearlyProBtn);
-    } else {
-      yearlyProBtn.style.display = 'inline-flex';
-    }
-  }
-
-  // Update Elite button
-  if (monthlyEliteBtn) {
-    if (currentPlan === 'elite') {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'btn btn-primary';
-      button.style.cssText = 'width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; font-weight: 700; padding: 12px; opacity: 0.6; cursor: default;';
-      button.disabled = true;
-      button.textContent = 'Tvoj trenutni paket';
-      monthlyEliteBtn.parentNode.replaceChild(button, monthlyEliteBtn);
-    } else {
-      monthlyEliteBtn.style.display = 'inline-flex';
-    }
-  }
-
-  if (yearlyEliteBtn) {
-    if (currentPlan === 'elite') {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'btn btn-primary';
-      button.style.cssText = 'width: 100%; margin-top: auto; background: #53FC18; color: #0E0E1D; text-align: center; font-weight: 700; padding: 12px; opacity: 0.6; cursor: default;';
-      button.disabled = true;
-      button.textContent = 'Tvoj trenutni paket';
-      yearlyEliteBtn.parentNode.replaceChild(button, yearlyEliteBtn);
-    } else {
-      yearlyEliteBtn.style.display = 'inline-flex';
-    }
+  // --- Elite plan ---
+  const eliteStyle = 'background:#53FC18;color:#0E0E1D;font-weight:700;';
+  if (currentPlan === 'elite') {
+    markCurrent(monthlyEliteBtn, eliteStyle);
+    markCurrent(yearlyEliteBtn, eliteStyle);
+  } else {
+    markAvailable(monthlyEliteBtn, 'Izaberi Elite →', () => openCheckout('elite', 'monthly'));
+    markAvailable(yearlyEliteBtn, 'Izaberi Elite →', () => openCheckout('elite', 'yearly'));
   }
 }
+
+
 
 function togglePricing(type) {
   currentPricingPeriod = type;
@@ -441,7 +523,7 @@ function openCheckout(plan, period) {
     try {
       const stored = JSON.parse(localStorage.getItem('kickbot-supabase-auth') || '{}');
       if (stored && stored.user) userId = stored.user.id;
-    } catch (_) {}
+    } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   }
 
   if (!userId) {
@@ -483,7 +565,7 @@ async function proceedToCheckout() {
         userId = stored.user.id;
         userEmail = stored.user.email;
       }
-    } catch (_) {}
+    } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   }
 
   if (!userId) {
@@ -502,7 +584,7 @@ async function proceedToCheckout() {
       if (typeof sb !== 'undefined' && sb.rpc) {
         await sb.rpc('create_user_referral', { p_user_id: userId, p_referral_code: refCode });
       }
-    } catch (_) { }
+    } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   }
 
   closeModal('preCheckoutReferralModal');
@@ -739,10 +821,10 @@ function renderPlanLimitBanners() {
     }
   }
 
-  // 6. Moderation Penalty Settings Banner
-  const modPenaltyBanner = document.getElementById('modPenaltyBanner');
+  // 6. Moderation Penalty Settings & Plan Limit Banner
+  const modPenaltyBanner = document.getElementById('moderationPlanLimitBanner') || document.getElementById('modPenaltyBanner');
   if (modPenaltyBanner) {
-    if (limits.customPenaltySettings) {
+    if (limits.customPenaltySettings && limits.allowAdvancedModeration) {
       modPenaltyBanner.style.display = 'none';
       modPenaltyBanner.innerHTML = '';
     } else {
@@ -750,18 +832,18 @@ function renderPlanLimitBanners() {
       modPenaltyBanner.innerHTML = `
         <div style="display:flex; align-items:center; gap:12px;">
           <div style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#EF4444; padding:6px 12px; border-radius:8px; font-weight:800; font-size:0.75rem; text-transform:uppercase;">
-            Zaključano (Free)
+            Free Paket
           </div>
           <div>
             <div style="font-size:0.85rem; font-weight:700; color:#fff;">
-              Individualne kazne za moderacijske filtere
+              Ograničenje Moderacije: <strong>Osnovni Nivo Zaštite</strong>
             </div>
             <div style="font-size:0.78rem; color:var(--text-muted);">
-              Na Free planu su dostupne samo globalne kazne. Nadogradi na PRO za individualne podešavanja.
+              Na Free paketu važe globalne kazne. Individualna podešavanja kazni po filteru i napredna pravila moderacije otključani su na PRO i ELITE paketima.
             </div>
           </div>
         </div>
-        <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('customPenalty')">${upgradeSvgIcon}<span>Otključaj individualne kazne</span></button>
+        <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('moderation')">${upgradeSvgIcon}<span>Otključaj Naprednu Moderaciju</span></button>
       `;
     }
   }
@@ -815,25 +897,30 @@ function renderPlanLimitBanners() {
     `;
   }
 
-  // 7. Mini Games Banner & Casino Games Overlay
+  // 8. Mini Games Banner & Casino Games Overlay (Both Casino tab and Sve Igre tab)
   const mgBanner = document.getElementById('minigamesPlanLimitBanner');
-  const casinoWrap = document.getElementById('casinoMinigamesWrap');
-  if (mgBanner || casinoWrap) {
-    let overlay = document.getElementById('casinoMinigamesLockOverlay');
+  const casinoWraps = [
+    { wrap: document.getElementById('casinoMinigamesWrap'), overlayId: 'casinoMinigamesLockOverlay' },
+    { wrap: document.getElementById('allGamesCasinoWrap'), overlayId: 'allGamesCasinoLockOverlay' }
+  ];
+
+  if (mgBanner || casinoWraps.some(item => item.wrap)) {
     if (limits.name !== 'Free') {
       if (mgBanner) {
         mgBanner.style.display = 'none';
         mgBanner.innerHTML = '';
       }
-      if (overlay) overlay.style.display = 'none';
-      if (casinoWrap) {
-        casinoWrap.style.opacity = '1';
-        casinoWrap.style.filter = 'none';
-        casinoWrap.style.pointerEvents = 'auto';
-        casinoWrap.querySelectorAll('input, select, button').forEach(el => {
+      casinoWraps.forEach(({ wrap, overlayId }) => {
+        if (!wrap) return;
+        const ov = document.getElementById(overlayId);
+        if (ov) ov.style.display = 'none';
+        wrap.style.opacity = '1';
+        wrap.style.filter = 'none';
+        wrap.style.pointerEvents = 'auto';
+        wrap.querySelectorAll('input, select, button').forEach(el => {
           if (!el.classList.contains('plan-upgrade-btn')) el.disabled = false;
         });
-      }
+      });
     } else {
       if (mgBanner) {
         mgBanner.style.display = 'flex';
@@ -855,21 +942,23 @@ function renderPlanLimitBanners() {
         `;
       }
 
-      if (casinoWrap) {
-        casinoWrap.style.position = 'relative';
-        casinoWrap.style.borderRadius = '14px';
-        casinoWrap.style.opacity = '1';
-        casinoWrap.style.filter = 'none';
+      casinoWraps.forEach(({ wrap, overlayId }) => {
+        if (!wrap) return;
+        wrap.style.position = 'relative';
+        wrap.style.borderRadius = '14px';
+        wrap.style.opacity = '1';
+        wrap.style.filter = 'none';
 
-        if (!overlay) {
-          overlay = document.createElement('div');
-          overlay.id = 'casinoMinigamesLockOverlay';
-          overlay.className = 'locked-feature-overlay';
-          casinoWrap.appendChild(overlay);
+        let ov = document.getElementById(overlayId);
+        if (!ov) {
+          ov = document.createElement('div');
+          ov.id = overlayId;
+          ov.className = 'locked-feature-overlay';
+          wrap.appendChild(ov);
         }
-        overlay.style.display = 'flex';
-        overlay.style.pointerEvents = 'auto';
-        overlay.innerHTML = `
+        ov.style.display = 'flex';
+        ov.style.pointerEvents = 'auto';
+        ov.innerHTML = `
           <div class="locked-feature-overlay__icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           </div>
@@ -878,12 +967,12 @@ function renderPlanLimitBanners() {
           <button type="button" class="plan-upgrade-btn" onclick="openUpgradeModal('general')" style="padding: 10px 22px; font-size: 0.85rem;">${upgradeSvgIcon}<span>Nadogradi i Otključaj Sve Igre</span></button>
         `;
 
-        casinoWrap.querySelectorAll('input, select, button').forEach(el => {
-          if (!el.classList.contains('plan-upgrade-btn') && !el.closest('#casinoMinigamesLockOverlay')) {
+        wrap.querySelectorAll('input, select, button').forEach(el => {
+          if (!el.classList.contains('plan-upgrade-btn') && !el.closest('#' + overlayId)) {
             el.disabled = true;
           }
         });
-      }
+      });
     }
   }
 }
@@ -1638,7 +1727,7 @@ async function loadUserProfile() {
         await sb.rpc('create_user_referral', { p_user_id: currentUser.id, p_referral_code: refCode });
         localStorage.removeItem('user_referral_code');
         sessionStorage.removeItem('user_referral_code');
-      } catch (e) { }
+      } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
     }
     ensureUserHasReferralCode(currentUser.id).catch(() => { });
   }
@@ -1841,7 +1930,7 @@ async function tryFetchKickAvatarForSlug(username) {
         return localData.avatar;
       }
     }
-  } catch (_) { }
+  } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
 
   // 2. Direktan Kick fallback (preko Netlify proxy-ja) je isključen kao redovan put:
   // Kick.com blokira (403) server-to-server pozive sa Netlify servera (Cloudflare
@@ -1873,6 +1962,16 @@ function updateSidebarUserPlanAndRole() {
   `;
 }
 
+function showChannelLoadingSkeletons() {
+  const statIds = ['statTotalCommands', 'statTotalChat', 'statTotalWatchtime', 'statTopPoints'];
+  statIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.innerHTML = '<span class="skeleton-shimmer" style="display:inline-block;width:56px;height:16px;background:rgba(255,255,255,0.08);border-radius:4px;"></span>';
+    }
+  });
+}
+
 function setActiveChannel(ch) {
   activeChannel = ch;
   window.activeChannel = ch;
@@ -1880,8 +1979,10 @@ function setActiveChannel(ch) {
     try {
       localStorage.setItem('kickbot_selected_channel_id', String(ch.id || ''));
       localStorage.setItem('kickbot_selected_channel_name', String(ch.username || ''));
-    } catch (_) { }
+    } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   }
+
+  showChannelLoadingSkeletons();
 
   // Osveži bedž i limite paketa prema vlasniku izabranog kanala i prikaži ulogu (Vlasnik/Menadžer) u istom redu
   updateSidebarUserPlanAndRole();
@@ -1889,7 +1990,8 @@ function setActiveChannel(ch) {
     renderPlanLimitBanners();
   }
 
-  document.getElementById('channelNameDisplay').textContent = ch.username;
+  const nameEl = document.getElementById('channelNameDisplay');
+  if (nameEl) nameEl.textContent = ch.username;
   updateLiveStatusUI(false); // Resetuj na offline po defaultu kako ne bi flešovalo prethodno stanje
 
   const avatarEl = document.getElementById('channelAvatar');
@@ -2006,21 +2108,23 @@ function setupRealtimeSongQueueSubscription(channelId) {
 function renderChannelList() {
   const list = document.getElementById('channelList');
   if (!list) return;
-  list.innerHTML = '';
 
   const checkSvg = `<span class="ch-check"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#53FC18" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>`;
+
+  // Build everything into a fragment first — single reflow at the end
+  const frag = document.createDocumentFragment();
 
   // 1. Tvoji kanali (own channels)
   const ownHeader = document.createElement('div');
   ownHeader.className = 'channel-group-header';
   ownHeader.textContent = 'Tvoji kanali';
-  list.appendChild(ownHeader);
+  frag.appendChild(ownHeader);
 
   if (currentChannels.length === 0) {
     const emptyOwn = document.createElement('div');
     emptyOwn.className = 'channel-empty-text';
     emptyOwn.textContent = 'Nema dodatih kanala';
-    list.appendChild(emptyOwn);
+    frag.appendChild(emptyOwn);
   } else {
     currentChannels.forEach(ch => {
       const div = document.createElement('div');
@@ -2038,7 +2142,7 @@ function renderChannelList() {
         ${activeChannel?.id === ch.id ? checkSvg : ''}
       `;
       div.onclick = () => selectChannel(ch);
-      list.appendChild(div);
+      frag.appendChild(div);
     });
   }
 
@@ -2047,13 +2151,13 @@ function renderChannelList() {
   managedHeader.className = 'channel-group-header';
   managedHeader.style.marginTop = '8px';
   managedHeader.textContent = 'Kanali kojima upravljaš';
-  list.appendChild(managedHeader);
+  frag.appendChild(managedHeader);
 
   if (managedChannels.length === 0) {
     const emptyManaged = document.createElement('div');
     emptyManaged.className = 'channel-empty-text';
     emptyManaged.textContent = 'Nema kanala za upravljanje';
-    list.appendChild(emptyManaged);
+    frag.appendChild(emptyManaged);
   } else {
     managedChannels.forEach(ch => {
       const div = document.createElement('div');
@@ -2076,9 +2180,12 @@ function renderChannelList() {
         ${activeChannel?.id === ch.id ? checkSvg : ''}
       `;
       div.onclick = () => selectChannel(ch);
-      list.appendChild(div);
+      frag.appendChild(div);
     });
   }
+
+  list.innerHTML = '';
+  list.appendChild(frag);
 }
 
 async function selectChannel(ch) {
@@ -2092,7 +2199,7 @@ async function selectChannel(ch) {
   currentTimeSeconds = 0;
   localSongQueue = [];
   if (window.ytPlayer && typeof window.ytPlayer.stopVideo === 'function') {
-    try { window.ytPlayer.stopVideo(); } catch (_) { }
+    try { window.ytPlayer.stopVideo(); } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   }
   setActiveChannel(ch);
   renderChannelList();
@@ -2138,13 +2245,14 @@ function showNoChannelState() {
 
 // ── Channel Management ────────────────────────────────────
 function extractKickUsername(input) {
-  let val = input.trim();
+  if (!input) return '';
+  let val = String(input).trim();
   // Ukloni URL delove
-  val = val.replace(/https?:\/\/(www\.)?kick\.com\//i, '');
-  // Ukloni eventualni @ na početku
-  val = val.replace(/^@/, '');
-  // Uzmi samo prvi deo do sledećeg kosog poteza ili space-a ili upitnika
-  val = val.split(/[/?\s]/)[0];
+  val = val.replace(/^https?:\/\/(www\.)?kick\.com\//i, '');
+  // Ukloni eventualni @ na početku ili kick_user_
+  val = val.replace(/^@/, '').replace(/^kick_user_/, '');
+  // Uzmi samo prvi deo do sledećeg kosog poteza, space-a, upitnika ili heša
+  val = val.split(/[/?#\s]/)[0];
   return val.toLowerCase();
 }
 
@@ -2168,7 +2276,7 @@ async function resolveChatroomId(username) {
         };
       }
     }
-  } catch (_) { }
+  } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
 
   const apiUrl = `https://kick.com/api/v2/channels/${cleanUser}`;
 
@@ -2192,7 +2300,7 @@ async function resolveChatroomId(username) {
         };
       }
     }
-  } catch (_) { }
+  } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
 
   return null;
 }
@@ -2606,7 +2714,7 @@ function filterBuiltinCategory(cat, btnEl) {
   activeBuiltinCategory = cat || 'all';
   try {
     localStorage.setItem('activeBuiltinCategory', activeBuiltinCategory);
-  } catch (e) {}
+  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
 
   const tabs = document.querySelectorAll('#builtinCategoryTabs .btn-category');
   tabs.forEach(t => t.classList.remove('active'));
@@ -3235,7 +3343,7 @@ function fallbackCopyText(text) {
   ta.style.opacity = '0';
   document.body.appendChild(ta);
   ta.select();
-  try { document.execCommand('copy'); } catch (_) {}
+  try { document.execCommand('copy'); } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   document.body.removeChild(ta);
 }
 
@@ -3734,6 +3842,13 @@ async function loadLeaderboard() {
 
   leaderboardPage = 1;
 
+  const body = document.getElementById('leaderboardBody');
+  if (body) {
+    const isCombined = activeLeaderboardType === 'combined';
+    const colCount = isCombined ? 6 : 5;
+    body.innerHTML = `<tr><td colspan="${colCount}" class="table-loading" style="text-align:center; padding: 2.5rem 1rem; color: var(--text-muted);"><div style="display:inline-flex; align-items:center; gap:10px; font-size:0.92rem;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--app-primary)" stroke-width="2.5" stroke-linecap="round" style="animation: spin 1s linear infinite;"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle><path d="M12 2a10 10 0 0 1 10 10"></path></svg><span>Učitavanje rang liste...</span></div></td></tr>`;
+  }
+
   // Clear search input on month reload
   const searchInput = document.getElementById('leaderboardSearchInput');
   if (searchInput) searchInput.value = '';
@@ -3905,7 +4020,7 @@ function renderUnifiedLeaderboard(customRows = null) {
   const colCount = isCombined ? 6 : 5;
 
   if (rows.length === 0) {
-    body.innerHTML = `<tr><td colspan="${colCount}" class="table-empty">Nema podataka za prikaz.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="${colCount}" class="table-empty" style="text-align:center; padding: 2.5rem 1rem; color: var(--text-muted);"><div style="display:inline-flex; flex-direction:column; align-items:center; gap:8px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg><span style="font-size:0.92rem;">Nema podataka za prikaz za izabrani period.</span></div></td></tr>`;
     document.getElementById('lbTableMeta').textContent = '0 korisnika';
     const prevBtn = document.getElementById('lbPrevPageBtn');
     const nextBtn = document.getElementById('lbNextPageBtn');
@@ -4054,7 +4169,30 @@ function renderUnifiedLeaderboard(customRows = null) {
       </tr>
     `;
   }
-  body.innerHTML = html;
+  // Batch/chunk DOM update to avoid main-thread freeze on large lists
+  if (pageRows.length > 40 && typeof requestAnimationFrame === 'function') {
+    body.innerHTML = '';
+    const tempTable = document.createElement('tbody');
+    tempTable.innerHTML = html;
+    const trs = Array.from(tempTable.children);
+    const chunkSize = 20;
+    let currIdx = 0;
+    function appendChunk() {
+      const frag = document.createDocumentFragment();
+      const end = Math.min(currIdx + chunkSize, trs.length);
+      for (let i = currIdx; i < end; i++) {
+        frag.appendChild(trs[i]);
+      }
+      body.appendChild(frag);
+      currIdx = end;
+      if (currIdx < trs.length) {
+        requestAnimationFrame(appendChunk);
+      }
+    }
+    appendChunk();
+  } else {
+    body.innerHTML = html;
+  }
 }
 
 function renderPodium(top3) {
@@ -4922,29 +5060,33 @@ async function saveBotConfig(silent = false) {
     if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', true);
   }
 
-  const { error } = await sb.from('bot_config')
-    .upsert(config, { onConflict: 'channel_id' });
+  try {
+    const { error } = await sb.from('bot_config')
+      .upsert(config, { onConflict: 'channel_id' });
 
-  const alertsError = await saveChatAlerts();
-  const announcesError = await saveAutoAnnounces();
+    const alertsError = await saveChatAlerts();
+    const announcesError = await saveAutoAnnounces();
 
-  if (!silent) {
-    if (btnConfig) setLoading('saveConfigBtn', false);
-    if (btnConfigBottom) setLoading('saveConfigBtnBottom', false);
-    if (btnAnnounces) setLoading('saveAnnouncesConfigBtn', false);
-    if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', false);
+    if (error || alertsError || announcesError) {
+      showToast('error', 'Greška pri čuvanju config-a');
+      return;
+    }
+
+    if (!silent) {
+      showToast('success', 'Bot config sačuvan!');
+    }
+    notifyBotToReload();
+    updateOverviewModulesUI();
+  } catch (err) {
+    showToast('error', 'Mrežna greška pri čuvanju konfiguracije. Proveri konekciju.');
+  } finally {
+    if (!silent) {
+      if (btnConfig) setLoading('saveConfigBtn', false);
+      if (btnConfigBottom) setLoading('saveConfigBtnBottom', false);
+      if (btnAnnounces) setLoading('saveAnnouncesConfigBtn', false);
+      if (btnAnnouncesBottom) setLoading('saveAnnouncesConfigBtnBottom', false);
+    }
   }
-
-  if (error || alertsError || announcesError) {
-    showToast('error', 'Greška pri čuvanju config-a');
-    return;
-  }
-
-  if (!silent) {
-    showToast('success', 'Bot config sačuvan!');
-  }
-  notifyBotToReload();
-  updateOverviewModulesUI();
 }
 
 // Čuva chat alertove (follow/kicks/sub/resub/giftsub/host/welcome) u tabelu `chat_alerts`.
@@ -5313,27 +5455,31 @@ async function saveModerationSettings(silent = false) {
   const btn = document.getElementById('btnSaveModeration');
   if (!silent && btn) btn.disabled = true;
 
-  const { error } = await sb.from('moderation')
-    .upsert({
-      channel_id: activeChannel.id,
-      type: 'config',
-      enabled: featureModeration,
-      settings: moderationSettings,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'channel_id,type' });
+  try {
+    const { error } = await sb.from('moderation')
+      .upsert({
+        channel_id: activeChannel.id,
+        type: 'config',
+        enabled: featureModeration,
+        settings: moderationSettings,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'channel_id,type' });
 
-  if (!silent && btn) btn.disabled = false;
+    if (error) {
+      showToast('error', 'Greška pri čuvanju podešavanja moderacije');
+      return;
+    }
 
-  if (error) {
-    showToast('error', 'Greška pri čuvanju podešavanja moderacije');
-    return;
+    if (!silent) {
+      showToast('success', 'Podešavanja moderacije uspešno sačuvana u moderation!');
+    }
+    notifyBotToReload();
+    updateOverviewModulesUI();
+  } catch (err) {
+    showToast('error', 'Mrežna greška pri čuvanju podešavanja moderacije');
+  } finally {
+    if (!silent && btn) btn.disabled = false;
   }
-
-  if (!silent) {
-    showToast('success', 'Podešavanja moderacije uspešno sačuvana u moderation!');
-  }
-  notifyBotToReload();
-  updateOverviewModulesUI();
 }
 
 function applyGlobalPenaltyToAll() {
@@ -5812,7 +5958,7 @@ async function fetchKickLiveStatus() {
     try {
       const { data } = await sb.from('channels').select('is_active').eq('id', activeChannel.id).maybeSingle();
       updateLiveStatusUI(data ? !!data.is_active : false);
-    } catch (_) { }
+    } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
     return;
   }
 
@@ -5825,7 +5971,7 @@ async function fetchKickLiveStatus() {
         .eq('id', activeChannel.id)
         .maybeSingle();
       updateLiveStatusUI(data ? !!data.is_active : false);
-    } catch (_) { }
+    } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
     return;
   }
 }
@@ -6356,27 +6502,34 @@ async function saveCommand() {
     created_at: new Date().toISOString()
   };
 
-  let error;
-  if (existsInDb) {
-    ({ error } = await getSbPanels().from('custom_commands').update(updatePayload).eq('id', editingCmdId));
-  } else {
-    ({ error } = await getSbPanels().from('custom_commands').insert(insertPayload));
-  }
+  try {
+    let error;
+    if (existsInDb) {
+      ({ error } = await getSbPanels().from('custom_commands').update(updatePayload).eq('id', editingCmdId));
+    } else {
+      ({ error } = await getSbPanels().from('custom_commands').insert(insertPayload));
+    }
 
-  setLoading('saveCmdBtn', false);
+    if (error) {
+      const msg = 'Greška pri čuvanju komande u bazi. Pokušaj ponovo.';
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+      showToast('error', msg, 'error');
+      return;
+    }
 
-  if (error) {
-    const msg = 'Greška pri čuvanju komande u bazi. Pokušaj ponovo.';
+    showToast('success', editingCmdId ? 'Komanda uspešno izmenjena' : 'Komanda uspešno kreirana!', 'check');
+    notifyBotToReload();
+    closeModal('cmdModal');
+    await loadCommands();
+  } catch (err) {
+    const msg = 'Mrežna greška pri čuvanju komande. Proveri internet vezu.';
     errEl.textContent = msg;
     errEl.style.display = 'block';
     showToast('error', msg, 'error');
-    return;
+  } finally {
+    setLoading('saveCmdBtn', false);
   }
-
-  showToast('success', editingCmdId ? 'Komanda uspešno izmenjena' : 'Komanda uspešno kreirana!', 'check');
-  notifyBotToReload();
-  closeModal('cmdModal');
-  await loadCommands();
 }
 
 const _togglingCmds = new Set();
@@ -6573,7 +6726,7 @@ function switchPanel(panelId, resetTab = false) {
     if (window.history && window.history.replaceState) {
       window.history.replaceState(null, '', `#${panelId}`);
     }
-  } catch (e) { }
+  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
 
   // Reset scroll for all panels
   document.querySelectorAll('.panel').forEach(p => {
@@ -6671,7 +6824,10 @@ function switchPanel(panelId, resetTab = false) {
   }
 
   if (window.innerWidth < 768) {
-    document.getElementById('sidebar').classList.remove('mobile-open');
+    const sb = document.getElementById('sidebar');
+    if (sb) sb.classList.remove('mobile-open');
+    const toggleBtn = document.getElementById('sidebarToggleBtn') || document.querySelector('[aria-controls="sidebar"]');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
   }
 }
 
@@ -6681,7 +6837,7 @@ function goHome(e) {
   try {
     sessionStorage.setItem('from_kickot', 'true');
     localStorage.setItem('kick_origin_site', 'kickot');
-  } catch (_) { }
+  } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   window.location.href = '../index.html';
   return false;
 }
@@ -6690,8 +6846,13 @@ window.goHome = goHome;
 // ── Sidebar Toggle ─────────────────────────────────────────
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
   if (window.innerWidth < 768) {
-    sidebar.classList.toggle('mobile-open');
+    const isOpen = sidebar.classList.toggle('mobile-open');
+    const toggleBtn = document.getElementById('sidebarToggleBtn') || document.querySelector('[aria-controls="sidebar"]');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
   }
 }
 
@@ -6849,19 +7010,68 @@ function goToSettings() { showToast('info', 'Podešavanja dolaze uskoro'); }
 // ═══════════════════════════════════════════════════════════
 // MODAL HELPERS
 // ═══════════════════════════════════════════════════════════
+// Map: modal-id → element that had focus before the modal opened
+const _modalFocusReturn = new Map();
+
+// CSS selector for keyboard-focusable elements
+const _focusableSelectors = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+// IDs of the page-chrome regions to hide from AT when a modal is open
+const _PAGE_CHROME_IDS = ['sidebar', 'mainContent'];
+
+function _modalSetAriaHidden(hide) {
+  _PAGE_CHROME_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) hide ? el.setAttribute('aria-hidden', 'true') : el.removeAttribute('aria-hidden');
+  });
+}
+
+function _getFocusables(container) {
+  return Array.from(container.querySelectorAll(_focusableSelectors))
+    .filter(el => !el.closest('[hidden]') && getComputedStyle(el).display !== 'none');
+}
+
 function openModal(id) {
   const modalEl = document.getElementById(id);
   if (!modalEl) return;
+
+  // Save the element that triggered the modal so we can restore focus on close
+  _modalFocusReturn.set(id, document.activeElement);
+
   modalEl.classList.remove('closing');
   modalEl.classList.add('open');
   document.body.style.overflow = 'hidden';
+  _modalSetAriaHidden(true);
 
-  // Uvek skroluj na vrh pri otvaranju modala
+  // Scroll to top
   modalEl.scrollTop = 0;
   const box = modalEl.querySelector('.modal-box');
   if (box) box.scrollTop = 0;
   const body = modalEl.querySelector('.modal-body');
   if (body) body.scrollTop = 0;
+
+  // Move focus into modal (first focusable element or the modal backdrop itself)
+  requestAnimationFrame(() => {
+    const focusables = _getFocusables(modalEl);
+    if (focusables.length) focusables[0].focus();
+    else modalEl.setAttribute('tabindex', '-1'), modalEl.focus();
+  });
+
+  // Tab-wrap focus trap: keep keyboard navigation inside the modal
+  function _trapTab(e) {
+    if (e.key !== 'Tab') return;
+    const focusables = _getFocusables(modalEl);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+  modalEl._focusTrap = _trapTab;
+  modalEl.addEventListener('keydown', _trapTab);
 }
 
 function closeModal(id) {
@@ -6869,6 +7079,12 @@ function closeModal(id) {
   if (!modalEl) return;
   modalEl.style.pointerEvents = 'none';
   modalEl.classList.add('closing');
+
+  // Remove focus trap
+  if (modalEl._focusTrap) {
+    modalEl.removeEventListener('keydown', modalEl._focusTrap);
+    delete modalEl._focusTrap;
+  }
 
   // Reset inline styles for upgrade modal
   if (id === 'upgradeModal') {
@@ -6889,6 +7105,17 @@ function closeModal(id) {
     modalEl.classList.remove('open', 'closing');
     modalEl.style.pointerEvents = '';
     document.body.style.overflow = '';
+
+    // Restore aria-hidden only when no other modal is still open
+    const anyOpen = document.querySelector('.modal-backdrop.open, .modal.open');
+    if (!anyOpen) _modalSetAriaHidden(false);
+
+    // Return focus to the element that triggered this modal
+    const returnTo = _modalFocusReturn.get(id);
+    if (returnTo && typeof returnTo.focus === 'function') {
+      try { returnTo.focus(); } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
+    }
+    _modalFocusReturn.delete(id);
   }, 220);
 }
 
@@ -6896,12 +7123,22 @@ function handleModalBg(e, id) {
   if (e.target.id === id) closeModal(id);
 }
 
-const ALL_MODAL_IDS = ['cmdModal', 'addChannelModal', 'confirmModal', 'feedbackModal', 'helpModal', 'modFilterPenaltyModal', 'docsModal', 'settingsModal', 'storeItemModal', 'referralModal', 'customBotAuthModal', 'withdrawalModal', 'upgradeModal'];
+
+const ALL_MODAL_IDS = [
+  'cmdModal', 'addChannelModal', 'confirmModal', 'downgradeFreeModal', 'feedbackModal', 'helpModal',
+  'modFilterPenaltyModal', 'docsModal', 'settingsModal', 'storeItemModal',
+  'referralModal', 'customBotAuthModal', 'withdrawalModal', 'upgradeModal',
+  'botrixImportModal', 'preCheckoutReferralModal', 'editUserPointsModal'
+];
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     ALL_MODAL_IDS.forEach(id => {
       const el = document.getElementById(id);
-      if (el && el.classList.contains('open')) closeModal(id);
+      if (el && (el.classList.contains('open') || el.style.display === 'flex')) closeModal(id);
+    });
+    // Generički fallback za bilo koji otvoreni modal backdrop
+    document.querySelectorAll('.modal-backdrop.open, .modal.open').forEach(el => {
+      if (el.id) closeModal(el.id);
     });
     document.body.style.overflow = '';
   }
@@ -7270,7 +7507,7 @@ async function renderSettingsSubscriptionPanel() {
         .eq('id', currentUser.id)
         .maybeSingle();
       if (data) currentUserProfileData = data;
-    } catch (_) { }
+    } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   }
 
   const p = currentUserProfileData || {};
@@ -7395,14 +7632,20 @@ function renderSettingsManagersList() {
       </div>` : ''}
     </div>
   `;
-  const managerListLabel = listEl.previousElementSibling;
-  if (managerListLabel) {
-    // Remove old banner if present
-    const existingBanner = managerListLabel.previousElementSibling;
-    if (existingBanner && existingBanner.dataset.limitBanner === 'managers') existingBanner.remove();
-    if (limitBannerHtml) {
-      managerListLabel.insertAdjacentHTML('beforebegin', limitBannerHtml);
-      managerListLabel.previousElementSibling.dataset.limitBanner = 'managers';
+  // Remove old manager banners if present
+  const managerBannerWrap = document.getElementById('settingsManagersLimitBannerWrap');
+  if (managerBannerWrap) managerBannerWrap.innerHTML = '';
+  document.querySelectorAll('[data-limit-banner="managers"]').forEach(el => el.remove());
+
+  if (limitBannerHtml) {
+    if (managerBannerWrap) {
+      managerBannerWrap.innerHTML = limitBannerHtml;
+    } else {
+      const managerListLabel = listEl.previousElementSibling;
+      if (managerListLabel) {
+        managerListLabel.insertAdjacentHTML('beforebegin', limitBannerHtml);
+        if (managerListLabel.previousElementSibling) managerListLabel.previousElementSibling.dataset.limitBanner = 'managers';
+      }
     }
   }
 
@@ -7702,13 +7945,18 @@ function renderSettingsChannelList() {
     </div>
   `;
 
-  // Remove previously injected banner if any (on re-render)
-  const prevBanner = listEl.previousElementSibling?.previousElementSibling;
-  if (prevBanner && prevBanner.dataset.limitBanner === 'channels') prevBanner.remove();
+  // Remove previously injected banners (both container and legacy sibling injections)
+  const channelBannerWrap = document.getElementById('settingsChannelsLimitBannerWrap');
+  if (channelBannerWrap) channelBannerWrap.innerHTML = '';
+  document.querySelectorAll('[data-limit-banner="channels"]').forEach(el => el.remove());
 
   if (limitBannerHtml) {
-    listEl.insertAdjacentHTML('beforebegin', limitBannerHtml);
-    listEl.previousElementSibling.dataset.limitBanner = 'channels';
+    if (channelBannerWrap) {
+      channelBannerWrap.innerHTML = limitBannerHtml;
+    } else {
+      listEl.insertAdjacentHTML('beforebegin', limitBannerHtml);
+      if (listEl.previousElementSibling) listEl.previousElementSibling.dataset.limitBanner = 'channels';
+    }
   }
 
   if (currentChannels.length === 0) {
@@ -7728,19 +7976,19 @@ function renderSettingsChannelList() {
 
     const badgeHtml = ch.is_primary
       ? `<span class="modal-ch-badge primary">Glavni</span>`
-      : `<button class="btn btn-outline btn-sm" onclick="makeChannelPrimary('${ch.id}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;cursor:pointer;">Glavni</button>`;
+      : `<button class="btn btn-outline btn-sm" onclick="makeChannelPrimary('${escapeHtml(ch.id)}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;cursor:pointer;">Glavni</button>`;
 
     item.innerHTML = `
       <div class="modal-channel-info">
         ${avatarHtml}
         <div>
-          <div class="modal-channel-name">${ch.username}</div>
-          <div style="font-size:0.7rem;color:var(--text-muted)">ID: ${ch.id}</div>
+          <div class="modal-channel-name">${escapeHtml(ch.username)}</div>
+          <div style="font-size:0.7rem;color:var(--text-muted)">ID: ${escapeHtml(ch.id)}</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
         ${badgeHtml}
-        <button class="btn btn-outline btn-sm" onclick="deleteConnectedChannel('${ch.id}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;border-color:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="Ukloni kanal"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        <button class="btn btn-outline btn-sm" onclick="deleteConnectedChannel('${escapeHtml(ch.id)}')" style="padding:3px 8px;font-size:0.75rem;border-radius:4px;border-color:rgba(239,68,68,0.2);color:#ef4444;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;" title="Ukloni kanal"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
       </div>
     `;
     listEl.appendChild(item);
@@ -8827,7 +9075,7 @@ function onYtPlayerReady(_event) {
     try {
       if (ytPlayer.unMute) ytPlayer.unMute();
       if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume);
-    } catch (_) { }
+    } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   }
 }
 
@@ -9048,7 +9296,7 @@ async function playCurrentAudio() {
     try {
       if (ytPlayer.unMute) ytPlayer.unMute();
       if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
-    } catch (_) { }
+    } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
 
     if (ytPlayer.loadVideoById) {
       ytPlayer.loadVideoById({
@@ -9090,7 +9338,7 @@ async function togglePlayback() {
           if (ytPlayer.unMute) ytPlayer.unMute();
           if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
           if (ytPlayer.playVideo) ytPlayer.playVideo();
-        } catch (_) { }
+        } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
         startTimer();
       }
     } else {
@@ -9133,7 +9381,7 @@ async function previousSong() {
   if (currentTimeSeconds > 3) {
     currentTimeSeconds = 0;
     if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
-      try { window.ytPlayer.seekTo(0); } catch (_) { }
+      try { window.ytPlayer.seekTo(0); } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
     }
   } else {
     currentTimeSeconds = 0;
@@ -9163,20 +9411,25 @@ async function saveSongRequestConfig(silent) {
   const maxDur = maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360;
   const role = rankSelect ? rankSelect.value : 'everyone';
 
-  const { error } = await sb.from('song_request')
-    .upsert({
-      channel_id: activeChannel.id,
-      type: 'config',
-      enabled: isMasterEnabled && isEnabled,
-      request_role: role,
-      cost_points: costPoints,
-      max_duration_seconds: maxDur,
-      queue: localSongQueue,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'channel_id,type' });
+  try {
+    const { error } = await sb.from('song_request')
+      .upsert({
+        channel_id: activeChannel.id,
+        type: 'config',
+        enabled: isMasterEnabled && isEnabled,
+        request_role: role,
+        cost_points: costPoints,
+        max_duration_seconds: maxDur,
+        queue: localSongQueue,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'channel_id,type' });
 
-  if (error) {
-    if (!silent) showToast('error', 'Greška pri čuvanju podešavanja song request-a');
+    if (error) {
+      if (!silent) showToast('error', 'Greška pri čuvanju podešavanja song request-a');
+      return;
+    }
+  } catch (err) {
+    if (!silent) showToast('error', 'Mrežna greška pri čuvanju podešavanja song request-a');
     return;
   }
 
@@ -9212,7 +9465,7 @@ function seekPlayer(event) {
   if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
     try {
       window.ytPlayer.seekTo(targetSeconds, true);
-    } catch (e) { }
+    } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
   }
 
   updatePlayerUI();
@@ -9234,7 +9487,7 @@ async function searchYouTubeVideoId(query) {
         return data.videoId;
       }
     }
-  } catch (e) { }
+  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
 
   // 2. Fallback: allorigins proxy
   try {
@@ -9246,7 +9499,7 @@ async function searchYouTubeVideoId(query) {
         return match[1];
       }
     }
-  } catch (e) { }
+  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
 
   // 3. Fallback: corsproxy
   try {
@@ -9258,7 +9511,7 @@ async function searchYouTubeVideoId(query) {
         return match[1];
       }
     }
-  } catch (e) { }
+  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
 
   return null;
 }
@@ -9274,7 +9527,7 @@ async function fetchExactYouTubeDuration(ytId) {
         return Math.round(parseInt(match[1]) / 1000);
       }
     }
-  } catch (e) { }
+  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
   return 0;
 }
 
@@ -9298,7 +9551,7 @@ async function resolveYouTubeSongSmart(query) {
           duration: exactDuration > 0 ? exactDuration : 210
         };
       }
-    } catch (e) { }
+    } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
     return {
       ytId: ytIdMatch,
       title: `YouTube Track (${ytIdMatch})`,
@@ -9334,7 +9587,7 @@ async function resolveYouTubeSongSmart(query) {
         };
       }
     }
-  } catch (e) { }
+  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
 
   // 3. Fallback: Pronađi Video ID preko klijentskog proxy-ja
   const foundYtId = await searchYouTubeVideoId(cleanQuery);
@@ -9437,7 +9690,7 @@ function removeSong(index) {
     currentTimeSeconds = 0;
     currentSongIndex = 0;
     if (ytPlayer && ytPlayer.stopVideo) {
-      try { ytPlayer.stopVideo(); } catch (_) { }
+      try { ytPlayer.stopVideo(); } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
     }
   } else if (isCurrent) {
     currentTimeSeconds = 0;
@@ -9448,7 +9701,7 @@ function removeSong(index) {
       playCurrentAudio();
     } else {
       if (ytPlayer && ytPlayer.stopVideo) {
-        try { ytPlayer.stopVideo(); } catch (_) { }
+        try { ytPlayer.stopVideo(); } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
       }
     }
   } else if (index < currentSongIndex) {
@@ -9474,7 +9727,7 @@ function clearSongQueue() {
   isPlaying = false;
   stopTimer();
   if (ytPlayer && ytPlayer.stopVideo) {
-    try { ytPlayer.stopVideo(); } catch (_) { }
+    try { ytPlayer.stopVideo(); } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   }
 
   renderSongQueue();
@@ -9663,32 +9916,36 @@ async function saveEconomyConfig(silent = false) {
   currentChannelConfig.economy_settings = ecoSettings;
   Object.assign(currentChannelConfig, ecoSettings);
 
-  const { error } = await sb.from('ranking')
-    .upsert({
-      channel_id: activeChannel.id,
-      type: 'config',
-      currency_name: ecoSettings.currency_name,
-      points_per_msg: ecoSettings.points_per_msg,
-      smart_chat_validation: ecoSettings.smart_chat_validation,
-      first_interaction_bonus: ecoSettings.first_interaction_bonus,
-      points_per_watchtime: ecoSettings.points_per_watchtime,
-      level_up_announce: ecoSettings.level_up_announce,
-      sub_multiplier: ecoSettings.sub_multiplier,
-      sub_bonus_per_msg: ecoSettings.sub_bonus_per_msg,
-      points_per_sub: ecoSettings.points_per_sub,
-      points_per_gift_sub: ecoSettings.points_per_gift_sub,
-      points_per_100_kicks: ecoSettings.points_per_100_kicks,
-      points_daily_streak: ecoSettings.points_daily_streak,
-      points_per_raid: ecoSettings.points_per_raid,
-      gamble_enabled: ecoSettings.gamble_enabled,
-      max_gamble_amount: ecoSettings.max_gamble_amount,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'channel_id,type' });
+  try {
+    const { error } = await sb.from('ranking')
+      .upsert({
+        channel_id: activeChannel.id,
+        type: 'config',
+        currency_name: ecoSettings.currency_name,
+        points_per_msg: ecoSettings.points_per_msg,
+        smart_chat_validation: ecoSettings.smart_chat_validation,
+        first_interaction_bonus: ecoSettings.first_interaction_bonus,
+        points_per_watchtime: ecoSettings.points_per_watchtime,
+        level_up_announce: ecoSettings.level_up_announce,
+        sub_multiplier: ecoSettings.sub_multiplier,
+        sub_bonus_per_msg: ecoSettings.sub_bonus_per_msg,
+        points_per_sub: ecoSettings.points_per_sub,
+        points_per_gift_sub: ecoSettings.points_per_gift_sub,
+        points_per_100_kicks: ecoSettings.points_per_100_kicks,
+        points_daily_streak: ecoSettings.points_daily_streak,
+        points_per_raid: ecoSettings.points_per_raid,
+        gamble_enabled: ecoSettings.gamble_enabled,
+        max_gamble_amount: ecoSettings.max_gamble_amount,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'channel_id,type' });
 
-  if (error) {
-    if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ranking sistema!');
-  } else {
-    if (!silent) showToast('success', 'Podešavanja ranking sistema su uspešno sačuvana!');
+    if (error) {
+      if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ranking sistema!');
+    } else {
+      if (!silent) showToast('success', 'Podešavanja ranking sistema su uspešno sačuvana!');
+    }
+  } catch (err) {
+    if (!silent) showToast('error', 'Mrežna greška pri čuvanju ranking sistema!');
   }
 
   updateEconomyPreviews();
@@ -9704,7 +9961,7 @@ function switchMinigamesTab(tabName) {
   try {
     sessionStorage.setItem('active-minigames-tab', tabName);
     localStorage.setItem('active-minigames-tab', tabName);
-  } catch (e) {}
+  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
 
   // Sync tab buttons
   const tabIds = {
@@ -9931,7 +10188,18 @@ async function saveMinigamesConfig(silent = false) {
   }
 }
 
+let isSimRunning = false;
+let simTimer = null;
+
 function selectSimGame(type) {
+  if (simTimer) {
+    clearTimeout(simTimer);
+    simTimer = null;
+  }
+  isSimRunning = false;
+  const mainBtn = document.getElementById('simRunMainBtn');
+  if (mainBtn) mainBtn.disabled = false;
+
   currentSimGame = type;
   const typeInput = document.getElementById('simGameType');
   if (typeInput) typeInput.value = type;
@@ -10032,10 +10300,25 @@ const slotSymbolNames = {
 };
 
 function runSimulatedGame() {
+  if (isSimRunning) return;
+
   const type = currentSimGame || document.getElementById('simGameType')?.value || 'slots';
   const bet = parseInt(document.getElementById('simBetAmount')?.value, 10) || 100;
-  const valuta = document.getElementById('cfgCurrencyName')?.value.trim() || currentChannelConfig?.currency_name || 'Poena';
+  const valutaRaw = document.getElementById('cfgCurrencyName')?.value.trim() || currentChannelConfig?.currency_name || 'Poena';
+  const valuta = escapeHtml(valutaRaw);
   const resEl = document.getElementById('simGameResult');
+  const mainBtn = document.getElementById('simRunMainBtn');
+
+  isSimRunning = true;
+  if (mainBtn) mainBtn.disabled = true;
+
+  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const finishSim = () => {
+    isSimRunning = false;
+    if (mainBtn) mainBtn.disabled = false;
+    simTimer = null;
+  };
 
   if (type === 'slots') {
     const keys = Object.keys(slotSymbolSVGs);
@@ -10043,11 +10326,13 @@ function runSimulatedGame() {
     const r2 = document.getElementById('slotReel2');
     const r3 = document.getElementById('slotReel3');
 
-    if (r1) r1.classList.add('spinning');
-    if (r2) r2.classList.add('spinning');
-    if (r3) r3.classList.add('spinning');
+    if (!prefersReducedMotion) {
+      if (r1) r1.classList.add('spinning');
+      if (r2) r2.classList.add('spinning');
+      if (r3) r3.classList.add('spinning');
+    }
 
-    setTimeout(() => {
+    simTimer = setTimeout(() => {
       const k1 = keys[Math.floor(Math.random() * keys.length)];
       const k2 = keys[Math.floor(Math.random() * keys.length)];
       const k3 = keys[Math.floor(Math.random() * keys.length)];
@@ -10092,11 +10377,12 @@ function runSimulatedGame() {
         const s3Name = slotSymbolNames[k3];
         resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo slot: [ ${s1Name} | ${s2Name} | ${s3Name} ] — <span style="color:${badgeColor}; font-weight:700;">${outcomeLabel}</span>`;
       }
-    }, 450);
+      finishSim();
+    }, prefersReducedMotion ? 0 : 450);
 
   } else if (type === 'roulette') {
     const wheelBox = document.getElementById('rouletteWheelBox');
-    if (wheelBox) {
+    if (!prefersReducedMotion && wheelBox) {
       wheelBox.style.transform = `rotate(${Math.floor(720 + Math.random() * 720)}deg)`;
     }
 
@@ -10112,7 +10398,8 @@ function runSimulatedGame() {
 
     let isWin = false;
     let payout = 0;
-    const choice = (currentRouletteChoice || 'crvena').toLowerCase();
+    const choiceRaw = (currentRouletteChoice || 'crvena').toLowerCase();
+    const choice = escapeHtml(choiceRaw);
 
     if (choice === 'crvena' && boja === 'CRVENA') { isWin = true; payout = bet * 2; }
     else if (choice === 'crna' && boja === 'CRNA') { isWin = true; payout = bet * 2; }
@@ -10128,9 +10415,13 @@ function runSimulatedGame() {
       }
     }
 
+    simTimer = setTimeout(() => {
+      finishSim();
+    }, prefersReducedMotion ? 0 : 400);
+
   } else if (type === 'coinflip') {
     const coinEl = document.getElementById('simCoin3d');
-    if (coinEl) {
+    if (!prefersReducedMotion && coinEl) {
       coinEl.classList.remove('flipping');
       void coinEl.offsetWidth;
       coinEl.classList.add('flipping');
@@ -10139,7 +10430,7 @@ function runSimulatedGame() {
     const ishod = Math.random() < 0.5 ? 'pismo' : 'glava';
     const isWin = (ishod === (currentCoinflipChoice || 'pismo'));
 
-    setTimeout(() => {
+    simTimer = setTimeout(() => {
       const lbl = document.getElementById('simCoinLabel');
       if (lbl) {
         lbl.textContent = ishod.toUpperCase();
@@ -10153,13 +10444,14 @@ function runSimulatedGame() {
           resEl.innerHTML = `<strong>@Strimer</strong> je bacio novčić: pao je na <strong>${ishod.toUpperCase()}</strong>! <span style="color:#ef4444; font-weight:700;">Promašaj! Izgubio si ${bet.toLocaleString()} ${valuta}.</span>`;
         }
       }
-    }, 450);
+      finishSim();
+    }, prefersReducedMotion ? 0 : 450);
 
   } else if (type === 'wheel') {
     const mults = [0, 0.5, 1.5, 2, 3, 5];
     const m = mults[Math.floor(Math.random() * mults.length)];
     const wheelWrap = document.getElementById('simWheelWrap');
-    if (wheelWrap) {
+    if (!prefersReducedMotion && wheelWrap) {
       const randSpin = 1080 + Math.floor(Math.random() * 360);
       wheelWrap.style.transform = `rotate(${randSpin}deg)`;
     }
@@ -10167,7 +10459,7 @@ function runSimulatedGame() {
     const dobitak = Math.floor(bet * m);
     const razlika = dobitak - bet;
 
-    setTimeout(() => {
+    simTimer = setTimeout(() => {
       const resLbl = document.getElementById('simWheelResultLabel');
       if (resLbl) {
         resLbl.textContent = `Točak se zaustavio na ${m}x!`;
@@ -10183,7 +10475,8 @@ function runSimulatedGame() {
           resEl.innerHTML = `<strong>@Strimer</strong> je zavrteo Točak Sreće i pogodio <strong>${m}x</strong>! <span style="color:#ef4444; font-weight:700;">Gubitak! Izgubio si ${Math.abs(razlika).toLocaleString()} ${valuta}.</span>`;
         }
       }
-    }, 700);
+      finishSim();
+    }, prefersReducedMotion ? 0 : 700);
 
   } else if (type === 'duel') {
     const challengerWins = Math.random() < 0.5;
@@ -10202,9 +10495,11 @@ function runSimulatedGame() {
         resEl.innerHTML = `Dvoboj završen: <strong>@Protivnik</strong> je uspešno odbranio napad i pobedio <strong>@Izazivač</strong>, osvojivši +${bet.toLocaleString()} ${valuta}!`;
       }
     }
+    finishSim();
 
   } else if (type === 'fun') {
     simTriggerFun('iq');
+    finishSim();
   }
 }
 
@@ -10521,20 +10816,24 @@ async function saveStoreItem() {
   if (!currentChannelConfig) currentChannelConfig = {};
   currentChannelConfig.store_items = items;
 
-  const { error } = await sb.from('ranking')
-    .upsert({
-      channel_id: activeChannel.id,
-      type: 'config',
-      store_items: items,
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'channel_id,type' });
+  try {
+    const { error } = await sb.from('ranking')
+      .upsert({
+        channel_id: activeChannel.id,
+        type: 'config',
+        store_items: items,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'channel_id,type' });
 
-  if (error) {
-    showToast('error', 'Greška pri čuvanju artikla!');
-  } else {
-    showToast('success', editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!');
-    closeModal('storeItemModal');
-    renderStoreItems();
+    if (error) {
+      showToast('error', 'Greška pri čuvanju artikla!');
+    } else {
+      showToast('success', editId ? 'Artikal uspešno izmenjen!' : 'Novi artikal uspešno dodat!');
+      closeModal('storeItemModal');
+      renderStoreItems();
+    }
+  } catch (err) {
+    showToast('error', 'Mrežna greška pri čuvanju artikla!');
   }
 }
 
@@ -10897,20 +11196,24 @@ async function saveUserPointsModal() {
   closeModal('editUserPointsModal');
 
   if (activeChannel && activeChannel.id && target) {
-    const { error } = await sb.from('leaderboard')
-      .upsert({
-        channel_id: String(activeChannel.id),
-        username: target.username,
-        month: target.month || 'all_time',
-        year: target.year || null,
-        coins: parsed,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'channel_id,username,month,year' });
+    try {
+      const { error } = await sb.from('leaderboard')
+        .upsert({
+          channel_id: String(activeChannel.id),
+          username: target.username,
+          month: target.month || 'all_time',
+          year: target.year || null,
+          coins: parsed,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'channel_id,username,month,year' });
 
-    if (error) {
-      showToast('error', `Greška pri čuvanju poena u bazi za @${username}!`);
-    } else {
-      showToast('success', `Poeni za @${username} su ažurirani na ${parsed.toLocaleString()} ${valuta}!`);
+      if (error) {
+        showToast('error', `Greška pri čuvanju poena u bazi za @${username}!`);
+      } else {
+        showToast('success', `Poeni za @${username} su ažurirani na ${parsed.toLocaleString()} ${valuta}!`);
+      }
+    } catch (err) {
+      showToast('error', `Mrežna greška pri ažuriranju poena za @${username}!`);
     }
   }
 }

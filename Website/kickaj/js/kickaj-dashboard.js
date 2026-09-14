@@ -4,6 +4,30 @@
  * WebSocket, Animacije, Zvuk, Fullscreen, Sinhronizacija baze (Supabase tabela 'kickaj')
  * i LocalStorage, Trajna trajnost tajmera pobednika.
  */
+if (typeof window === 'undefined') {
+  global.window = global;
+  global.window.addEventListener = () => {};
+  global.window.removeEventListener = () => {};
+  if (!global.window.CONFIG) global.window.CONFIG = { SUPABASE: {}, API: {} };
+}
+if (typeof document === 'undefined') {
+  global.document = {
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    getElementById: () => null,
+    querySelectorAll: () => [],
+    querySelector: () => null,
+    body: { classList: { add: () => {}, remove: () => {}, contains: () => false }, appendChild: () => {} }
+  };
+}
+if (typeof localStorage === 'undefined') {
+  global.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {}
+  };
+}
+
 (function () {
   'use strict';
 
@@ -40,6 +64,19 @@
   let wsReconnectTimer = null;
   let particleResizeHandler = null;
   let uiRefreshTimer   = null;
+
+  /* ── Global Error Handling for Unhandled Promise Rejections ── */
+  if (typeof window !== 'undefined') {
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('[Kickaj] Unhandled promise rejection:', event.reason);
+      if (typeof showToast === 'function') {
+        const msg = event?.reason?.message || '';
+        if (!msg.includes('AbortError')) {
+          showToast('Došlo je do neočekivane greške.', 'error');
+        }
+      }
+    });
+  }
 
   /* ── 240fps Master Animation Manager & Cache ── */
   const AnimationManager = {
@@ -99,7 +136,13 @@
   };
 
   const wheelCaches = new Map();
+  const reusableOffscreens = new Map();
   function invalidateWheelCache() {
+    for (const [key, entry] of wheelCaches.entries()) {
+      if (entry && entry.offCanvas) {
+        reusableOffscreens.set(key, entry.offCanvas);
+      }
+    }
     wheelCaches.clear();
   }
 
@@ -119,6 +162,12 @@
     return !!(ov && ov.classList.contains('open') && ov.style.display !== 'none');
   }
 
+  /* ── Settings Defaults & Limits ── */
+  const DEFAULT_CONFIRM_TIME = 60; // sekundi za potvrdu pobednika
+  const DEFAULT_SPIN_TIME = 5; // sekundi za animaciju okretanja
+  const DEFAULT_MAX_PARTICIPANTS = 500; // maksimalan broj učesnika na free planu
+  const DEFAULT_SOUND_VOLUME = 0.5; // podrazumevana jačina zvuka
+
   /* ── Settings ── */
   let settings = {
     prize:           '',
@@ -129,12 +178,12 @@
     followDuration:  0,
     subscribersOnly: false,
     blacklist:       '',
-    confirmTime:     60,
+    confirmTime:     DEFAULT_CONFIRM_TIME,
     animation:       'wheel',
-    spinTime:        5,
-    maxParticipants: 500,
+    spinTime:        DEFAULT_SPIN_TIME,
+    maxParticipants: DEFAULT_MAX_PARTICIPANTS,
     soundEnabled:    true,
-    volume:          0.5,
+    volume:          DEFAULT_SOUND_VOLUME,
     announceStart:   true,
     announceWinner:  true
   };
@@ -309,9 +358,10 @@
 
   function syncStateToSupabaseDebounced(payload) {
     if (dbSaveTimeout) clearTimeout(dbSaveTimeout);
+    const delay = participantsMap.size > 150 ? 1000 : 600;
     dbSaveTimeout = setTimeout(() => {
       syncStateToSupabase(payload);
-    }, 600);
+    }, delay);
   }
 
   async function syncStateToSupabase(payload) {
@@ -320,15 +370,37 @@
       const dataToSave = payload || getSerializableState();
       const cleanName = cleanUsername(channelName);
 
+      // Ograniči i sanitizuj učesnike pre upisa u Supabase bazu radi zaštite od XSS i 413 Payload Too Large
+      const MAX_PERSISTED_PARTICIPANTS = 1500;
+      let safeParticipants = dataToSave.participants || [];
+      if (safeParticipants.length > MAX_PERSISTED_PARTICIPANTS) {
+        safeParticipants = safeParticipants.slice(0, MAX_PERSISTED_PARTICIPANTS);
+      }
+      safeParticipants = safeParticipants.map(([key, p]) => [
+        key,
+        {
+          ...p,
+          username: escHtml(p.username || key)
+        }
+      ]);
+
+      // Sanitizuj pobednike
+      const safeWinners = (dataToSave.winners || []).slice(0, 200).map(w => ({
+        ...w,
+        username: escHtml(w.username || '')
+      }));
+
+      const safeSettings = { ...dataToSave.settings, is_running: !!dataToSave.isRunning };
+
       if (cleanName && cleanName !== 'Kanal' && cleanName !== 'DemoKanal') {
         const rowData = {
           user_id: currentUser.id,
           channel_name: cleanName,
           channel_id: channelId ? String(channelId) : null,
           chatroom_id: chatroomId ? parseInt(chatroomId, 10) : null,
-          settings: { ...dataToSave.settings, is_running: !!dataToSave.isRunning },
-          participants: dataToSave.participants || [],
-          winners: dataToSave.winners,
+          settings: safeSettings,
+          participants: safeParticipants,
+          winners: safeWinners,
           updated_at: new Date().toISOString()
         };
 
@@ -344,7 +416,11 @@
       // Rezervni backup u user_profiles
       if (currentUser?.id) {
         await sb.from('user_profiles').update({
-          kickaj_state: dataToSave
+          kickaj_state: {
+            ...dataToSave,
+            participants: safeParticipants,
+            winners: safeWinners
+          }
         }).eq('id', currentUser.id);
       }
 
@@ -558,7 +634,9 @@
         const data = await res.json();
         if (data?.avatar) return data.avatar;
       }
-    } catch (_) { }
+    } catch (err) {
+      console.debug('[Kickaj] Avatar fetch fallback error:', err);
+    }
     return null;
   }
 
@@ -624,7 +702,7 @@
           if (rawPlan.includes('elite') || rawPlan.includes('business')) tier = 'elite';
           else if (rawPlan.includes('pro')) tier = 'pro';
           userPlan = tier;
-          try { localStorage.setItem('kickaj_user_plan', tier); } catch (_) { }
+          try { localStorage.setItem('kickaj_user_plan', tier); } catch (e) { console.debug('[Kickaj] LocalStorage unavailable:', e); }
 
           const myUsername = profile.kick_username || profile.display_name || username;
 
@@ -719,7 +797,7 @@
             });
           }
         }
-      } catch (_) { }
+      } catch (_) { console.debug('[Kickaj] Handled non-critical error:', _); }
 
       // Deduplicate kanale
       const seen = new Set();
@@ -752,7 +830,7 @@
         if (candidate.chatroom_id) chatroomId = candidate.chatroom_id;
         if (candidate.id) channelId = candidate.id;
         userPlan = resolveChannelPlan(candidate);
-        try { localStorage.setItem('kickaj_user_plan', userPlan); } catch (_) { }
+        try { localStorage.setItem('kickaj_user_plan', userPlan); } catch (_) { console.debug('[Kickaj] Handled non-critical error:', _); }
       }
 
       channelName = cleanUsername(username);
@@ -925,7 +1003,7 @@
     try {
       const customOnly = userChannels.filter(c => c.role === 'custom');
       localStorage.setItem('kickaj_custom_channels_list', JSON.stringify(customOnly));
-    } catch (_) { }
+    } catch (e) { console.debug('[Kickaj] Failed saving custom channels:', e); }
 
     // Ako je obrisan trenutno aktivan kanal, automatski prebaci na sledeci dostupan
     if (channelName.toLowerCase() === clean) {
@@ -984,7 +1062,7 @@
       try {
         const customOnly = userChannels.filter(c => c.role === 'custom');
         localStorage.setItem('kickaj_custom_channels_list', JSON.stringify(customOnly));
-      } catch (_) { }
+      } catch (_) { console.debug('[Kickaj] Handled non-critical error:', _); }
     }
 
     channelName = targetName;
@@ -994,7 +1072,7 @@
 
     // Prilagodi plan: za menadžerske kanale koristi plan vlasnika, za sopstvene uvek stvarni plan
     userPlan = resolveChannelPlan(targetObj);
-    try { localStorage.setItem('kickaj_user_plan', userPlan); } catch (_) { }
+    try { localStorage.setItem('kickaj_user_plan', userPlan); } catch (_) { console.debug('[Kickaj] Handled non-critical error:', _); }
 
     // Snimi u LocalStorage
     try {
@@ -1130,7 +1208,7 @@
       try {
         const customOnly = userChannels.filter(c => c.role === 'custom');
         localStorage.setItem('kickaj_custom_channels_list', JSON.stringify(customOnly));
-      } catch (_) { }
+      } catch (_) { console.debug('[Kickaj] Handled non-critical error:', _); }
     }
 
     await setActiveChannel(existing, true);
@@ -1355,7 +1433,7 @@
         updateNotifBadgeUI();
         renderNotifContent();
       }
-    } catch (_) {}
+    } catch (err) { console.debug('[Kickaj] Load notifications fallback:', err); }
   }
 
   async function loadChangelogs() {
@@ -1382,7 +1460,7 @@
         });
         renderNotifContent();
       }
-    } catch (_) {}
+    } catch (err) { console.debug('[Kickaj] Load changelogs fallback:', err); }
   }
 
   function initNotificationRealtime() {
@@ -1393,7 +1471,7 @@
             loadNotifications();
           })
           .subscribe();
-      } catch (_) {}
+      } catch (err) { console.debug('[Kickaj] Notification realtime subscribe error:', err); }
     }
   }
 
@@ -2089,7 +2167,7 @@
     bindClick('wfoBtnReset', resetGiveaway);
 
     document.addEventListener('keydown', (e) => {
-      /* Esc closes dialogs in order: confirm modal -> winner modal -> custom channel modal -> fullscreen overlay */
+      /* Esc closes dialogs in order: confirm modal -> winner modal -> custom channel modal -> help modal -> fullscreen overlay */
       if (e.key === 'Escape') {
         const confirmModal = document.getElementById('kickajConfirmModal');
         if (confirmModal && (confirmModal.classList.contains('open') || confirmModal.style.display === 'flex')) {
@@ -2109,6 +2187,13 @@
         if (customModal && (customModal.classList.contains('open') || customModal.style.display === 'flex')) {
           if (typeof window.closeModal === 'function') {
             window.closeModal('customChannelModal');
+          }
+          return;
+        }
+        const helpModal = document.getElementById('helpModal');
+        if (helpModal && (helpModal.classList.contains('open') || helpModal.style.display === 'flex')) {
+          if (typeof window.closeModal === 'function') {
+            window.closeModal('helpModal');
           }
           return;
         }
@@ -2254,8 +2339,10 @@
     window.location.href = '../index.html';
   };
 
-  /* Track whether native browser fullscreen is active */
+  /* Track whether native browser fullscreen is active and manage focus trap */
   let nativeFSActive = false;
+  let _fsFocusReturn = null;
+  let _fsFocusTrap = null;
 
   function openFullscreen() {
     const limits = PLAN_LIMITS[userPlan] || PLAN_LIMITS.free;
@@ -2263,10 +2350,31 @@
 
     const ov = document.getElementById('wheelFullscreenOverlay');
     if (!ov) return;
+
+    _fsFocusReturn = document.activeElement;
+    if (_fsFocusTrap) {
+      ov.removeEventListener('keydown', _fsFocusTrap);
+    }
+    _fsFocusTrap = function(e) {
+      if (e.key !== 'Tab') return;
+      const focusables = Array.from(ov.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    ov.addEventListener('keydown', _fsFocusTrap);
+
     ov.style.display = 'flex';
     requestAnimationFrame(() => {
       ov.classList.add('open');
       ov.removeAttribute('aria-hidden');
+      const closeBtn = document.getElementById('btnCloseFullscreen');
+      if (closeBtn) closeBtn.focus();
     });
 
     /* Request native browser fullscreen so the overlay takes the ENTIRE screen
@@ -2302,6 +2410,10 @@
   function closeFullscreen() {
     const ov = document.getElementById('wheelFullscreenOverlay');
     if (ov) {
+      if (_fsFocusTrap) {
+        ov.removeEventListener('keydown', _fsFocusTrap);
+        _fsFocusTrap = null;
+      }
       ov.classList.remove('open');
       ov.classList.remove('native-fs');
       ov.setAttribute('aria-hidden', 'true');
@@ -2311,6 +2423,10 @@
           drawVisualizerStage();
         }
       }, 300);
+    }
+    if (_fsFocusReturn && typeof _fsFocusReturn.focus === 'function') {
+      try { _fsFocusReturn.focus(); } catch (_) { console.debug('[Kickaj] Handled non-critical error:', _); }
+      _fsFocusReturn = null;
     }
     /* Exit native browser fullscreen if we triggered it */
     if (document.fullscreenElement) {
@@ -2531,7 +2647,7 @@
       const pGain = ctx.createGain();
       pGain.gain.setValueAtTime(0, pTime);
       pGain.gain.linearRampToValueAtTime(0.22 * (0.55 + 0.45 * (i / pulseCount)), pTime + 0.015);
-      try { pGain.gain.exponentialRampToValueAtTime(0.0001, pTime + 0.12); } catch (_) {}
+      try { pGain.gain.exponentialRampToValueAtTime(0.0001, pTime + 0.12); } catch (_) { console.debug('[Kickaj] Handled non-critical error:', _); }
       pGain.connect(master);
       nodes.push(pGain);
 
@@ -2745,7 +2861,7 @@
           return;
         }
       }
-    } catch (_) { }
+    } catch (_) { console.debug('[Kickaj] Handled non-critical error:', _); }
 
     // 3. Tercijarno: AllOrigins proxy fallback
     try {
@@ -2764,7 +2880,7 @@
           return;
         }
       }
-    } catch (_) { }
+    } catch (err) { console.debug('[Kickaj] Allorigins chatroom fallback error:', err); }
   }
 
   async function connectKickChat() {
@@ -3240,7 +3356,7 @@
     }
 
     participantsMap.set(key, {
-      username: user.username,
+      username: escHtml(user.username || key),
       isSub: !!user.isSub,
       mult: user.isSub ? settings.subMultiplier : 1,
       isTest: !!isTest,
@@ -3364,7 +3480,22 @@
     setText('wfoParticipantCount',     total);
 
     if (!container) return;
-    if (total === 0) { container.innerHTML = '<div class="list-empty">Prijavljeni učesnici će se pojaviti ovde.</div>'; return; }
+    if (total === 0) {
+      container.innerHTML = `
+        <div class="list-empty-rich" style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:2.5rem 1rem; text-align:center; color:var(--text-muted);">
+          <div style="width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; justify-content:center; margin-bottom:12px; color:var(--text-muted);">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <p style="font-weight:600; color:var(--text-main); margin-bottom:4px; font-size:0.92rem;">Još uvek nema prijavljenih učesnika</p>
+          <p style="font-size:0.8rem; max-width:240px; margin:0; line-height:1.4;">Gledaoci se prijavljuju putem čet komande ili simulacije unosa.</p>
+        </div>`;
+      return;
+    }
 
     let html = '';
     let shown = 0;
@@ -3981,13 +4112,48 @@
 
     startParticles(isTop5, isFinalChamp);
 
-    const onKey = (e) => { if (e.key === 'Escape') { window.closeWinnerOverlay(); document.removeEventListener('keydown', onKey); } };
-    document.addEventListener('keydown', onKey);
+    _winnerFocusReturn = document.activeElement;
+    if (_winnerFocusTrap) {
+      ov.removeEventListener('keydown', _winnerFocusTrap);
+    }
+    _winnerFocusTrap = function(e) {
+      if (e.key === 'Tab') {
+        const focusables = Array.from(ov.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      } else if (e.key === 'Escape') {
+        window.closeWinnerOverlay();
+      }
+    };
+    ov.addEventListener('keydown', _winnerFocusTrap);
+    requestAnimationFrame(() => {
+      const firstBtn = ov.querySelector('button');
+      if (firstBtn) firstBtn.focus();
+    });
   }
+
+  let _winnerFocusReturn = null;
+  let _winnerFocusTrap = null;
 
   window.closeWinnerOverlay = function () {
     const ov = document.getElementById('winnerRevealOverlay');
-    if (ov) { ov.classList.remove('open'); }
+    if (ov) {
+      if (_winnerFocusTrap) {
+        ov.removeEventListener('keydown', _winnerFocusTrap);
+        _winnerFocusTrap = null;
+      }
+      ov.classList.remove('open');
+    }
+    if (_winnerFocusReturn && typeof _winnerFocusReturn.focus === 'function') {
+      try { _winnerFocusReturn.focus(); } catch (_) { console.debug('[Kickaj] Handled non-critical error:', _); }
+      _winnerFocusReturn = null;
+    }
     if (overlayTimerId) { clearInterval(overlayTimerId); overlayTimerId = null; }
     const fbox = document.getElementById('winnerRevealFollowBox');
     if (fbox) { fbox.style.display = 'none'; fbox.innerHTML = ''; }
@@ -4448,6 +4614,15 @@
         window.triggerDraw();
       };
     });
+
+    // Re-draw and clear wheel cache on mobile / tablet orientation changes
+    window.addEventListener('orientationchange', () => {
+      wheelCaches.clear();
+      setTimeout(() => {
+        drawVisualizerStage();
+      }, 150);
+    });
+
     drawVisualizerStage();
   }
 
@@ -4461,7 +4636,7 @@
       return entry;
     }
 
-    let offCanvas = entry ? entry.offCanvas : null;
+    let offCanvas = entry ? entry.offCanvas : (reusableOffscreens.get(key) || null);
     if (!offCanvas) {
       offCanvas = document.createElement('canvas');
     }
@@ -4485,6 +4660,7 @@
     offCtx.save();
     offCtx.translate(cx, cy);
 
+    // Pass 1: Fill all slices
     for (let i = 0; i < n; i++) {
       const a0 = i * sliceAngle;
       const a1 = a0 + sliceAngle;
@@ -4493,15 +4669,35 @@
       offCtx.arc(0, 0, r, a0, a1);
       offCtx.fillStyle = SLICE_COLORS[i % SLICE_COLORS.length];
       offCtx.fill();
-      offCtx.lineWidth = 1.5;
-      offCtx.strokeStyle = '#07070D';
-      offCtx.stroke();
+    }
 
+    // Pass 2: Batch stroke for all radial divider lines
+    offCtx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = i * sliceAngle;
+      offCtx.moveTo(0, 0);
+      offCtx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    offCtx.lineWidth = 1.5;
+    offCtx.strokeStyle = '#07070D';
+    offCtx.stroke();
+
+    // Pass 3: Outer rim circle (isolated beginPath prevents implicit chord connection)
+    offCtx.beginPath();
+    offCtx.arc(0, 0, r, 0, Math.PI * 2);
+    offCtx.lineWidth = 1.5;
+    offCtx.strokeStyle = '#07070D';
+    offCtx.stroke();
+
+    // Pass 3: Draw labels with unified font configuration
+    const fontSize = Math.max(10, Math.min(15, r * 0.06 - n * 0.1));
+    offCtx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+    offCtx.textAlign = 'right';
+
+    for (let i = 0; i < n; i++) {
+      const a0 = i * sliceAngle;
       offCtx.save();
       offCtx.rotate(a0 + sliceAngle / 2);
-      offCtx.textAlign = 'right';
-      const fontSize = Math.max(10, Math.min(15, r * 0.06 - n * 0.1));
-      offCtx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
       const sliceCol = SLICE_COLORS[i % SLICE_COLORS.length];
       offCtx.fillStyle = (sliceCol === '#53fc18' || sliceCol === '#eab308') ? '#07070D' : '#FFFFFF';
       const label = pool[i].length > 16 ? pool[i].substring(0, 14) + '..' : pool[i];
@@ -5382,8 +5578,12 @@
   ════════════════════════════════════════ */
   function cleanUsername(raw) {
     if (!raw) return 'Kanal';
-    let s = String(raw).trim().replace(/^https?:\/\/(www\.)?kick\.com\//, '').replace(/^kick_user_/, '').replace(/^@/, '');
+    let s = String(raw).trim()
+      .replace(/^https?:\/\/(www\.)?kick\.com\//i, '')
+      .replace(/^kick_user_/, '')
+      .replace(/^@/, '');
     if (s.includes('@')) s = s.split('@')[0];
+    s = s.split(/[/?#\s]/)[0];
     return s || 'Kanal';
   }
 
@@ -5410,4 +5610,13 @@
     if (el) el.addEventListener('click', cb);
   }
 
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      PLAN_LIMITS,
+      ANIM_LABELS,
+      SLICE_COLORS,
+      cleanUsername,
+      escHtml
+    };
+  }
 })();

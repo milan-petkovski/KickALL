@@ -2802,6 +2802,23 @@ body.kickaj-body.auth-loading {
   box-shadow: 0 0 40px rgba(0,0,0,0.9), 0 0 20px rgba(83,252,24,0.2);
 }
 
+@media (max-width: 480px) {
+  .wheel-stage-frame {
+    min-height: 320px;
+    padding: 10px 4px;
+    overflow: hidden;
+  }
+  .wheel-canvas-container {
+    width: min(100%, 310px);
+    max-width: calc(100vw - 28px);
+  }
+  .wheel-pointer {
+    width: 26px;
+    height: 30px;
+    top: 4px;
+  }
+}
+
 /* ── Luxury Arcade Slot Machine ── */
 .slot-stage-frame {
   width: 100%;
@@ -4967,3 +4984,39 @@ button:active,
 .topbar-refresh-btn:hover .refresh-icon {
   transform: none !important;
 }
+
+/* ── Accessibility: Prefers Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Mobile Touch Target & Interaction Optimizations ── */
+@media (hover: none) and (pointer: coarse) {
+  .sc-btn,
+  .stage-action-btn,
+  .winner-reveal-ok-btn,
+  .btn,
+  .topbar-refresh-btn {
+    min-height: 44px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .winner-confirm-btn,
+  .winner-remove-btn,
+  .winner-redraw-btn,
+  .winner-close-btn,
+  .wfo-close-btn {
+    min-width: 36px;
+    min-height: 36px;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
