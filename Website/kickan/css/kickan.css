@@ -1306,18 +1306,31 @@ body.sidebar-open .sidebar-backdrop {
 
 /* Notification Center Popover */
 .notif-badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--an-cyan);
   display: none;
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  background: #EF4444;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 800;
+  border-radius: 10px;
+  border: 2px solid #0D091A;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.8);
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  z-index: 10;
+  box-sizing: border-box;
+  text-align: center;
+  pointer-events: none;
 }
 
 .notif-badge.active {
-  display: block;
+  display: flex;
 }
 
 /* Notifications Popover - 1:1 sa Kickaj */
@@ -3468,6 +3481,103 @@ body.sidebar-open .sidebar-backdrop {
 
 .modal-box.modal-box-xl {
   max-width: 1060px;
+}
+
+/* ══════════ HELP MODAL (1:1 KICKAJ PARITET) ══════════ */
+#helpModal .modal-box {
+  background: #12121E;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 24px;
+  padding: 28px 32px;
+  width: min(520px, 92vw);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(139, 92, 246, 0.25);
+  overflow: visible;
+}
+
+#helpModal .modal-head {
+  padding: 0;
+  border-bottom: none;
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#helpModal .modal-head h3 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#helpModal .modal-close-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--an-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#helpModal .modal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #ef4444;
+  transform: scale(1.05);
+}
+
+#helpModal .modal-body {
+  padding: 0;
+}
+
+#helpModal .help-modal-desc {
+  color: var(--an-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+#helpModal .help-modal-email-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #53fc18 0%, #3de810 100%);
+  color: #04030a;
+  border-radius: 14px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: 0 4px 20px rgba(83, 252, 24, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+#helpModal .help-modal-email-btn svg {
+  stroke: #04030a;
+  flex-shrink: 0;
+}
+
+#helpModal .help-modal-email-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(83, 252, 24, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  color: #04030a;
+}
+
+#helpModal .help-modal-email-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 3px 12px rgba(83, 252, 24, 0.35);
 }
 
 /* ══════════ PAST STREAMS ARCHIVE STYLES ══════════ */

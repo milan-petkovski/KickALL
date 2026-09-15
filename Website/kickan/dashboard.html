@@ -36,8 +36,8 @@
   <link rel="dns-prefetch" href="https://milanwebportal.app.fungies.io" />
 
   <!-- Preload kritičnih stilova -->
-  <link rel="preload" href="css/kickan.css?v=20260915-v3" as="style" />
-  <link rel="stylesheet" href="css/kickan.css?v=20260915-v3" />
+  <link rel="preload" href="css/kickan.css?v=20260916-v1" as="style" />
+  <link rel="stylesheet" href="css/kickan.css?v=20260916-v1" />
   <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon" />
 
   <!-- PWA Manifest & Icons -->
@@ -474,7 +474,7 @@
                 </div>
                 <div class="lts-stat-info">
                   <span class="lts-stat-label">Gledaoci uživo</span>
-                  <strong class="lts-stat-val" id="statLiveViewers">0</strong>
+                  <strong class="lts-stat-val" id="statLiveViewers" aria-live="polite">0</strong>
                 </div>
               </div>
 
@@ -487,7 +487,7 @@
                 </div>
                 <div class="lts-stat-info">
                   <span class="lts-stat-label">Jedinstveni Chatters</span>
-                  <strong class="lts-stat-val" id="statUniqueChatters">0</strong>
+                  <strong class="lts-stat-val" id="statUniqueChatters" aria-live="polite">0</strong>
                 </div>
               </div>
 
@@ -499,7 +499,7 @@
                 </div>
                 <div class="lts-stat-info">
                   <span class="lts-stat-label">Ukupno Poruka</span>
-                  <strong class="lts-stat-val" id="statTotalMessages">0</strong>
+                  <strong class="lts-stat-val" id="statTotalMessages" aria-live="polite">0</strong>
                 </div>
               </div>
 
@@ -511,7 +511,7 @@
                 </div>
                 <div class="lts-stat-info">
                   <span class="lts-stat-label">Peak Gledaoci</span>
-                  <strong class="lts-stat-val" id="statPeakViewers">0</strong>
+                  <strong class="lts-stat-val" id="statPeakViewers" aria-live="polite">0</strong>
                 </div>
               </div>
 
@@ -777,11 +777,12 @@
                     <th style="width:45px;">Rang</th>
                     <th>Korisnik</th>
                     <th>Poruka</th>
+                    <th>Udeo</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody id="tableMostActiveViewers">
-                  <tr class="empty-row"><td colspan="4" class="table-empty-state">Nema aktivnih gledalaca</td></tr>
+                  <tr class="empty-row"><td colspan="5" class="table-empty-state">Nema aktivnih gledalaca</td></tr>
                 </tbody>
               </table>
             </div>
@@ -790,7 +791,6 @@
 
         <!-- Hidden preserved elements for compatibility -->
         <div style="display:none;" aria-hidden="true">
-          <span id="metricAvgViewers">0</span>
           <span id="metricEstEarningsHero">$0.00</span>
           <span id="kcipEngageMultBadge">1.00x</span>
           <span id="kcipCpmBadge">$3.00</span>
@@ -1100,14 +1100,14 @@
         </button>
       </div>
       <div class="modal-body">
-        <p style="color:var(--an-muted); font-size:0.9rem; line-height:1.6;">Za sva pitanja, pomoć sa podešavanjem Kickan analitike ili tehničke nedoumice, naš tim podrške vam stoji na raspolaganju:</p>
+        <p class="help-modal-desc">Za sva pitanja, pomoć sa podešavanjem ili tehničke nedoumice, naš tim podrške vam stoji na raspolaganju:</p>
         <div style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
-          <a href="mailto:contact@milanwebportal.com" class="sc-btn sc-btn-tracking" style="text-decoration:none; justify-content:center; font-weight:800; gap:8px;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <a href="mailto:contact@milanwebportal.com" class="help-modal-email-btn" title="Pošalji email">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
               <polyline points="22,6 12,13 2,6"/>
             </svg>
-            <span>contact@milanwebportal.com</span>
+            <span>CONTACT@MILANWEBPORTAL.COM</span>
           </a>
         </div>
       </div>
@@ -1247,6 +1247,6 @@
   <script src="../js/config.js?v=20260915-v3" defer></script>
   <script src="../js/toast.js?v=20260915-v2" defer></script>
   <script src="../js/mobile-optimization.js?v=20260915-v2" defer></script>
-  <script src="js/kickan-dashboard.js?v=20260915-v3" defer></script>
+  <script src="js/kickan-dashboard.js?v=20260916-v1" defer></script>
 </body>
 </html>

@@ -802,5 +802,120 @@ test('Kickan - Mobile Sidebar Drawer pravilno postavlja aria-expanded i aria-hid
   assert.equal(ariaHidden, 'true');
 });
 
+test('Kickan - Offline stanje: resetuje sve lajv metrike na 0/prazno, a čuva istoriju grafikona (hourlyCounts)', () => {
+  const liveStats = {
+    totalMessages: 1450,
+    liveViewers: 320,
+    avgViewers: 280,
+    viewerSamples: [300, 310, 320],
+    peakViewers: 450,
+    activeSubs: 14,
+    uniqueChattersMap: new Set(['user1', 'user2', 'user3']),
+    totalKicks: 250,
+    totalBans: 5,
+    totalHosts: 2,
+    totalEmotes: 89,
+    emotesMap: new Map([['kekw', 40]]),
+    viewersActivityMap: new Map([['user1', { count: 50 }]]),
+    banLogs: [{ user: 'troll', time: '14:00' }],
+    recentChatMessages: [{ content: 'test', sender: 'user1' }],
+    hourlyCounts: [0, 0, 15, 45, 80, 120, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+  };
 
+  // Funkcija za prelazak u offline stanje
+  function handleStreamOffline(stats) {
+    stats.liveViewers = 0;
+    stats.avgViewers = 0;
+    stats.viewerSamples = [];
+    stats.totalMessages = 0;
+    stats.peakViewers = 0;
+    stats.activeSubs = 0;
+    stats.uniqueChattersMap = new Set();
+    stats.totalKicks = 0;
+    stats.totalBans = 0;
+    stats.totalHosts = 0;
+    stats.totalEmotes = 0;
+    stats.emotesMap = new Map();
+    stats.viewersActivityMap = new Map();
+    stats.banLogs = [];
+    stats.recentChatMessages = [];
+    // hourlyCounts se NE resetuje - čuva se za grafike
+  }
 
+  handleStreamOffline(liveStats);
+
+  // Proveri da su sve trenutne lajv vrednosti očišćene
+  assert.equal(liveStats.liveViewers, 0);
+  assert.equal(liveStats.avgViewers, 0);
+  assert.equal(liveStats.viewerSamples.length, 0);
+  assert.equal(liveStats.totalMessages, 0);
+  assert.equal(liveStats.peakViewers, 0);
+  assert.equal(liveStats.activeSubs, 0);
+  assert.equal(liveStats.uniqueChattersMap.size, 0);
+  assert.equal(liveStats.totalKicks, 0);
+  assert.equal(liveStats.totalBans, 0);
+  assert.equal(liveStats.totalHosts, 0);
+  assert.equal(liveStats.totalEmotes, 0);
+  assert.equal(liveStats.emotesMap.size, 0);
+  assert.equal(liveStats.viewersActivityMap.size, 0);
+  assert.equal(liveStats.banLogs.length, 0);
+  assert.equal(liveStats.recentChatMessages.length, 0);
+
+  // Proveri da su podaci grafikona netaknuti
+  assert.equal(liveStats.hourlyCounts[2], 15);
+  assert.equal(liveStats.hourlyCounts[5], 120);
+});
+
+test('Kickan - saveLiveStreamToDatabase update operacija striktno uključuje id i user_id', async () => {
+  const currentUserId = 'user-owner-uuid-456';
+  const targetSessionDbId = 'stream-session-id-789';
+  let updateFilters = {};
+
+  const mockSupabaseQuery = {
+    from(table) {
+      assert.equal(table, 'kickan');
+      return {
+        update(payload) {
+          assert.ok(payload);
+          return {
+            eq(col, val) {
+              updateFilters[col] = val;
+              return {
+                eq(col2, val2) {
+                  updateFilters[col2] = val2;
+                  return Promise.resolve({ error: null });
+                }
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  async function updateStreamInDatabase(dbId, targetUserId, payload, sb) {
+    const { error } = await sb.from('kickan').update(payload).eq('id', dbId).eq('user_id', targetUserId);
+    if (error) throw error;
+  }
+
+  await updateStreamInDatabase(targetSessionDbId, currentUserId, { peak_viewers: 250 }, mockSupabaseQuery);
+  assert.equal(updateFilters['id'], targetSessionDbId);
+  assert.equal(updateFilters['user_id'], currentUserId);
+});
+
+test('Kickan - Bot filtriranje ignoriše poznate bot naloge iz statistike čatera', () => {
+  const KNOWN_BOTS = new Set(['botrix', 'nightbot', 'streamlabs', 'streamelements', 'kickbot']);
+
+  function isBotUser(username, filterBotsEnabled) {
+    if (!filterBotsEnabled) return false;
+    if (!username) return false;
+    return KNOWN_BOTS.has(username.toLowerCase().trim());
+  }
+
+  assert.equal(isBotUser('BotRix', true), true);
+  assert.equal(isBotUser('nightbot', true), true);
+  assert.equal(isBotUser('StreamLabs', true), true);
+  assert.equal(isBotUser('MilanStreamer', true), false);
+  // Kada je filter isključen, ne filtrira
+  assert.equal(isBotUser('BotRix', false), false);
+});

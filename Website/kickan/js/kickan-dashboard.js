@@ -664,6 +664,29 @@
     const menu = document.getElementById('channelDropdownMenu');
     if (menu) menu.classList.remove('open');
 
+    // Reset local metrics for clean channel switch
+    liveStats.totalMessages = 0;
+    liveStats.liveViewers = 0;
+    liveStats.avgViewers = 0;
+    liveStats.viewerSamples = [];
+    liveStats.peakViewers = 0;
+    liveStats.activeSubs = 0;
+    liveStats.uniqueChattersMap = new Set();
+    liveStats.totalKicks = 0;
+    liveStats.totalBans = 0;
+    liveStats.totalHosts = 0;
+    liveStats.totalEmotes = 0;
+    liveStats.emotesMap = new Map();
+    liveStats.viewersActivityMap = new Map();
+    liveStats.banLogs = [];
+    liveStats.recentChatMessages = [];
+    liveStats.hourlyCounts = new Array(24).fill(0);
+    rollingMessageTimes = [];
+    currentVelocity = 0;
+    peakVelocity = 0;
+    streamStartTime = null;
+    isStreamCurrentlyLive = false;
+
     updateUserProfileUI(channelName, targetObj.avatar, targetObj.role);
     renderChannelDropdownList();
 
@@ -812,9 +835,25 @@
         fetchPastStreams().catch(() => {});
       }
 
+      // Ako trenutno nije live, očisti sve metrike i liste, a zadrži samo grafike (hourlyCounts)
       liveStats.liveViewers = 0;
       liveStats.avgViewers = 0;
       liveStats.viewerSamples = [];
+      liveStats.totalMessages = 0;
+      liveStats.peakViewers = 0;
+      liveStats.activeSubs = 0;
+      liveStats.uniqueChattersMap = new Set();
+      liveStats.totalKicks = 0;
+      liveStats.totalBans = 0;
+      liveStats.totalHosts = 0;
+      liveStats.totalEmotes = 0;
+      liveStats.emotesMap = new Map();
+      liveStats.viewersActivityMap = new Map();
+      liveStats.banLogs = [];
+      liveStats.recentChatMessages = [];
+      rollingMessageTimes = [];
+      currentVelocity = 0;
+      peakVelocity = 0;
       streamStartTime = null;
       currentStreamTitle = '';
       detectedGeoRegion = 'Offline (Čeka se lajv)';
@@ -1561,7 +1600,15 @@
     const studioContainer = document.getElementById('studioLiveFeedContainer');
     if (!container && !studioContainer) return;
 
+    const showBadges = document.getElementById('toggleShowBadges') ? document.getElementById('toggleShowBadges').checked : true;
+    const filterBots = document.getElementById('toggleFilterBots') ? document.getElementById('toggleFilterBots').checked : false;
+    const knownBots = ['botrix', 'kickbot', 'streamlabs', 'nightbot', 'streamelements', 'botrixbot', 'livebot'];
+
     let filtered = liveStats.recentChatMessages;
+    if (filterBots) {
+      filtered = filtered.filter(m => !knownBots.includes(String(m.author || '').toLowerCase().trim()));
+    }
+
     if (activeChatFilter === 'subs') {
       filtered = filtered.filter(m => m.isSub);
     } else if (activeChatFilter === 'mods') {
@@ -1579,9 +1626,12 @@
 
     let html = '';
     filtered.slice(0, 25).forEach(m => {
-      const badgeHtml = m.isSub
-        ? `<span style="background:rgba(236,72,153,0.2); color:var(--an-pink); font-size:0.65rem; font-weight:800; padding:1px 5px; border-radius:4px;">SUB</span>`
-        : (m.isMod ? `<span style="background:rgba(83,252,24,0.2); color:var(--an-green); font-size:0.65rem; font-weight:800; padding:1px 5px; border-radius:4px;">MOD</span>` : '');
+      let badgeHtml = '';
+      if (showBadges) {
+        badgeHtml = m.isSub
+          ? `<span style="background:rgba(236,72,153,0.2); color:var(--an-pink); font-size:0.65rem; font-weight:800; padding:1px 5px; border-radius:4px;">SUB</span>`
+          : (m.isMod ? `<span style="background:rgba(83,252,24,0.2); color:var(--an-green); font-size:0.65rem; font-weight:800; padding:1px 5px; border-radius:4px;">MOD</span>` : '');
+      }
 
       html += `
         <div class="feed-msg-row">
@@ -1616,9 +1666,18 @@
     }
 
     const searchQuery = (document.getElementById('inputSearchChatters')?.value || '').toLowerCase().trim();
+    const showBadges = document.getElementById('toggleShowBadges') ? document.getElementById('toggleShowBadges').checked : true;
+    const filterBots = document.getElementById('toggleFilterBots') ? document.getElementById('toggleFilterBots').checked : false;
+    const knownBots = ['botrix', 'kickbot', 'streamlabs', 'nightbot', 'streamelements', 'botrixbot', 'livebot'];
+
     let sorted = Array.from(liveStats.viewersActivityMap.entries())
-      .map(([user, data]) => ({ user, ...data }))
-      .sort((a, b) => b.count - a.count);
+      .map(([user, data]) => ({ user, ...data }));
+
+    if (filterBots) {
+      sorted = sorted.filter(item => !knownBots.includes(String(item.user || '').toLowerCase().trim()));
+    }
+
+    sorted = sorted.sort((a, b) => b.count - a.count);
 
     if (searchQuery) {
       sorted = sorted.filter(item => item.user.toLowerCase().includes(searchQuery));
@@ -1645,9 +1704,13 @@
       const sharePct = ((item.count / totalMsgs) * 100).toFixed(1);
 
       let statusTag = `<span class="table-status-pill pill-viewer">Gledalac</span>`;
-      if (item.isMod) statusTag = `<span class="table-status-pill pill-mod">MOD</span>`;
-      else if (item.isSub) statusTag = `<span class="table-status-pill pill-sub">SUB</span>`;
-      else if (item.isVip) statusTag = `<span class="table-status-pill pill-vip">VIP</span>`;
+      if (showBadges) {
+        if (item.isMod) statusTag = `<span class="table-status-pill pill-mod">MOD</span>`;
+        else if (item.isSub) statusTag = `<span class="table-status-pill pill-sub">SUB</span>`;
+        else if (item.isVip) statusTag = `<span class="table-status-pill pill-vip">VIP</span>`;
+      } else {
+        statusTag = `<span class="table-status-pill pill-viewer">Čater</span>`;
+      }
 
       html += `
         <tr>
@@ -2398,7 +2461,7 @@ Generisano u Kickan Studio.`;
     saveSessionTimeout = setTimeout(() => {
       saveSessionTimeout = null;
       saveSessionStats(slug);
-    }, 10000);
+    }, SAVE_DEBOUNCE_MS);
   }
 
   function saveSessionStats(slug) {
@@ -2454,7 +2517,7 @@ Generisano u Kickan Studio.`;
   async function fetchPastStreams() {
     if (!sb || !currentUser) return;
     try {
-      let query = sb.from('kickan').select('*');
+      let query = sb.from('kickan').select('*').not('ended_at', 'is', null);
       if (channelName) {
         query = query.ilike('channel_name', channelName);
       } else {
@@ -2708,7 +2771,7 @@ Generisano u Kickan Studio.`;
       };
 
       if (currentSessionDbId) {
-        const { error } = await sb.from('kickan').update(payload).eq('id', currentSessionDbId);
+        const { error } = await sb.from('kickan').update(payload).eq('id', currentSessionDbId).eq('user_id', targetUserId);
         if (error) throw error;
       } else if (activeChannelObj?.role !== 'managed' || activeChannelObj?.owner_id === currentUser.id) {
         // Samo vlasnik kanala može kreirati novi zapis kroz frontend klijent; menadžeri se oslanjaju na 24/7 server bot
@@ -2750,7 +2813,7 @@ Generisano u Kickan Studio.`;
       btn.onclick = async () => {
         window.closeModal('deleteStreamConfirmModal');
         try {
-          const { error } = await sb.from('kickan').delete().eq('id', streamId);
+          const { error } = await sb.from('kickan').delete().eq('id', streamId).eq('user_id', currentUser.id);
           if (error) throw error;
           pastStreamsList = pastStreamsList.filter(s => s.id !== streamId);
           if (currentSessionDbId === streamId) currentSessionDbId = null;
@@ -2860,7 +2923,7 @@ Generisano u Kickan Studio.`;
       <div class="psd-meta-strip">
         <span class="psd-meta-item">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          ${escapeHtml(dateStr)}
+          ${escapeHtml(dateStr)}${stream.ended_at ? ' – ' + escapeHtml(dateEndStr) : ''}
         </span>
         <span class="psd-meta-dot"></span>
         <span class="psd-meta-item">
@@ -3058,6 +3121,49 @@ Generisano u Kickan Studio.`;
         setText('volumeLabelVal', `${e.target.value}%`);
       });
     }
+
+    // Sidebar Config Controls
+    const timeframeSelect = document.getElementById('selectTimeframe');
+    if (timeframeSelect) {
+      timeframeSelect.addEventListener('change', () => {
+        updateDashboardUI();
+        if (window.showToast) {
+          window.showToast(timeframeSelect.value === 'all' ? 'Prikaz za ceo period osvežen' : 'Prikaz za trenutni lajv osvežen', 'info');
+        }
+      });
+    }
+
+    const minMsgInput = document.getElementById('inputMinMsgThreshold');
+    if (minMsgInput) {
+      minMsgInput.addEventListener('input', () => {
+        renderChattersLeaderboard();
+      });
+    }
+
+    const spikeInput = document.getElementById('inputSpikeThreshold');
+    if (spikeInput) {
+      spikeInput.addEventListener('change', () => {
+        if (window.showToast) {
+          window.showToast(`Prag brzine postavljen na ${spikeInput.value} poruka/min`, 'info');
+        }
+      });
+    }
+
+    const showBadgesToggle = document.getElementById('toggleShowBadges');
+    if (showBadgesToggle) {
+      showBadgesToggle.addEventListener('change', () => {
+        renderChattersLeaderboard();
+        renderLiveChatFeed();
+      });
+    }
+
+    const filterBotsToggle = document.getElementById('toggleFilterBots');
+    if (filterBotsToggle) {
+      filterBotsToggle.addEventListener('change', () => {
+        renderChattersLeaderboard();
+        renderLiveChatFeed();
+      });
+    }
   }
 
   function setupKeyboardShortcuts() {
@@ -3101,5 +3207,9 @@ Generisano u Kickan Studio.`;
     if (str === undefined || str === null) return '';
     return String(str).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m]);
   }
+  const escHtml = escapeHtml;
+  window.escapeHtml = escapeHtml;
+  window.escHtml = escHtml;
+  window.cleanUsername = cleanUsername;
 
 })();
