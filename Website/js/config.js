@@ -97,12 +97,6 @@ window.CONFIG = {
 
   // Backend API Configuration
   getBackendApiBase: () => {
-    const isLocalhost = window.location.hostname === 'localhost' || 
-                        window.location.hostname === '127.0.0.1' || 
-                        window.location.hostname === '0.0.0.0';
-    if (isLocalhost && localStorage.getItem('use_local_bot') === 'true') {
-      return 'http://localhost:3000';
-    }
     return 'https://kickbot-ihzb.onrender.com';
   },
 

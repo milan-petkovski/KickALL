@@ -346,12 +346,14 @@ async function handleHttpRequest(req, res) {
                 let userId = '';
                 let slug = username;
 
+                let channelPayload = null;
                 if (channelRes.ok) {
                     const channelData = await channelRes.json();
                     avatar = channelData?.user?.profile_pic || '';
                     chatroomId = channelData?.chatroom?.id || '';
                     userId = channelData?.user_id ? String(channelData.user_id) : '';
                     slug = channelData?.slug || username;
+                    channelPayload = channelData;
                 }
 
                 res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -360,7 +362,11 @@ async function handleHttpRequest(req, res) {
                     username: username,
                     slug: slug,
                     avatar: avatar,
-                    chatroom_id: chatroomId
+                    chatroom_id: chatroomId,
+                    livestream: channelPayload?.livestream || null,
+                    followers_count: channelPayload?.followers_count || 0,
+                    user: channelPayload?.user || null,
+                    chatroom: channelPayload?.chatroom || null
                 }));
             } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });

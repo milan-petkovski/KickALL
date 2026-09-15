@@ -380,6 +380,20 @@
           </div>
           <!-- Popup dropdown - gore -->
           <div class="user-menu-sm" id="userMenuSm" onclick="event.stopPropagation()">
+            <div class="user-menu-notice" style="padding: 10px 12px; margin-bottom: 4px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.22); border-radius: 10px; display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.76rem; font-weight: 700; color: #a78bfa;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <span>Paketi &amp; Podešavanja</span>
+              </div>
+              <a href="/kickot/dashboard" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 8px; color: #c4b5fd; font-size: 0.74rem; font-weight: 700; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.background='rgba(139,92,246,0.35)';this.style.color='#fff';" onmouseout="this.style.background='rgba(139,92,246,0.2)';this.style.color='#c4b5fd;'">
+                <span>Otvori Kickot</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" x2="21" y1="14" y2="3"></line></svg>
+              </a>
+            </div>
             <button class="dropdown-item" onclick="event.stopPropagation(); window.openHelpModal()">
               <svg class="dropdown-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14">
                 <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
@@ -387,29 +401,10 @@
               </svg>
               <span>Pomoć</span>
             </button>
-            <div class="dropdown-divider"></div>
             <button class="dropdown-item danger" id="btnLogout" onclick="event.stopPropagation(); window.handleSignOut()">
               <svg class="dropdown-icon" fill="none" height="14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" width="14"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               <span>Odjavi se</span>
             </button>
-            <div class="dropdown-divider"></div>
-            <div class="user-menu-notice" style="padding: 10px 12px; margin-top: 4px; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.22); border-radius: 10px; display: flex; flex-direction: column; gap: 6px;">
-              <div style="display: flex; align-items: center; gap: 6px; font-size: 0.74rem; font-weight: 700; color: #a78bfa;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <line x1="12" y1="16" x2="12" y2="12"></line>
-                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                </svg>
-                <span>Paketi &amp; Podešavanja</span>
-              </div>
-              <p style="margin: 0; font-size: 0.72rem; color: var(--text-muted, #94a3b8); line-height: 1.45;">
-                Podešavanje naloga, kanala i kupovina paketa vrše se u <strong style="color: #fff;">Kickot</strong> kontrolnoj tabli.
-              </p>
-              <a href="/kickot/dashboard" style="display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 6px 10px; background: rgba(139, 92, 246, 0.2); border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 7px; color: #c4b5fd; font-size: 0.72rem; font-weight: 700; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.background='rgba(139,92,246,0.35)';this.style.color='#fff';" onmouseout="this.style.background='rgba(139,92,246,0.2)';this.style.color='#c4b5fd;'">
-                <span>Otvori Kickot Dashboard</span>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" x2="21" y1="14" y2="3"></line></svg>
-              </a>
-            </div>
           </div>
         </div>
       </div>

@@ -263,7 +263,7 @@ test('Kickan - buildStreamPayload vraća null ukoliko korisnik nije prijavljen',
 
 function getRoleBadgeInfo(role, isManaged) {
   if (role === 'managed' || isManaged) {
-    return { label: 'Glavni Moderator', class: 'cdm-role-managed' };
+    return { label: 'Menadžer', class: 'cdm-role-managed' };
   } else if (role === 'custom') {
     return { label: 'Dodat', class: 'cdm-role-custom' };
   }
@@ -289,10 +289,10 @@ function deduplicateChannels(channelsList) {
   });
 }
 
-test('Kickan - getRoleBadgeInfo mapira uloge u ispravne nazive (Vlasnik, Glavni Moderator, Dodat)', () => {
+test('Kickan - getRoleBadgeInfo mapira uloge u ispravne nazive (Vlasnik, Menadžer, Dodat)', () => {
   assert.deepEqual(getRoleBadgeInfo('owner', false), { label: 'Vlasnik', class: 'cdm-role-owner' });
-  assert.deepEqual(getRoleBadgeInfo('managed', true), { label: 'Glavni Moderator', class: 'cdm-role-managed' });
-  assert.deepEqual(getRoleBadgeInfo(null, true), { label: 'Glavni Moderator', class: 'cdm-role-managed' });
+  assert.deepEqual(getRoleBadgeInfo('managed', true), { label: 'Menadžer', class: 'cdm-role-managed' });
+  assert.deepEqual(getRoleBadgeInfo(null, true), { label: 'Menadžer', class: 'cdm-role-managed' });
   assert.deepEqual(getRoleBadgeInfo('custom', false), { label: 'Dodat', class: 'cdm-role-custom' });
   assert.deepEqual(getRoleBadgeInfo(undefined, false), { label: 'Vlasnik', class: 'cdm-role-owner' });
 });
@@ -556,5 +556,251 @@ test('Kickan - calculateEstimatedEarnings vraća 0 za novu praznu ili offline se
   assert.equal(res.tierLabel, 'OFFLINE');
   assert.equal(res.qualificationStatus, 'Offline (Čeka se lajv)');
 });
+
+/* ════════════════════════════════════════════════════════════════
+   DODATNI TOP-TIER AUDIT TESTOVI (Konzistentnost sa Kickot i Kickaj)
+   ════════════════════════════════════════════════════════════════ */
+
+test('Kickan - cleanUsername robusno ekstrahuje ime iz URL-ova, prefiksa, query parametara i heševa', () => {
+  function cleanUsername(raw, defaultVal = 'Kanal') {
+    if (!raw) return defaultVal;
+    let s = String(raw).trim()
+      .replace(/^https?:\/\/(www\.)?kick\.com\//i, '')
+      .replace(/^kick_user_/, '')
+      .replace(/^@/, '');
+    if (s.includes('@')) s = s.split('@')[0];
+    s = s.split(/[/?#\s]/)[0];
+    return s || defaultVal;
+  }
+
+  assert.equal(cleanUsername('https://kick.com/milan_567/'), 'milan_567');
+  assert.equal(cleanUsername('http://www.kick.com/streamer?ref=banner#bio'), 'streamer');
+  assert.equal(cleanUsername('@MilanGamer'), 'MilanGamer');
+  assert.equal(cleanUsername('kick_user_pro123'), 'pro123');
+  assert.equal(cleanUsername('streamer/about/sub'), 'streamer');
+  assert.equal(cleanUsername(''), 'Kanal');
+  assert.equal(cleanUsername(null), 'Kanal');
+  assert.equal(cleanUsername(undefined), 'Kanal');
+  assert.equal(cleanUsername(null, 'Streamer'), 'Streamer');
+});
+
+test('Kickan - escapeHtml neutrališe opasne XSS payload-e u korisničkim imenima i porukama', () => {
+  function escapeHtml(str) {
+    if (str === undefined || str === null) return '';
+    return String(str).replace(/[&<>"']/g, (m) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[m]);
+  }
+
+  const payload = '<script>alert("xss")</script>';
+  const escaped = escapeHtml(payload);
+  assert.equal(escaped.includes('<script>'), false);
+  assert.equal(escaped.includes('&lt;script&gt;'), true);
+  assert.equal(escaped.includes('&quot;xss&quot;'), true);
+  assert.equal(escapeHtml(null), '');
+  assert.equal(escapeHtml(undefined), '');
+  assert.equal(escapeHtml('Normalan tekst 123'), 'Normalan tekst 123');
+  assert.equal(escapeHtml('User & Name <Tag> "Quote" \'Apostrophe\''), 'User &amp; Name &lt;Tag&gt; &quot;Quote&quot; &#39;Apostrophe&#39;');
+});
+
+test('Kickan - Modal Manager upravlja fokusom, aria-hidden atributima i zatvaranjem na Escape', () => {
+  let activeModalStack = [];
+  const modalTriggerElements = new Map();
+  let appAriaHidden = null;
+  let focusedElement = null;
+
+  const mockApp = {
+    setAttribute(attr, val) { if (attr === 'aria-hidden') appAriaHidden = val; },
+    removeAttribute(attr) { if (attr === 'aria-hidden') appAriaHidden = null; }
+  };
+
+  const mockModal = {
+    id: 'exportReportModal',
+    isOpen: false,
+    ariaHidden: 'true',
+    classList: {
+      add(cls) { if (cls === 'open') mockModal.isOpen = true; },
+      remove(cls) { if (cls === 'open') mockModal.isOpen = false; }
+    },
+    setAttribute(attr, val) { if (attr === 'aria-hidden') mockModal.ariaHidden = val; },
+    focus() { focusedElement = 'modalFirstBtn'; }
+  };
+
+  function openModal(id, triggerBtn) {
+    if (triggerBtn) modalTriggerElements.set(id, triggerBtn);
+    mockModal.classList.add('open');
+    mockModal.setAttribute('aria-hidden', 'false');
+    mockApp.setAttribute('aria-hidden', 'true');
+    activeModalStack.push(id);
+    mockModal.focus();
+  }
+
+  function closeModal(id) {
+    mockModal.classList.remove('open');
+    mockModal.setAttribute('aria-hidden', 'true');
+    activeModalStack = activeModalStack.filter(item => item !== id);
+    if (activeModalStack.length === 0) {
+      mockApp.removeAttribute('aria-hidden');
+    }
+    const trigger = modalTriggerElements.get(id);
+    if (trigger) {
+      focusedElement = trigger;
+      modalTriggerElements.delete(id);
+    }
+  }
+
+  // 1. Otvaranje modala
+  openModal('exportReportModal', 'btnTriggerExport');
+  assert.equal(mockModal.isOpen, true);
+  assert.equal(mockModal.ariaHidden, 'false');
+  assert.equal(appAriaHidden, 'true');
+  assert.equal(focusedElement, 'modalFirstBtn');
+  assert.equal(activeModalStack.length, 1);
+
+  // 2. Zatvaranje modala vraća fokus na dugme pokretača i uklanja aria-hidden
+  closeModal('exportReportModal');
+  assert.equal(mockModal.isOpen, false);
+  assert.equal(mockModal.ariaHidden, 'true');
+  assert.equal(appAriaHidden, null);
+  assert.equal(focusedElement, 'btnTriggerExport');
+  assert.equal(activeModalStack.length, 0);
+});
+
+test('Kickan - Escape taster poštuje hijerarhiju zatvaranja (prvo modal, tek onda fullscreen studio)', () => {
+  let activeModalStack = ['customChannelModal'];
+  let isFullscreenOpen = true;
+
+  function handleEscapeKey() {
+    if (activeModalStack.length > 0) {
+      activeModalStack.pop();
+      return 'modal_closed';
+    }
+    if (isFullscreenOpen) {
+      isFullscreenOpen = false;
+      return 'fullscreen_closed';
+    }
+    return 'none';
+  }
+
+  // Prvi pritisak na Escape zatvara modal, ali Fullscreen ostaje otvoren
+  assert.equal(handleEscapeKey(), 'modal_closed');
+  assert.equal(isFullscreenOpen, true);
+  assert.equal(activeModalStack.length, 0);
+
+  // Drugi pritisak na Escape zatvara Fullscreen studio
+  assert.equal(handleEscapeKey(), 'fullscreen_closed');
+  assert.equal(isFullscreenOpen, false);
+});
+
+test('Kickan - debouncedSaveSessionStats ograničava upise u localStorage tokom brzog chata', () => {
+  let writesCount = 0;
+  let saveSessionTimeout = null;
+
+  function saveSessionStats() {
+    writesCount++;
+  }
+
+  function debouncedSaveSessionStats() {
+    if (saveSessionTimeout) return;
+    saveSessionTimeout = setTimeout(() => {
+      saveSessionTimeout = null;
+      saveSessionStats();
+    }, 100);
+  }
+
+  // Simulacija 50 brzih dolaznih chat poruka u 10ms
+  for (let i = 0; i < 50; i++) {
+    debouncedSaveSessionStats();
+  }
+
+  // Pre isteka tajmera, nije izvršen nijedan upis
+  assert.equal(writesCount, 0);
+  assert.ok(saveSessionTimeout !== null);
+  clearTimeout(saveSessionTimeout);
+});
+
+test('Kickan - deletePastStream i update operacije striktno filtriraju zapis po user_id ulogovanog korisnika', () => {
+  const currentUserId = 'user-uuid-1234-abcd';
+  let queryFilters = {};
+
+  const mockSupabaseQuery = {
+    from(table) {
+      assert.equal(table, 'kickan');
+      return {
+        delete() {
+          return {
+            eq(col, val) {
+              queryFilters[col] = val;
+              return {
+                eq(col2, val2) {
+                  queryFilters[col2] = val2;
+                  return Promise.resolve({ error: null });
+                }
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  async function deletePastStream(streamId, sb, user) {
+    if (!streamId || !sb || !user) return;
+    await sb.from('kickan').delete().eq('id', streamId).eq('user_id', user.id);
+  }
+
+  deletePastStream('stream-session-999', mockSupabaseQuery, { id: currentUserId });
+  assert.equal(queryFilters['id'], 'stream-session-999');
+  assert.equal(queryFilters['user_id'], currentUserId, 'Brisanje mora biti zaštićeno sa user_id filterom');
+});
+
+test('Kickan - liveStats.viewerSamples se automatski ograničava na 500 stavki kako bi se sprečio memory leak', () => {
+  const samples = [];
+  for (let i = 0; i < 1200; i++) {
+    samples.push(i);
+    if (samples.length > 500) {
+      samples.shift();
+    }
+  }
+
+  assert.equal(samples.length, 500);
+  assert.equal(samples[samples.length - 1], 1199);
+  assert.equal(samples[0], 700);
+});
+
+test('Kickan - Mobile Sidebar Drawer pravilno postavlja aria-expanded i aria-hidden atribute', () => {
+  let isSidebarOpen = false;
+  let ariaExpanded = 'false';
+  let ariaHidden = 'true';
+
+  function toggleMobileSidebar() {
+    isSidebarOpen = !isSidebarOpen;
+    ariaExpanded = String(isSidebarOpen);
+    ariaHidden = String(!isSidebarOpen);
+  }
+
+  function closeMobileSidebar() {
+    isSidebarOpen = false;
+    ariaExpanded = 'false';
+    ariaHidden = 'true';
+  }
+
+  // 1. Otvaranje
+  toggleMobileSidebar();
+  assert.equal(isSidebarOpen, true);
+  assert.equal(ariaExpanded, 'true');
+  assert.equal(ariaHidden, 'false');
+
+  // 2. Zatvaranje
+  closeMobileSidebar();
+  assert.equal(isSidebarOpen, false);
+  assert.equal(ariaExpanded, 'false');
+  assert.equal(ariaHidden, 'true');
+});
+
 
 

@@ -7,6 +7,50 @@
 (function () {
   'use strict';
 
+  /* ── Imenovane konstante (bez magic numbers u kodu) ── */
+  const WS_PING_INTERVAL_MS      = 25000; // Pusher keepalive interval
+  const WS_RECONNECT_BASE_MS     = 5000;  // Bazni delay za WebSocket reconnect
+  const WS_RECONNECT_MAX_RETRIES = 10;    // Maksimalan broj pokušaja reconnecta
+  const POLL_INTERVAL_MS         = 15000; // Kick API polling interval
+  const UI_THROTTLE_MS           = 400;   // Throttle za updateDashboardUI
+  const BOT_API_TIMEOUT_MS       = 6000;  // Timeout za Bot API poziv
+  const ALLORIGINS_TIMEOUT_MS    = 3000;  // Timeout za allorigins proxy
+  const VELOCITY_WINDOW_MS       = 60000; // Prozor za chat velocity (1 min)
+  const VIEWER_SAMPLES_CAP       = 60;    // Maksimalan broj uzoraka gledaoca
+  const CHAT_FEED_MAX_MSGS       = 40;    // Maksimalan broj poruka u live feed-u
+  const BAN_LOGS_MAX             = 30;    // Maksimalan broj ban logova u memoriji
+  const SAVE_DEBOUNCE_MS         = 10000; // Debounce za localStorage čuvanje
+
+  /* ── Global Error Handling for Unhandled Promise Rejections (identično Kickaj/Kickot) ── */
+  if (typeof window !== 'undefined') {
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('[Kickan] Unhandled promise rejection:', event.reason);
+      if (typeof window.showToast === 'function') {
+        const msg = event?.reason?.message || '';
+        if (!msg.includes('AbortError')) {
+          window.showToast('Došlo je do neočekivane mrežne greške.', 'error');
+        }
+      }
+    });
+  }
+
+  /* ── Mobile Sidebar Drawer ── */
+  window.toggleMobileSidebar = function () {
+    const isOpen = document.body.classList.toggle('sidebar-open');
+    const toggleBtn = document.getElementById('btnMobileMenuToggle');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(isOpen));
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.setAttribute('aria-hidden', String(!isOpen));
+  };
+
+  window.closeMobileSidebar = function () {
+    document.body.classList.remove('sidebar-open');
+    const toggleBtn = document.getElementById('btnMobileMenuToggle');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.setAttribute('aria-hidden', 'true');
+  };
+
   /* ── Supabase Configuration ── */
   const supabaseUrl     = window.CONFIG?.SUPABASE?.URL;
   const supabaseAnonKey = window.CONFIG?.SUPABASE?.ANON_KEY;
@@ -37,6 +81,7 @@
   let isSavingStream     = false;
   let currentSessionDbId = null;
   let currentStreamTitle = '';
+  let isStreamCurrentlyLive = false;
 
   // Rolling message timestamps for exact velocity calculation (last 60s)
   let rollingMessageTimes = [];
@@ -115,19 +160,21 @@
     startVelocityTimer();
     loadNotifications();
     loadChangelogs();
+    window.addEventListener('beforeunload', () => {
+      if (channelName) saveSessionStats(channelName);
+    });
     await checkAuth();
   });
 
-  function cleanUsername(raw) {
-    if (!raw) return '';
-    let s = String(raw).trim();
-    if (s.startsWith('kick_user_')) {
-      s = s.replace(/^kick_user_/, '');
-    }
-    if (s.includes('@')) {
-      s = s.split('@')[0];
-    }
-    return s || '';
+  function cleanUsername(raw, defaultVal = 'Kanal') {
+    if (!raw) return defaultVal;
+    let s = String(raw).trim()
+      .replace(/^https?:\/\/(www\.)?kick\.com\//i, '')
+      .replace(/^kick_user_/, '')
+      .replace(/^@/, '');
+    if (s.includes('@')) s = s.split('@')[0];
+    s = s.split(/[/?#\s]/)[0];
+    return s || defaultVal;
   }
 
   function getBotApiBase() {
@@ -275,31 +322,7 @@
         console.warn('[Kickan] Greška pri učitavanju managed kanala:', rpcErr);
       }
 
-      // 3. Dodaj sačuvane custom kanale iz LocalStorage
-      try {
-        const savedCustomRaw = localStorage.getItem('kickan_custom_channels_list');
-        if (savedCustomRaw) {
-          const customList = JSON.parse(savedCustomRaw);
-          if (Array.isArray(customList)) {
-            customList.forEach(c => {
-              const uName = cleanUsername(typeof c === 'string' ? c : c.username);
-              if (uName && !userChannels.some(ex => ex.username.toLowerCase() === uName.toLowerCase())) {
-                userChannels.push({
-                  id: typeof c === 'object' ? c.id : null,
-                  username: uName,
-                  avatar: typeof c === 'object' ? c.avatar || '' : '',
-                  chatroom_id: typeof c === 'object' ? c.chatroom_id : null,
-                  is_primary: false,
-                  is_managed: false,
-                  role: 'custom',
-                  owner_id: currentUser.id,
-                  owner_plan: userPlan
-                });
-              }
-            });
-          }
-        }
-      } catch (_) {}
+
 
       // Deduplicate kanale po korisničkom imenu
       const seen = new Set();
@@ -361,16 +384,17 @@
       renderChannelDropdownList();
 
       if (channelName) {
+        updateStreamStatusUI('loading');
         await loadSavedSessionStats(channelName);
-        await loadRealKickChannelData(channelName);
         connectToRealKickChat();
+        loadRealKickChannelData(channelName).catch(() => {});
 
         if (pollInterval) clearInterval(pollInterval);
         pollInterval = setInterval(() => {
           if (channelName && isTrackingActive) {
             loadRealKickChannelData(channelName).catch(() => {});
           }
-        }, 20000);
+        }, POLL_INTERVAL_MS);
 
         fetchPastStreams().catch(() => {});
       }
@@ -427,6 +451,41 @@
     document.body.classList.remove('auth-loading');
   }
 
+  function updateSidebarUserPlanAndRole() {
+    const sidebarPlanEl = document.getElementById('userPlanLabel');
+    if (!sidebarPlanEl) return;
+
+    const isManaged = Boolean(activeChannelObj?.is_managed || activeChannelObj?.role === 'managed');
+    const roleLabel = isManaged ? 'Menadžer' : 'Vlasnik';
+    const roleClass = isManaged ? 'role-badge-managed' : 'role-badge-owner';
+
+    const roleIcon = isManaged
+      ? `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`
+      : `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>`;
+
+    let effectivePlan = userPlan || 'free';
+    if (isManaged && activeChannelObj?.owner_plan) {
+      effectivePlan = String(activeChannelObj.owner_plan).toLowerCase();
+    }
+    if (!['free', 'pro', 'elite'].includes(effectivePlan)) {
+      effectivePlan = (effectivePlan.includes('elite') || effectivePlan.includes('business')) ? 'elite' : (effectivePlan.includes('pro') ? 'pro' : 'free');
+    }
+
+    const planClass = 'plan-badge-' + effectivePlan;
+    const planText = effectivePlan.toUpperCase();
+
+    sidebarPlanEl.innerHTML = `
+      <span class="plan-badge ${planClass}" id="planBadge">${planText}</span>
+      <span class="role-badge ${roleClass}" id="roleBadge">${roleIcon}<span>${roleLabel}</span></span>
+    `;
+
+    const heroPlanBadge = document.getElementById('heroPlanBadge');
+    if (heroPlanBadge) {
+      heroPlanBadge.textContent = planText;
+      heroPlanBadge.className = 'hero-plan-badge plan-' + effectivePlan;
+    }
+  }
+
   function updateUserProfileUI(username, avatarUrl, role) {
     const clean = cleanUsername(username);
     const nameEl = document.getElementById('userNameDisplay');
@@ -436,15 +495,25 @@
     const roleBadge = document.getElementById('connectedRoleBadge');
     const studioRoleBadge = document.getElementById('studioRoleBadge');
 
+    // Telemetry Banner Elements
+    const telNameEl = document.getElementById('telemetryChannelName');
+    const telSlugEl = document.getElementById('telemetryKickSlug');
+    const telLinkEl = document.getElementById('telemetryKickLink');
+    const telAvatarEl = document.getElementById('telemetryAvatar');
+
     if (nameEl) nameEl.textContent = clean || 'Streamer';
     if (chPillEl) chPillEl.textContent = clean || 'Nepovezan';
     if (studioNameEl) studioNameEl.textContent = clean || 'Nepovezan';
+
+    if (telNameEl) telNameEl.textContent = clean || 'Kanal';
+    if (telSlugEl) telSlugEl.textContent = clean || 'kick';
+    if (telLinkEl) telLinkEl.href = clean ? `https://kick.com/${clean}` : '#';
 
     const currentRole = role || activeChannelObj?.role || 'owner';
     let roleLabel = 'Vlasnik';
     let roleClass = 'cdm-role-owner';
     if (currentRole === 'managed' || activeChannelObj?.is_managed) {
-      roleLabel = 'Glavni Moderator';
+      roleLabel = 'Menadžer';
       roleClass = 'cdm-role-managed';
     } else if (currentRole === 'custom') {
       roleLabel = 'Dodat';
@@ -460,20 +529,26 @@
       studioRoleBadge.className = `cdm-role-badge ${roleClass}`;
     }
 
-    if (avatarEl) {
+    updateSidebarUserPlanAndRole();
+
+    const applyAvatar = (el) => {
+      if (!el) return;
       if (avatarUrl && /^https?:\/\//i.test(avatarUrl)) {
         const safeUrl = encodeURI(avatarUrl).replace(/["'()<>]/g, '');
-        avatarEl.style.backgroundImage = `url("${safeUrl}")`;
-        avatarEl.style.backgroundSize = 'cover';
-        avatarEl.style.backgroundPosition = 'center';
-        avatarEl.textContent = '';
+        el.style.backgroundImage = `url("${safeUrl}")`;
+        el.style.backgroundSize = 'cover';
+        el.style.backgroundPosition = 'center';
+        el.textContent = '';
       } else {
-        avatarEl.style.backgroundImage = 'none';
-        avatarEl.style.backgroundColor = 'var(--an-cyan)';
-        avatarEl.style.color = '#000';
-        avatarEl.textContent = clean ? clean.charAt(0).toUpperCase() : 'K';
+        el.style.backgroundImage = 'none';
+        el.style.backgroundColor = 'var(--an-cyan)';
+        el.style.color = '#000';
+        el.textContent = clean ? clean.charAt(0).toUpperCase() : 'K';
       }
-    }
+    };
+
+    applyAvatar(avatarEl);
+    applyAvatar(telAvatarEl);
   }
 
   function renderChannelDropdownList() {
@@ -512,7 +587,7 @@
       let roleLabel = 'Vlasnik';
       let roleClass = 'cdm-role-owner';
       if (ch.role === 'managed' || ch.is_managed) {
-        roleLabel = 'Glavni Moderator';
+        roleLabel = 'Menadžer';
         roleClass = 'cdm-role-managed';
       } else if (ch.role === 'custom') {
         roleLabel = 'Dodat';
@@ -550,7 +625,7 @@
         chatroom_id: cId ? parseInt(cId, 10) : null,
         is_primary: false,
         is_managed: role === 'managed',
-        role: role || 'custom',
+        role: role || 'owner',
         owner_id: currentUser ? currentUser.id : null,
         owner_plan: ownerPlan || userPlan
       };
@@ -563,14 +638,6 @@
 
     if (!userChannels.some(c => c.username.toLowerCase() === targetName.toLowerCase())) {
       userChannels.push(targetObj);
-      try {
-        const customOnly = userChannels.filter(c => c.role === 'custom');
-        localStorage.setItem('kickan_custom_channels_list', JSON.stringify(customOnly));
-      } catch (_) {}
-    }
-
-    if ((liveStats.totalMessages > 0 || liveStats.peakViewers > 0) && channelName && channelName.toLowerCase() !== targetName.toLowerCase()) {
-      saveLiveStreamToDatabase(false).catch(() => {});
     }
 
     channelName = targetName;
@@ -600,12 +667,10 @@
     updateUserProfileUI(channelName, targetObj.avatar, targetObj.role);
     renderChannelDropdownList();
 
-    const roleMsg = targetObj.role === 'managed' ? ' (Glavni Moderator)' : '';
-    if (window.showToast) window.showToast(`Povezan kanal: ${channelName}${roleMsg}`, 'info');
-
+    updateStreamStatusUI('loading');
     await loadSavedSessionStats(channelName);
-    await loadRealKickChannelData(channelName);
     connectToRealKickChat();
+    loadRealKickChannelData(channelName).catch(() => {});
     fetchPastStreams().catch(() => {});
   };
 
@@ -614,113 +679,181 @@
   ════════════════════════════════════════ */
   async function loadRealKickChannelData(slug) {
     if (!slug) return;
+    const cleanSlug = cleanUsername(slug);
+    if (!cleanSlug) return;
     let channelData = null;
 
+    // 1. Primarno: Pokušaj preko Bot Backend API-ja (brz, stabilan, bez CORS problema)
     try {
-      const res = await fetch(`https://kick.com/api/v2/channels/${slug}`);
-      if (res.ok) channelData = await res.json();
+      const apiBase = getBotApiBase();
+      const botRes = await fetch(`${apiBase}/api/avatar?username=${encodeURIComponent(cleanSlug)}`, {
+        signal: AbortSignal.timeout(BOT_API_TIMEOUT_MS)
+      });
+      if (botRes.ok) {
+        const botData = await botRes.json();
+        if (botData && (botData.chatroom_id || botData.avatar || botData.channel || botData.livestream)) {
+          channelData = botData.channel || {
+            user: { username: botData.username, profile_pic: botData.avatar },
+            chatroom: { id: botData.chatroom_id },
+            id: botData.id,
+            livestream: botData.livestream,
+            followers_count: botData.followers_count
+          };
+          if (botData.chatroom_id) chatroomId = parseInt(botData.chatroom_id, 10);
+          if (botData.id) channelId = botData.id;
+        }
+      }
     } catch (_) {}
 
-    if (!channelData) {
+    // 2. Sekundarno: Netlify proxy funkcija (samo na produkciji, ne na localhostu)
+    if (!channelData && typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
       try {
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(`https://kick.com/api/v2/channels/${slug}`)}`;
-        const res = await fetch(proxyUrl);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.contents) channelData = JSON.parse(json.contents);
+        const targetUrl = `https://kick.com/api/v2/channels/${encodeURIComponent(cleanSlug)}`;
+        const netlifyRes = await fetch(`/.netlify/functions/api-proxy`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetUrl }),
+          signal: AbortSignal.timeout(1500)
+        });
+        if (netlifyRes.ok) {
+          channelData = await netlifyRes.json();
         }
       } catch (_) {}
     }
 
-    if (channelData) {
-      if (channelData.chatroom?.id) {
-        chatroomId = parseInt(channelData.chatroom.id, 10);
+    // 3. Tercijarno: Allorigins raw & get fallback
+    if (!channelData) {
+      try {
+        const targetUrl = `https://kick.com/api/v2/channels/${encodeURIComponent(cleanSlug)}`;
+        const fetchRaw = async () => {
+          const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`, {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(ALLORIGINS_TIMEOUT_MS)
+          });
+          if (!res.ok) throw new Error('Raw non-200');
+          return await res.json();
+        };
+
+        const fetchGet = async () => {
+          const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`, {
+            signal: AbortSignal.timeout(ALLORIGINS_TIMEOUT_MS)
+          });
+          if (!res.ok) throw new Error('Get non-200');
+          const json = await res.json();
+          if (!json.contents) throw new Error('No contents');
+          return JSON.parse(json.contents);
+        };
+
+        channelData = await Promise.any([fetchRaw(), fetchGet()]);
+      } catch (_) {}
+    }
+
+    // Ažuriraj vizuelne elemente kanala
+    const nameEl = document.getElementById('telemetryChannelName');
+    const slugEl = document.getElementById('telemetryKickSlug');
+    const linkEl = document.getElementById('telemetryKickLink');
+    const avatarEl = document.getElementById('telemetryAvatar');
+
+    if (nameEl) nameEl.textContent = channelData?.user?.username || cleanSlug;
+    if (slugEl) slugEl.textContent = cleanSlug;
+    if (linkEl) linkEl.href = `https://kick.com/${cleanSlug}`;
+
+    if (avatarEl && channelData?.user?.profile_pic && /^https?:\/\//i.test(channelData.user.profile_pic)) {
+      const safePic = encodeURI(channelData.user.profile_pic).replace(/["'()<>]/g, '');
+      avatarEl.style.backgroundImage = `url("${safePic}")`;
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.textContent = '';
+    }
+
+    if (channelData?.chatroom?.id) {
+      chatroomId = parseInt(channelData.chatroom.id, 10);
+    }
+    if (channelData?.id) {
+      channelId = channelData.id;
+    }
+    if (channelData?.followers_count !== undefined) {
+      liveStats.followersCount = channelData.followers_count;
+    }
+
+    // Proveri realan status strima sa Kick API-ja
+    // Kick API v2 vraća livestream: null kad je offline, a non-null objekat kad je live
+    // Nema posebnog is_live flaga na objektu — dovoljno je proveriti da li postoji
+    if (channelData?.livestream) {
+      isStreamCurrentlyLive = true;
+      liveStats.liveViewers = channelData.livestream.viewer_count || 0;
+      if (liveStats.liveViewers > liveStats.peakViewers) {
+        liveStats.peakViewers = liveStats.liveViewers;
       }
-      if (channelData.id) {
-        channelId = channelData.id;
-      }
 
-      if (channelData.livestream && channelData.livestream.is_live) {
-        liveStats.liveViewers = channelData.livestream.viewer_count || 0;
-        if (liveStats.liveViewers > liveStats.peakViewers) {
-          liveStats.peakViewers = liveStats.liveViewers;
-        }
-
-        if (!liveStats.viewerSamples) liveStats.viewerSamples = [];
-        if (liveStats.liveViewers > 0) {
-          liveStats.viewerSamples.push(liveStats.liveViewers);
-          if (liveStats.viewerSamples.length > 60) liveStats.viewerSamples.shift();
-          const sum = liveStats.viewerSamples.reduce((a, b) => a + b, 0);
-          liveStats.avgViewers = Math.round(sum / liveStats.viewerSamples.length);
-        } else {
-          liveStats.avgViewers = liveStats.liveViewers;
-        }
-
-        // Stream start time
-        if (channelData.livestream.created_at) {
-          streamStartTime = new Date(channelData.livestream.created_at).getTime();
-        }
-
-        currentStreamTitle = channelData.livestream.session_title || '';
-
-        // Kalibracija demografije iz naslova, kategorije ili zemlje
-        const titleLower = (currentStreamTitle || '').toLowerCase();
-        if (/[čćšđž]|(\b(dobro|jutro|vece|dan|igra|balkan|srb|cro|bih|brate|idemo)\b)/i.test(titleLower) || channelData.country === 'RS' || channelData.country === 'BA' || channelData.country === 'HR') {
-          balkanChatScore += 4;
-          detectedGeoRegion = 'Balkan / Ex-YU (Tier 2)';
-          geoMultiplierValue = 0.95;
-        }
-
-        updateStreamStatusUI(true, channelData.livestream.session_title, channelData.livestream.categories?.[0]?.name || 'Gaming');
+      if (!liveStats.viewerSamples) liveStats.viewerSamples = [];
+      if (liveStats.liveViewers > 0) {
+        liveStats.viewerSamples.push(liveStats.liveViewers);
+        if (liveStats.viewerSamples.length > VIEWER_SAMPLES_CAP) liveStats.viewerSamples.shift();
+        const sum = liveStats.viewerSamples.reduce((a, b) => a + b, 0);
+        liveStats.avgViewers = Math.round(sum / liveStats.viewerSamples.length);
       } else {
-        liveStats.liveViewers = 0;
-        liveStats.avgViewers = 0;
-        liveStats.viewerSamples = [];
-        streamStartTime = null;
-        currentStreamTitle = '';
-        detectedGeoRegion = 'Offline (Čeka se lajv)';
-        geoMultiplierValue = 1.00;
-        updateStreamStatusUI(false, 'Nema aktivnog strima', 'Offline');
+        liveStats.avgViewers = liveStats.liveViewers;
       }
 
-      if (channelData.followers_count !== undefined) {
-        liveStats.followersCount = channelData.followers_count;
+      if (channelData.livestream.created_at) {
+        streamStartTime = new Date(channelData.livestream.created_at).getTime();
+      }
+      currentStreamTitle = channelData.livestream.session_title || '';
+
+      updateStreamStatusUI(true, currentStreamTitle, channelData.livestream.categories?.[0]?.name || 'Gaming');
+
+      if (liveStats.totalMessages > 0 || liveStats.peakViewers > 0) {
+        debouncedSaveSessionStats(slug);
+      }
+    } else {
+      // Strim je sigurno OFFLINE
+      if (isStreamCurrentlyLive) {
+        isStreamCurrentlyLive = false;
+        fetchPastStreams().catch(() => {});
       }
 
-      // Update Channel Overview Card
-      const nameEl = document.getElementById('telemetryChannelName');
-      const slugEl = document.getElementById('telemetryKickSlug');
-      const linkEl = document.getElementById('telemetryKickLink');
-      const avatarEl = document.getElementById('telemetryAvatar');
-
-      if (nameEl) nameEl.textContent = channelData.user?.username || slug;
-      if (slugEl) slugEl.textContent = slug;
-      if (linkEl) linkEl.href = `https://kick.com/${slug}`;
-
-      if (avatarEl && channelData.user?.profile_pic && /^https?:\/\//i.test(channelData.user.profile_pic)) {
-        const safePic = encodeURI(channelData.user.profile_pic).replace(/["'()<>]/g, '');
-        avatarEl.style.backgroundImage = `url("${safePic}")`;
-        avatarEl.style.backgroundSize = 'cover';
-        avatarEl.textContent = '';
-      }
+      liveStats.liveViewers = 0;
+      liveStats.avgViewers = 0;
+      liveStats.viewerSamples = [];
+      streamStartTime = null;
+      currentStreamTitle = '';
+      detectedGeoRegion = 'Offline (Čeka se lajv)';
+      geoMultiplierValue = 1.00;
+      updateStreamStatusUI(false, 'Nema aktivnog strima', 'Offline');
     }
 
     updateDashboardUI();
   }
 
   function updateStreamStatusUI(isLive, title, category) {
-    const liveBadge = document.getElementById('streamLiveBadge');
+    const channelDot = document.getElementById('channelDot');
     const statusText = document.getElementById('streamStatusText');
     const uptimeText = document.getElementById('streamUptimeText');
     const titleDisplay = document.getElementById('streamTitleDisplay');
     const catDisplay = document.getElementById('streamCategoryDisplay');
     const studioStatus = document.getElementById('studioStreamStatus');
+    const liveBadge = document.getElementById('telemetryLiveBadge');
+    const liveStatusText = document.getElementById('telemetryLiveStatusText');
+
+    if (isLive === 'loading') {
+      if (channelDot) channelDot.classList.remove('is-live');
+      if (liveBadge) liveBadge.classList.remove('is-live');
+      if (liveStatusText) liveStatusText.textContent = 'Učitavanje...';
+      if (statusText) statusText.textContent = 'Učitavanje...';
+      if (uptimeText) uptimeText.style.display = 'none';
+      if (studioStatus) studioStatus.textContent = 'Učitavanje...';
+      if (titleDisplay) titleDisplay.textContent = 'Učitavanje...';
+      if (catDisplay) catDisplay.textContent = 'Kategorija: Učitavanje...';
+      return;
+    }
 
     if (titleDisplay) titleDisplay.textContent = title || 'Nema naslova';
     if (catDisplay) catDisplay.textContent = `Kategorija: ${category || 'Razno'}`;
 
-    if (isLive) {
-      if (liveBadge) liveBadge.classList.add('live');
+    if (isLive === true) {
+      if (channelDot) channelDot.classList.add('is-live');
+      if (liveBadge) liveBadge.classList.add('is-live');
+      if (liveStatusText) liveStatusText.textContent = 'LIVE';
       if (statusText) statusText.textContent = 'LIVE';
       if (uptimeText) uptimeText.style.display = 'inline-block';
       if (studioStatus) studioStatus.textContent = 'LIVE';
@@ -729,8 +862,10 @@
         uptimeInterval = setInterval(updateUptimeClock, 1000);
       }
     } else {
-      if (liveBadge) liveBadge.classList.remove('live');
-      if (statusText) statusText.textContent = 'Offline';
+      if (channelDot) channelDot.classList.remove('is-live');
+      if (liveBadge) liveBadge.classList.remove('is-live');
+      if (liveStatusText) liveStatusText.textContent = 'OFFLINE';
+      if (statusText) statusText.textContent = 'OFFLINE';
       if (uptimeText) uptimeText.style.display = 'none';
       if (studioStatus) studioStatus.textContent = 'OFFLINE';
 
@@ -781,15 +916,19 @@
 
     const pusherUrl = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false';
 
+    // Reconnect state — reset pri svakom svesnom pozivu connectToRealKickChat
+    if (!connectToRealKickChat._retryCount) connectToRealKickChat._retryCount = 0;
+
     try {
       kickWebSocket = new WebSocket(pusherUrl);
     } catch (err) {
-      console.warn('WebSocket init greška:', err);
+      console.warn('[Kickan] WebSocket init greška:', err);
       return;
     }
 
     kickWebSocket.onopen = () => {
-      console.log(`Kickan Realtime Connected: chatroom ${chatroomId}`);
+      connectToRealKickChat._retryCount = 0; // Reset po uspešnom spajanju
+      console.info(`[Kickan] Realtime Connected: chatroom ${chatroomId}`);
 
       kickWebSocket.send(JSON.stringify({
         event: 'pusher:subscribe',
@@ -806,21 +945,38 @@
         if (kickWebSocket?.readyState === WebSocket.OPEN) {
           kickWebSocket.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
         }
-      }, 25000);
+      }, WS_PING_INTERVAL_MS);
     };
 
     kickWebSocket.onclose = () => {
       if (pingInterval) clearInterval(pingInterval);
+      if (!channelName || !isTrackingActive) return;
+
+      const retries = connectToRealKickChat._retryCount || 0;
+      if (retries >= WS_RECONNECT_MAX_RETRIES) {
+        console.warn(`[Kickan] WebSocket — dostignut maksimalan broj pokušaja (${WS_RECONNECT_MAX_RETRIES}). Reconnect zaustavljen.`);
+        return;
+      }
+      // Exponential backoff: 5s, 10s, 20s, 40s... max ~80s
+      const delay = Math.min(WS_RECONNECT_BASE_MS * Math.pow(2, retries), 80000);
+      connectToRealKickChat._retryCount = retries + 1;
       setTimeout(() => {
         if (channelName && isTrackingActive) connectToRealKickChat();
-      }, 5000);
+      }, delay);
     };
 
     kickWebSocket.onmessage = (event) => {
       if (!isTrackingActive) return;
 
+      let msgData;
       try {
-        const msgData = JSON.parse(event.data);
+        msgData = JSON.parse(event.data);
+      } catch (parseErr) {
+        console.warn('[Kickan] WS parse greška:', parseErr);
+        return;
+      }
+
+      try {
         const evName = msgData.event || '';
 
         if (evName.includes('ChatMessageEvent') || evName.includes('ChatMessageSentEvent')) {
@@ -847,7 +1003,9 @@
           addRecentEventMessage('Kicks Donacija', `${payload?.sender?.username || 'Gledalac'} je donirao ${amount} Kicks!`);
           throttledUpdateUI();
         }
-      } catch (err) {}
+      } catch (err) {
+        console.warn('[Kickan] WS event obrada greška:', err);
+      }
     };
   }
 
@@ -960,7 +1118,7 @@
       isMod: isMod,
       isEvent: false
     });
-    if (liveStats.recentChatMessages.length > 40) liveStats.recentChatMessages.pop();
+    if (liveStats.recentChatMessages.length > CHAT_FEED_MAX_MSGS) liveStats.recentChatMessages.pop();
 
     throttledUpdateUI();
   }
@@ -978,7 +1136,7 @@
       type: actionType,
       time: new Date().toLocaleTimeString('sr-RS', { hour: '2-digit', minute: '2-digit' })
     });
-    if (liveStats.banLogs.length > 30) liveStats.banLogs.pop();
+    if (liveStats.banLogs.length > BAN_LOGS_MAX) liveStats.banLogs.pop();
 
     throttledUpdateUI();
   }
@@ -993,7 +1151,7 @@
       isMod: false,
       isEvent: true
     });
-    if (liveStats.recentChatMessages.length > 40) liveStats.recentChatMessages.pop();
+    if (liveStats.recentChatMessages.length > CHAT_FEED_MAX_MSGS) liveStats.recentChatMessages.pop();
   }
 
   /* ════════════════════════════════════════
@@ -1003,7 +1161,7 @@
     if (velocityInterval) clearInterval(velocityInterval);
     velocityInterval = setInterval(() => {
       const now = Date.now();
-      const cutoff = now - 60000;
+      const cutoff = now - VELOCITY_WINDOW_MS;
       rollingMessageTimes = rollingMessageTimes.filter(t => t >= cutoff);
       currentVelocity = rollingMessageTimes.length;
 
@@ -1034,7 +1192,7 @@
       uiUpdateTimer = setTimeout(() => {
         updateDashboardUI();
         uiUpdateTimer = null;
-      }, 400);
+      }, UI_THROTTLE_MS);
     }
   }
 
@@ -1252,8 +1410,6 @@
     setText('kcipSubsCountVal', `${(liveStats.activeSubs || 0)} Subs (${formattedSubs})`);
     setText('kcipKicksCountVal', `${(liveStats.totalKicks || 0)} Kicks (${formattedKicks})`);
     setText('mbKcipHourlyEst', formattedKcip);
-
-    // Legacy hidden spans
     setText('mbSubsEst', formattedSubs);
     setText('mbKicksEst', formattedKicks);
 
@@ -1295,7 +1451,7 @@
     renderChattersLeaderboard();
     renderBanHistoryTable();
 
-    if (channelName) saveSessionStats(channelName);
+    if (channelName) debouncedSaveSessionStats(channelName);
   }
 
   function setText(id, val) {
@@ -1314,13 +1470,14 @@
     let maxHourCount = 0;
     let html = '';
 
+    // maxVal izračunat jednom gore — ne ponavljamo Math.max unutar petlje
     liveStats.hourlyCounts.forEach((val, hour) => {
       if (val > maxHourCount) {
         maxHourCount = val;
         peakHour = hour;
       }
       const pct = Math.round((val / maxVal) * 100);
-      const isPeak = val > 0 && val === Math.max(...liveStats.hourlyCounts);
+      const isPeak = val > 0 && val === maxVal;
       const hourStr = hour < 10 ? `0${hour}h` : `${hour}h`;
 
       html += `
@@ -1338,9 +1495,11 @@
     if (peakLabel) {
       if (maxHourCount > 0) {
         const nextHour = (peakHour + 1) % 24;
-        peakLabel.textContent = `Peak period: ${pad(peakHour)}:00 - ${pad(nextHour)}:00 (${maxHourCount} msgs)`;
+        peakLabel.textContent = `Peak: ${pad(peakHour)}:00 - ${pad(nextHour)}:00 (${maxHourCount} msgs)`;
+        peakLabel.style.display = 'inline-block';
       } else {
-        peakLabel.textContent = 'Čeka se aktivnost chata...';
+        peakLabel.textContent = '';
+        peakLabel.style.display = 'none';
       }
     }
   }
@@ -1351,12 +1510,19 @@
     const studioContainer = document.getElementById('studioPopularEmotesContainer');
     const totalLabel = document.getElementById('emotesTotalLabel');
 
-    if (totalLabel) totalLabel.textContent = `Ukupno: ${liveStats.totalEmotes.toLocaleString()} emotea`;
+    if (totalLabel) {
+      if (liveStats.totalEmotes > 0) {
+        totalLabel.textContent = `Ukupno: ${liveStats.totalEmotes.toLocaleString()} emotea`;
+        totalLabel.style.display = 'inline-block';
+      } else {
+        totalLabel.textContent = '';
+        totalLabel.style.display = 'none';
+      }
+    }
 
     if (liveStats.emotesMap.size === 0) {
-      const emptyHtml = `<div class="empty-list-notice">Emoti će se pojaviti ovde kada ih gledaoci iskoriste u chatu.</div>`;
-      if (container) container.innerHTML = emptyHtml;
-      if (studioContainer) studioContainer.innerHTML = emptyHtml;
+      if (container) container.innerHTML = '';
+      if (studioContainer) studioContainer.innerHTML = '';
       return;
     }
 
@@ -1444,8 +1610,8 @@
     const tbody = document.getElementById('tableMostActiveViewers');
     if (!tbody) return;
 
-    if (liveStats.viewersActivityMap.size === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="table-empty-state">Učitavamo prve chat poruke sa kanala uživo...</td></tr>`;
+    if (!liveStats.viewersActivityMap || liveStats.viewersActivityMap.size === 0) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="5" class="table-empty-state">Nema aktivnih gledalaca</td></tr>`;
       return;
     }
 
@@ -1458,8 +1624,13 @@
       sorted = sorted.filter(item => item.user.toLowerCase().includes(searchQuery));
     }
 
-    const minThreshold = parseInt(document.getElementById('inputMinMsgThreshold')?.value || '1', 10);
+    const minThreshold = parseInt(document.getElementById('inputMinMsgThreshold')?.value || '50', 10);
     sorted = sorted.filter(item => item.count >= minThreshold);
+
+    if (sorted.length === 0) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="5" class="table-empty-state">Nema aktivnih gledalaca</td></tr>`;
+      return;
+    }
 
     const totalMsgs = Math.max(liveStats.totalMessages, 1);
     let html = '';
@@ -1489,7 +1660,7 @@
       `;
     });
 
-    tbody.innerHTML = html || `<tr><td colspan="5" class="table-empty-state">Nema rezultata za pretragu.</td></tr>`;
+    tbody.innerHTML = html;
   }
 
   window.filterChattersTable = function () {
@@ -1501,8 +1672,8 @@
     const tbody = document.getElementById('tableBanHistory');
     if (!tbody) return;
 
-    if (liveStats.banLogs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" class="table-empty-state">Nema nedavnih zabranjenih poruka ili banova.</td></tr>`;
+    if (!liveStats.banLogs || liveStats.banLogs.length === 0) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="4" class="table-empty-state">Nema zabeleženih akcija</td></tr>`;
       return;
     }
 
@@ -1511,6 +1682,11 @@
 
     if (searchQuery) {
       logs = logs.filter(b => b.user.toLowerCase().includes(searchQuery) || b.mod.toLowerCase().includes(searchQuery) || b.reason.toLowerCase().includes(searchQuery));
+    }
+
+    if (logs.length === 0) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="4" class="table-empty-state">Nema zabeleženih akcija</td></tr>`;
+      return;
     }
 
     let html = '';
@@ -1532,7 +1708,7 @@
       `;
     });
 
-    tbody.innerHTML = html || `<tr><td colspan="4" class="table-empty-state">Nema rezultata za pretragu.</td></tr>`;
+    tbody.innerHTML = html;
   }
 
   window.filterBansTable = function () {
@@ -1611,12 +1787,29 @@
     }
   };
 
+  function updateMuteIcon() {
+    const icon = document.getElementById('muteIcon');
+    if (!icon) return;
+    if (!isMuted) {
+      icon.innerHTML = `
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>`;
+      icon.style.opacity = '1';
+    } else {
+      icon.innerHTML = `
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <line x1="23" y1="9" x2="17" y2="15"/>
+        <line x1="17" y1="9" x2="23" y2="15"/>`;
+      icon.style.opacity = '0.7';
+    }
+  }
+
   window.toggleMute = function () {
     isMuted = !isMuted;
-    const icon = document.getElementById('muteIcon');
-    if (icon) {
-      icon.style.opacity = isMuted ? '0.4' : '1';
-    }
+    const btn = document.getElementById('btnMuteSound');
+    if (btn) btn.classList.toggle('is-muted', isMuted);
+    updateMuteIcon();
     if (window.showToast) {
       window.showToast(isMuted ? 'Zvukovi isključeni' : 'Zvukovi uključeni', 'info');
     }
@@ -1833,48 +2026,45 @@
   };
 
   window.refreshDatabase = async function () {
-    const btn = document.getElementById('btnRefreshDb');
-    const originalHtml = btn ? btn.innerHTML : '';
-
-    if (btn) {
-      btn.classList.remove('is-success');
-      btn.classList.add('is-refreshing');
-      btn.disabled = true;
-      btn.innerHTML = `
-        <svg class="refresh-spin-svg" fill="none" height="16" stroke="var(--an-cyan)" stroke-width="2.5" viewBox="0 0 24 24" width="16">
-          <polyline points="23 4 23 10 17 10"></polyline>
-          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-        </svg>
-      `;
-    }
-
+    const btnEl = document.querySelector('.topbar-refresh-btn');
+    const svgEl = btnEl ? btnEl.querySelector('svg') : null;
+    if (svgEl) svgEl.style.animation = 'spin 1s linear infinite';
     try {
-      await Promise.all([loadRealKickChannelData(channelName), loadNotifications(), loadChangelogs()]);
-    } catch (e) {
-      console.warn('[Kickan] Greška pri osvežavanju:', e);
-    }
-
-    if (btn) {
-      btn.classList.remove('is-refreshing');
-      btn.classList.add('is-success');
-      btn.innerHTML = `
-        <svg class="check-bounce-svg" fill="none" height="18" stroke="#53fc18" stroke-width="3" viewBox="0 0 24 24" width="18">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      `;
-    }
-
-    if (window.showToast) {
-      window.showToast('Telemetrija i podaci uspešno osveženi.', 'success');
-    }
-
-    setTimeout(() => {
-      if (btn) {
-        btn.classList.remove('is-success');
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
+      await Promise.all([
+        loadRealKickChannelData(channelName),
+        loadSavedSessionStats(channelName),
+        loadNotifications(),
+        loadChangelogs()
+      ]);
+      if (window.showToast) {
+        window.showToast('Podaci uspešno sinhronizovani iz baze.', 'success');
       }
-    }, 1400);
+
+      if (btnEl) {
+        if (svgEl) svgEl.style.animation = '';
+        btnEl.classList.add('is-success');
+        btnEl.innerHTML = `
+          <svg fill="none" height="16" stroke="#53fc18" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24" width="16">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        `;
+        setTimeout(() => {
+          btnEl.classList.remove('is-success');
+          btnEl.innerHTML = `
+            <svg class="refresh-icon" fill="none" height="16" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" width="16">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          `;
+        }, 1800);
+      }
+    } catch (err) {
+      console.warn('[Kickan] Greška pri osvežavanju:', err);
+      if (window.showToast) {
+        window.showToast('Greška pri osvežavanju podataka.', 'error');
+      }
+      if (svgEl) svgEl.style.animation = '';
+    }
   };
 
   /* ════════════════════════════════════════
@@ -1901,39 +2091,65 @@
   };
 
   /* ════════════════════════════════════════
-     MODALS & EXPORT
+     MODALS & EXPORT (Accessible Focus Trap & Aria-Hidden)
   ════════════════════════════════════════ */
+  let activeModalStack = [];
+  const modalTriggerElements = new Map();
+
+  function getFocusableElements(container) {
+    if (!container) return [];
+    return Array.from(container.querySelectorAll(
+      'button:not([disabled]):not([tabindex="-1"]), [href]:not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])'
+    ));
+  }
+
   window.openModal = function (id) {
     const m = document.getElementById(id);
-    if (m) m.classList.add('open');
+    if (!m) return;
+    if (document.activeElement && !m.contains(document.activeElement)) {
+      modalTriggerElements.set(id, document.activeElement);
+    }
+    m.classList.add('open');
+    m.setAttribute('aria-hidden', 'false');
+    const appEl = document.getElementById('app');
+    if (appEl) appEl.setAttribute('aria-hidden', 'true');
+
+    if (!activeModalStack.includes(id)) {
+      activeModalStack.push(id);
+    }
+
+    setTimeout(() => {
+      const focusable = getFocusableElements(m);
+      if (focusable.length > 0) {
+        focusable[0].focus();
+      }
+    }, 40);
   };
 
   window.closeModal = function (id) {
     const m = document.getElementById(id);
-    if (m) m.classList.remove('open');
+    if (m) {
+      m.classList.remove('open');
+      m.setAttribute('aria-hidden', 'true');
+    }
+    activeModalStack = activeModalStack.filter(item => item !== id);
+    if (activeModalStack.length === 0) {
+      const appEl = document.getElementById('app');
+      if (appEl) appEl.removeAttribute('aria-hidden');
+    }
+
+    const triggerEl = modalTriggerElements.get(id);
+    if (triggerEl && typeof triggerEl.focus === 'function') {
+      try { triggerEl.focus(); } catch (_) {}
+      modalTriggerElements.delete(id);
+    }
   };
 
   window.handleModalBg = function (e, id) {
     if (e.target.id === id) window.closeModal(id);
   };
 
-  window.openCustomChannelModal = function (e) {
-    if (e) e.stopPropagation();
-    document.getElementById('channelDropdownMenu')?.classList.remove('open');
-    window.openModal('customChannelModal');
-  };
 
-  window.saveCustomChannel = function () {
-    const input = document.getElementById('customChannelInput');
-    const val = cleanUsername(input?.value);
-    if (!val) {
-      if (window.showToast) window.showToast('Unesite ispravno Kick korisničko ime.', 'error');
-      return;
-    }
-    window.closeModal('customChannelModal');
-    if (input) input.value = '';
-    window.selectChannel(val, null, null, 'custom', userPlan);
-  };
 
   window.openExportModal = function () {
     window.openModal('exportReportModal');
@@ -1944,9 +2160,6 @@
   };
 
   window.confirmResetStats = function () {
-    if ((liveStats.totalMessages > 0 || liveStats.peakViewers > 0) && channelName) {
-      saveLiveStreamToDatabase(false).catch(() => {});
-    }
     currentSessionDbId = null;
 
     liveStats.totalMessages = 0;
@@ -2092,8 +2305,11 @@ Generisano u Kickan Studio.`;
           if (dbSession.started_at) {
             streamStartTime = new Date(dbSession.started_at).getTime();
           }
-          if (dbSession.stream_title) {
-            currentStreamTitle = dbSession.stream_title;
+          if (dbSession.chatroom_id) {
+            chatroomId = parseInt(dbSession.chatroom_id, 10);
+          }
+          if (dbSession.channel_id) {
+            channelId = dbSession.channel_id;
           }
           liveStats.totalMessages = dbSession.total_messages || 0;
           liveStats.totalEmotes = dbSession.total_emotes || 0;
@@ -2131,8 +2347,10 @@ Generisano u Kickan Studio.`;
           }
 
           updateDashboardUI();
-          renderTopLists();
-          renderBanLogs();
+          renderChattersLeaderboard();
+          renderBanHistoryTable();
+          renderPopularEmotes();
+          renderHourlyBarChart();
           return;
         }
       } catch (dbErr) {
@@ -2173,9 +2391,22 @@ Generisano u Kickan Studio.`;
     } catch (_) {}
   }
 
+  let saveSessionTimeout = null;
+  function debouncedSaveSessionStats(slug) {
+    if (!slug) return;
+    if (saveSessionTimeout) return;
+    saveSessionTimeout = setTimeout(() => {
+      saveSessionTimeout = null;
+      saveSessionStats(slug);
+    }, 10000);
+  }
+
   function saveSessionStats(slug) {
     if (!slug) return;
     try {
+      if (liveStats.viewerSamples && liveStats.viewerSamples.length > 500) {
+        liveStats.viewerSamples = liveStats.viewerSamples.slice(-500);
+      }
       const payload = {
         totalMessages: liveStats.totalMessages,
         totalEmotes: liveStats.totalEmotes,
@@ -2223,14 +2454,17 @@ Generisano u Kickan Studio.`;
   async function fetchPastStreams() {
     if (!sb || !currentUser) return;
     try {
-      let query = sb.from('kickan').select('*').eq('user_id', currentUser.id);
+      let query = sb.from('kickan').select('*');
       if (channelName) {
-        query = query.eq('channel_name', channelName);
+        query = query.ilike('channel_name', channelName);
+      } else {
+        query = query.eq('user_id', currentUser.id);
       }
       const { data, error } = await query.order('started_at', { ascending: false }).limit(50);
       if (!error && Array.isArray(data)) {
         pastStreamsList = data;
         updatePastStreamsBadges();
+        renderPastStreamsCarousel();
         renderPastStreamsTable();
       }
     } catch (err) {
@@ -2243,10 +2477,12 @@ Generisano u Kickan Studio.`;
     const sidebarCountEl = document.getElementById('sidebarPastStreamsCount');
     const topbarBadgeEl = document.getElementById('pastStreamsCountBadge');
     const modalCountEl = document.getElementById('pastStreamsModalCount');
+    const carouselBadgeEl = document.getElementById('carouselStreamsCountBadge');
     const filterChannelEl = document.getElementById('pastStreamsFilterChannelName');
 
     if (sidebarCountEl) sidebarCountEl.textContent = count;
     if (modalCountEl) modalCountEl.textContent = `${count} ${count === 1 ? 'lajv' : 'lajvova'}`;
+    if (carouselBadgeEl) carouselBadgeEl.textContent = `${count} ${count === 1 ? 'snimak' : 'snimaka'}`;
     if (filterChannelEl) filterChannelEl.textContent = channelName || 'Svi';
 
     if (topbarBadgeEl) {
@@ -2254,6 +2490,53 @@ Generisano u Kickan Studio.`;
       topbarBadgeEl.style.display = count > 0 ? 'inline-flex' : 'none';
     }
   }
+
+  function renderPastStreamsCarousel() {
+    const track = document.getElementById('pastStreamsCarouselTrack');
+    if (!track) return;
+
+    if (!pastStreamsList || pastStreamsList.length === 0) {
+      track.innerHTML = `
+        <div class="psc-empty">
+          Nema sačuvanih lajvova u arhivi za kanal <strong>@${escapeHtml(channelName || 'Kick')}</strong>. 
+          Sesije se automatski arhiviraju nakon svakog završenog strima.
+        </div>
+      `;
+      return;
+    }
+
+    let cardsHtml = '';
+    pastStreamsList.forEach(s => {
+      const dateStr = formatDateTime(s.started_at);
+      const title = s.stream_title || 'Kick Live Stream';
+      const durationStr = formatDuration(s.duration_seconds);
+      const peakViewers = s.peak_viewers || 0;
+      const msgs = s.total_messages || 0;
+
+      cardsHtml += `
+        <div class="psc-card" onclick="window.viewPastStreamDetail('${escapeHtml(String(s.id))}')" title="Kliknite za kompletan izveštaj">
+          <div class="psc-card-top">
+            <span class="psc-card-date">${escapeHtml(dateStr)}</span>
+            <span class="psc-card-duration">${escapeHtml(durationStr)}</span>
+          </div>
+          <div class="psc-card-title">${escapeHtml(title)}</div>
+          <div class="psc-card-metrics">
+            <span>Peak: <strong style="color:var(--an-green);">${peakViewers.toLocaleString()}</strong></span>
+            <span>Poruke: <strong>${msgs.toLocaleString()}</strong></span>
+          </div>
+        </div>
+      `;
+    });
+
+    track.innerHTML = cardsHtml;
+  }
+
+  window.scrollStreamsCarousel = function (direction) {
+    const track = document.getElementById('pastStreamsCarouselTrack');
+    if (!track) return;
+    const scrollAmount = 280 * direction;
+    track.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  };
 
   function renderPastStreamsTable(searchTerm = '') {
     const tbody = document.getElementById('pastStreamsTableBody');
@@ -2273,7 +2556,7 @@ Generisano u Kickan Studio.`;
       tbody.innerHTML = `
         <tr>
           <td colspan="8" class="table-empty-state">
-            ${searchTerm ? 'Nema pronađenih lajvova za zadati pojam pretrage.' : 'Nema sačuvanih lajvova u arhivi. Pokrenite praćenje i kliknite na "Sačuvaj trenutni lajv".'}
+            ${searchTerm ? 'Nema pronađenih lajvova za zadati pojam pretrage.' : 'Nema sačuvanih lajvova u arhivi. Sesije se automatski prate i arhiviraju 24/7 po završetku svakog strima.'}
           </td>
         </tr>
       `;
@@ -2398,8 +2681,14 @@ Generisano u Kickan Studio.`;
         savedAt: now.toISOString()
       };
 
+      const realAvgViewers = (liveStats.avgViewers && liveStats.avgViewers > 0)
+        ? liveStats.avgViewers
+        : (liveStats.peakViewers || 0);
+
+      const targetUserId = activeChannelObj?.owner_id || currentUser.id;
+
       const payload = {
-        user_id: currentUser.id,
+        user_id: targetUserId,
         channel_name: channelName || 'Kick Kanal',
         channel_id: channelId ? String(channelId) : null,
         chatroom_id: chatroomId ? parseInt(chatroomId, 10) : null,
@@ -2408,7 +2697,7 @@ Generisano u Kickan Studio.`;
         ended_at: now.toISOString(),
         duration_seconds: durationSec,
         peak_viewers: liveStats.peakViewers || 0,
-        avg_viewers: liveStats.peakViewers > 0 ? Math.round(liveStats.peakViewers * 0.75) : 0,
+        avg_viewers: realAvgViewers,
         total_messages: liveStats.totalMessages || 0,
         total_emotes: liveStats.totalEmotes || 0,
         unique_chatters: liveStats.uniqueChattersMap.size || 0,
@@ -2421,10 +2710,13 @@ Generisano u Kickan Studio.`;
       if (currentSessionDbId) {
         const { error } = await sb.from('kickan').update(payload).eq('id', currentSessionDbId);
         if (error) throw error;
-      } else {
+      } else if (activeChannelObj?.role !== 'managed' || activeChannelObj?.owner_id === currentUser.id) {
+        // Samo vlasnik kanala može kreirati novi zapis kroz frontend klijent; menadžeri se oslanjaju na 24/7 server bot
         const { data, error } = await sb.from('kickan').insert([payload]).select('id').maybeSingle();
         if (error) throw error;
         if (data?.id) currentSessionDbId = data.id;
+      } else {
+        console.info('[Kickan] Kanonski zapis za ovaj kanal kreira 24/7 server bot; klijent menadžera čita ažurno stanje.');
       }
 
       await fetchPastStreams();
@@ -2442,30 +2734,38 @@ Generisano u Kickan Studio.`;
     }
   }
 
-  async function deletePastStream(streamId) {
-    if (!streamId || !sb) return;
-    const confirmDelete = window.confirm('Da li ste sigurni da želite da obrišete ovaj lajv iz arhive?');
-    if (!confirmDelete) return;
+  function deletePastStream(streamId) {
+    if (!streamId || !sb || !currentUser) return;
+    const stream = pastStreamsList.find(s => s.id === streamId);
+    const title = stream ? (stream.stream_title || 'Kick Live Stream') : 'ovaj lajv';
+    const dateStr = stream ? formatDateTime(stream.started_at) : '';
 
-    try {
-      const { error } = await sb.from('kickan').delete().eq('id', streamId);
-      if (error) throw error;
-
-      pastStreamsList = pastStreamsList.filter(s => s.id !== streamId);
-      if (currentSessionDbId === streamId) currentSessionDbId = null;
-
-      updatePastStreamsBadges();
-      renderPastStreamsTable();
-
-      if (window.showToast) {
-        window.showToast('Zapis lajva uspešno obrisan iz arhive.', 'info');
-      }
-    } catch (err) {
-      console.error('deletePastStream error:', err);
-      if (window.showToast) {
-        window.showToast('Greška pri brisanju zapisa: ' + err.message, 'error');
-      }
+    const descEl = document.getElementById('deleteConfirmDesc');
+    if (descEl) {
+      descEl.textContent = `"${title}"${dateStr ? ' (' + dateStr + ')' : ''} — zapis ce biti trajno uklonjen iz arhive. Ova akcija se ne moze ponistiti.`;
     }
+
+    const btn = document.getElementById('deleteConfirmBtn');
+    if (btn) {
+      btn.onclick = async () => {
+        window.closeModal('deleteStreamConfirmModal');
+        try {
+          const { error } = await sb.from('kickan').delete().eq('id', streamId);
+          if (error) throw error;
+          pastStreamsList = pastStreamsList.filter(s => s.id !== streamId);
+          if (currentSessionDbId === streamId) currentSessionDbId = null;
+          updatePastStreamsBadges();
+          renderPastStreamsCarousel();
+          renderPastStreamsTable();
+          if (window.showToast) window.showToast('Zapis lajva uspešno obrisan iz arhive.', 'info');
+        } catch (err) {
+          console.error('deletePastStream error:', err);
+          if (window.showToast) window.showToast('Greška pri brisanju zapisa: ' + err.message, 'error');
+        }
+      };
+    }
+
+    window.openModal('deleteStreamConfirmModal');
   }
 
   function viewPastStreamDetail(streamId) {
@@ -2474,137 +2774,178 @@ Generisano u Kickan Studio.`;
 
     const container = document.getElementById('pastStreamDetailContent');
     const titleEl = document.getElementById('pastStreamDetailTitle');
+    const channelEl = document.getElementById('pastStreamDetailChannel');
     if (!container) return;
 
     const dateStr = formatDateTime(stream.started_at);
+    const dateEndStr = stream.ended_at ? formatDateTime(stream.ended_at) : 'Aktivno';
     const durationStr = formatDuration(stream.duration_seconds);
     const summary = stream.summary || {};
     const topChatters = summary.topChatters || [];
     const topEmotes = summary.topEmotes || [];
     const banLogs = summary.banLogs || [];
+    const hourlyCounts = summary.hourlyCounts || [];
 
-    if (titleEl) {
-      titleEl.textContent = `Lajv: ${stream.channel_name} (${dateStr})`;
+    if (titleEl) titleEl.textContent = stream.stream_title || 'Kick Live Stream';
+    if (channelEl) channelEl.textContent = '@' + (stream.channel_name || 'kanal');
+
+    // Wire up export buttons
+    const csvBtn = document.getElementById('psdExportCsvBtn');
+    const jsonBtn = document.getElementById('psdExportJsonBtn');
+    if (csvBtn) csvBtn.onclick = () => window.exportPastStream(streamId, 'csv');
+    if (jsonBtn) jsonBtn.onclick = () => window.exportPastStream(streamId, 'json');
+
+    // Hourly chart mini
+    let hourlyHtml = '';
+    if (hourlyCounts.length === 24) {
+      const maxH = Math.max(...hourlyCounts, 1);
+      hourlyHtml = hourlyCounts.map((v, h) => {
+        const pct = Math.round((v / maxH) * 100);
+        return `<div class="psd-hour-bar" title="${h}:00 — ${v} msg" style="--psd-bar-h:${pct}%"><span class="psd-hour-label">${h}</span></div>`;
+      }).join('');
     }
 
+    // Top chatters
     let chattersHtml = '';
     if (topChatters.length > 0) {
-      topChatters.slice(0, 10).forEach((c, i) => {
-        chattersHtml += `
-          <div class="ps-mini-item">
-            <span><strong>#${i + 1}</strong> @${escapeHtml(c.user)} ${c.isSub ? '<span style="color:var(--an-cyan); font-size:0.7rem; font-weight:700;">SUB</span>' : ''}</span>
-            <span style="font-family:'JetBrains Mono',monospace; font-weight:700;">${(c.count || 0).toLocaleString()} msg</span>
-          </div>
-        `;
-      });
+      chattersHtml = topChatters.slice(0, 10).map((c, i) => {
+        const badges = [
+          c.isSub ? '<span class="psd-badge psd-badge-sub">SUB</span>' : '',
+          c.isMod ? '<span class="psd-badge psd-badge-mod">MOD</span>' : '',
+          c.isVip ? '<span class="psd-badge psd-badge-vip">VIP</span>' : ''
+        ].join('');
+        const rankClass = i === 0 ? 'psd-rank-gold' : i === 1 ? 'psd-rank-silver' : i === 2 ? 'psd-rank-bronze' : '';
+        return `
+          <div class="psd-leaderboard-row">
+            <span class="psd-rank ${rankClass}">#${i + 1}</span>
+            <span class="psd-leaderboard-name">@${escapeHtml(c.user)}${badges}</span>
+            <span class="psd-leaderboard-val">${(c.count || 0).toLocaleString()} msg</span>
+          </div>`;
+      }).join('');
     } else {
-      chattersHtml = '<div style="color:var(--an-muted); font-size:0.8rem; padding:8px 0;">Nema podataka o gledaocima.</div>';
+      chattersHtml = '<div class="psd-empty-notice">Nema podataka o gledaocima.</div>';
     }
 
+    // Top emotes
     let emotesHtml = '';
     if (topEmotes.length > 0) {
-      topEmotes.slice(0, 10).forEach((e, i) => {
-        emotesHtml += `
-          <div class="ps-mini-item">
-            <span><strong>#${i + 1}</strong> ${escapeHtml(e.name)}</span>
-            <span style="font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--an-green);">${(e.count || 0).toLocaleString()}x</span>
-          </div>
-        `;
-      });
+      emotesHtml = topEmotes.slice(0, 8).map((e, i) => {
+        const pct = topEmotes[0].count > 0 ? Math.round((e.count / topEmotes[0].count) * 100) : 0;
+        return `
+          <div class="psd-emote-row">
+            <span class="psd-emote-rank">#${i + 1}</span>
+            <span class="psd-emote-name">${escapeHtml(e.name)}</span>
+            <div class="psd-emote-bar"><div style="width:${pct}%"></div></div>
+            <span class="psd-emote-count">${(e.count || 0).toLocaleString()}x</span>
+          </div>`;
+      }).join('');
     } else {
-      emotesHtml = '<div style="color:var(--an-muted); font-size:0.8rem; padding:8px 0;">Nema zabeleženih emotea.</div>';
+      emotesHtml = '<div class="psd-empty-notice">Nema zabeleženih emotea.</div>';
+    }
+
+    // Ban logs
+    let bansHtml = '';
+    if (banLogs.length > 0) {
+      bansHtml = banLogs.slice(0, 6).map(b => `
+        <div class="psd-ban-row">
+          <span class="psd-ban-type ${b.type === 'BAN' ? 'psd-ban-type-ban' : 'psd-ban-type-del'}">${escapeHtml(b.type || 'BAN')}</span>
+          <span class="psd-ban-user">@${escapeHtml(b.user)}</span>
+          <span class="psd-ban-reason">${escapeHtml(b.reason || 'Bez razloga')}</span>
+          <span class="psd-ban-time">${escapeHtml(b.time || '')}</span>
+        </div>`).join('');
     }
 
     container.innerHTML = `
-      <!-- Metric Cards Grid -->
-      <div class="ps-detail-grid">
-        <div class="ps-detail-card">
-          <div class="ps-detail-card-label">Trajanje</div>
-          <div class="ps-detail-card-val" style="font-size:1rem; color:var(--an-cyan);">${escapeHtml(durationStr)}</div>
+      <!-- Meta info strip -->
+      <div class="psd-meta-strip">
+        <span class="psd-meta-item">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          ${escapeHtml(dateStr)}
+        </span>
+        <span class="psd-meta-dot"></span>
+        <span class="psd-meta-item">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          ${escapeHtml(durationStr)}
+        </span>
+        <span class="psd-meta-dot"></span>
+        <span class="psd-meta-item" style="color:var(--an-muted);">Arhivovano: ${escapeHtml(formatDateTime(stream.updated_at || stream.started_at))}</span>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="psd-stats-grid">
+        <div class="psd-stat-card psd-stat-viewers">
+          <svg class="psd-stat-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          <div class="psd-stat-val">${(stream.peak_viewers || 0).toLocaleString()}</div>
+          <div class="psd-stat-label">Peak Gledaoci</div>
         </div>
-        <div class="ps-detail-card">
-          <div class="ps-detail-card-label">Peak Gledaoci</div>
-          <div class="ps-detail-card-val" style="color:var(--an-green);">${(stream.peak_viewers || 0).toLocaleString()}</div>
+        <div class="psd-stat-card psd-stat-messages">
+          <svg class="psd-stat-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <div class="psd-stat-val">${(stream.total_messages || 0).toLocaleString()}</div>
+          <div class="psd-stat-label">Ukupno Poruka</div>
         </div>
-        <div class="ps-detail-card">
-          <div class="ps-detail-card-label">Ukupno Poruka</div>
-          <div class="ps-detail-card-val">${(stream.total_messages || 0).toLocaleString()}</div>
+        <div class="psd-stat-card psd-stat-chatters">
+          <svg class="psd-stat-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <div class="psd-stat-val">${(stream.unique_chatters || 0).toLocaleString()}</div>
+          <div class="psd-stat-label">Jedinstveni</div>
         </div>
-        <div class="ps-detail-card">
-          <div class="ps-detail-card-label">Jedinstveni</div>
-          <div class="ps-detail-card-val" style="color:#cbd5e1;">${(stream.unique_chatters || 0).toLocaleString()}</div>
+        <div class="psd-stat-card psd-stat-velocity">
+          <svg class="psd-stat-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <div class="psd-stat-val">${stream.chat_velocity_peak || 0}<span style="font-size:0.7em;font-weight:500;">/m</span></div>
+          <div class="psd-stat-label">Peak Brzina</div>
         </div>
-        <div class="ps-detail-card">
-          <div class="ps-detail-card-label">Peak Brzina</div>
-          <div class="ps-detail-card-val" style="color:var(--an-amber);">${stream.chat_velocity_peak || 0}/m</div>
+        <div class="psd-stat-card psd-stat-emotes">
+          <svg class="psd-stat-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          <div class="psd-stat-val">${(stream.total_emotes || 0).toLocaleString()}</div>
+          <div class="psd-stat-label">Emoti</div>
         </div>
-        <div class="ps-detail-card">
-          <div class="ps-detail-card-label">Emoti</div>
-          <div class="ps-detail-card-val" style="color:#c084fc;">${(stream.total_emotes || 0).toLocaleString()}</div>
-        </div>
-        <div class="ps-detail-card">
-          <div class="ps-detail-card-label">Moderacija</div>
-          <div class="ps-detail-card-val" style="color:var(--an-red);">${stream.moderation_actions || 0}</div>
+        <div class="psd-stat-card psd-stat-mod">
+          <svg class="psd-stat-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <div class="psd-stat-val">${stream.moderation_actions || 0}</div>
+          <div class="psd-stat-label">Moderacija</div>
         </div>
       </div>
 
-      <!-- Detail Subsections -->
-      <div class="ps-detail-sections">
-        <div class="ps-section-box">
-          <div class="ps-section-head">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <span>Top Gledaoci</span>
+      <!-- Body: three columns -->
+      <div class="psd-body-cols">
+
+        <!-- Top Chatters -->
+        <div class="psd-col-box">
+          <div class="psd-col-head">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--an-cyan)" stroke-width="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            Top Gledaoci
           </div>
-          <div class="ps-mini-list">
-            ${chattersHtml}
-          </div>
+          <div class="psd-leaderboard">${chattersHtml}</div>
         </div>
 
-        <div class="ps-section-box">
-          <div class="ps-section-head">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--an-green)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
-            <span>Top Emoti</span>
+        <!-- Top Emotes -->
+        <div class="psd-col-box">
+          <div class="psd-col-head">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--an-green)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            Top Emoti
           </div>
-          <div class="ps-mini-list">
-            ${emotesHtml}
-          </div>
+          <div class="psd-emote-list">${emotesHtml}</div>
         </div>
+
+        ${bansHtml ? `
+        <!-- Moderacija -->
+        <div class="psd-col-box">
+          <div class="psd-col-head">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--an-red)" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Moderacija (${banLogs.length})
+          </div>
+          <div class="psd-ban-list">${bansHtml}</div>
+        </div>` : ''}
       </div>
 
-      ${banLogs.length > 0 ? `
-        <div class="ps-section-box" style="margin-top:14px;">
-          <div class="ps-section-head">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--an-red)" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span>Akcije Moderacije (${banLogs.length})</span>
-          </div>
-          <div class="ps-mini-list">
-            ${banLogs.slice(0, 5).map(b => `
-              <div class="ps-mini-item">
-                <span><strong>@${escapeHtml(b.user)}</strong> — ${escapeHtml(b.reason || 'Bez razloga')}</span>
-                <span style="color:var(--an-red); font-size:0.75rem;">${escapeHtml(b.type || 'BAN')}</span>
-              </div>
-            `).join('')}
-          </div>
+      ${hourlyHtml ? `
+      <!-- Hourly chart -->
+      <div class="psd-col-box psd-hourly-box">
+        <div class="psd-col-head">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--an-amber)" stroke-width="2.5"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+          Aktivnost po satima
         </div>
-      ` : ''}
-
-      <!-- Actions footer -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:18px; padding-top:14px; border-top:1px solid var(--an-border);">
-        <div style="font-size:0.8rem; color:var(--an-muted);">
-          Sačuvano: ${escapeHtml(formatDateTime(stream.updated_at || stream.started_at))}
-        </div>
-        <div style="display:flex; gap:8px;">
-          <button type="button" class="ps-btn ps-btn-export" onclick="window.exportPastStream('${escapeHtml(stream.id)}', 'csv')">
-            Preuzmi CSV
-          </button>
-          <button type="button" class="ps-btn ps-btn-export" onclick="window.exportPastStream('${escapeHtml(stream.id)}', 'json')">
-            Preuzmi JSON
-          </button>
-          <button type="button" class="sc-btn sc-btn-reset" style="padding:6px 14px;" onclick="window.closeModal('pastStreamDetailModal')">
-            Zatvori
-          </button>
-        </div>
-      </div>
+        <div class="psd-hourly-chart">${hourlyHtml}</div>
+      </div>` : ''}
     `;
 
     window.openModal('pastStreamDetailModal');
@@ -2722,8 +3063,36 @@ Generisano u Kickan Studio.`;
   function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        window.closeFullscreenStudio();
-        document.querySelectorAll('.modal-backdrop.open').forEach(m => m.classList.remove('open'));
+        if (activeModalStack.length > 0) {
+          const topModalId = activeModalStack[activeModalStack.length - 1];
+          window.closeModal(topModalId);
+          return;
+        }
+        const fullscreenOverlay = document.getElementById('kickanFullscreenOverlay');
+        if (fullscreenOverlay && fullscreenOverlay.style.display === 'flex') {
+          window.closeFullscreenStudio();
+          return;
+        }
+        document.getElementById('channelDropdownMenu')?.classList.remove('open');
+        document.getElementById('notifPopover')?.classList.remove('open');
+        window.closeMobileSidebar();
+      } else if (e.key === 'Tab' && activeModalStack.length > 0) {
+        const topModalId = activeModalStack[activeModalStack.length - 1];
+        const modalEl = document.getElementById(topModalId);
+        if (modalEl) {
+          const focusable = getFocusableElements(modalEl);
+          if (focusable.length === 0) return;
+          const firstEl = focusable[0];
+          const lastEl = focusable[focusable.length - 1];
+
+          if (e.shiftKey && document.activeElement === firstEl) {
+            e.preventDefault();
+            lastEl.focus();
+          } else if (!e.shiftKey && document.activeElement === lastEl) {
+            e.preventDefault();
+            firstEl.focus();
+          }
+        }
       }
     });
   }
