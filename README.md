@@ -19,8 +19,9 @@
       <img src="https://img.shields.io/badge/Node.js-22.x-brightgreen?style=flat-square" alt="Node.js" />
     </a>
     <a href="#code-testing-and-verification">
-      <img src="https://img.shields.io/badge/Tests-57%2F57%20Passing-brightgreen?style=flat-square" alt="Tests" />
+      <img src="https://img.shields.io/badge/Tests-228%2F228%20Passing-brightgreen?style=flat-square" alt="Tests" />
     </a>
+
   </p>
 
   <p>
@@ -231,7 +232,7 @@ The project utilizes the native Node.js test runner for rapid, zero-overhead aut
 
 | Command                     | Description                                                                                                                   |
 | :-------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
-| **`npm test`**              | Runs the full suite of **57 automated tests** (bot mechanics, anti-spam filters, serverless functions, and security proxies). |
+| **`npm test`**              | Runs the full suite of **228 automated tests** (bot mechanics, anti-spam filters, serverless functions, overlay routing, and security proxies). |
 | **`npm run test:bot`**      | Runs tests isolated to the Bot server and chat processing engine.                                                             |
 | **`npm run test:website`**  | Runs tests for Netlify serverless functions, webhook signatures, and rate limiters.                                           |
 | **`npm run test:coverage`** | Produces a detailed test coverage report.                                                                                     |
@@ -241,13 +242,14 @@ The project utilizes the native Node.js test runner for rapid, zero-overhead aut
 
 ---
 
-## ☕ The Story & Support
+## The Story & Support
 
 Hi! I am Milan, a 20-year-old student and web developer from Serbia. I engineered the KickALL ecosystem from scratch to give Kick.com creators, moderators, and communities high-performance, real-time tools without the complexity of legacy software.
 
 If KickALL helps you grow your channel or streamlines your broadcast workflow, and you want to support my late-night coding sessions, you can buy me a coffee!
 
-💖 [Support my work via PayPal](https://paypal.me/milanwebportal)
+[Support my work via PayPal](https://paypal.me/milanwebportal)
+
 
 Every donation means a lot and directly supports server infrastructure, Pusher real-time capacity, and continuous feature development. Thank you!
 

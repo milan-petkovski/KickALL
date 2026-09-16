@@ -29,7 +29,7 @@ module.exports = [
   },
   {
     files: ["Website/**/*.js"],
-    ignores: ["Website/netlify/**/*.js"],
+    ignores: ["Website/netlify/**/*.js", "Website/tests/**/*.js"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "script",
@@ -47,5 +47,25 @@ module.exports = [
       "no-undef": "off",
       "no-console": "off"
     }
+  },
+  {
+    files: ["Website/tests/**/*.js", "Bot/tests/**/*.js"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "commonjs",
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly"
+      }
+    },
+    rules: {
+      "no-unused-vars": "off",
+      "no-undef": "off",
+      "no-console": "off"
+    }
   }
 ];
+

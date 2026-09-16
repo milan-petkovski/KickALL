@@ -162,6 +162,45 @@ paths:
         '444':
           description: Nije pronađen video zapis za dati upit
 
+  /.netlify/functions/kickov-dispatch:
+    post:
+      summary: Prijem donacija, server-side rate limiting i okidanje KickOV OBS alertova
+      operationId: netlifyKickovDispatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                  description: Jedinstveni streamer ID ili token za OBS alert kanal
+                donorName:
+                  type: string
+                  description: Ime donatora
+                amount:
+                  type: number
+                  description: Iznos donacije u EUR (min 0.5, max 10000)
+                message:
+                  type: string
+                  description: Opciona poruka donatora
+                alertConfig:
+                  type: object
+                  description: Opciona konfiguracija prikaza alerta
+              required:
+                - token
+                - amount
+      responses:
+        '200':
+          description: Alert uspešno broadcastovan i zabeležen u bazu
+        '400':
+          description: Neispravni parametri (iznos van granica, nedostaje token)
+        '429':
+          description: Prekoračen rate limit (maksimalno 1 donacija u 60 sekundi po IP adresi)
+        '500':
+          description: Serverska greška pri slanju alerta
+
   /.netlify/functions/fungies-webhook:
     post:
       summary: Prijem i obrada Fungies.io billing webhook događaja sa proverom HMAC potpisa

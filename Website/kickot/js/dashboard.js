@@ -3616,6 +3616,24 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+const escHtml = escapeHtml;
+
+function cleanUsername(raw, defaultVal = 'Kanal') {
+  if (!raw) return defaultVal;
+  let s = String(raw).trim()
+    .replace(/^https?:\/\/(www\.)?kick\.com\//i, '')
+    .replace(/^kick_user_/, '')
+    .replace(/^@/, '');
+  if (s.includes('@')) s = s.split('@')[0];
+  s = s.split(/[/?#\s]/)[0];
+  return s || defaultVal;
+}
+
+if (typeof window !== 'undefined') {
+  window.escapeHtml = escapeHtml;
+  window.escHtml = escapeHtml;
+  window.cleanUsername = cleanUsername;
+}
 
 function downloadCsv(csvContent, fileName) {
   const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });

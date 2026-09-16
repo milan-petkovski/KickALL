@@ -15,7 +15,7 @@ test('Kickaj - PLAN_LIMITS ima ispravno definisana pravila za planove', () => {
 test('Kickaj - Potvrda više pobednika u nizu kroz chat poruku', () => {
   const winnersList = [
     { username: 'DrugiPobednik', prize: 'Sub', isConfirmed: false, isExpired: false, timerId: 101 },
-    { username: 'PrviPobednik',  prize: 'Vip', isConfirmed: false, isExpired: false, timerId: 102 }
+    { username: 'PrviPobednik', prize: 'Vip', isConfirmed: false, isExpired: false, timerId: 102 }
   ];
   const _activeWinnerUsername = 'DrugiPobednik';
 
@@ -45,7 +45,7 @@ test('Kickaj - Potvrda više pobednika u nizu kroz chat poruku', () => {
 test('Kickaj - Ručna potvrda pobednika po indeksu', () => {
   const winnersList = [
     { username: 'StreamViewer1', prize: 'T-Shirt', isConfirmed: false, timerId: 55 },
-    { username: 'StreamViewer2', prize: 'Key',     isConfirmed: false, timerId: 56 }
+    { username: 'StreamViewer2', prize: 'Key', isConfirmed: false, timerId: 56 }
   ];
 
   function confirmWinnerByIndex(idx) {
@@ -94,7 +94,7 @@ test('Kickaj - Izvoz pobednika u hronološkom redosledu (prvi osvojio = broj 1)'
   const winnersList = [
     { username: 'Treci', prize: 'Nagrada 3' },
     { username: 'Drugi', prize: 'Nagrada 2' },
-    { username: 'Prvi',  prize: 'Nagrada 1' }
+    { username: 'Prvi', prize: 'Nagrada 1' }
   ];
 
   const chronological = [...winnersList].reverse();
@@ -1493,16 +1493,16 @@ test('Kickaj - Točak sreće 3-pass batching objedinjuje radialne linije i obod 
 
   const mockCtx = {
     beginPath: () => { beginPathCalls++; },
-    moveTo: () => {},
-    lineTo: () => {},
-    arc: () => {},
-    closePath: () => {},
+    moveTo: () => { },
+    lineTo: () => { },
+    arc: () => { },
+    closePath: () => { },
     fill: () => { fillCalls++; },
     stroke: () => { strokeCalls++; },
-    save: () => {},
-    restore: () => {},
-    rotate: () => {},
-    fillText: () => {},
+    save: () => { },
+    restore: () => { },
+    rotate: () => { },
+    fillText: () => { },
     fillStyle: '',
     strokeStyle: '',
     lineWidth: 1,
@@ -1569,7 +1569,7 @@ test('Kickaj - Focus trap i focus return u openFullscreen i closeFullscreen', ()
 
   function openFullscreenSim() {
     fsFocusReturn = activeElement;
-    fsFocusTrap = function(e) {
+    fsFocusTrap = function (e) {
       if (e.key !== 'Tab') return;
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
@@ -1632,7 +1632,7 @@ test('Kickaj - Focus trap i focus return u showWinnerOverlay i closeWinnerOverla
 
   function showWinnerOverlaySim() {
     winnerFocusReturn = triggerBtn;
-    winnerFocusTrap = function(e) {
+    winnerFocusTrap = function (e) {
       if (e.key === 'Tab') {
         const first = modalButtons[0];
         const last = modalButtons[modalButtons.length - 1];

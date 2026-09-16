@@ -21,6 +21,11 @@
   }
 })();
 
+/* ── Global Error Handling ── */
+window.addEventListener('unhandledrejection', function (event) {
+  console.warn('[Dashboard] Unhandled promise rejection:', event.reason);
+});
+
 // ── Imenovane konstante za Dashboard ──────────────────────
 const MIN_WITHDRAWAL_AMOUNT = 5; // Minimalni iznos za isplatu provizije (EUR)
 const NOTIFICATION_DURATION_MS = 5000; // Vreme prikaza in-app notifikacije (ms)
@@ -751,6 +756,24 @@ function escapeHtml(str) {
     '"': '&quot;',
     "'": '&#39;'
   }[c]));
+}
+const escHtml = escapeHtml;
+
+function cleanUsername(raw, defaultVal = 'Kanal') {
+  if (!raw) return defaultVal;
+  let s = String(raw).trim()
+    .replace(/^https?:\/\/(www\.)?kick\.com\//i, '')
+    .replace(/^kick_user_/, '')
+    .replace(/^@/, '');
+  if (s.includes('@')) s = s.split('@')[0];
+  s = s.split(/[/?#\s]/)[0];
+  return s || defaultVal;
+}
+
+if (typeof window !== 'undefined') {
+  window.escapeHtml = escapeHtml;
+  window.escHtml = escapeHtml;
+  window.cleanUsername = cleanUsername;
 }
 
 // ── Time-of-day Dynamic Greeting ──────────────────────────
@@ -1693,6 +1716,8 @@ function animateAnalyticsBars() {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     escapeHtml,
+    escHtml,
+    cleanUsername,
     getGreetingTime,
     updateWelcomeSection,
     navigateToModule,

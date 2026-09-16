@@ -358,7 +358,7 @@ test('Kickot - TimerRegistry uredno registruje i čisti intervale po panelu bez 
 // ── 9. DEBOUNCE & THROTTLE TIMING BEHAVIOR ─────────────────────────────────
 function debounce(fn, wait) {
   let timeout;
-  return function(...args) {
+  return function (...args) {
     clearTimeout(timeout);
     timeout = setTimeout(() => fn.apply(this, args), wait);
   };
@@ -864,7 +864,7 @@ test('Kickot - Casino wrap overlay zaključava igre i u Sve Igre i u Kazino tabu
 
 test('Kickot - Moderacija limit banner se prikazuje na Free planu i krije na PRO/ELITE', () => {
   const banner = { style: {}, innerHTML: '' };
-  
+
   function updateModBanner(limits) {
     if (limits.customPenaltySettings && limits.allowAdvancedModeration) {
       banner.style.display = 'none';

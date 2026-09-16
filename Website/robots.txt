@@ -36,6 +36,12 @@ Disallow: /kickot/
 Disallow: /kickaj/
 Disallow: /kickan/
 Disallow: /kickov/
+Disallow: /kickov/widget
+Disallow: /kickov/widget.html
+
+# Allow public donation tipping page
+Allow: /kickov/tip
+Allow: /kickov/tip.html
 
 # Sitemap
 Sitemap: https://kickall.app/sitemap.xml

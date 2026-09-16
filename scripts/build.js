@@ -66,6 +66,21 @@ for (const d of dashboards) {
 }
 console.log(`Dashboard varijante verifikovane (${dashboardsOk}/${dashboards.length}): ${dashboards.join(', ')}`);
 
+// Proveri KickOV javne stranice
+const kickovPages = ['widget.html', 'tip.html'];
+let kickovPagesOk = 0;
+for (const p of kickovPages) {
+    const pagePath = path.join(websiteDir, 'kickov', p);
+    if (fs.existsSync(pagePath)) {
+        kickovPagesOk++;
+    } else {
+        console.warn(`Upozorenje: Nije pronađena KickOV stranica: kickov/${p}`);
+        errorsFound++;
+    }
+}
+console.log(`KickOV javne stranice verifikovane (${kickovPagesOk}/${kickovPages.length}): ${kickovPages.join(', ')}`);
+
+
 if (errorsFound > 0) {
     console.error(`Pronađeno ${errorsFound} upozorenja/grešaka tokom verifikacije.`);
     process.exit(1);

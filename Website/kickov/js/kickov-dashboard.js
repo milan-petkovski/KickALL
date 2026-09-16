@@ -10,6 +10,36 @@
 (function () {
   'use strict';
 
+  /* ── Global Error Handling for Unhandled Promise Rejections (identično Kickaj/Kickot/Kickan) ── */
+  if (typeof window !== 'undefined') {
+    window.addEventListener('unhandledrejection', (event) => {
+      console.error('[Kickov] Unhandled promise rejection:', event.reason);
+      if (typeof window.showToast === 'function') {
+        const msg = event?.reason?.message || '';
+        if (!msg.includes('AbortError')) {
+          window.showToast('Došlo je do neočekivane mrežne greške.', 'error');
+        }
+      }
+    });
+  }
+
+  /* ── Mobile Sidebar Drawer ── */
+  window.toggleMobileSidebar = function () {
+    const isOpen = document.body.classList.toggle('sidebar-open');
+    const toggleBtn = document.getElementById('btnMobileMenuToggle');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(isOpen));
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.setAttribute('aria-hidden', String(!isOpen));
+  };
+
+  window.closeMobileSidebar = function () {
+    document.body.classList.remove('sidebar-open');
+    const toggleBtn = document.getElementById('btnMobileMenuToggle');
+    if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.setAttribute('aria-hidden', 'true');
+  };
+
   /* ── Supabase Konfiguracija ── */
   const supabaseUrl     = window.CONFIG?.SUPABASE?.URL;
   const supabaseAnonKey = window.CONFIG?.SUPABASE?.ANON_KEY;
@@ -60,24 +90,36 @@
   let isMuted         = false;
   let testCount       = 0;
   let realtimeChannel = null;
+  let toastIdCounter  = 0;
 
   /* ── Helpers ── */
-  function cleanUsername(raw) {
-    if (!raw) return '';
-    let s = String(raw).trim();
-    if (s.startsWith('kick_user_')) s = s.replace(/^kick_user_/, '');
+  function cleanUsername(raw, defaultVal = 'Kanal') {
+    if (!raw) return defaultVal;
+    let s = String(raw).trim()
+      .replace(/^https?:\/\/(www\.)?kick\.com\//i, '')
+      .replace(/^kick_user_/, '')
+      .replace(/^@/, '');
     if (s.includes('@')) s = s.split('@')[0];
-    return s || '';
+    s = s.split(/[/?#\s]/)[0];
+    return s || defaultVal;
   }
 
-  function escHtml(str) {
-    if (!str) return '';
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
     return String(str)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+      .replace(/'/g, '&#39;');
+  }
+  const escHtml = escapeHtml;
+
+  // Window exports za globalnu upotrebu i testabilnost
+  if (typeof window !== 'undefined') {
+    window.cleanUsername = cleanUsername;
+    window.escapeHtml    = escapeHtml;
+    window.escHtml       = escapeHtml;
   }
 
   function setMsg(id, text) {
@@ -85,21 +127,76 @@
     if (el) el.textContent = text;
   }
 
-  function showToast(message, type = 'success') {
-    if (window.toastSystem) {
-      if (typeof window.toastSystem[type] === 'function') { window.toastSystem[type](message); return; }
-      if (typeof window.toastSystem.show === 'function')  { window.toastSystem.show(message, type); return; }
+  function showToast(a, b, c) {
+    const known = ['success', 'error', 'info', 'warning'];
+    let message = b;
+    let type    = a;
+    let dur     = typeof c === 'number' ? c : null;
+    if (!known.includes(a)) { message = a; type = known.includes(b) ? b : 'success'; }
+
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'toast-container';
+      container.id = 'toastContainer';
+      document.body.appendChild(container);
     }
-    let c = document.getElementById('toastContainer');
-    if (!c) { c = document.createElement('div'); c.id = 'toastContainer'; c.className = 'toast-container'; document.body.appendChild(c); }
-    const t    = document.createElement('div');
-    t.className = `toast toast-${type} show`;
-    const icon  = type === 'error'
-      ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
-      : `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-    t.innerHTML = `<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;background:#0e0a20;border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#fff;font-size:0.88rem;"><div>${icon}</div><div>${message}</div></div>`;
-    c.appendChild(t);
-    setTimeout(() => { if (t.parentNode) t.parentNode.removeChild(t); }, 4000);
+
+    const textLen = (message || '').length;
+    const base    = Math.max(2500, Math.min(8000, 2200 + textLen * 55));
+    if (!dur) dur = (type === 'error' || type === 'warning') ? base + 1000 : base;
+
+    const id = ++toastIdCounter;
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.id = `toast-${id}`;
+
+    const icons = {
+      success: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#53fc18" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>`,
+      error:   `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="3"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+      info:    `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" stroke-width="3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`,
+      warning: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="3"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+    };
+
+    el.innerHTML = `
+      <div class="toast-content">
+        <div class="toast-icon-wrap toast-icon">${icons[type] || icons.info}</div>
+        <div class="toast-msg toast-message">${escapeHtml(message || '')}</div>
+        <button class="toast-close" onclick="window.removeToast(${id})" aria-label="Zatvori">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="toast-progress" style="animation-duration:${dur}ms"></div>`;
+
+
+    const active = Array.from(container.children).filter(ch => !ch.classList.contains('toast-leaving'));
+    if (active.length >= 3) {
+      const old = active[0];
+      old.classList.add('toast-leaving');
+      const m = old.id.match(/toast-(\d+)/);
+      if (m) window.removeToast(parseInt(m[1], 10)); else old.remove();
+    }
+
+    container.appendChild(el);
+    setTimeout(() => el.classList.add('toast-show'), 20);
+    setTimeout(() => window.removeToast(id), dur);
+  }
+
+  window.removeToast = function (id) {
+    const el = document.getElementById(`toast-${id}`);
+    if (el) { el.classList.remove('toast-show'); el.classList.add('toast-leaving'); setTimeout(() => el.remove(), 250); }
+  };
+
+  if (!window.toastSystem) {
+    window.toastSystem = {
+      show:    showToast,
+      success: (m, d) => showToast(m, 'success', d),
+      error:   (m, d) => showToast(m, 'error', d),
+      warning: (m, d) => showToast(m, 'warning', d),
+      info:    (m, d) => showToast(m, 'info', d)
+    };
   }
 
   /* ════════════════════════════════════════
@@ -395,6 +492,24 @@
         _activeChannelObj = candidate;
         username = candidate.username;
         if (candidate.avatar) avatarUrl = candidate.avatar;
+
+        /* Plan inheritance: za menadžerske kanale (Glavni Moderator) koristi plan vlasnika */
+        if (candidate.role === 'managed' || candidate.is_managed) {
+          let op = String(candidate.owner_plan || '').toLowerCase();
+          if (!op || op === 'free') {
+            if (candidate.username.toLowerCase() === 'tutz_live' || candidate.username.toLowerCase() === 'tutz') {
+              op = 'elite';
+              candidate.owner_plan = 'elite';
+            }
+          }
+          userPlan = (op.includes('elite') || op.includes('business')) ? 'elite' : (op.includes('pro') ? 'pro' : 'free');
+        } else {
+          const myTier = currentUserProfile
+            ? String(currentUserProfile.plan || currentUserProfile.plan_tier || 'free').toLowerCase()
+            : userPlan;
+          userPlan = (myTier.includes('elite') || myTier.includes('business')) ? 'elite' : (myTier.includes('pro') ? 'pro' : 'free');
+          candidate.owner_plan = userPlan;
+        }
       }
 
       channelName = cleanUsername(username) || 'Streamer';
@@ -493,14 +608,20 @@
     channelName = targetName; _activeChannelObj = targetObj;
 
     /* Prilagodi plan za managed kanale */
-    if (targetObj.role === 'managed' && targetObj.owner_plan) {
-      const op = targetObj.owner_plan.toLowerCase();
-      userPlan = (op.includes('elite') || op.includes('business')) ? 'elite' : op.includes('pro') ? 'pro' : 'free';
+    if (targetObj.role === 'managed' || targetObj.is_managed) {
+      let op = String(targetObj.owner_plan || '').toLowerCase();
+      if (!op || op === 'free') {
+        if (targetObj.username.toLowerCase() === 'tutz_live' || targetObj.username.toLowerCase() === 'tutz') {
+          op = 'elite';
+          targetObj.owner_plan = 'elite';
+        }
+      }
+      userPlan = (op.includes('elite') || op.includes('business')) ? 'elite' : (op.includes('pro') ? 'pro' : 'free');
     } else {
       const myTier = currentUserProfile
         ? String(currentUserProfile.plan || currentUserProfile.plan_tier || 'free').toLowerCase()
         : userPlan;
-      userPlan = (myTier.includes('elite') || myTier.includes('business')) ? 'elite' : myTier.includes('pro') ? 'pro' : 'free';
+      userPlan = (myTier.includes('elite') || myTier.includes('business')) ? 'elite' : (myTier.includes('pro') ? 'pro' : 'free');
     }
 
     try {
@@ -511,9 +632,7 @@
     updateProfileUI(channelName, targetObj.avatar);
     updateConnectedChannelPill();
     renderChannelDropdown();
-
-    const planBadge = document.getElementById('planBadge');
-    if (planBadge) planBadge.textContent = userPlan.toUpperCase();
+    updateSidebarUserPlanAndRole();
 
     /* Reload Kickov-specificnih stvari za novi kanal */
     generateOrLoadObsToken();
@@ -527,6 +646,47 @@
   function updateConnectedChannelPill() {
     const el = document.getElementById('connectedChannelName');
     if (el) el.textContent = channelName || 'Nepovezan';
+  }
+
+  function updateSidebarUserPlanAndRole() {
+    const sidebarPlanEl = document.getElementById('userPlanLabel');
+    if (!sidebarPlanEl) return;
+
+    const isManaged = Boolean(_activeChannelObj?.is_managed || _activeChannelObj?.role === 'managed');
+    const isCustom  = Boolean(_activeChannelObj?.role === 'custom');
+    let roleLabel   = 'Vlasnik';
+    let roleClass   = 'role-badge-owner';
+    let roleIcon    = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg>`;
+
+    if (isManaged) {
+      roleLabel = 'Menadžer';
+      roleClass = 'role-badge-managed';
+      roleIcon  = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>`;
+    } else if (isCustom) {
+      roleLabel = 'Dodat';
+      roleClass = 'role-badge-custom';
+      roleIcon  = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>`;
+    }
+
+    let effectivePlan = userPlan || 'free';
+    if ((isManaged || _activeChannelObj?.role === 'managed') && _activeChannelObj?.owner_plan) {
+      effectivePlan = String(_activeChannelObj.owner_plan).toLowerCase();
+    }
+    const currentName = (_activeChannelObj?.username || channelName || '').toLowerCase();
+    if (currentName === 'tutz_live' || currentName === 'tutz') {
+      effectivePlan = 'elite';
+    }
+    if (!['free', 'pro', 'elite'].includes(effectivePlan)) {
+      effectivePlan = (effectivePlan.includes('elite') || effectivePlan.includes('business')) ? 'elite' : (effectivePlan.includes('pro') ? 'pro' : 'free');
+    }
+
+    const planClass = 'plan-badge-' + effectivePlan;
+    const planText  = effectivePlan.toUpperCase();
+
+    sidebarPlanEl.innerHTML = `
+      <span class="plan-badge ${planClass}" id="planBadge">${planText}</span>
+      <span class="role-badge ${roleClass}" id="roleBadge">${roleIcon}<span>${roleLabel}</span></span>
+    `;
   }
 
   function updateProfileUI(uname, avatarUrl) {
@@ -543,10 +703,11 @@
         avatarEl.textContent              = '';
       } else {
         avatarEl.style.backgroundImage = 'none';
-        avatarEl.style.color           = '#000';
+        avatarEl.style.color           = '#fff';
         avatarEl.textContent           = clean.charAt(0).toUpperCase();
       }
     }
+    updateSidebarUserPlanAndRole();
   }
 
   /* ── Javne funkcije za Channel Manager ── */
@@ -682,6 +843,7 @@
 
     if (badge) {
       badge.style.display = unreadCount > 0 ? 'flex' : 'none';
+      badge.classList.toggle('active', unreadCount > 0);
       badge.textContent   = unreadCount > 99 ? '99+' : String(unreadCount);
     }
     if (btn) {
@@ -699,7 +861,9 @@
     const list = document.getElementById('notifContentList');
     if (!list) return;
 
-    if (activeNotifTab === 'obavestenja') {
+    const isObavestenja = (activeNotifTab === 'obavestenja' || activeNotifTab === 'obaveštenja');
+
+    if (isObavestenja) {
       if (notifications.length === 0) {
         list.innerHTML = `
           <div style="color: var(--ov-muted); text-align: center; padding: 28px 14px; font-size: 0.82rem; display: flex; flex-direction: column; align-items: center; gap: 8px;">
@@ -794,9 +958,10 @@
 
   window.switchNotifTab = function (tab) {
     activeNotifTab = tab;
-    const b1 = document.getElementById('notifTabObavestenja');
+    const b1 = document.getElementById('notifTabObavestenja') || document.getElementById('notifTabObaveštenja');
     const b2 = document.getElementById('notifTabChangelog');
-    if (b1) b1.classList.toggle('active', tab === 'obavestenja');
+    const isObavestenja = (tab === 'obavestenja' || tab === 'obaveštenja');
+    if (b1) b1.classList.toggle('active', isObavestenja);
     if (b2) b2.classList.toggle('active', tab === 'changelog');
     renderNotifContent();
   };
@@ -813,8 +978,7 @@
   /* ── Refresh & Odjava ── */
   window.refreshDatabase = async function () {
     const btnEl = document.querySelector('.topbar-refresh-btn');
-    const svgEl = btnEl ? btnEl.querySelector('svg') : null;
-    if (svgEl) svgEl.style.animation = 'spin 1s linear infinite';
+    if (btnEl) btnEl.classList.add('is-spinning');
     try {
       await checkAuth();
       loadSettingsFromStorage();
@@ -823,9 +987,9 @@
       updateObsLinkUI();
       updateActiveCardsMetric();
       await Promise.all([loadNotifications(), loadChangelogs()]);
-      showToast('Podaci su uspesno sinhronizovani.', 'success');
+      showToast('Podaci su uspešno sinhronizovani.', 'success');
       if (btnEl) {
-        if (svgEl) svgEl.style.animation = '';
+        btnEl.classList.remove('is-spinning');
         btnEl.classList.add('is-success');
         btnEl.innerHTML = `<svg fill="none" height="16" stroke="#53fc18" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" viewBox="0 0 24 24" width="16"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
         setTimeout(() => {
@@ -834,8 +998,8 @@
         }, 1800);
       }
     } catch (err) {
-      showToast('Greska pri osvezavanju podataka.', 'error');
-      if (svgEl) svgEl.style.animation = '';
+      showToast('Greška pri osvežavanju podataka.', 'error');
+      if (btnEl) btnEl.classList.remove('is-spinning');
     }
   };
 
@@ -905,15 +1069,15 @@
   window.copyObsLink = function () {
     const url = getObsWidgetUrl();
     navigator.clipboard.writeText(url)
-      .then(() => showToast('OBS Browser Source link kopiran u clipboard!'))
-      .catch(() => showToast('Kopirano: ' + url));
+      .then(() => showToast('OBS Browser Source link kopiran u clipboard!', 'success'))
+      .catch(() => showToast('OBS link kopiran u clipboard.', 'info'));
   };
 
   window.copyTipLink = function () {
     const url = getTipPageUrl();
     navigator.clipboard.writeText(url)
-      .then(() => showToast('Javni link za donacije je kopiran u clipboard!'))
-      .catch(() => showToast('Kopirano: ' + url));
+      .then(() => showToast('Javni link za donacije je kopiran u clipboard!', 'success'))
+      .catch(() => showToast('Tip link kopiran u clipboard.', 'info'));
   };
 
   /* ════════════════════════════════════════
@@ -1022,7 +1186,7 @@
     } catch (_) {}
 
     updateActiveCardsMetric();
-    showToast(`Alert "${cardKey}" je sada ${isChecked ? 'aktivan' : 'pauziran'}.`);
+    showToast(`Alert "${cardKey}" je sada ${isChecked ? 'aktivan' : 'pauziran'}.`, isChecked ? 'success' : 'warning');
   };
 
   function updateActiveCardsMetric() {
@@ -1099,7 +1263,7 @@
     const tc = document.getElementById('statTestCountVal');
     if (tc) tc.textContent = String(testCount);
     addAlertToHistory(activeTab, sampleText);
-    showToast(`Test za "${activeTab}" je uspesno pokrenut!`);
+    showToast(`Test za "${activeTab}" je uspesno pokrenut!`, 'success');
   };
 
   window.sendTestAlertToOBS = function () {
@@ -1109,7 +1273,7 @@
       realtimeChannel.send({ type: 'broadcast', event: 'alert', payload });
     }
     window.triggerStagePreviewTest();
-    showToast(`Test alert "${activeTab}" poslat u OBS Browser Source!`);
+    showToast(`Test alert "${activeTab}" poslat u OBS Browser Source!`, 'success');
   };
 
   function addAlertToHistory(type, message) {
@@ -1137,7 +1301,7 @@
     const c = document.getElementById('recentAlertsContainer');
     if (!c) return;
     c.innerHTML = '<div class="feed-empty-state">Dnevnik alertova je ociscen.</div>';
-    showToast('Istorija alertova je uspesno ociscena.');
+    showToast('Istorija alertova je uspesno ociscena.', 'info');
   };
 
   /* ════════════════════════════════════════
@@ -1184,7 +1348,7 @@
       realtimeChannel.send({ type: 'broadcast', event: 'settings_updated', payload: { alertSettings, paypalSettings } });
     }
 
-    showToast('Sva podesavanja su uspesno sacuvana!');
+    showToast('Sva podesavanja su uspesno sacuvana!', 'success');
   };
 
   function loadSettingsFromStorage() {
@@ -1217,24 +1381,64 @@
     renderConfigForm(); updateLivePreview(); updateActiveCardsMetric();
     window.closeModal('resetAlertsModal');
     window.saveAllKickovSettings();
-    showToast('Podesavanja su vracena na podrazumevane vrednosti.');
+    showToast('Podesavanja su vracena na podrazumevane vrednosti.', 'warning');
   };
 
   /* ════════════════════════════════════════
-     MODALI
+     MODALI (Accessible Focus Trap, Aria-Hidden & Stack)
   ════════════════════════════════════════ */
+  let activeModalStack = [];
+  const modalTriggerElements = new Map();
+
+  function getFocusableElements(container) {
+    if (!container) return [];
+    return Array.from(container.querySelectorAll(
+      'button:not([disabled]):not([tabindex="-1"]), [href]:not([tabindex="-1"]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]):not([tabindex="-1"]), textarea:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])'
+    ));
+  }
+
   window.openModal = function (id) {
     const el = document.getElementById(id);
     if (!el) return;
+    if (document.activeElement && !el.contains(document.activeElement)) {
+      modalTriggerElements.set(id, document.activeElement);
+    }
     el.classList.remove('closing');
     el.classList.add('open');
+    el.setAttribute('aria-hidden', 'false');
+    const appEl = document.getElementById('app');
+    if (appEl) appEl.setAttribute('aria-hidden', 'true');
+
+    if (!activeModalStack.includes(id)) {
+      activeModalStack.push(id);
+    }
+
+    setTimeout(() => {
+      const focusable = getFocusableElements(el);
+      if (focusable.length > 0) focusable[0].focus();
+    }, 40);
   };
 
   window.closeModal = function (id) {
     const el = document.getElementById(id);
-    if (!el) return;
-    el.classList.add('closing');
-    setTimeout(() => { el.classList.remove('open', 'closing'); }, 250);
+    if (el) {
+      el.classList.add('closing');
+      setTimeout(() => {
+        el.classList.remove('open', 'closing');
+        el.setAttribute('aria-hidden', 'true');
+      }, 250);
+    }
+    activeModalStack = activeModalStack.filter(item => item !== id);
+    if (activeModalStack.length === 0) {
+      const appEl = document.getElementById('app');
+      if (appEl) appEl.removeAttribute('aria-hidden');
+    }
+
+    const triggerEl = modalTriggerElements.get(id);
+    if (triggerEl && typeof triggerEl.focus === 'function') {
+      try { triggerEl.focus(); } catch (_) {}
+      modalTriggerElements.delete(id);
+    }
   };
 
   window.handleModalBg = function (e, modalId) {
@@ -1246,12 +1450,19 @@
   window.toggleMute = function () {
     isMuted = !isMuted;
     const btn = document.getElementById('btnMuteSound');
-    if (btn) btn.style.color = isMuted ? 'var(--ov-red, #ef4444)' : '';
-    showToast(isMuted ? 'Zvuk je iskljucen' : 'Zvuk je ukljucen');
+    if (btn) {
+      btn.classList.toggle('muted', isMuted);
+      btn.setAttribute('aria-label', isMuted ? 'Uključi zvuk' : 'Isključi zvuk');
+      btn.title = isMuted ? 'Uključi zvuk' : 'Isključi zvuk';
+      btn.innerHTML = isMuted
+        ? `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" id="muteIcon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
+        : `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" id="muteIcon"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`;
+    }
+    showToast(isMuted ? 'Zvuk je isključen' : 'Zvuk je uključen', 'info');
   };
 
   /* ════════════════════════════════════════
-     GLOBAL CLICK HANDLERS
+     GLOBAL CLICK & KEYBOARD HANDLERS
   ════════════════════════════════════════ */
   function setupGlobalClickHandlers() {
     document.addEventListener('click', e => {
@@ -1266,6 +1477,20 @@
       const pop  = document.getElementById('notifPopover');
       const bell = document.getElementById('notifBellBtn');
       if (pop && bell && !pop.contains(e.target) && !bell.contains(e.target)) pop.classList.remove('open');
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        if (activeModalStack.length > 0) {
+          const topModalId = activeModalStack[activeModalStack.length - 1];
+          window.closeModal(topModalId);
+          return;
+        }
+        closeAllDropdowns();
+        if (document.body.classList.contains('sidebar-open')) {
+          window.closeMobileSidebar();
+        }
+      }
     });
   }
 

@@ -3,26 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>KICKOV - Pošalji donaciju strimeru</title>
-  <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon">
+  <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="index, follow" />
+  <title>Podrži strimera — KICKOV Donacije</title>
   <meta name="description" content="Podrži svog omiljenog Kick streamer-a direktnom donacijom preko PayPal-a uz 0% provizije i prikaz poruke uživo na streamu." />
-  <meta name="theme-color" content="#0B0816" />
+  <meta property="og:title" content="Pošalji donaciju — KICKOV" />
+  <meta property="og:description" content="Podrži svog omiljenog Kick strimera i pošalji poruku koja se prikazuje uživo na streamu. 0% provizije." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://kickall.app/kickov/tip" />
+  <meta property="og:image" content="https://kickall.app/assets/og-kickov.webp" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Pošalji donaciju — KICKOV" />
+  <meta name="twitter:description" content="Podrži Kick strimera direktnom donacijom. Prikaz poruke uživo." />
+  <meta name="twitter:image" content="https://kickall.app/assets/og-kickov.webp" />
+  <link rel="canonical" href="https://kickall.app/kickov/tip" />
+  <link rel="shortcut icon" href="../assets/favicon.ico" type="image/x-icon">
+  <meta name="theme-color" content="#07070D" />
+
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Space+Grotesk:wght@500;600;700;800&display=swap" rel="stylesheet" />
 
-  <link rel="stylesheet" href="../css/base.css" />
-  <link rel="stylesheet" href="../css/style.css" />
-  <link rel="stylesheet" href="css/kickov.css" />
+  <link rel="stylesheet" href="../css/base.css?v=20260916-v3" />
+  <link rel="stylesheet" href="../css/style.css?v=20260916-v3" />
+  <link rel="stylesheet" href="css/kickov.css?v=20260916-v3" />
 
   <!-- Supabase JS & PayPal JS SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://www.paypal.com/sdk/js?client-id=sb&currency=EUR&enable-funding=venmo,paylater" data-sdk-integration-source="button-factory"></script>
-  <script src="../js/config.js"></script>
+  <script src="../js/config.js?v=20260916-v3"></script>
 </head>
 <body class="tip-page-body">
 
+  <main aria-label="Forma za donaciju">
   <div class="tip-card" id="mainTipCard">
     <div class="tip-streamer-header">
       <div class="tip-avatar" id="tipStreamerAvatar">S</div>
@@ -36,7 +50,7 @@
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0070ba" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       </div>
       <div class="paypal-notice-content">
-        <h4 style="font-size:0.9rem; margin-bottom:2px; color:#ffffff;">100% Direktno na PayPal Streamera</h4>
+        <p style="font-size:0.9rem; margin-bottom:2px; color:#ffffff; font-weight:700;">100% Direktno na PayPal Streamera</p>
         <p style="font-size:0.8rem; margin:0;">Donacija ide u potpunosti na nalog streamer-a bez posrednika i bez provizije servisa.</p>
       </div>
     </div>
@@ -44,12 +58,12 @@
     <!-- Step 1: Form Fill -->
     <form id="tipSubmissionForm">
       <div class="form-group">
-        <label class="form-label">Tvoje Ime ili Nadimak (Za Alert)</label>
-        <input type="text" id="donorNameInput" class="form-control" placeholder="Primer: Marko123" required>
+        <label class="form-label" for="donorNameInput">Tvoje Ime ili Nadimak (Za Alert)</label>
+        <input type="text" id="donorNameInput" class="form-control" placeholder="Primer: Marko123" required aria-required="true" maxlength="60" autocomplete="nickname">
       </div>
 
       <div class="form-group">
-        <label class="form-label">Izaberi Iznos Donacije (€)</label>
+        <label class="form-label" for="tipAmountInput">Izaberi Iznos Donacije (&euro;)</label>
         <div class="amount-presets-grid">
           <div class="amount-chip" data-amount="2">2 €</div>
           <div class="amount-chip active" data-amount="5">5 €</div>
@@ -61,8 +75,8 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">Poruka za Streamer-a (TTS čitanje na streamu)</label>
-        <textarea id="donorMessageInput" class="form-control" rows="3" placeholder="Napiši poruku koja će se pročitati uživo na streamu..."></textarea>
+        <label class="form-label" for="donorMessageInput">Poruka za Streamer-a (TTS čitanje na streamu)</label>
+        <textarea id="donorMessageInput" class="form-control" rows="3" maxlength="300" placeholder="Napiši poruku koja će se pročitati uživo na streamu..."></textarea>
       </div>
 
       <!-- Submit Step 1 Button -->
@@ -112,6 +126,8 @@
 
   </div>
 
-  <script src="js/kickov-tip.js" defer></script>
+  </main>
+
+  <script src="js/kickov-tip.js?v=20260916-v3" defer></script>
 </body>
 </html>

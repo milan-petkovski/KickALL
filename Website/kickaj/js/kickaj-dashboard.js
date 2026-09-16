@@ -5590,6 +5590,13 @@ if (typeof localStorage === 'undefined') {
   function escHtml(str) {
     return String(str).replace(/[&<>"']/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[m]);
   }
+  const escapeHtml = escHtml;
+
+  if (typeof window !== 'undefined') {
+    window.escHtml = escHtml;
+    window.escapeHtml = escapeHtml;
+    window.cleanUsername = cleanUsername;
+  }
 
   function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
   function setMsg(id, val)  { setText(id, val); }
@@ -5616,7 +5623,8 @@ if (typeof localStorage === 'undefined') {
       ANIM_LABELS,
       SLICE_COLORS,
       cleanUsername,
-      escHtml
+      escHtml,
+      escapeHtml
     };
   }
-})();
+})();

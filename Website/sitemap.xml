@@ -41,4 +41,12 @@
         <changefreq>monthly</changefreq>
         <priority>0.3</priority>
     </url>
+
+    <!-- Public Donation Tip Page -->
+    <url>
+        <loc>https://kickall.app/kickov/tip</loc>
+        <lastmod>2026-09-16</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
 </urlset>

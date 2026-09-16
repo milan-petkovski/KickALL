@@ -7,6 +7,15 @@
 (function () {
   'use strict';
 
+  /* ── Global Error Handling ── */
+  window.addEventListener('unhandledrejection', function (event) {
+    console.warn('[Kickov Tip] Unhandled promise rejection:', event.reason);
+  });
+
+  // Rate limiting — sprečava spam submitova
+  const MIN_SUBMIT_INTERVAL_MS = 3000;
+  let lastSubmitTime = 0;
+
   const urlParams = new URLSearchParams(window.location.search);
   const targetUserToken = urlParams.get('u') || urlParams.get('user') || urlParams.get('token');
 
@@ -86,7 +95,7 @@
         }
       }
     } catch (e) {
-      console.log('Streamer profile fetch info:', e);
+      console.warn('Streamer profile fetch info:', e);
     }
   }
 
@@ -96,6 +105,14 @@
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
+
+      // Rate limiting: sprečava spam
+      const now = Date.now();
+      if (now - lastSubmitTime < MIN_SUBMIT_INTERVAL_MS) {
+        showToast('Sačekajte trenutak pre ponovnog slanja.', 'warning');
+        return;
+      }
+      lastSubmitTime = now;
 
       donorName = document.getElementById('donorNameInput').value.trim() || 'Anoniman Gledalac';
       selectedAmount = parseFloat(document.getElementById('tipAmountInput').value) || selectedAmount;
@@ -130,9 +147,8 @@
   }
 
   function dispatchObsAlert() {
-    if (!sb || !targetUserToken) return;
+    if (!targetUserToken) return;
 
-    const channelName = `kickov_alerts:${targetUserToken}`;
     const alertConfig = streamerConfig?.alertSettings?.donation || {
       enabled: true,
       duration: 6,
@@ -153,36 +169,23 @@
       messageTemplate: '{name} je donirao {amount} €!'
     };
 
-    const channel = sb.channel(channelName);
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        channel.send({
-          type: 'broadcast',
-          event: 'alert',
-          payload: {
-            type: 'donation',
-            name: donorName,
-            amount: selectedAmount,
-            message: donorMessage,
-            config: alertConfig,
-            timestamp: Date.now()
-          }
-        });
-      }
-    });
-
-    // Record donation log in Supabase if table exists
-    try {
-      sb.from('donations').insert({
-        streamer_id: targetUserToken,
-        donor_name: donorName,
+    // Koristi server-side funkciju sa rate limitingom umesto direktnog Supabase broadcastinga
+    fetch('/.netlify/functions/kickov-dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: targetUserToken,
+        donorName: donorName,
         amount: selectedAmount,
-        currency: 'EUR',
         message: donorMessage,
-        created_at: new Date().toISOString()
-      }).then(() => {}).catch(() => {});
-    } catch (_) {}
+        alertConfig: alertConfig
+      })
+    }).catch((err) => {
+      // Neuspešan broadcast nije fatalan — donacija je već prošla kroz PayPal
+      console.warn('[Kickov Tip] Alert dispatch greška:', err);
+    });
   }
+
 
   function showSuccessScreen() {
     const stage2 = document.getElementById('paypalCheckoutStage');

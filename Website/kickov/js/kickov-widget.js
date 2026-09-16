@@ -6,6 +6,27 @@
 (function () {
   'use strict';
 
+  /* ── Global Error Handling ── */
+  window.addEventListener('unhandledrejection', function (event) {
+    console.warn('[Kickov Widget] Unhandled promise rejection:', event.reason);
+  });
+
+  // ── Constants ──────────────────────────────────────────
+  const MAX_QUEUE_SIZE        = 50;   // Sprečava rast queue-a u dugotrajnom OBS sesiji
+  const EXIT_ANIM_DURATION_MS = 600;  // Trajanje izlazne animacije
+  const MAX_RECONNECT_ATTEMPTS = 5;   // Max pokušaja WebSocket reconnect
+
+  // ── XSS Sanitizer (identičan kickaj/kickan/kickot) ──
+  function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   // Extract Token from URL query string
   const urlParams = new URLSearchParams(window.location.search);
   const obsToken = urlParams.get('token') || urlParams.get('u') || urlParams.get('key');
@@ -91,6 +112,11 @@
     }
 
     enqueue(alertPayload) {
+      // Sprečava neograničeni rast queue-a tokom dugih strimova
+      if (this.queue.length >= MAX_QUEUE_SIZE) {
+        console.warn('[Kickov Widget] Queue je pun (max ' + MAX_QUEUE_SIZE + '), odbacujem najstariji alert.');
+        this.queue.shift();
+      }
       this.queue.push(alertPayload);
       if (!this.isProcessing) {
         this.processNext();
@@ -124,28 +150,31 @@
         const textAnimClass = (cfg.textAnim && cfg.textAnim !== 'none') ? cfg.textAnim : '';
         const durationSec = Math.max(2, parseInt(cfg.duration || 5, 10));
 
-        const name = alertData.name || 'Korisnik';
+        // Sanitizacija svih user-supplied podataka pre DOM inserta — sprečava XSS
+        const name = escapeHtml(alertData.name || 'Korisnik');
         const rawTemplate = cfg.messageTemplate || '{name} je novi pratilac!';
-        const formattedMsg = rawTemplate
-          .replace('{name}', name)
-          .replace('{count}', alertData.count || '1')
-          .replace('{viewers}', alertData.viewers || '10')
-          .replace('{amount}', alertData.amount || '5');
+        const formattedMsg = escapeHtml(
+          rawTemplate
+            .replace('{name}', alertData.name || 'Korisnik')
+            .replace('{count}', alertData.count || '1')
+            .replace('{viewers}', alertData.viewers || '10')
+            .replace('{amount}', alertData.amount || '5')
+        );
 
         // Create Alert Box DOM
         const alertEl = document.createElement('div');
         alertEl.className = `kickov-alert-box ${layout} ${entryAnim}`;
-        alertEl.style.fontFamily = `'${cfg.fontFamily || 'Space Grotesk'}', sans-serif`;
+        alertEl.style.fontFamily = `'${escapeHtml(cfg.fontFamily || 'Space Grotesk')}', sans-serif`;
 
         alertEl.innerHTML = `
           <div class="alert-media-wrap">
-            <img src="${cfg.mediaUrl || 'https://media.giphy.com/media/26tPplGWjN0xLybiU/giphy.gif'}" alt="Media" class="alert-media-img">
+            <img src="${escapeHtml(cfg.mediaUrl || 'https://media.giphy.com/media/26tPplGWjN0xLybiU/giphy.gif')}" alt="Media" class="alert-media-img">
           </div>
           <div class="alert-content-wrap">
-            <div class="alert-user-name ${textAnimClass}" style="color:${cfg.highlightColor || '#53fc18'}; font-size:${cfg.fontSize || 28}px; font-weight:${cfg.fontWeight || '700'}; text-shadow:0 0 14px ${cfg.accentColor || '#53fc18'};">
+            <div class="alert-user-name ${escapeHtml(textAnimClass)}" style="color:${escapeHtml(cfg.highlightColor || '#53fc18')}; font-size:${parseInt(cfg.fontSize || 28, 10)}px; font-weight:${escapeHtml(cfg.fontWeight || '700')}; text-shadow:0 0 14px ${escapeHtml(cfg.accentColor || '#53fc18')};">
               ${name}
             </div>
-            <div class="alert-message-text" style="color:${cfg.textColor || '#ffffff'};">
+            <div class="alert-message-text" style="color:${escapeHtml(cfg.textColor || '#ffffff')};">
               ${formattedMsg}
             </div>
           </div>
@@ -161,7 +190,13 @@
         // Play TTS if enabled
         if (cfg.ttsEnabled && this.synth && (alertData.message || formattedMsg)) {
           try {
-            const ttsText = alertData.message || formattedMsg;
+            // Koristi neobrađenu poruku za TTS (escapeHtml za HTML, ne za govor)
+            const ttsText = alertData.message
+              || rawTemplate
+                .replace('{name}', alertData.name || 'Korisnik')
+                .replace('{count}', alertData.count || '1')
+                .replace('{viewers}', alertData.viewers || '10')
+                .replace('{amount}', alertData.amount || '5');
             const utterance = new SpeechSynthesisUtterance(ttsText);
             utterance.lang = cfg.ttsVoice || 'sr-RS';
             utterance.volume = Math.min(1, Math.max(0, (cfg.ttsVolume || 80) / 100));
@@ -182,7 +217,7 @@
             }
             resolve();
             this.processNext();
-          }, 600); // 600ms exit animation duration
+          }, EXIT_ANIM_DURATION_MS);
         }, durationSec * 1000);
       });
     }
@@ -190,15 +225,25 @@
 
   const queueManager = new AlertQueueManager();
 
-  // ── 2. Supabase Realtime Listener ──────────────────────
+  // ── 2. Supabase Realtime Listener sa Reconnect Logikom ──
   const supabaseUrl = window.CONFIG?.SUPABASE?.URL;
   const supabaseAnonKey = window.CONFIG?.SUPABASE?.ANON_KEY;
 
-  if (window.supabase && supabaseUrl && supabaseAnonKey && obsToken) {
-    const sb = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+  let reconnectAttempts = 0;
+  let activeChannel = null;
+
+  function connectRealtimeChannel(sb) {
+    if (!sb || !obsToken) return;
+
+    // Cleanup prethodnog kanala ako postoji
+    if (activeChannel) {
+      try { sb.removeChannel(activeChannel); } catch (_) {}
+      activeChannel = null;
+    }
+
     const channelName = `kickov_alerts:${obsToken}`;
 
-    sb.channel(channelName)
+    activeChannel = sb.channel(channelName)
       .on('broadcast', { event: 'alert' }, (payload) => {
         if (payload?.payload) {
           queueManager.enqueue(payload.payload);
@@ -210,8 +255,28 @@
         }
       })
       .subscribe((status) => {
-        console.log(`[Kickov Widget OBS] Realtime status za kanal ${channelName}:`, status);
+        console.warn(`[Kickov Widget OBS] Realtime status za kanal ${channelName}:`, status);
+
+        if (status === 'SUBSCRIBED') {
+          // Uspešna konekcija — resetuj brojač pokušaja
+          reconnectAttempts = 0;
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          // WebSocket pao — pokušaj reconnect sa exponential backoff
+          if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            const delay = Math.min(30000, 2000 * Math.pow(2, reconnectAttempts)); // max 30s
+            reconnectAttempts++;
+            console.warn(`[Kickov Widget] Konekcija pala. Reconnect pokušaj ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} za ${delay}ms`);
+            setTimeout(() => connectRealtimeChannel(sb), delay);
+          } else {
+            console.warn('[Kickov Widget] Max reconnect pokušaji dostignuti. OBS widget je u offline modu.');
+          }
+        }
       });
+  }
+
+  if (window.supabase && supabaseUrl && supabaseAnonKey && obsToken) {
+    const sb = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+    connectRealtimeChannel(sb);
   } else {
     console.warn('[Kickov Widget] Supabase nije dostupan ili nedostaje token.');
   }
