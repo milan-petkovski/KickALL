@@ -335,16 +335,13 @@ async function obradiPusherPoruku(data) {
             watchtime.registrujAktivnogGledaoca(chatroomId, username);
         }
 
-        // Auto-announce brojač po broju poruka
-        if (channelState.isStreamLive && channelState.announce_msg_enabled && userKey !== channelState.channelUsername.toLowerCase()) {
-            channelState.porukePosleAnnounce++;
-            if (channelState.porukePosleAnnounce >= (channelState.announce_message_threshold || 30)) {
-                const sada = Date.now();
-                const minGapMs = 5 * 60 * 1000;
-                if (sada - channelState.zadnjaAutoPorukaTs >= minGapMs) {
-                    channelManager.triggerAutoAnnounce(chatroomId);
-                }
-            }
+        // Auto-announce praćenje aktivnosti i provera uslova za slanje
+        const botUsername = (channelManager.getBotUsername() || '').toLowerCase();
+        const isFromBotOrStreamer = userKey === botUsername || userKey === (channelState.channelUsername || '').toLowerCase();
+
+        if (channelState.isStreamLive && !isFromBotOrStreamer) {
+            channelState.porukePosleAnnounce = (channelState.porukePosleAnnounce || 0) + 1;
+            channelManager.proveriAutoAnnounce(chatroomId);
         }
 
         // Obrada komande preko centralnog command router-a

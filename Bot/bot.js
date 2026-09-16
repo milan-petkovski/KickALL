@@ -527,6 +527,21 @@ async function start() {
                     }
                 }
             })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'auto_messages'
+            }, async (payload) => {
+                const { new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (row && row.channel_id) {
+                    const chatroomId = String(row.channel_id);
+                    if (state.channels[chatroomId]) {
+                        logDebouncedUpdate(`auto_messages::${chatroomId}`, `[REALTIME] Auto-poruke osvežene za kanal.`);
+                        await database.ucitajAutoAnnounces(chatroomId);
+                    }
+                }
+            })
             .subscribe();
 
         // 8. Osluškuj izmene korisničkih profila

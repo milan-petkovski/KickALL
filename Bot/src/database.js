@@ -931,7 +931,7 @@ async function ucitajBotConfig(chatroomId) {
             channelState.welcome_message = data.welcome_message || '';
             channelState.botActive = data.bot_active || false;
             channelState.announce_interval_mins = data.announce_interval_mins ?? 15;
-            channelState.announce_message_threshold = data.announce_message_threshold ?? 10;
+            channelState.announce_message_threshold = data.announce_message_threshold ?? 30;
             channelState.announce_time_enabled = data.announce_time_enabled ?? true;
             channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
 
@@ -1006,9 +1006,22 @@ async function ucitajBotConfig(chatroomId) {
             }
 
             log('INFO', `⚙️ Bot konfiguracija sinhronizovana za @${channelState.channelUsername} (${limits.name} Plan). Prefix: '${channelState.PREFIX}', Aktivan: ${channelState.botActive}`);
+
+            try {
+                const channelManager = require('./channelManager');
+                if (channelManager && typeof channelManager.pokreniAutoAnnounceTajmer === 'function') {
+                    channelManager.pokreniAutoAnnounceTajmer(channelState.realChatroomId || chatroomId);
+                }
+            } catch (_) {}
         } else {
             channelState.botActive = false;
             channelState.autoAnnounces = [];
+            try {
+                const channelManager = require('./channelManager');
+                if (channelManager && typeof channelManager.pokreniAutoAnnounceTajmer === 'function') {
+                    channelManager.pokreniAutoAnnounceTajmer(channelState.realChatroomId || chatroomId);
+                }
+            } catch (_) {}
         }
     } catch (err) {
         log('ERR', `Greška pri učitavanju bot konfiguracije za ${chatroomId}: ${err.message}`);

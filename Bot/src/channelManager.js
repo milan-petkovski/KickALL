@@ -66,6 +66,8 @@ async function proveriDaLiJeLive(chatroomId) {
                     if (channelState.STREAM_START_PIN_MESSAGE) {
                         messenger.posaljiIPinujPoruku(chatroomId, channelState.STREAM_START_PIN_MESSAGE);
                     }
+                    channelState.porukePosleAnnounce = 0;
+                    channelState.zadnjaAutoPorukaTs = Date.now();
                 } else if (!channelState.isStreamLive) {
                     try {
                         await streamAnalytics.onStreamOffline(chatroomId, channelUsername);
@@ -75,6 +77,7 @@ async function proveriDaLiJeLive(chatroomId) {
                     watchtime.ocistiAktivneGledaoce(chatroomId);
                     channelState.welcomedUsers.clear(); // Očisti pozdravljene korisnike za sledeći stream
                     channelState.porukePosleAnnounce = 0; // Resetuj brojač za "broj poruka" pravilo za sledeći stream
+                    channelState.zadnjaAutoPorukaTs = 0;
                 }
             }
             channelState.isFirstLiveCheck = false;
@@ -110,6 +113,56 @@ function triggerAutoAnnounce(chatroomId) {
     messenger.posaljiPoruku(chatroomId, poruke[idx]);
 }
 
+function proveriAutoAnnounce(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || !channelState.botActive || !channelState.isStreamLive || channelState.isModerator === false) return;
+
+    const poruke = channelState.autoAnnounces || [];
+    if (poruke.length === 0) return;
+
+    const timeEnabled = !!channelState.announce_time_enabled;
+    const msgEnabled = !!channelState.announce_msg_enabled;
+
+    if (!timeEnabled && !msgEnabled) return;
+
+    const now = Date.now();
+    const intervalMs = Math.max(1, (Number(channelState.announce_interval_mins) || 15)) * 60 * 1000;
+    const threshold = Math.max(1, (Number(channelState.announce_message_threshold) || 30));
+
+    // Inicijalizujemo timestamp ako još nije postavljen (npr. pri startu)
+    if (!channelState.zadnjaAutoPorukaTs) {
+        channelState.zadnjaAutoPorukaTs = now;
+        return;
+    }
+
+    const timePassed = now - channelState.zadnjaAutoPorukaTs;
+    const msgsPassed = channelState.porukePosleAnnounce || 0;
+
+    let shouldTrigger = false;
+
+    if (timeEnabled && msgEnabled) {
+        // Preporučeni režim (oba uključena): prošao vremenski interval I bar definisan broj chat poruka
+        if (timePassed >= intervalMs && msgsPassed >= threshold) {
+            shouldTrigger = true;
+        }
+    } else if (timeEnabled && !msgEnabled) {
+        // Samo vremenski interval
+        if (timePassed >= intervalMs) {
+            shouldTrigger = true;
+        }
+    } else if (!timeEnabled && msgEnabled) {
+        // Samo broj poruka (uz zaštitni razmak od 60 sekundi protiv flood/spam-a)
+        const MIN_MSG_ONLY_GAP_MS = 60 * 1000;
+        if (msgsPassed >= threshold && timePassed >= MIN_MSG_ONLY_GAP_MS) {
+            shouldTrigger = true;
+        }
+    }
+
+    if (shouldTrigger) {
+        triggerAutoAnnounce(chatroomId);
+    }
+}
+
 function pokreniAutoAnnounceTajmer(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
@@ -119,12 +172,22 @@ function pokreniAutoAnnounceTajmer(chatroomId) {
         channelState.autoAnnounceTimer = null;
     }
 
-    if (channelState.botActive && channelState.announce_time_enabled && channelState.announce_interval_mins > 0) {
+    // Pokrećemo kontrolni pulsni tajmer ako je bot aktivan i ako je omogućeno barem jedno pravilo
+    if (channelState.botActive && (channelState.announce_time_enabled || channelState.announce_msg_enabled)) {
+        if (!channelState.zadnjaAutoPorukaTs) {
+            channelState.zadnjaAutoPorukaTs = Date.now();
+        }
+
+        // Provera na svakih 30 sekundi omogućava precizno okidanje čim se steknu uslovi
         channelState.autoAnnounceTimer = setInterval(() => {
             if (channelState.isStreamLive) {
-                triggerAutoAnnounce(chatroomId);
+                proveriAutoAnnounce(chatroomId);
             }
-        }, channelState.announce_interval_mins * 60 * 1000);
+        }, 30 * 1000);
+
+        if (channelState.autoAnnounceTimer && typeof channelState.autoAnnounceTimer.unref === 'function') {
+            channelState.autoAnnounceTimer.unref();
+        }
     }
 }
 
@@ -289,7 +352,7 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     await database.ucitajAutoAnnounces(dbConfig.channel_id);
 
     channelState.announce_interval_mins = dbConfig.announce_interval_mins ?? 15;
-    channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 10;
+    channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 30;
     channelState.announce_time_enabled = dbConfig.announce_time_enabled ?? true;
     channelState.announce_msg_enabled = dbConfig.announce_msg_enabled ?? true;
     channelState.moderationSettings = dbConfig.moderation_settings || {};
@@ -309,6 +372,9 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
     const rawStore = Array.isArray(dbConfig.store_items) ? dbConfig.store_items : [];
     channelState.store_items = rawStore.slice(0, maxStoreItems);
+
+    // Osvežavamo i restartujemo auto-announce tajmer sa novim vrednostima
+    pokreniAutoAnnounceTajmer(channelState.realChatroomId || dbConfig.channel_id);
 }
 
 // ─── BACKGROUND SUBSCRIPTION RETRY WORKER ──────────────────────────────────────
@@ -375,6 +441,7 @@ module.exports = {
     proveriDaLiJeLive,
     proveriDaLiSuLiveSvi,
     triggerAutoAnnounce,
+    proveriAutoAnnounce,
     pokreniAutoAnnounceTajmer,
     pokreniKanal,
     zaustaviKanal,
