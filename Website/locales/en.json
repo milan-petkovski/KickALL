@@ -32,7 +32,8 @@
     "guestUptime": "99.98% UPTIME",
     "guestProcessedMsgs": "Processed Chat Messages",
     "guestLatency": "<15ms Response",
-    "guestStreams": "Active Kick Streams"
+    "guestStreams": "Active Kick Streams",
+    "trustText": "Kick creators already growing with KickALL"
   },
   "statsBar": {
     "msgs": "Processed Messages",
@@ -247,7 +248,7 @@
     "resolvedTickets": "Resolved tickets",
     "log1": "Viewer: \"How do I activate kickot?\"",
     "log2": "\"Just click the Start kickot button and connect channel.\"",
-    "log3": "Support ticket successfully resolved. ⭐⭐⭐⭐⭐",
+    "log3": "Support ticket successfully resolved (rated 5/5).",
     "tagSupport": "Support",
     "tagResolved": "RESOLVED"
   },
@@ -615,13 +616,13 @@
     "viewer": "Viewer",
     "bot": "kickot",
     "unnamedViewer": "Unnamed viewer",
-    "cooldownError": "⚠️ Error: Command {cmd} is on cooldown for {time}s! (Originally 10m)",
-    "bacihejtTrigger": "👿 <strong>!bacihejt</strong> triggered by {user} towards <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)",
-    "loveSent": "❤️ <strong>!posaljiljubav</strong> sent to <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)",
-    "pointsResponse": "🏆 User {user} currently has <strong>{points}</strong> points on this channel. Rank: <strong>Chat King</strong>.",
-    "weather": "🌍 Weather in Belgrade: ⛅ Partly cloudy | 🌡️ 26°C (feels like 25°C) | 💧 Humidity: 32% | 💨 Wind: 22 km/h",
+    "cooldownError": "[COOLDOWN] Error: Command {cmd} is on cooldown for {time}s! (Originally 10m)",
+    "bacihejtTrigger": "<strong>!bacihejt</strong> triggered by {user} towards <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)",
+    "loveSent": "<strong>!posaljiljubav</strong> sent to <strong>{target}</strong>. <br>{reply}<br>{user} received <strong>{points}</strong> points! (Total: <strong>{total}</strong>)",
+    "pointsResponse": "[POINTS] User {user} currently has <strong>{points}</strong> points on this channel. Rank: <strong>Chat King</strong>.",
+    "weather": "Weather in Belgrade: Partly cloudy | 26°C (feels like 25°C) | Humidity: 32% | Wind: 22 km/h",
     "info": "The shortest war in history lasted only 38 minutes!",
-    "unknownCmd": "❌ Unknown command. Available commands: <strong>!weather Belgrade</strong>, <strong>!info</strong>.",
+    "unknownCmd": "Unknown command. Available commands: <strong>!weather Belgrade</strong>, <strong>!info</strong>.",
     "audioError": "Audio API not supported."
   },
   "userProfile": {

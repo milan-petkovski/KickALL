@@ -133,29 +133,68 @@
         href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap">
 
     <!-- Stylesheets -->
-    <link rel="stylesheet" href="css/base.css">
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/base.css?v=20260915-v2">
+    <link rel="stylesheet" href="css/style.css?v=20260915-v2">
+    <link rel="stylesheet" href="css/landing-premium.css?v=20260917-v1">
 
     <!-- Dodatni stilovi specifični za pricing.html stranicu -->
     <style>
-        .section-header{
-          padding: 0;
-          margin: 0 auto;
+        .section-header {
+            padding: 0;
+            margin: 0 auto;
         }
 
-        .pricing-section{
-          padding: 0;
+        .pricing-section {
+            padding: 20px 0 60px 0;
+            position: relative;
+            z-index: 1;
         }
+
         .pricing-page-header {
-            padding: 140px 0 20px;
+            padding: 140px 0 24px;
             text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .pricing-page-header .glow-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(139, 92, 246, 0.12);
+            border: 1px solid rgba(139, 92, 246, 0.35);
+            color: #C084FC;
+            font-family: var(--font-heading);
+            font-size: 0.78rem;
+            font-weight: 800;
+            letter-spacing: 0.1em;
+            padding: 6px 18px;
+            border-radius: 9999px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+        }
+
+        .pricing-page-header .section-title {
+            font-family: var(--font-heading);
+            font-size: clamp(2.4rem, 4.5vw, 3.8rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            color: #FFFFFF;
+            margin-bottom: 14px;
+        }
+
+        .pricing-page-header .section-subtitle {
+            font-size: 1.1rem;
+            color: #94A3B8;
+            max-width: 600px;
+            margin: 0 auto;
         }
 
         .pricing-faq-note {
             margin-top: 24px;
             text-align: center;
-            color: var(--color-text-muted);
-            font-size: 0.9rem;
+            color: #94A3B8;
+            font-size: 0.92rem;
         }
 
         .pricing-faq-note a {
@@ -166,7 +205,7 @@
         }
 
         .pricing-faq-note a:hover {
-            color: var(--color-green-hover);
+            color: #6EFF35;
         }
 
         .nav-link.active {
@@ -184,6 +223,13 @@
 <body>
     <!-- Skip Link za pristupačnost -->
     <a href="#main-content" class="sr-only skip-link">Pređi na glavni sadržaj</a>
+
+    <!-- Grid pozadinski svetlosni efekti -->
+    <div class="glow-bg" aria-hidden="true">
+        <div class="blob blob-violet"></div>
+        <div class="blob blob-green"></div>
+        <div class="blob blob-cyan"></div>
+    </div>
 
     <!-- Header -->
     <header class="header" role="banner">

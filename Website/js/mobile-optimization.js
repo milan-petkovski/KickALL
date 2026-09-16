@@ -31,31 +31,9 @@ if (window.location.hostname !== 'localhost' && window.location.hostname !== '12
             }
         }
 
-        // 2. Optimize images for mobile
+        // 2. Optimize images for mobile (lazy loading is handled declaratively in HTML)
         function optimizeImages() {
-            const images = document.querySelectorAll('img');
-            images.forEach(img => {
-                // Add loading="lazy" to below-fold images
-                if (img.getBoundingClientRect().top > window.innerHeight) {
-                    img.loading = 'lazy';
-                }
-                
-                // Use WebP if supported
-                if (img.src.endsWith('.png') || img.src.endsWith('.jpg')) {
-                    const webpSrc = img.src.replace(/\.(png|jpg)$/, '.webp');
-                    // Check if WebP version exists
-                    fetch(webpSrc, { method: 'HEAD' })
-                        .then(response => {
-                            if (response.ok) {
-                                img.src = webpSrc;
-                            }
-                        })
-                        .catch((error) => {
-                            // Silently fail - WebP optimization is optional
-                            console.debug('WebP optimization failed for:', img.src, error);
-                        });
-                }
-            });
+            // Declarative loading="lazy" and fetchpriority="high" are set in HTML
         }
 
         // 3. Lazy load images
@@ -80,19 +58,13 @@ if (window.location.hostname !== 'localhost' && window.location.hostname !== '12
 
         // 4. Optimize animations for mobile
         function optimizeAnimations() {
-            // Reduce animation complexity on mobile - only specific elements
             const style = document.createElement('style');
             style.textContent = `
                 @media (max-width: 768px) {
-                    .blob {
-                        animation-duration: 10s !important;
-                        opacity: 0.12 !important;
-                    }
-                    
                     .glow-bg {
                         will-change: transform;
                         backface-visibility: hidden;
-                        perspective: 1000px;
+                        transform: translate3d(0, 0, 0);
                     }
                 }
             `;
@@ -107,19 +79,9 @@ if (window.location.hostname !== 'localhost' && window.location.hostname !== '12
             });
         }
 
-        // 6. Optimize touch events
+        // 6. Optimize touch events (handled natively via CSS :active without JS layout thrashing)
         function optimizeTouchEvents() {
-            // Add touch feedback to buttons
-            const buttons = document.querySelectorAll('.btn, .nav-link, .mobile-toggle');
-            buttons.forEach(button => {
-                button.addEventListener('touchstart', function() {
-                    this.style.transform = 'scale(0.95)';
-                }, { passive: true });
-                
-                button.addEventListener('touchend', function() {
-                    this.style.transform = 'scale(1)';
-                }, { passive: true });
-            });
+            // Touch feedback handled purely in CSS
         }
 
         // 7. Implement smooth scroll with momentum
@@ -156,24 +118,9 @@ if (window.location.hostname !== 'localhost' && window.location.hostname !== '12
             };
         }
 
-        // 10. Optimize scroll events
-        let ticking = false;
-        function onScroll() {
-            if (!ticking) {
-                window.requestAnimationFrame(() => {
-                    // Handle scroll-based optimizations
-                    ticking = false;
-                });
-                ticking = true;
-            }
-        }
-
-        window.addEventListener('scroll', onScroll, { passive: true });
-
-        // 11. Memory management
+        // 10. Scroll events handled natively with GPU acceleration
         function cleanup() {
-            // Remove event listeners and clean up resources
-            window.removeEventListener('scroll', onScroll);
+            // Memory cleanup if needed
         }
 
         // 12. Gesture support (swipe detection)
@@ -261,10 +208,10 @@ if (window.location.hostname !== 'localhost' && window.location.hostname !== '12
 
         // 15. Viewport orientation handling
         function handleOrientationChange() {
-            const orientation = window.screen.orientation.type;
+            const orientation = window.screen?.orientation?.type || (window.innerHeight > window.innerWidth ? 'portrait-primary' : 'landscape-primary');
             document.body.classList.remove('portrait', 'landscape');
             
-            if (orientation === 'portrait-primary' || orientation === 'portrait-secondary') {
+            if (orientation.startsWith('portrait')) {
                 document.body.classList.add('portrait');
             } else {
                 document.body.classList.add('landscape');

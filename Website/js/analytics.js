@@ -34,11 +34,20 @@ class KickALLAnalytics {
   async init() {
     this.setupUserProperties();
     this.trackPageView();
-    this.setupPerformanceTracking();
-    this.setupErrorTracking();
-    this.setupClickTracking();
-    this.setupScrollTracking();
-    this.setupVisibilityTracking();
+
+    const setupSecondaryTracking = () => {
+      this.setupPerformanceTracking();
+      this.setupErrorTracking();
+      this.setupClickTracking();
+      this.setupScrollTracking();
+      this.setupVisibilityTracking();
+    };
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(setupSecondaryTracking, { timeout: 2500 });
+    } else {
+      setTimeout(setupSecondaryTracking, 1200);
+    }
   }
 
   setupUserProperties() {
@@ -138,19 +147,27 @@ class KickALLAnalytics {
   setupScrollTracking() {
     let scrollDepth = 0;
     const maxDepth = [25, 50, 75, 90, 100];
+    let ticking = false;
 
     window.addEventListener('scroll', () => {
-      const scrollPercent = Math.round(
-        (window.scrollY / (document.body.scrollHeight - window.innerHeight)) * 100
-      );
-
-      maxDepth.forEach(depth => {
-        if (scrollPercent >= depth && scrollDepth < depth) {
-          scrollDepth = depth;
-          this.trackScrollDepth(depth);
-        }
-      });
-    });
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const docHeight = document.documentElement.scrollHeight || document.body.scrollHeight;
+          const scrollable = docHeight - window.innerHeight;
+          if (scrollable > 0) {
+            const scrollPercent = Math.round((window.scrollY / scrollable) * 100);
+            maxDepth.forEach(depth => {
+              if (scrollPercent >= depth && scrollDepth < depth) {
+                scrollDepth = depth;
+                this.trackScrollDepth(depth);
+              }
+            });
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    }, { passive: true });
   }
 
   setupVisibilityTracking() {

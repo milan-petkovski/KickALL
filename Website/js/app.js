@@ -448,9 +448,16 @@ async function setLanguage(lang) {
         }
     }
 
+    let lastChatSubmitTime = 0;
     if (chatForm && chatInput) {
         chatForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            const now = Date.now();
+            if (now - lastChatSubmitTime < 500) {
+                return; // Prevent spam submits in demo
+            }
+            lastChatSubmitTime = now;
+
             const message = chatInput.value.trim();
             if (!message) return;
 
@@ -1005,27 +1012,8 @@ async function setLanguage(lang) {
     });
 
     // -----------------------------------------------------------------
-    // 12. Spotlight Effect (Debounced for better performance)
+    // 12. Hardware-accelerated hover effects (CSS-driven for 120 FPS)
     // -----------------------------------------------------------------
-    const cards = document.querySelectorAll('.feature-card, .pricing-card');
-    cards.forEach(card => {
-        let cardTimeout = null;
-        card.addEventListener('mousemove', e => {
-            // Disable on mobile/tablet devices (< 1024px)
-            if (window.innerWidth < 1024) return;
-            
-            if (cardTimeout) return;
-            cardTimeout = setTimeout(() => {
-                const rect = card.getBoundingClientRect();
-                const x = e.clientX - rect.left;
-                const y = e.clientY - rect.top;
-
-                card.style.setProperty('--mouse-x', `${x}px`);
-                card.style.setProperty('--mouse-y', `${y}px`);
-                cardTimeout = null;
-            }, 16); // ~60fps max
-        });
-    });
 
     // -----------------------------------------------------------------
     // 13. Kopiranje Email Adrese
@@ -1036,15 +1024,13 @@ async function setLanguage(lang) {
     
     if (copyEmailBtn) {
         copyEmailBtn.addEventListener('click', () => {
-            const emailAddress = window.CONFIG.CONTACT_EMAIL;
-            navigator.clipboard.writeText(emailAddress).then(() => {
-                // Dodaj klasu za zelenu boju i sjaj
-                copyEmailBtn.classList.add('copied');
+            const emailAddress = window.CONFIG?.CONTACT_EMAIL || 'contact@milanwebportal.com';
+            const isEn = currentLang === 'en';
 
-                // Koristi lokalizaciju
+            const onCopySuccess = () => {
+                copyEmailBtn.classList.add('copied');
                 const t = window.translations || {};
                 const copyText = t.copy || {};
-                const isEn = currentLang === 'en';
 
                 if (copyBtnText) copyBtnText.textContent = copyText.copied || (isEn ? 'Copied!' : 'Kopirano!');
                 if (copyBtnTextEn) copyBtnTextEn.textContent = copyText.copied || 'Copied!';
@@ -1052,15 +1038,48 @@ async function setLanguage(lang) {
                 playSynthSound(600, 'sine', 0.08);
                 setTimeout(() => playSynthSound(800, 'sine', 0.12), 80);
 
-                // Vrati na staro nakon 2 sekunde
+                if (window.toastSystem) {
+                    window.toastSystem.success(isEn ? 'Email address copied to clipboard!' : 'Email adresa je uspešno kopirana!');
+                }
+
                 setTimeout(() => {
                     copyEmailBtn.classList.remove('copied');
                     if (copyBtnText) copyBtnText.textContent = copyText.copy || (isEn ? 'Copy' : 'Kopiraj');
                     if (copyBtnTextEn) copyBtnTextEn.textContent = copyText.copy || 'Copy';
                 }, 2000);
-            }).catch(err => {
-                console.error("Greška pri kopiranju emaila: ", err);
-            });
+            };
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(emailAddress).then(onCopySuccess).catch(() => {
+                    try {
+                        const input = document.createElement('input');
+                        input.value = emailAddress;
+                        document.body.appendChild(input);
+                        input.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(input);
+                        onCopySuccess();
+                    } catch (e) {
+                        if (window.toastSystem) {
+                            window.toastSystem.error(isEn ? 'Failed to copy email.' : 'Greška pri kopiranju emaila.');
+                        }
+                    }
+                });
+            } else {
+                try {
+                    const input = document.createElement('input');
+                    input.value = emailAddress;
+                    document.body.appendChild(input);
+                    input.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(input);
+                    onCopySuccess();
+                } catch (e) {
+                    if (window.toastSystem) {
+                        window.toastSystem.error(isEn ? 'Failed to copy email.' : 'Greška pri kopiranju emaila.');
+                    }
+                }
+            }
         });
     }
 
@@ -1214,8 +1233,12 @@ window.addEventListener('storage', (event) => {
     }
 });
 
+    let lastFocusedElement = null;
+
     function openAuthModal() {
         if (authModal) {
+            lastFocusedElement = document.activeElement;
+
             // Reset loading state when opening modal
             if (authKickLoginBtn) {
                 authKickLoginBtn.classList.remove('loading');
@@ -1235,6 +1258,11 @@ window.addEventListener('storage', (event) => {
             document.body.style.width = '100%';
             document.body.style.top = `-${scrollY}px`;
             document.body.dataset.scrollY = scrollY;
+
+            setTimeout(() => {
+                const focusTarget = authModalClose || authKickLoginBtn;
+                if (focusTarget) focusTarget.focus();
+            }, 50);
         }
     }
 
@@ -1260,6 +1288,11 @@ window.addEventListener('storage', (event) => {
             document.body.style.top = '';
             delete document.body.dataset.scrollY;
             window.scrollTo(0, parseInt(scrollY));
+
+            if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+                lastFocusedElement.focus();
+                lastFocusedElement = null;
+            }
         }
     }
 
@@ -1780,7 +1813,24 @@ window.addEventListener('storage', (event) => {
     }
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeAuthModal();
+        if (authModal && authModal.classList.contains('open')) {
+            if (e.key === 'Escape') {
+                closeAuthModal();
+            } else if (e.key === 'Tab') {
+                const focusables = authModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+                if (focusables.length > 0) {
+                    const firstEl = focusables[0];
+                    const lastEl = focusables[focusables.length - 1];
+                    if (e.shiftKey && document.activeElement === firstEl) {
+                        lastEl.focus();
+                        e.preventDefault();
+                    } else if (!e.shiftKey && document.activeElement === lastEl) {
+                        firstEl.focus();
+                        e.preventDefault();
+                    }
+                }
+            }
+        }
     });
 
     checkAuthSession();
@@ -1837,19 +1887,7 @@ window.addEventListener('storage', (event) => {
         });
     }
 
-    // Cursor Glow / Mouse Spotlight Effect (Debounced for performance)
-    let spotlightTimeout = null;
-    window.addEventListener('mousemove', (e) => {
-        // Disable on mobile/tablet devices (< 1024px)
-        if (window.innerWidth < 1024) return;
-        
-        if (spotlightTimeout) return;
-        spotlightTimeout = setTimeout(() => {
-            document.body.style.setProperty('--mouse-x', `${e.clientX}px`);
-            document.body.style.setProperty('--mouse-y', `${e.clientY}px`);
-            spotlightTimeout = null;
-        }, 16); // ~60fps max
-    });
+    // Mouse spotlight disabled for ultra-smooth 120 FPS rendering performance
 
     // Real Supabase & Kickot API Global Live Telemetry Stats
     async function fetchRealDatabaseGlobalStats() {
@@ -1896,7 +1934,11 @@ window.addEventListener('storage', (event) => {
             console.warn("Global stats DB sync fallback:", err);
         }
     }
-    fetchRealDatabaseGlobalStats();
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => fetchRealDatabaseGlobalStats(), { timeout: 4000 });
+    } else {
+        setTimeout(fetchRealDatabaseGlobalStats, 1500);
+    }
 
     function animateValue(obj, start, end, duration, isDecimal, suffix) {
         let startTimestamp = null;
@@ -2008,7 +2050,11 @@ window.addEventListener('storage', (event) => {
             }
         });
     }
-    checkTestimonialChannels();
+    if ('requestIdleCallback' in window) {
+        requestIdleCallback(() => checkTestimonialChannels(), { timeout: 3000 });
+    } else {
+        setTimeout(checkTestimonialChannels, 1500);
+    }
 
     // Dynamic FAQ Search & Accordion Filters
     const faqItems = document.querySelectorAll('.faq-item');
@@ -2020,9 +2066,16 @@ window.addEventListener('storage', (event) => {
         if (questionBtn) {
             questionBtn.addEventListener('click', () => {
                 const isOpen = item.classList.contains('open');
-                faqItems.forEach(other => other.classList.remove('open'));
+                faqItems.forEach(other => {
+                    other.classList.remove('open');
+                    const otherBtn = other.querySelector('.faq-question');
+                    if (otherBtn) otherBtn.setAttribute('aria-expanded', 'false');
+                });
                 if (!isOpen) {
                     item.classList.add('open');
+                    questionBtn.setAttribute('aria-expanded', 'true');
+                } else {
+                    questionBtn.setAttribute('aria-expanded', 'false');
                 }
             });
         }

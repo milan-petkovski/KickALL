@@ -32,7 +32,8 @@
     "guestUptime": "99.98% UPTIME",
     "guestProcessedMsgs": "Obrađenih Poruka u Chatu",
     "guestLatency": "<15ms Odziv",
-    "guestStreams": "Aktivnih Kick Strimova"
+    "guestStreams": "Aktivnih Kick Strimova",
+    "trustText": "Kick strimera već aktivno koristi KickALL"
   },
   "statsBar": {
     "msgs": "Obrađenih Chat Poruka",
@@ -247,7 +248,7 @@
     "resolvedTickets": "Rešeni tiketi",
     "log1": "Gledalac: \"Kako da aktiviram kickot?\"",
     "log2": "\"Samo klikni na dugme Pokreni kickot i poveži kanal.\"",
-    "log3": "Podrška uspešno zatvorena. ⭐⭐⭐⭐⭐",
+    "log3": "Podrška uspešno zatvorena (ocena 5/5).",
     "tagSupport": "Podrška",
     "tagResolved": "REŠENO"
   },
@@ -615,13 +616,13 @@
     "viewer": "Gledalac",
     "bot": "kickot",
     "unnamedViewer": "Neimenovani gledalac",
-    "cooldownError": "⚠️ Greška: Komanda {cmd} je na cooldown-u još {time}s! (Originalno 10 min)",
-    "bacihejtTrigger": "👿 <strong>!bacihejt</strong> pokrenut od strane {user} ka korisniku <strong>{target}</strong>. <br>{reply}<br>{user} je dobio <strong>{points}</strong> poena! (Ukupno: <strong>{total}</strong> poena)",
-    "loveSent": "❤️ <strong>!posaljiljubav</strong> poslata za <strong>{target}</strong>. <br>{reply}<br>{user} je dobio <strong>{points}</strong> poena! (Ukupno: <strong>{total}</strong> poena)",
-    "pointsResponse": "🏆 Korisnik {user} trenutno ima <strong>{points}</strong> poena na ovom kanalu. Rang: <strong>Kralj chata</strong>.",
-    "weather": "🌍 Vreme u Beograd: ⛅ Delimično oblačno | 🌡️ 26°C (oseća se 25°C) | 💧 Vlažnost: 32% | 💨 Vetar: 22 km/h",
+    "cooldownError": "[PAUZA] Greška: Komanda {cmd} je na cooldown-u još {time}s! (Originalno 10 min)",
+    "bacihejtTrigger": "<strong>!bacihejt</strong> pokrenut od strane {user} ka korisniku <strong>{target}</strong>. <br>{reply}<br>{user} je dobio <strong>{points}</strong> poena! (Ukupno: <strong>{total}</strong> poena)",
+    "loveSent": "<strong>!posaljiljubav</strong> poslata za <strong>{target}</strong>. <br>{reply}<br>{user} je dobio <strong>{points}</strong> poena! (Ukupno: <strong>{total}</strong> poena)",
+    "pointsResponse": "[POENI] Korisnik {user} trenutno ima <strong>{points}</strong> poena na ovom kanalu. Rang: <strong>Kralj chata</strong>.",
+    "weather": "Vreme u Beogradu: Delimično oblačno | 26°C (oseća se 25°C) | Vlažnost: 32% | Vetar: 22 km/h",
     "info": "Najkraći rat u istoriji trajao je svega 38 minuta!",
-    "unknownCmd": "❌ Nepoznata komanda. Dostupne komande su: <strong>!vreme Beograd</strong>, <strong>!info</strong>.",
+    "unknownCmd": "Nepoznata komanda. Dostupne komande su: <strong>!vreme Beograd</strong>, <strong>!info</strong>.",
     "audioError": "Audio API nije podržan."
   },
   "userProfile": {

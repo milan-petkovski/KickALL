@@ -35,10 +35,26 @@
     <!-- Optimizacija mrežnih resursa Brže učitavanje -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://www.googletagmanager.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://milanwebportal.app.fungies.io">
     <link rel="dns-prefetch" href="https://rcukparptzzyssqdmydt.supabase.co">
     <link rel="dns-prefetch" href="https://kickall.app">
+
+    <!-- Preload kritičnih web fontova (sprečava CLS font-swap) -->
+    <link rel="preload" href="https://fonts.gstatic.com/s/spacegrotesk/v22/V8mDoQDjQSkFtoMM3T6r8E7mPb94C_k3HqUtEw.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2" as="font" type="font/woff2" crossorigin>
+
+    <!-- Preload Hero Logo -->
+    <link rel="preload" href="assets/kickall.webp" as="image" type="image/webp" fetchpriority="high">
+
+    <!-- Preload kritičnih stilova -->
+    <link rel="preload" href="css/base.css?v=20260917-v2" as="style">
+    <link rel="preload" href="css/style.css?v=20260917-v2" as="style">
+    <link rel="preload" href="css/landing-premium.css?v=20260917-v2" as="style">
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -186,6 +202,82 @@
                 }
             },
             {
+                "@type": "SoftwareApplication",
+                "@id": "https://kickall.app/#kickot",
+                "name": "Kickot — Kick Chatbot & Moderacija",
+                "alternateName": ["Kickot", "Kick Bot", "Kick Chatbot"],
+                "operatingSystem": "Web",
+                "applicationCategory": "UtilitiesApplication",
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD",
+                    "description": "Besplatan chatbot za Kick strimere sa pametnom moderacijom i komandama"
+                },
+                "featureList": [
+                    "Automatska moderacija i anti-spam zaštita",
+                    "Prilagođene komande i tajmeri",
+                    "Poeni i mini igre u čatu",
+                    "Watchtime praćenje i leaderboard"
+                ],
+                "description": "Kickot je napredni chatbot za Kick kanale koji pruža automatizovanu moderaciju, prilagođene komande, tajmere i mini igre u realnom vremenu.",
+                "url": "https://kickall.app/kickot/dashboard",
+                "softwareVersion": "2.5",
+                "author": {
+                    "@id": "https://kickall.app/#organization"
+                }
+            },
+            {
+                "@type": "SoftwareApplication",
+                "@id": "https://kickall.app/#kickan",
+                "name": "Kickan — Analitika & Telemetrija",
+                "alternateName": ["Kickan", "Kick Analytics", "Kick Telemetrija"],
+                "operatingSystem": "Web",
+                "applicationCategory": "BusinessApplication",
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD",
+                    "description": "Praćenje rasta gledalaca i performansi Kick strima"
+                },
+                "featureList": [
+                    "Grafikoni rasta gledalaca u realnom vremenu",
+                    "Analiza aktivnosti i frekvencije poruka u čatu",
+                    "Istorija strim sesija i trendovi"
+                ],
+                "description": "Kickan je studio za analitiku i telemetriju koji Kick strimerima pruža uvid u rast publike, angažovanje u čatu i istorijske trendove strima.",
+                "url": "https://kickall.app/kickan/dashboard",
+                "softwareVersion": "2.0",
+                "author": {
+                    "@id": "https://kickall.app/#organization"
+                }
+            },
+            {
+                "@type": "SoftwareApplication",
+                "@id": "https://kickall.app/#kickov",
+                "name": "Kickov — OBS Overleji & Alerti",
+                "alternateName": ["Kickov", "Kick Overlays", "Kick OBS Alerts"],
+                "operatingSystem": "Web",
+                "applicationCategory": "MultimediaApplication",
+                "offers": {
+                    "@type": "Offer",
+                    "price": "0",
+                    "priceCurrency": "USD",
+                    "description": "Besplatni browser source strim overleji za OBS Studio i Streamlabs"
+                },
+                "featureList": [
+                    "Dinamični alerti sa zvučnim efektima",
+                    "Moderni chat boksovi sa emotikonima",
+                    "Nisko kašnjenje i 100% OBS kompatibilnost"
+                ],
+                "description": "Kickov je studio za prilagodljive browser source strim overleje i alerte sa nultim kašnjenjem za OBS i Streamlabs.",
+                "url": "https://kickall.app/kickov/dashboard",
+                "softwareVersion": "2.0",
+                "author": {
+                    "@id": "https://kickall.app/#organization"
+                }
+            },
+            {
                 "@type": "FAQPage",
                 "@id": "https://kickall.app/#faq",
                 "mainEntity": [
@@ -235,17 +327,20 @@
     }
     </script>
 
-    <!-- Fontovi -->
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
+    <!-- Fontovi (Asinhrono učitavanje bez blokiranja renderovanja) -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" media="print" onload="this.media='all'">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap">
+    </noscript>
 
     <!-- Favicon i Stilovi -->
     <link rel="icon" href="/assets/favicon.ico" sizes="48x48" type="image/x-icon">
     <link rel="shortcut icon" href="/assets/favicon.ico">
     <link rel="apple-touch-icon" href="/assets/logo.webp">
-    <link rel="stylesheet" href="css/base.css?v=20260915-v2">
-    <link rel="stylesheet" href="css/style.css?v=20260915-v2">
+    <link rel="stylesheet" href="css/base.css?v=20260917-v2">
+    <link rel="stylesheet" href="css/style.css?v=20260917-v2">
+    <link rel="stylesheet" href="css/landing-premium.css?v=20260917-v2">
 
     <!-- Service Worker Registration -->
     <script nonce="kickall-inline-core">
@@ -260,10 +355,10 @@
     </script>
 
     <!-- Mobile Performance Optimizations -->
-    <script src="js/mobile-optimization.js?v=20260915-v2" defer></script>
+    <script src="js/mobile-optimization.js?v=20260917-v2" defer></script>
 
     <!-- Toast Notification System -->
-    <script src="js/toast.js?v=20260915-v2" defer></script>
+    <script src="js/toast.js?v=20260917-v2" defer></script>
 </head>
 
 <body>
@@ -274,6 +369,7 @@
     <div class="glow-bg" aria-hidden="true">
         <div class="blob blob-violet"></div>
         <div class="blob blob-green"></div>
+        <div class="blob blob-cyan"></div>
     </div>
 
     <!-- Navigacija -->
@@ -315,8 +411,8 @@
             <div class="nav-actions">
                 <!-- Language Switcher -->
                 <div class="lang-switcher">
-                    <button class="lang-btn active" id="btn-sr">SR</button>
-                    <button class="lang-btn" id="btn-en">EN</button>
+                    <button class="lang-btn active" id="btn-sr" aria-label="Srpski jezik">SR</button>
+                    <button class="lang-btn" id="btn-en" aria-label="English language">EN</button>
                 </div>
 
                 <!-- Guest Login Button -->
@@ -403,6 +499,22 @@
                         </svg>
                         <span data-i18n="hero.note">Besplatan plan dostupan. Bez kreditne kartice.</span>
                     </p>
+                    <div class="hero-trust-stack">
+                        <div class="trust-avatars">
+                            <span class="trust-avatar av-1">T</span>
+                            <span class="trust-avatar av-2">M</span>
+                            <span class="trust-avatar av-3">I</span>
+                            <span class="trust-avatar av-4">K</span>
+                            <span class="trust-badge-mini" aria-label="Verified">
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </span>
+                        </div>
+                        <div class="trust-text">
+                            <span class="trust-bold">2.840+</span> <span data-i18n="hero.trustText">Kick strimera već aktivno koristi KickALL</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Dynamic Real-Time Hero Visual (Logged-In User Profile vs Guest Telemetry) -->
@@ -487,7 +599,7 @@
                         </div>
                         <div class="bar-stat-content">
                             <span class="bar-stat-val" data-target="50" data-suffix="+" id="statBarWidgets">0</span>
-                            <span class="bar-stat-lbl" data-i18n="statsBar.widgets">Ugradjenih komandi</span>
+                            <span class="bar-stat-lbl" data-i18n="statsBar.widgets">Ugrađenih komandi</span>
                         </div>
                     </div>
                     <div class="bar-stat-card">
@@ -548,7 +660,7 @@
                             <li><span class="checkmark"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span> <span data-i18n="ecosystem.kickot.f3">Poeni i chat mini
                                     igre</span></li>
                         </ul>
-                        <a href="kickot/dashboard.html" class="card-action-link font-bold"
+                        <a href="/kickot/dashboard" class="card-action-link font-bold"
                             data-i18n="ecosystem.connectKickot">
                             Poveži kickot →
                         </a>
@@ -648,6 +760,12 @@
                     </div>
 
                 </div>
+
+                <!-- AEO / GEO Factual Ecosystem Overview for AI Agents & Search Engines -->
+                <div class="aeo-overview-box" id="kickallOverview" style="margin-top: 2.2rem; padding: 1.5rem 1.75rem; background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: 16px;">
+                    <h3 style="margin: 0 0 0.6rem; font-size: 1.15rem; font-weight: 700; color: #53fc18;">Šta je KickALL i koje alate nudi za Kick strimere?</h3>
+                    <p style="margin: 0; font-size: 0.95rem; line-height: 1.65; color: #cbd5e1;">KickALL je sveobuhvatni cloud SaaS ekosistem kreiran namenski za Kick.com strimere. Platforma objedinjuje četiri nezavisna studija: <strong>Kickot</strong> (napredni chatbot sa pametnom moderacijom, prilagođenim komandama, tajmerima i chat igrama), <strong>Kickaj</strong> (giveaway studio za interaktivna izvlačenja nagrada uz Točak Sreće, Slot Mašinu i Neon Rulet na 240 FPS), <strong>Kickan</strong> (detaljna analitika, telemetrija i praćenje rasta gledalaca) i <strong>Kickov</strong> (prilagodljivi OBS browser source overleji i alerti bez kašnjenja). Svi moduli rade u realnom vremenu uz zvanični Kick OAuth 2.0 i brze WebSocket konekcije.</p>
+                </div>
             </div>
         </section>
 
@@ -710,7 +828,7 @@
                                         <button class="cmd-badge" data-cmd="!poeni" id="cmdPoeni">!info</button>
 
                                     </div>
-                                    <a href="kickot/dashboard.html" class="btn btn-primary mt-4 inline-flex"
+                                    <a href="/kickot/dashboard" class="btn btn-primary mt-4 inline-flex"
                                         style="margin-top: 20px;" data-i18n="kickot.connectBtn">
                                         Poveži kickot za svoj kanal
                                     </a>
@@ -719,6 +837,7 @@
                                     <div class="chat-header">
                                         <div class="chat-live-badge"><span class="pulse-dot"></span> <span
                                                 data-i18n="chat.live">UŽIVO CHAT</span></div>
+                                        <span class="chat-sim-tag" style="background: rgba(139, 92, 246, 0.2); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.4); border-radius: 9999px; padding: 2px 8px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;">DEMO SIMULACIJA</span>
                                         <span class="chat-viewers" data-i18n="chat.viewers">1.248 gledalaca</span>
                                     </div>
                                     <div class="chat-messages" id="chatMessages">
@@ -731,12 +850,16 @@
                                     </div>
                                     <form class="chat-input-area" id="chatForm">
                                         <input type="text" id="chatInput" placeholder="Napiši poruku ili komandu..."
-                                            autocomplete="off" data-i18n-placeholder="chat.placeholder">
+                                            autocomplete="off" data-i18n-placeholder="chat.placeholder"
+                                            aria-label="Unos demo chat poruke">
                                         <button type="submit" class="chat-send-btn" id="chatSendBtn"
                                             data-i18n="chat.send">
                                             Pošalji
                                         </button>
                                     </form>
+                                    <div class="chat-sim-notice" style="padding: 6px 12px; font-size: 0.72rem; color: var(--color-text-muted); text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+                                        Interaktivni demo sandbox: poruke se obrađuju lokalno i ne šalju se na stvarni Kick čet.
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1063,7 +1186,7 @@
 
                 <div class="faq-accordion" id="faqAccordion">
                     <div class="faq-item" data-cat="chatbot">
-                        <button type="button" class="faq-question">
+                        <button type="button" class="faq-question" id="faq-btn-1" aria-expanded="false" aria-controls="faq-ans-1">
                             <span data-i18n="faq.q1.question">Kako da povežem Kickot chatbot sa mojim Kick
                                 kanalom?</span>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1071,7 +1194,7 @@
                                 <polyline points="6 9 12 15 18 9" />
                             </svg>
                         </button>
-                        <div class="faq-answer">
+                        <div class="faq-answer" id="faq-ans-1" role="region" aria-labelledby="faq-btn-1">
                             <p data-i18n="faq.q1.answer">Dovoljno je da klikneš na dugme "Prijavi se preko Kicka",
                                 autorizuješ nalog i u
                                 Dashboard-u aktiviraš Kickot bota. Bot će se automatski pridružiti tvom chatu.</p>
@@ -1079,14 +1202,14 @@
                     </div>
 
                     <div class="faq-item" data-cat="pricing">
-                        <button type="button" class="faq-question">
+                        <button type="button" class="faq-question" id="faq-btn-2" aria-expanded="false" aria-controls="faq-ans-2">
                             <span data-i18n="faq.q2.question">Da li je KickALL besplatan za korišćenje?</span>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" class="faq-icon">
                                 <polyline points="6 9 12 15 18 9" />
                             </svg>
                         </button>
-                        <div class="faq-answer">
+                        <div class="faq-answer" id="faq-ans-2" role="region" aria-labelledby="faq-btn-2">
                             <p data-i18n="faq.q2.answer">Da! Osnovni Kickot chatbot sa komandama i moderacijom je
                                 potpuno besplatan zauvek. Za
                                 napredne alate i neograničenu prilagodljivost dostupni su Pro i Elite paketi.</p>
@@ -1094,7 +1217,7 @@
                     </div>
 
                     <div class="faq-item" data-cat="overlay">
-                        <button type="button" class="faq-question">
+                        <button type="button" class="faq-question" id="faq-btn-3" aria-expanded="false" aria-controls="faq-ans-3">
                             <span data-i18n="faq.q3.question">Kako ubacujem alertove i vidžete u OBS ili
                                 Streamlabs?</span>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1102,7 +1225,7 @@
                                 <polyline points="6 9 12 15 18 9" />
                             </svg>
                         </button>
-                        <div class="faq-answer">
+                        <div class="faq-answer" id="faq-ans-3" role="region" aria-labelledby="faq-btn-3">
                             <p data-i18n="faq.q3.answer">U svom Dashboard-u generišeš jedinstveni Browser Source URL
                                 link i nalepiš ga kao novi
                                 Browser izvor u OBS / Streamlabs softveru. Izmena podešavanja se primenjuje uživo bez
@@ -1111,14 +1234,14 @@
                     </div>
 
                     <div class="faq-item" data-cat="oauth">
-                        <button type="button" class="faq-question">
+                        <button type="button" class="faq-question" id="faq-btn-4" aria-expanded="false" aria-controls="faq-ans-4">
                             <span data-i18n="faq.q4.question">Da li su moji podaci i Kick nalog bezbedni?</span>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" class="faq-icon">
                                 <polyline points="6 9 12 15 18 9" />
                             </svg>
                         </button>
-                        <div class="faq-answer">
+                        <div class="faq-answer" id="faq-ans-4" role="region" aria-labelledby="faq-btn-4">
                             <p data-i18n="faq.q4.answer">Apsolutno. Koristimo zvaničnu Kick OAuth 2.0 autentifikaciju sa
                                 S256 PKCE standardom za
                                 enkripciju. Mi nikada nemamo pristup tvojim lozinkama niti privatnim pristupnim
@@ -1127,14 +1250,14 @@
                     </div>
 
                     <div class="faq-item" data-cat="chatbot">
-                        <button type="button" class="faq-question">
+                        <button type="button" class="faq-question" id="faq-btn-5" aria-expanded="false" aria-controls="faq-ans-5">
                             <span data-i18n="faq.q5.question">Mogu li praviti sopstvene komande i alertove?</span>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" class="faq-icon">
                                 <polyline points="6 9 12 15 18 9" />
                             </svg>
                         </button>
-                        <div class="faq-answer">
+                        <div class="faq-answer" id="faq-ans-5" role="region" aria-labelledby="faq-btn-5">
                             <p data-i18n="faq.q5.answer">Da! Kroz Dashboard možete kreirati do 50 komandi na besplatnom
                                 planu, dok na ostalima možete neograničeno. Samo posetite komande panel u okviru
                                 Dashboard-a!</p>
@@ -1142,14 +1265,14 @@
                     </div>
 
                     <div class="faq-item" data-cat="giveaway">
-                        <button type="button" class="faq-question">
+                        <button type="button" class="faq-question" id="faq-btn-6" aria-expanded="false" aria-controls="faq-ans-6">
                             <span data-i18n="faq.q6.question">Šta je Kickaj i kako radi Kickaj giveaway alat?</span>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2" class="faq-icon">
                                 <polyline points="6 9 12 15 18 9" />
                             </svg>
                         </button>
-                        <div class="faq-answer">
+                        <div class="faq-answer" id="faq-ans-6" role="region" aria-labelledby="faq-btn-6">
                             <p data-i18n="faq.q6.answer">Kickaj je specijalizovani studio za nagradne igre (giveaway) na Kick.com platformi. Povezuje se na Kick čet u realnom vremenu, automatski beleži učesnike preko zadate ključne reči, primenjuje filtere za pratioce i pretplatnike, i vizualizuje izvlačenje pobednika kroz ultra-glatke animacije: Točak Sreće, Slot Mašinu ili Neon Rulet na 240 FPS uz zvučne efekte i automatsku verifikaciju.</p>
                         </div>
                     </div>
@@ -1252,7 +1375,7 @@
                             <div class="log-line text-green">
                                 <span class="log-time">11:47</span>
                                 <span class="log-tag log-resolved" data-i18n="support.tagResolved">REŠENO</span>
-                                <span class="log-msg" data-i18n="support.log3">Podrška uspešno zatvorena. ⭐⭐⭐⭐⭐</span>
+                                <span class="log-msg" data-i18n="support.log3">Podrška uspešno zatvorena (ocena 5/5).</span>
                             </div>
                         </div>
                     </div>
@@ -2141,9 +2264,9 @@
     </footer>
 
     <!-- Auth Modal -->
-    <div class="modal-backdrop" id="authModal">
+    <div class="modal-backdrop" id="authModal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
         <div class="auth-modal" id="authModalInner">
-            <button type="button" class="modal-close" id="authModalClose" aria-label="Close"
+            <button type="button" class="modal-close" id="authModalClose" aria-label="Zatvori prijavu"
                 data-i18n-aria-label="modal.close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
 
             <div class="modal-logo">
@@ -2152,6 +2275,7 @@
             </div>
 
             <div id="loginForm" class="auth-form auth-form-centered">
+                <h3 id="authModalTitle" class="sr-only">Prijava na KickALL</h3>
                 <p class="auth-modal-desc" data-i18n="auth.modalDesc">
                     Prijavi se preko svog Kick naloga da započneš.
                 </p>
@@ -2182,15 +2306,15 @@
     </button>
 
     <!-- Supabase SDK -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/config.js?v=20260915-v2"></script>
-    <script src="js/app.js?v=20260915-v2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+    <script src="js/config.js?v=20260917-v2" defer></script>
+    <script src="js/app.js?v=20260917-v2" defer></script>
 
     <!-- KickALL Data Layer & Analytics -->
-    <script src="js/data-layer.js?v=20260915-v2"></script>
-    <script src="js/route-tracking.js?v=20260915-v2"></script>
-    <script src="js/consent-banner.js?v=20260915-v2"></script>
-    <script src="js/analytics.js?v=20260915-v2"></script>
+    <script src="js/data-layer.js?v=20260917-v2" defer></script>
+    <script src="js/route-tracking.js?v=20260917-v2" defer></script>
+    <script src="js/consent-banner.js?v=20260917-v2" defer></script>
+    <script src="js/analytics.js?v=20260917-v2" defer></script>
 </body>
 
 </html>
