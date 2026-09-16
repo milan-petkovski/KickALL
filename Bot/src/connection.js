@@ -302,8 +302,8 @@ async function obradiPusherPoruku(data) {
             return;
         }
 
-        // Anti-spam filter (izuzimamo strimera)
-        if (userKey !== channelState.channelUsername.toLowerCase() && spam.spamFilter(chatroomId, username, poruka)) {
+        // Anti-spam filter (izuzimamo strimera i bot komande)
+        if (userKey !== channelState.channelUsername.toLowerCase() && !startsWithPrefix && spam.spamFilter(chatroomId, username, poruka)) {
             if (messageId) messenger.obrisiPoruku(chatroomId, messageId);
             return;
         }

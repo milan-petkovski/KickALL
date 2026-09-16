@@ -218,16 +218,44 @@ function dobijTrenutniDan() {
     return `${godina}-${mesec}-${dan}`;
 }
 
+const GLOBAL_BROADCAST_COMMANDS = new Set([
+    '!vreme', '!weather', '!vrijeme', '!uptime', '!igra',
+    '!topwatchtime', '!toplevel', '!topcoins',
+    '!store', '!prodavnica', '!shop', '!cinjenica', '!komande', '!commands',
+    '!queue', '!pesma', '!song', '!info',
+    '!limit', '!maxbet', '!limitbet'
+]);
+
+function getCooldownKey(kljuc, username) {
+    const rawKey = String(kljuc || '').trim();
+    const normKey = rawKey.startsWith('!') ? rawKey.toLowerCase() : `!${rawKey.toLowerCase()}`;
+    
+    // Broadcast komande gde je odgovor isti za sve gledaoce imaju kanalski cooldown
+    if (GLOBAL_BROADCAST_COMMANDS.has(normKey)) {
+        return normKey;
+    }
+    
+    // Sve interaktivne i lične komande (kazino, poeni, rank, duel...) imaju per-user cooldown
+    if (username) {
+        return `${normKey}::${String(username).toLowerCase()}`;
+    }
+    return normKey;
+}
+
 /**
- * Proverava i beleži cooldown za komandu
+ * Proverava i beleži cooldown za komandu.
+ * Podržava per-user cooldown i automatsko zakazivanje u red čekanja (queue)
+ * ukoliko komanda stigne dok je cooldown još aktivan.
  */
-function proveraKulauna(chatroomId, kljuc, username, customCooldownMs) {
+function proveraKulauna(chatroomId, kljuc, username, customCooldownMs, onReadyCallback) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return false;
     const sada   = Date.now();
-    const zadnji = channelState.cooldowns[kljuc] || 0;
+    
+    const storageKey = getCooldownKey(kljuc, username);
+    const zadnji = channelState.cooldowns[storageKey] || 0;
 
-    let limit = customCooldownMs;
+    let limit = typeof customCooldownMs === 'number' ? customCooldownMs : undefined;
     if (limit === undefined) {
         const cmdIme = kljuc.startsWith('!') ? kljuc.slice(1).toLowerCase() : kljuc.toLowerCase();
         if (channelState.customCommands && channelState.customCommands[cmdIme]) {
@@ -239,11 +267,46 @@ function proveraKulauna(chatroomId, kljuc, username, customCooldownMs) {
     }
 
     if (sada - zadnji < limit) {
-        const preostalo = ((limit - (sada - zadnji)) / 1000).toFixed(1);
-        log('WARN', `[${channelState.channelUsername || chatroomId}] [${username}] Komanda ${kljuc} na cooldown-u još ${preostalo}s`);
+        const preostaloMs = limit - (sada - zadnji);
+        const preostaloSec = (preostaloMs / 1000).toFixed(1);
+        log('WARN', `[${channelState.channelUsername || chatroomId}] [${username}] Komanda ${kljuc} na cooldown-u još ${preostaloSec}s`);
+
+        // Ako je obezbeđen callback za automatsko izvršenje kad istekne cooldown (queue)
+        if (typeof onReadyCallback === 'function') {
+            if (!channelState.queuedCommands) channelState.queuedCommands = {};
+            const queueKey = storageKey;
+
+            // Sprečavamo spam: maksimalno 1 komanda na čekanju po korisniku/komandi
+            if (channelState.queuedCommands[queueKey]) {
+                log('WARN', `[${channelState.channelUsername || chatroomId}] [${username}] Korisnik već ima komandu ${kljuc} u redu čekanja.`);
+                return true;
+            }
+
+            log('INFO', `[${channelState.channelUsername || chatroomId}] [${username}] Komanda ${kljuc} stavljena u red čekanja (izvršava se za ${preostaloSec}s).`);
+
+            const timer = setTimeout(() => {
+                const currentState = state.getChannelState(chatroomId);
+                if (currentState && currentState.queuedCommands) {
+                    delete currentState.queuedCommands[queueKey];
+                }
+                if (currentState && currentState.cooldowns) {
+                    currentState.cooldowns[storageKey] = Date.now();
+                }
+                try {
+                    onReadyCallback();
+                } catch (err) {
+                    log('ERR', `[${channelState.channelUsername || chatroomId}] Greška pri izvršavanju komande iz reda čekanja (${kljuc}): ${err.message}`);
+                }
+            }, preostaloMs);
+
+            if (timer && timer.unref) timer.unref();
+            channelState.queuedCommands[queueKey] = timer;
+        }
+
         return true;
     }
-    channelState.cooldowns[kljuc] = sada;
+
+    channelState.cooldowns[storageKey] = sada;
     return false;
 }
 

@@ -2675,6 +2675,7 @@ const defaultBuiltinCommands = [
   { id: 'builtin-slots', command: 'slot <ulog>, slots <ulog>', example: '!slot 100 ili !slots 100', response: 'Igraj slot mašinu sa poenima i osvoji do 10x nagrade.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'slots', category: 'Mini igre' },
   { id: 'builtin-coinflip', command: 'coinflip <pismo/glava> <ulog>, piskoglava, gamble, kockaj, flip', example: '!coinflip glava 100', response: 'Baci novčić (pismo/glava) za duplo ili ništa.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'coinflip', category: 'Mini igre' },
   { id: 'builtin-wheel', command: 'tocak <ulog>, wheel [iznos], spin [iznos]', example: '!tocak 100 ili !spin 100', response: 'Zavrti točak sreće za nasumične multiplikatore poena.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'tocak', category: 'Mini igre' },
+  { id: 'builtin-limit', command: 'limit, maxbet, limitbet', example: '!limit ili !maxbet', response: 'Prikazuje maksimalni dozvoljeni ulog (maxbet) za igre kockanja na ovom kanalu.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'limit', category: 'Mini igre' },
 
   // Song request
   { id: 'builtin-pesma', command: 'pesma [naziv], sr [naziv], song [naziv]', example: '!pesma Pesma od Izvodjaca ili YouTube link', response: 'Zatraži puštanje pesme na strimu po nazivu ili linku.', cooldown: 5000, min_rank: 'everyone', enabled: true, is_default: true, usage: 0, db_match_key: 'pesma', category: 'Song request' },
@@ -4900,6 +4901,16 @@ async function loadBotConfig() {
           if (document.getElementById('cfgPointsDailyStreak')) document.getElementById('cfgPointsDailyStreak').value = rankData.points_daily_streak ?? 150;
           if (document.getElementById('cfgPointsPerRaid')) document.getElementById('cfgPointsPerRaid').value = rankData.points_per_raid ?? 300;
 
+          if (rankData.max_gamble_amount !== undefined && rankData.max_gamble_amount !== null) {
+            if (document.getElementById('cfgMinigamesMaxBet')) document.getElementById('cfgMinigamesMaxBet').value = rankData.max_gamble_amount;
+            if (document.getElementById('cfgMaxGambleAmount')) document.getElementById('cfgMaxGambleAmount').value = rankData.max_gamble_amount;
+            if (currentChannelConfig) currentChannelConfig.max_gamble_amount = rankData.max_gamble_amount;
+          }
+          if (rankData.gamble_enabled !== undefined && rankData.gamble_enabled !== null) {
+            if (document.getElementById('cfgGambleEnabled')) document.getElementById('cfgGambleEnabled').checked = !!rankData.gamble_enabled;
+            if (currentChannelConfig) currentChannelConfig.gamble_enabled = !!rankData.gamble_enabled;
+          }
+
           if (Array.isArray(rankData.store_items) && currentChannelConfig) {
             currentChannelConfig.store_items = rankData.store_items;
             renderStoreItems();
@@ -4907,6 +4918,9 @@ async function loadBotConfig() {
           updateEconomyPreviews();
         }
       }).catch(() => { });
+
+    // Load mini games config (max_bet, enabled) from mini_games table
+    loadMinigamesConfig().catch(() => { });
 
     // Load auto announce list from auto_announces table
     getSbPanels().from('auto_messages')
@@ -6057,7 +6071,7 @@ function setupRealtimeChannels() {
   realtimeMarriagesSub = sb.channel('public:love_and_marriages_sub')
     .on('postgres_changes', {
       event: '*',
-      schema: 'panels',
+      schema: 'public',
       table: 'love_and_marriages',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
@@ -6069,7 +6083,7 @@ function setupRealtimeChannels() {
   realtimeMinigamesSub = sb.channel('public:mini_games_sub')
     .on('postgres_changes', {
       event: '*',
-      schema: 'panels',
+      schema: 'public',
       table: 'mini_games',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
@@ -6080,7 +6094,7 @@ function setupRealtimeChannels() {
   realtimeRankingSub = sb.channel('public:ranking_sub')
     .on('postgres_changes', {
       event: '*',
-      schema: 'panels',
+      schema: 'public',
       table: 'ranking',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
@@ -6091,7 +6105,7 @@ function setupRealtimeChannels() {
   realtimeModerationSub = sb.channel('public:moderation_sub')
     .on('postgres_changes', {
       event: '*',
-      schema: 'panels',
+      schema: 'public',
       table: 'moderation',
       filter: `channel_id=eq.${activeChannel.id}`
     }, () => {
@@ -9957,6 +9971,17 @@ async function saveEconomyConfig(silent = false) {
         updated_at: new Date().toISOString()
       }, { onConflict: 'channel_id,type' });
 
+    // Sinhronizacija sa mini_games tabelom
+    await sb.from('mini_games')
+      .upsert({
+        channel_id: activeChannel.id,
+        type: 'config',
+        enabled: ecoSettings.gamble_enabled,
+        max_bet: ecoSettings.max_gamble_amount,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'channel_id,type' })
+      .catch(() => { });
+
     if (error) {
       if (!silent) showToast('error', 'Greška pri čuvanju podešavanja ranking sistema!');
     } else {
@@ -10137,6 +10162,12 @@ async function loadMinigamesConfig(resetTab = false) {
       currentChannelConfig.max_gamble_amount = maxVal;
       currentChannelConfig.gamble_enabled = isEnabled;
     }
+  } else if (currentChannelConfig && currentChannelConfig.max_gamble_amount !== undefined && currentChannelConfig.max_gamble_amount !== null) {
+    const maxVal = currentChannelConfig.max_gamble_amount;
+    const isEnabled = currentChannelConfig.gamble_enabled ?? true;
+    if (document.getElementById('cfgMinigamesMaxBet')) document.getElementById('cfgMinigamesMaxBet').value = maxVal;
+    if (document.getElementById('cfgMaxGambleAmount')) document.getElementById('cfgMaxGambleAmount').value = maxVal;
+    if (document.getElementById('cfgGambleEnabled')) document.getElementById('cfgGambleEnabled').checked = isEnabled;
   }
 
   // Restore active sub-tab if saved and not resetting tab
@@ -10178,12 +10209,6 @@ async function saveMinigamesConfig(silent = false) {
   currentChannelConfig.gamble_enabled = gambleEnabled;
   currentChannelConfig.economy_settings = ecoSettings;
 
-  const fieldsToSave = {
-    max_gamble_amount: maxBetVal,
-    gamble_enabled: gambleEnabled,
-    economy_settings: ecoSettings
-  };
-
   const { error: mgError } = await sb.from('mini_games')
     .upsert({
       channel_id: activeChannel.id,
@@ -10193,12 +10218,21 @@ async function saveMinigamesConfig(silent = false) {
       updated_at: new Date().toISOString()
     }, { onConflict: 'channel_id,type' });
 
-  const { error } = await saveBotConfigFields(fieldsToSave);
+  // Takođe ažuriramo ranking tabelu kako bi oba izvora bila sinhronizovana
+  await sb.from('ranking')
+    .update({
+      gamble_enabled: gambleEnabled,
+      max_gamble_amount: maxBetVal,
+      updated_at: new Date().toISOString()
+    })
+    .eq('channel_id', activeChannel.id)
+    .eq('type', 'config')
+    .catch(() => { });
 
   updateMinigamesStatsDisplay();
 
   if (!silent) {
-    if (error || mgError) {
+    if (mgError) {
       showToast('error', 'Greška pri čuvanju podešavanja mini igara!');
     } else {
       showToast('success', 'Podešavanja mini igara su uspešno sačuvana!');

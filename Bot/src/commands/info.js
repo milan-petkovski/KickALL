@@ -468,7 +468,7 @@ function handleHelp(chatroomId, username) {
 
     // Kockanje
     if (channelState.feature_games !== false && channelState.gamble_enabled !== false) {
-        parts.push(`Kazino: ${prefix}slots, ${prefix}rulet, ${prefix}coinflip, ${prefix}tocak, ${prefix}duel`);
+        parts.push(`Kazino: ${prefix}slots, ${prefix}rulet, ${prefix}coinflip, ${prefix}tocak, ${prefix}duel, ${prefix}limit`);
     }
 
     // Ekonomija & Stats

@@ -29,14 +29,20 @@ function spamFilter(chatroomId, username, poruka) {
     const userKey = username.toLowerCase();
     
     // ── 1. Provera identičnih poruka ──────────────────────────────────────────
-    // Normalizujemo (skidamo zero-width karaktere) da bi "ista poruka + nevidljivi
-    // karakter na kraju" i dalje bila prepoznata kao duplikat.
-    const kljucIdenticna = `${userKey}::${normalizujZaPoredjenje(poruka)}`;
-    if (!channelState.spamTracker[kljucIdenticna]) channelState.spamTracker[kljucIdenticna] = [];
-    const windowIdenticnaTime = channelState.SPAM_WINDOW_MS !== undefined ? channelState.SPAM_WINDOW_MS : config.SPAM_WINDOW_MS;
-    channelState.spamTracker[kljucIdenticna] = channelState.spamTracker[kljucIdenticna].filter(t => sada - t < windowIdenticnaTime);
-    channelState.spamTracker[kljucIdenticna].push(sada);
-    const countIdenticna = channelState.spamTracker[kljucIdenticna].length;
+    // Komande (poruke koje počinju sa prefiksom kanala ili '!') ne podležu proveri identičnih poruka
+    // jer je legitimno da korisnici uzastopno igraju igre (npr. !rulet 0 5000, !tocak 5000)
+    const jeKomanda = poruka.startsWith(channelState.PREFIX || '!') || poruka.startsWith('!');
+    let countIdenticna = 0;
+    if (!jeKomanda) {
+        // Normalizujemo (skidamo zero-width karaktere) da bi "ista poruka + nevidljivi
+        // karakter na kraju" i dalje bila prepoznata kao duplikat.
+        const kljucIdenticna = `${userKey}::${normalizujZaPoredjenje(poruka)}`;
+        if (!channelState.spamTracker[kljucIdenticna]) channelState.spamTracker[kljucIdenticna] = [];
+        const windowIdenticnaTime = channelState.SPAM_WINDOW_MS !== undefined ? channelState.SPAM_WINDOW_MS : config.SPAM_WINDOW_MS;
+        channelState.spamTracker[kljucIdenticna] = channelState.spamTracker[kljucIdenticna].filter(t => sada - t < windowIdenticnaTime);
+        channelState.spamTracker[kljucIdenticna].push(sada);
+        countIdenticna = channelState.spamTracker[kljucIdenticna].length;
+    }
 
     // ── 2. Provera brzog kucanja (bilo kojih poruka) ──────────────────────────
     if (!channelState.rapidTracker[userKey]) channelState.rapidTracker[userKey] = [];
@@ -49,19 +55,17 @@ function spamFilter(chatroomId, username, poruka) {
     const windowIdenticna = channelState.SPAM_WINDOW_MS !== undefined ? channelState.SPAM_WINDOW_MS : config.SPAM_WINDOW_MS;
 
     // Ako je dostignut limit za identične poruke
-    if (countIdenticna === limitIdenticna) {
+    if (!jeKomanda && countIdenticna === limitIdenticna) {
         const zadnjiSpam = channelState.lastSpamPenalty[userKey] || 0;
         if (sada - zadnjiSpam >= config.SPAM_PENALTY_COOLDOWN_MS) {
-            if (!poruka.startsWith(channelState.PREFIX || '!')) {
-                smanjiPoruku(chatroomId, username, 1);
-                channelState.porukePosleAnnounce = Math.max(0, channelState.porukePosleAnnounce - 1);
-            }
+            smanjiPoruku(chatroomId, username, 1);
+            channelState.porukePosleAnnounce = Math.max(0, channelState.porukePosleAnnounce - 1);
             channelState.lastSpamPenalty[userKey] = sada;
         }
 
         const warningCooldown = Math.max(windowIdenticna, 60000);
         if (sada - zadnjeUpozorenje > warningCooldown) {
-            posaljiPoruku(chatroomId, `@${username}, molim te ne spamuj u chatu! 🙏`);
+            posaljiPoruku(chatroomId, `@${username}, molim te ne spamuj u chatu!`);
             channelState.lastWarned[userKey] = sada;
             log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [identična poruka]: upozoren ${username} (${countIdenticna}x ista poruka)`);
         } else {
@@ -70,7 +74,7 @@ function spamFilter(chatroomId, username, poruka) {
         return true;
     }
 
-    if (countIdenticna > limitIdenticna) {
+    if (!jeKomanda && countIdenticna > limitIdenticna) {
         log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [identična poruka]: blokirano od ${username} (${countIdenticna}x ista poruka)`);
         return true;
     }
@@ -79,7 +83,7 @@ function spamFilter(chatroomId, username, poruka) {
     if (countRapid === config.RAPID_MSG_THRESHOLD) {
         const zadnjiSpam = channelState.lastSpamPenalty[userKey] || 0;
         if (sada - zadnjiSpam >= config.SPAM_PENALTY_COOLDOWN_MS) {
-            if (!poruka.startsWith(channelState.PREFIX || '!')) {
+            if (!jeKomanda) {
                 smanjiPoruku(chatroomId, username, 1);
                 channelState.porukePosleAnnounce = Math.max(0, channelState.porukePosleAnnounce - 1);
             }
@@ -88,7 +92,7 @@ function spamFilter(chatroomId, username, poruka) {
 
         const warningCooldown = Math.max(windowIdenticna, 60000);
         if (sada - zadnjeUpozorenje > warningCooldown) {
-            posaljiPoruku(chatroomId, `@${username}, molim te ne spamuj u chatu! 🙏`);
+            posaljiPoruku(chatroomId, `@${username}, molim te ne spamuj u chatu!`);
             channelState.lastWarned[userKey] = sada;
             log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [brzo kucanje]: upozoren ${username} (${countRapid}x brze poruke)`);
         } else {

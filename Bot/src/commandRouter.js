@@ -158,12 +158,16 @@ const defaultBuiltinRanks = {
     'daily': 'everyone',
     'dnevna': 'everyone',
     'give': 'everyone',
+    'daj': 'everyone',
     'givepoints': 'everyone',
     'dajpoene': 'everyone',
     'toplevel': 'everyone',
     'topxp': 'everyone',
     
     // Kockanje
+    'limit': 'everyone',
+    'maxbet': 'everyone',
+    'limitbet': 'everyone',
     'slots': 'everyone',
     'slot': 'everyone',
     'roulette': 'everyone',
@@ -176,6 +180,7 @@ const defaultBuiltinRanks = {
     'tocak': 'everyone',
     'wheel': 'everyone',
     'spin': 'everyone',
+    'duel': 'everyone',
     'dvoboj': 'everyone',
     'accept': 'everyone',
     
@@ -443,7 +448,9 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         if (porukaNormalized.startsWith('!rank')) target = porukaSredjena.slice(5).trim();
         else if (porukaNormalized.startsWith('!level')) target = porukaSredjena.slice(6).trim();
         else target = porukaSredjena.slice(3).trim();
-        if (utils.proveraKulauna(chatroomId, '!rank', username)) return;
+        if (utils.proveraKulauna(chatroomId, '!rank', username, undefined, () => {
+            economy.handleRank(chatroomId, username, target);
+        })) return;
         economy.handleRank(chatroomId, username, target);
         return;
     }
@@ -454,27 +461,38 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         else if (porukaNormalized.startsWith('!poeni')) target = porukaSredjena.slice(6).trim();
         else if (porukaNormalized.startsWith('!coins')) target = porukaSredjena.slice(6).trim();
         else target = porukaSredjena.slice(4).trim();
-        if (utils.proveraKulauna(chatroomId, '!points', username)) return;
+        if (utils.proveraKulauna(chatroomId, '!points', username, undefined, () => {
+            economy.handlePoints(chatroomId, username, target);
+        })) return;
         economy.handlePoints(chatroomId, username, target);
         return;
     }
 
     if (porukaNormalized === '!daily' || porukaNormalized === '!dnevna') {
-        if (utils.proveraKulauna(chatroomId, '!daily', username)) return;
+        if (utils.proveraKulauna(chatroomId, '!daily', username, undefined, () => {
+            economy.handleDaily(chatroomId, username);
+        })) return;
         economy.handleDaily(chatroomId, username);
         return;
     }
 
-    if (porukaNormalized.startsWith('!give ') || porukaNormalized.startsWith('!dajpoene ') || porukaNormalized.startsWith('!givepoints ')) {
+    if (
+        porukaNormalized === '!give' || porukaNormalized.startsWith('!give ') ||
+        porukaNormalized === '!daj' || porukaNormalized.startsWith('!daj ') ||
+        porukaNormalized === '!givepoints' || porukaNormalized.startsWith('!givepoints ') ||
+        porukaNormalized === '!dajpoene' || porukaNormalized.startsWith('!dajpoene ')
+    ) {
         let rest = '';
         if (porukaNormalized.startsWith('!give ')) rest = porukaSredjena.slice(6).trim();
+        else if (porukaNormalized.startsWith('!daj ')) rest = porukaSredjena.slice(5).trim();
+        else if (porukaNormalized.startsWith('!givepoints ')) rest = porukaSredjena.slice(12).trim();
         else if (porukaNormalized.startsWith('!dajpoene ')) rest = porukaSredjena.slice(10).trim();
-        else rest = porukaSredjena.slice(12).trim();
-        const parts = rest.split(/\s+/);
-        const target = parts[0] || '';
-        const amount = parts[1] || '';
+
+        const parts = rest ? rest.split(/\s+/).filter(Boolean) : [];
+        const arg1 = parts[0] || '';
+        const arg2 = parts[1] || '';
         if (utils.proveraKulauna(chatroomId, '!give', username)) return;
-        economy.handleGivePoints(chatroomId, username, target, amount);
+        economy.handleGivePoints(chatroomId, username, arg1, arg2);
         return;
     }
 
@@ -496,29 +514,81 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
     }
 
     // ─── KOCKANJE & KAZINO ──────────────────────────────────────────
-    // Detekcija obrnutog redosleda: "200 !slot" → jasna poruka greške
-    if (/^\d+\s+!slots?$/.test(porukaNormalized)) {
-        messenger.posaljiPoruku(chatroomId, `@${username} Ispravna upotreba: !slot [iznos] (npr. !slot 200)`);
+    // Pametno prepoznavanje obrnutog unosa: "100 !slot", "100 !tocak", "all !spin", itd.
+    const reverseGamblingMatch = porukaNormalized.match(/^(\d+|all|sve|half|pola)\s+!(slots?|tocak|wheel|spin|coinflip|flip|rulet|roulette)$/i);
+    if (reverseGamblingMatch) {
+        if (channelState.feature_games === false) return;
+        const revAmount = reverseGamblingMatch[1];
+        const revCmd = reverseGamblingMatch[2].toLowerCase();
+
+        if (revCmd === 'slot' || revCmd === 'slots') {
+            if (utils.proveraKulauna(chatroomId, '!slots', username, undefined, () => {
+                gambling.handleSlots(chatroomId, username, revAmount);
+            })) return;
+            gambling.handleSlots(chatroomId, username, revAmount);
+            return;
+        }
+
+        if (revCmd === 'tocak' || revCmd === 'wheel' || revCmd === 'spin') {
+            if (utils.proveraKulauna(chatroomId, '!wheel', username, undefined, () => {
+                gambling.handleWheel(chatroomId, username, revAmount);
+            })) return;
+            gambling.handleWheel(chatroomId, username, revAmount);
+            return;
+        }
+
+        if (revCmd === 'coinflip' || revCmd === 'flip') {
+            if (utils.proveraKulauna(chatroomId, '!coinflip', username, undefined, () => {
+                gambling.handleCoinflip(chatroomId, username, 'glava', revAmount);
+            })) return;
+            gambling.handleCoinflip(chatroomId, username, 'glava', revAmount);
+            return;
+        }
+
+        if (revCmd === 'rulet' || revCmd === 'roulette') {
+            messenger.posaljiPoruku(chatroomId, `🎡 @${username}, izaberi opciju i ulog za rulet! Upotreba: !rulet <crvena/crna/par/nepar/0-36> <iznos> (npr. !rulet crvena ${revAmount})`);
+            return;
+        }
+    }
+
+    // Provera limita maksimalnog uloga (maxbet)
+    if (porukaNormalized === '!limit' || porukaNormalized.startsWith('!limit ') ||
+        porukaNormalized === '!maxbet' || porukaNormalized.startsWith('!maxbet ') ||
+        porukaNormalized === '!limitbet' || porukaNormalized.startsWith('!limitbet ')) {
+        if (channelState.feature_games === false) return;
+        if (utils.proveraKulauna(chatroomId, '!limit', username, undefined, () => {
+            gambling.handleLimit(chatroomId, username);
+        })) return;
+        gambling.handleLimit(chatroomId, username);
         return;
     }
 
     if (porukaNormalized.startsWith('!slots') || porukaNormalized.startsWith('!slot')) {
         if (channelState.feature_games === false) return;
         const amount = porukaNormalized.startsWith('!slots') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(5).trim();
-        if (utils.proveraKulauna(chatroomId, '!slots', username)) return;
+        if (utils.proveraKulauna(chatroomId, '!slots', username, undefined, () => {
+            gambling.handleSlots(chatroomId, username, amount);
+        })) return;
         gambling.handleSlots(chatroomId, username, amount);
         return;
     }
 
-    if (porukaNormalized.startsWith('!roulette') || (porukaNormalized.startsWith('!rulet') && !porukaNormalized.startsWith('!ruskirulet'))) {
+    if (porukaNormalized.startsWith('!roulette') || porukaNormalized.startsWith('!rullete') || (porukaNormalized.startsWith('!rulet') && !porukaNormalized.startsWith('!ruskirulet'))) {
         if (channelState.feature_games === false) return;
         let rest = '';
         if (porukaNormalized.startsWith('!roulette')) rest = porukaSredjena.slice(9).trim();
+        else if (porukaNormalized.startsWith('!rullete')) rest = porukaSredjena.slice(8).trim();
         else rest = porukaSredjena.slice(6).trim();
-        const parts = rest.split(/\s+/);
+        const parts = rest.split(/\s+/).filter(Boolean);
+        if (parts.length > 2) {
+            messenger.posaljiPoruku(chatroomId, `@${username} U ruletu biraš jednu opciju i ulog! Upotreba: !rulet <crvena/crna/par/nepar/0-36> <iznos> (npr. !rulet 0 5000 ili !rulet crvena 1000)`);
+            return;
+        }
         const opt = parts[0] || '';
         const amount = parts[1] || '';
-        if (utils.proveraKulauna(chatroomId, '!roulette', username)) return;
+        if (utils.proveraKulauna(chatroomId, '!roulette', username, undefined, () => {
+            gambling.handleRoulette(chatroomId, username, opt, amount);
+        })) return;
         gambling.handleRoulette(chatroomId, username, opt, amount);
         return;
     }
@@ -541,7 +611,9 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         const parts = rest.split(/\s+/);
         const side = parts[0] || 'glava';
         const amount = parts[1] || parts[0] || '';
-        if (utils.proveraKulauna(chatroomId, '!coinflip', username)) return;
+        if (utils.proveraKulauna(chatroomId, '!coinflip', username, undefined, () => {
+            gambling.handleCoinflip(chatroomId, username, side, amount);
+        })) return;
         gambling.handleCoinflip(chatroomId, username, side, amount);
         return;
     }
@@ -552,18 +624,24 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         if (porukaNormalized.startsWith('!tocak')) amount = porukaSredjena.slice(6).trim();
         else if (porukaNormalized.startsWith('!wheel')) amount = porukaSredjena.slice(6).trim();
         else amount = porukaSredjena.slice(5).trim();
-        if (utils.proveraKulauna(chatroomId, '!wheel', username)) return;
+        if (utils.proveraKulauna(chatroomId, '!wheel', username, undefined, () => {
+            gambling.handleWheel(chatroomId, username, amount);
+        })) return;
         gambling.handleWheel(chatroomId, username, amount);
         return;
     }
 
-    if (porukaNormalized.startsWith('!duel ') || porukaNormalized.startsWith('!dvoboj ')) {
+    if (porukaNormalized === '!duel' || porukaNormalized.startsWith('!duel ') || porukaNormalized === '!dvoboj' || porukaNormalized.startsWith('!dvoboj ')) {
         if (channelState.feature_games === false) return;
-        const rest = porukaNormalized.startsWith('!duel ') ? porukaSredjena.slice(6).trim() : porukaSredjena.slice(8).trim();
-        const parts = rest.split(/\s+/);
+        let rest = '';
+        if (porukaNormalized.startsWith('!duel ')) rest = porukaSredjena.slice(6).trim();
+        else if (porukaNormalized.startsWith('!dvoboj ')) rest = porukaSredjena.slice(8).trim();
+        const parts = rest ? rest.split(/\s+/).filter(Boolean) : [];
         const target = parts[0] || '';
         const amount = parts[1] || '';
-        if (utils.proveraKulauna(chatroomId, '!duel', username)) return;
+        if (utils.proveraKulauna(chatroomId, '!duel', username, undefined, () => {
+            gambling.handleDuel(chatroomId, username, target, amount);
+        })) return;
         gambling.handleDuel(chatroomId, username, target, amount);
         return;
     }

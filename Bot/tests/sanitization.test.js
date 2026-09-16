@@ -42,6 +42,43 @@ test('Sanitization & Utils - proveraKulauna sprečava brzinske komande', () => {
     assert.equal(res2, true);
 });
 
+test('Sanitization & Utils - proveraKulauna razdvaja cooldown po korisnicima za igre', () => {
+    const chatroomId = 'test_room_cooldown_multiuser';
+    
+    // Korisnik 1 (Anastasija) pokreće točak
+    const res1 = proveraKulauna(chatroomId, '!wheel', 'anastasijauser055', 3000);
+    assert.equal(res1, false); // Nije u cooldownu
+
+    // Korisnik 2 (Milan) pokreće točak u istoj sekundi
+    const res2 = proveraKulauna(chatroomId, '!wheel', 'Milan_567', 3000);
+    assert.equal(res2, false); // Nije u cooldownu jer ima sopstveni cooldown!
+
+    // Korisnik 1 odmah ponovo pokušava
+    const res3 = proveraKulauna(chatroomId, '!wheel', 'anastasijauser055', 3000);
+    assert.equal(res3, true); // Korisnik 1 jeste u cooldownu
+});
+
+test('Sanitization & Utils - proveraKulauna stavlja komandu u red čekanja i izvršava je nakon cooldown-a', async () => {
+    const chatroomId = 'test_room_cooldown_queue';
+    const username = 'QueuePlayer';
+    let executed = false;
+
+    // 1. Prvi poziv prolazi odmah (cooldown 100ms radi brzog testa)
+    const res1 = proveraKulauna(chatroomId, '!slots', username, 100);
+    assert.equal(res1, false);
+
+    // 2. Drugi poziv je u cooldown-u, prosleđujemo callback
+    const res2 = proveraKulauna(chatroomId, '!slots', username, 100, () => {
+        executed = true;
+    });
+    assert.equal(res2, true);
+    assert.equal(executed, false);
+
+    // 3. Čekamo 120ms da tajmer u redu čekanja okine
+    await new Promise(r => setTimeout(r, 120));
+    assert.equal(executed, true);
+});
+
 test('Sanitization & Utils - formatTemplateMessage zamenjuje sve varijante template varijabli', () => {
     const { formatTemplateMessage } = require('../src/utils');
 

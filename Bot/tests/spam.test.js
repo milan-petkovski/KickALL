@@ -116,3 +116,19 @@ test('normalizujZaPoredjenje uklanja zero-width karaktere i normalizuje case/whi
     assert.equal(withVariationSelector, 'testporuka');
 });
 
+test('Spam - Bot komande ne podležu proveri identičnih poruka', () => {
+    const chatroomId = 'test_spam_room_commands';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.SPAM_THRESHOLD = 2;
+    channelState.channelUsername = 'TestStreamer';
+
+    const username = 'Milan_567';
+    const cmd = '!rulet 0 5000';
+
+    // Višestruko uzastopno slanje iste komande ne sme biti tretirano kao spam
+    assert.equal(spamFilter(chatroomId, username, cmd), false);
+    assert.equal(spamFilter(chatroomId, username, cmd), false);
+    assert.equal(spamFilter(chatroomId, username, cmd), false);
+    assert.equal(spamFilter(chatroomId, username, cmd), false);
+});
+

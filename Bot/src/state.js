@@ -117,6 +117,9 @@ function getChannelState(chatroomId) {
             rateLimitUntil: 0,
             queueDrainTimer: null,
 
+            // Red čekanja komandi (ako stignu dok je aktivan cooldown)
+            queuedCommands: {},
+
             // Kanalski tajmeri
             leaderboardSaveTimer: null,
             loveSaveTimer: null,

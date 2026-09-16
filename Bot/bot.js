@@ -542,6 +542,27 @@ async function start() {
                     }
                 }
             })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'mini_games'
+            }, async (payload) => {
+                const { new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (row && row.channel_id) {
+                    const chatroomId = String(row.channel_id);
+                    if (state.channels[chatroomId]) {
+                        logDebouncedUpdate(`mini_games::${chatroomId}`, `[REALTIME] Mini igre podešavanja osvežena za kanal.`);
+                        const mgMaxBet = row.max_bet !== undefined && row.max_bet !== null ? Number(row.max_bet) : null;
+                        if (mgMaxBet !== null && !isNaN(mgMaxBet)) {
+                            state.channels[chatroomId].max_gamble_amount = mgMaxBet;
+                        }
+                        if (row.enabled !== undefined) {
+                            state.channels[chatroomId].gamble_enabled = !!row.enabled;
+                        }
+                    }
+                }
+            })
             .subscribe();
 
         // 8. Osluškuj izmene korisničkih profila

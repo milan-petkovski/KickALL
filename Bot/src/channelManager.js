@@ -316,6 +316,12 @@ async function zaustaviKanal(chatroomId) {
             clearTimeout(channelState.economySaveTimer);
             channelState.economySaveTimer = null;
         }
+        if (channelState.queuedCommands) {
+            for (const timer of Object.values(channelState.queuedCommands)) {
+                if (timer) clearTimeout(timer);
+            }
+            channelState.queuedCommands = {};
+        }
 
         delete state.channels[chatroomId];
     } finally {
@@ -357,8 +363,26 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     channelState.announce_msg_enabled = dbConfig.announce_msg_enabled ?? true;
     channelState.moderationSettings = dbConfig.moderation_settings || {};
     channelState.currency_name = dbConfig.currency_name || 'Koins';
-    channelState.max_gamble_amount = dbConfig.max_gamble_amount || 5000;
-    channelState.gamble_enabled = dbConfig.gamble_enabled ?? true;
+
+    try {
+        const { data: mgData } = await database.sbPanels
+            .from('mini_games')
+            .select('enabled, max_bet')
+            .eq('channel_id', dbConfig.channel_id)
+            .eq('type', 'config')
+            .maybeSingle();
+
+        if (mgData && mgData.max_bet !== undefined && mgData.max_bet !== null) {
+            channelState.max_gamble_amount = Number(mgData.max_bet) || 5000;
+            channelState.gamble_enabled = mgData.enabled ?? true;
+        } else {
+            channelState.max_gamble_amount = Number(dbConfig.max_gamble_amount) || 5000;
+            channelState.gamble_enabled = dbConfig.gamble_enabled ?? true;
+        }
+    } catch (_) {
+        channelState.max_gamble_amount = Number(dbConfig.max_gamble_amount) || 5000;
+        channelState.gamble_enabled = dbConfig.gamble_enabled ?? true;
+    }
     channelState.first_interaction_bonus = dbConfig.first_interaction_bonus ?? 100;
     channelState.sub_multiplier = dbConfig.sub_multiplier ?? 2.0;
     channelState.sub_bonus_per_msg = dbConfig.sub_bonus_per_msg ?? 10;
