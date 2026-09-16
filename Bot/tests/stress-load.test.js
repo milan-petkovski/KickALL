@@ -98,11 +98,14 @@ test('Stress Test - Red poruka poštuje maksimalni kapacitet (MAX_QUEUE_SIZE = 5
 test('Security & Stress Test - HTTP server odbija zahteve koji prelaze 50KB limit (HTTP 413)', async () => {
     const { EventEmitter } = require('events');
 
+    const testSecret = process.env.INTERNAL_API_SECRET || 'test_secret_for_suite_auth_123';
+    process.env.INTERNAL_API_SECRET = testSecret;
+
     const req = new EventEmitter();
     req.method = 'POST';
     req.url = '/api/kick/test-ping';
     req.headers = {
-        'x-internal-token': process.env.INTERNAL_API_SECRET || 'test_secret_for_suite_auth_123',
+        'x-internal-token': testSecret,
         'content-type': 'application/x-www-form-urlencoded'
     };
     req.destroy = () => {};
