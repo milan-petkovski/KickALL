@@ -1,7 +1,10 @@
 const { posaljiPoruku, obrisiPoruku } = require('./messenger');
 const { log } = require('./utils');
 const state = require('./state');
-const { normalizujZaPoredjenje } = require('./spam');
+const { normalizujZaPoredjenje, despaceText } = require('./spam');
+
+const VIEW_BOT_SPAM_REGEX = /\b(viewbot|view-bot|follower\s*bot|chat\s*bot|typical\s*panels|save\s*99%|buy\s*followers|kickbotting|ownkick|kickview|cheap\s*viewers|viewer\s*bot)\b/i;
+const DOMAIN_URL_REGEX = /(https?:\/\/[^\s]+|([a-zA-Z0-9-]{2,}\.)+(com|net|org|io|gg|xyz|site|ru|tv|me|info|biz|live|top|online|store|club|app|dev)\b[^\s]*)/gi;
 
 /**
  * Checks a chat message against active moderation filters.
@@ -56,10 +59,20 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
         }
     }
     
-    // ── 2. LINK PROTECTION ──────────────────────────────────────────────────
+    // ── 2. LINK & VIEWBOT PROTECTION ───────────────────────────────────────
+    const despaced = despaceText(content);
+    if (!triggerReason && (VIEW_BOT_SPAM_REGEX.test(content) || VIEW_BOT_SPAM_REGEX.test(despaced))) {
+        triggerReason = 'Viewbot / nedozvoljena reklama';
+        filterAction = 'timeout';
+        filterTimeout = 86400;
+    }
+
     if (!triggerReason && settings.links_enabled) {
-        const urlRegex = /(https?:\/\/[^\s]+)/gi;
-        if (urlRegex.test(content)) {
+        const matchesOriginal = content.match(DOMAIN_URL_REGEX) || [];
+        const matchesDespaced = despaced.match(DOMAIN_URL_REGEX) || [];
+        const allUrls = Array.from(new Set([...matchesOriginal, ...matchesDespaced]));
+
+        if (allUrls.length > 0) {
             // Check permits map
             const permitTime = channelState.permits ? channelState.permits.get(userKey) : null;
             const hasPermit = permitTime && (Date.now() - permitTime < 60000);
@@ -73,10 +86,9 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
                     .map(d => d.trim().toLowerCase())
                     .filter(Boolean);
                     
-                const urls = content.match(urlRegex) || [];
                 let allowedAll = true;
                 
-                for (const urlStr of urls) {
+                for (const urlStr of allUrls) {
                     try {
                         let host = urlStr.toLowerCase();
                         if (!host.startsWith('http://') && !host.startsWith('https://')) {

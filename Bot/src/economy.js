@@ -198,6 +198,42 @@ function handleRank(chatroomId, sender, targetRaw) {
     posaljiPoruku(chatroomId, `⭐ @${user} | Nivo: ${nivo} (${titula}) | XP: ${xp.toLocaleString()} (${procenat}% do Lvl ${nivo + 1}) | 🪙 ${coins.toLocaleString()} ${valuta} | Rang: ${rangStr}`);
 }
 
+// ─── KOMANDA: !levelup ────────────────────────────────────────────────────────
+function handleLevelUp(chatroomId, sender, targetRaw) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : '';
+    let user = sender;
+    if (target && isValidUsername(target)) {
+        user = sanitizeInput(target);
+    } else if (target) {
+        posaljiPoruku(chatroomId, `Nevalidno korisničko ime.`);
+        return;
+    }
+
+    const key = user.toLowerCase();
+    const podaci = channelState.economy[key];
+
+    if (!podaci || (podaci.xp === 0 && podaci.coins === 0)) {
+        posaljiPoruku(chatroomId, `@${user} još uvek nema zabeleženog XP-a na ovom kanalu.`);
+        return;
+    }
+
+    const xp = podaci.xp || 0;
+    const nivo = podaci.level || izracunajNivo(xp);
+    const titula = dobijTitulu(nivo);
+
+    const tekucaGranica = xpZaNivo(nivo);
+    const sledecaGranica = xpZaNivo(nivo + 1);
+    const potrebnoZaSledeci = Math.max(1, sledecaGranica - tekucaGranica);
+    const napredak = Math.max(0, xp - tekucaGranica);
+    const preostaloXP = Math.max(0, sledecaGranica - xp);
+    const procenat = Math.min(100, Math.floor((napredak / potrebnoZaSledeci) * 100));
+
+    posaljiPoruku(chatroomId, `[Level Up] @${user} | Trenutni nivo: ${nivo} (${titula}) -> Sledeći: ${nivo + 1} | Još ${preostaloXP.toLocaleString()} XP do level up-a! | Napredak: ${procenat}% (${napredak.toLocaleString()} / ${potrebnoZaSledeci.toLocaleString()} XP)`);
+}
+
 // ─── KOMANDA: !points / !poeni / !bal ────────────────────────────────────────
 function handlePoints(chatroomId, sender, targetRaw) {
     const channelState = state.getChannelState(chatroomId);
@@ -446,6 +482,7 @@ module.exports = {
     dodajGiftSubBonus,
     dodajKickDonationBonus,
     handleRank,
+    handleLevelUp,
     handlePoints,
     handleDaily,
     handleGivePoints,

@@ -7702,3 +7702,108 @@ button:active,
   outline-offset: 2px !important;
 }
 
+/* ══ Persistent Global YouTube Audio Engine ══ */
+.sr-global-audio-engine {
+  position: fixed !important;
+  bottom: 0 !important;
+  right: 0 !important;
+  width: 200px !important;
+  height: 120px !important;
+  opacity: 0.08 !important;
+  pointer-events: none !important;
+  z-index: 1000 !important;
+  overflow: hidden !important;
+}
+
+.sr-global-audio-engine iframe,
+.sr-global-audio-engine div {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  pointer-events: none !important;
+}
+
+/* ══ Topbar Song Request Mini Player ══ */
+.sr-mini-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 0, 51, 0.08);
+  border: 1px solid rgba(255, 0, 51, 0.25);
+  border-radius: 9999px;
+  padding: 3px 10px 3px 6px;
+  max-width: 250px;
+  transition: all 0.2s ease;
+  flex-shrink: 1;
+}
+
+.sr-mini-player:hover {
+  background: rgba(255, 0, 51, 0.14);
+  border-color: rgba(255, 0, 51, 0.45);
+}
+
+.sr-mini-cover {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+  animation: spin 6s linear infinite;
+  animation-play-state: paused;
+}
+
+.sr-mini-cover.playing {
+  animation-play-state: running;
+}
+
+.sr-mini-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  line-height: 1.15;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.sr-mini-title {
+  font-size: 0.73rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-mini-requester {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sr-mini-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.sr-mini-btn:hover {
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .sr-mini-player {
+    max-width: 170px;
+  }
+}

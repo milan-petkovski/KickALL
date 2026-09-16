@@ -21,6 +21,27 @@ function normalizujZaPoredjenje(poruka) {
         .toLowerCase();
 }
 
+function despaceText(tekst) {
+    if (!tekst) return '';
+    return tekst
+        .replace(/\b([a-zA-Z0-9])\s+(?=[a-zA-Z0-9]\b)/g, '$1')
+        .replace(/\s*([./])\s*/g, '$1');
+}
+
+const BOT_SPAM_REGEX = /\b(viewbot|view-bot|follower\s*bot|chat\s*bot|typical\s*panels|save\s*99%|buy\s*followers|kickbotting|ownkick|kickview|cheap\s*viewers|viewer\s*bot)\b/i;
+const SPAM_DOMAIN_PATTERN = /\b([a-zA-Z0-9-]{3,}\.)+(com|net|org|io|gg|xyz|site|ru|top|live|store|club|app|tv|me|info)\b/i;
+
+function daLiJeBotSpam(poruka) {
+    if (!poruka) return false;
+    if (BOT_SPAM_REGEX.test(poruka)) return true;
+    const despaced = despaceText(poruka);
+    if (BOT_SPAM_REGEX.test(despaced)) return true;
+    if (SPAM_DOMAIN_PATTERN.test(despaced) && /\b(kick|bot|panel|view|follow|cheap|save|ownkick)\b/i.test(despaced)) {
+        return true;
+    }
+    return false;
+}
+
 function spamFilter(chatroomId, username, poruka) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return false;
@@ -28,10 +49,17 @@ function spamFilter(chatroomId, username, poruka) {
     const sada  = Date.now();
     const userKey = username.toLowerCase();
     
+    // ── 0. Provera viewbot / promo spam botova ────────────────────────────────
+    const jeKomanda = poruka.startsWith(channelState.PREFIX || '!') || poruka.startsWith('!');
+    if (!jeKomanda && daLiJeBotSpam(poruka)) {
+        log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [viewbot/reklama]: blokirano od ${username}: "${poruka}"`);
+        posaljiPoruku(chatroomId, `/timeout ${username} 86400 Promo bot spam`);
+        return true;
+    }
+    
     // ── 1. Provera identičnih poruka ──────────────────────────────────────────
     // Komande (poruke koje počinju sa prefiksom kanala ili '!') ne podležu proveri identičnih poruka
     // jer je legitimno da korisnici uzastopno igraju igre (npr. !rulet 0 5000, !tocak 5000)
-    const jeKomanda = poruka.startsWith(channelState.PREFIX || '!') || poruka.startsWith('!');
     let countIdenticna = 0;
     if (!jeKomanda) {
         // Normalizujemo (skidamo zero-width karaktere) da bi "ista poruka + nevidljivi
@@ -111,5 +139,6 @@ function spamFilter(chatroomId, username, poruka) {
 
 module.exports = {
     spamFilter,
-    normalizujZaPoredjenje
+    normalizujZaPoredjenje,
+    despaceText
 };

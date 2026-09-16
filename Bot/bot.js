@@ -246,7 +246,7 @@ async function acquireOrRenewLeaderLock(options = {}) {
         }
 
         const isCurrentHolder = existingLock.leader_instance_id === state.instanceId;
-        const isExpired = new Date(existingLock.expires_at).getTime() <= Date.now();
+        const isExpired = !existingLock.leader_instance_id || !existingLock.expires_at || new Date(existingLock.expires_at).getTime() <= Date.now();
 
         if (isCurrentHolder || isExpired || options.force) {
             const { error: updateError } = await database.supabase
@@ -308,6 +308,27 @@ async function broadcastLeadershipTakeover() {
         utils.log('INFO', `[LEADER-ELECTION] Poslat broadcast signal za preuzimanje vođstva (Instance ID: ${state.instanceId})`);
     } catch (err) {
         utils.log('WARN', `[LEADER-ELECTION] Neuspešno slanje takeover broadcast-a: ${err.message}`);
+    }
+}
+
+async function releaseLeaderLock() {
+    if (!database.supabase || !database.KORISTI_SUPABASE || !state.isLeader) return;
+    try {
+        const nowIso = new Date().toISOString();
+        const expiredIso = new Date(0).toISOString();
+        await database.supabase
+            .from('bot_cluster_lock')
+            .update({
+                leader_instance_id: null,
+                expires_at: expiredIso,
+                updated_at: nowIso
+            })
+            .eq('lock_id', CLUSTER_LOCK_ID)
+            .eq('leader_instance_id', state.instanceId);
+        state.isLeader = false;
+        utils.log('INFO', `[DISTRIBUTED-LOCK] Uspešno oslobođen distributed lock pri gašenju (Instance ID: ${state.instanceId})`);
+    } catch (err) {
+        utils.log('WARN', `[DISTRIBUTED-LOCK] Greška pri oslobađanju lock-a: ${err.message}`);
     }
 }
 
@@ -733,6 +754,12 @@ async function gracefulShutdown(signal) {
         utils.log('ERR', `Greška pri čuvanju stream analytics sesija pri gašenju: ${saFlushErr.message}`);
     }
 
+    try {
+        await releaseLeaderLock();
+    } catch (lockErr) {
+        utils.log('WARN', `Greška pri oslobađanju cluster lock-a: ${lockErr.message}`);
+    }
+
     clearTimeout(watchdogTimer);
     utils.log('INFO', 'Svi podaci bezbedno sačuvani u Supabase. Bot je spreman za gašenje.');
     process.exit(0);
@@ -770,6 +797,7 @@ module.exports = {
     start,
     povezi: connection.povezi,
     acquireOrRenewLeaderLock,
+    releaseLeaderLock,
     acquireStartupLeadership,
     setupClusterBroadcast,
     broadcastLeadershipTakeover

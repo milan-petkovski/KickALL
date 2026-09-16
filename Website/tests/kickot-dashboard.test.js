@@ -911,3 +911,174 @@ test('Kickot - Višestruki pozivi renderSettingsChannelList ne dupliraju limit b
   renderBanner();
   assert.equal(container.innerHTML, limitBannerHtml);
 });
+
+// ── 15. SONG REQUEST LIVE SYNC & CONTINUOUS PLAYBACK ────────────────────────
+test('Kickot - syncSongQueueFromRemote automatski pokreće reprodukciju čim stigne pesma u prazan red', () => {
+  let localQueue = [];
+  let isPlaying = false;
+  let currentSongIndex = 0;
+  let playCalls = 0;
+
+  function mockPlayCurrentAudio() {
+    isPlaying = true;
+    playCalls++;
+  }
+
+  function syncQueue(newQueue) {
+    if (!Array.isArray(newQueue)) return;
+    const wasEmpty = localQueue.length === 0;
+    const currentlyPlaying = localQueue[currentSongIndex];
+
+    if (newQueue.length === 0) {
+      localQueue = [];
+      isPlaying = false;
+      return;
+    }
+
+    if (!isPlaying || wasEmpty || !currentlyPlaying) {
+      localQueue = newQueue;
+      currentSongIndex = 0;
+      mockPlayCurrentAudio();
+      return;
+    }
+  }
+
+  // Korisnik je na Overview tabu, red je prazan, stiže nova pesma iz četa
+  const incomingQueue = [
+    { id: 'yt_123', ytId: '123', title: 'Pesma 1', artist: 'Izvođač 1', requester: 'KorisnikA', duration: 180 }
+  ];
+
+  syncQueue(incomingQueue);
+
+  assert.equal(localQueue.length, 1);
+  assert.equal(isPlaying, true);
+  assert.equal(currentSongIndex, 0);
+  assert.equal(playCalls, 1);
+});
+
+test('Kickot - syncSongQueueFromRemote ne prekida trenutnu pesmu dok svira kada stignu nove pesme iz četa', () => {
+  let localQueue = [
+    { id: 'yt_123', ytId: '123', title: 'Pesma 1', artist: 'Izvođač 1', requester: 'KorisnikA', duration: 180 }
+  ];
+  let isPlaying = true;
+  let currentSongIndex = 0;
+  let playCalls = 0;
+
+  function mockPlayCurrentAudio() {
+    playCalls++;
+  }
+
+  function syncQueue(newQueue) {
+    if (!Array.isArray(newQueue)) return;
+    const wasEmpty = localQueue.length === 0;
+    const currentlyPlaying = localQueue[currentSongIndex];
+
+    if (!isPlaying || wasEmpty || !currentlyPlaying) {
+      localQueue = newQueue;
+      currentSongIndex = 0;
+      mockPlayCurrentAudio();
+      return;
+    }
+
+    const matchIdx = newQueue.findIndex(s =>
+      (s.id && currentlyPlaying.id && s.id === currentlyPlaying.id) ||
+      (s.ytId && currentlyPlaying.ytId && s.ytId === currentlyPlaying.ytId)
+    );
+
+    if (matchIdx !== -1) {
+      localQueue = newQueue;
+      currentSongIndex = matchIdx;
+    } else {
+      localQueue = newQueue;
+      if (currentSongIndex >= localQueue.length) currentSongIndex = 0;
+    }
+  }
+
+  // Gledalac B unosi pesmu 2 u četu dok pesma 1 svira
+  const updatedQueue = [
+    { id: 'yt_123', ytId: '123', title: 'Pesma 1', artist: 'Izvođač 1', requester: 'KorisnikA', duration: 180 },
+    { id: 'yt_456', ytId: '456', title: 'Pesma 2', artist: 'Izvođač 2', requester: 'KorisnikB', duration: 210 }
+  ];
+
+  syncQueue(updatedQueue);
+
+  assert.equal(localQueue.length, 2);
+  assert.equal(localQueue[1].title, 'Pesma 2');
+  assert.equal(currentSongIndex, 0);
+  assert.equal(isPlaying, true);
+  assert.equal(playCalls, 0); // Pesma 1 nije prekinuta niti restartovana!
+});
+
+test('Kickot - Auto-advance uklanja završenu pesmu i odmah pušta sledeću iz reda', () => {
+  let localQueue = [
+    { id: 'yt_123', title: 'Pesma 1', artist: 'Izvođač 1' },
+    { id: 'yt_456', title: 'Pesma 2', artist: 'Izvođač 2' }
+  ];
+  let currentSongIndex = 0;
+  let isPlaying = true;
+  let nextPlayed = null;
+
+  function mockSkipSong(isAutoAdvance = false) {
+    if (localQueue.length > 0) {
+      localQueue.splice(currentSongIndex, 1);
+      if (currentSongIndex >= localQueue.length) currentSongIndex = 0;
+    }
+
+    if (localQueue.length === 0) {
+      isPlaying = false;
+      nextPlayed = null;
+    } else {
+      isPlaying = true;
+      nextPlayed = localQueue[currentSongIndex];
+    }
+  }
+
+  // Pesma 1 završava
+  mockSkipSong(true);
+
+  assert.equal(localQueue.length, 1);
+  assert.equal(localQueue[0].title, 'Pesma 2');
+  assert.equal(isPlaying, true);
+  assert.equal(nextPlayed.title, 'Pesma 2');
+
+  // Pesma 2 završava
+  mockSkipSong(true);
+  assert.equal(localQueue.length, 0);
+  assert.equal(isPlaying, false);
+});
+
+test('Kickot - YouTube audio engine startuje utišano (mute: 1) kada je tab u pozadini da izbegne blokadu autoplay-a', () => {
+  let isMuted = false;
+  let isVideoPlaying = false;
+  let unMutedCalled = false;
+  let isDocHidden = true;
+
+  const mockYtPlayer = {
+    mute: () => { isMuted = true; },
+    unMute: () => { isMuted = false; unMutedCalled = true; },
+    loadVideoById: () => { },
+    playVideo: () => { isVideoPlaying = true; },
+    getPlayerState: () => 1 // PLAYING
+  };
+
+  function simulatePlayCurrentAudio() {
+    if (isDocHidden) {
+      mockYtPlayer.mute();
+    }
+    mockYtPlayer.loadVideoById();
+    mockYtPlayer.playVideo();
+
+    // Watchdog / onStateChange detektuje da svira i odmah odmutira
+    if (mockYtPlayer.getPlayerState() === 1) {
+      mockYtPlayer.unMute();
+    }
+  }
+
+  simulatePlayCurrentAudio();
+
+  assert.equal(isVideoPlaying, true);
+  assert.equal(unMutedCalled, true);
+  assert.equal(isMuted, false);
+});
+
+

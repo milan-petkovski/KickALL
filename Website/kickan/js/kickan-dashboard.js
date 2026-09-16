@@ -8,18 +8,18 @@
   'use strict';
 
   /* ── Imenovane konstante (bez magic numbers u kodu) ── */
-  const WS_PING_INTERVAL_MS      = 25000; // Pusher keepalive interval
-  const WS_RECONNECT_BASE_MS     = 5000;  // Bazni delay za WebSocket reconnect
+  const WS_PING_INTERVAL_MS = 25000; // Pusher keepalive interval
+  const WS_RECONNECT_BASE_MS = 5000;  // Bazni delay za WebSocket reconnect
   const WS_RECONNECT_MAX_RETRIES = 10;    // Maksimalan broj pokušaja reconnecta
-  const POLL_INTERVAL_MS         = 15000; // Kick API polling interval
-  const UI_THROTTLE_MS           = 400;   // Throttle za updateDashboardUI
-  const BOT_API_TIMEOUT_MS       = 6000;  // Timeout za Bot API poziv
-  const ALLORIGINS_TIMEOUT_MS    = 3000;  // Timeout za allorigins proxy
-  const VELOCITY_WINDOW_MS       = 60000; // Prozor za chat velocity (1 min)
-  const VIEWER_SAMPLES_CAP       = 60;    // Maksimalan broj uzoraka gledaoca
-  const CHAT_FEED_MAX_MSGS       = 40;    // Maksimalan broj poruka u live feed-u
-  const BAN_LOGS_MAX             = 30;    // Maksimalan broj ban logova u memoriji
-  const SAVE_DEBOUNCE_MS         = 10000; // Debounce za localStorage čuvanje
+  const POLL_INTERVAL_MS = 15000; // Kick API polling interval
+  const UI_THROTTLE_MS = 400;   // Throttle za updateDashboardUI
+  const BOT_API_TIMEOUT_MS = 6000;  // Timeout za Bot API poziv
+  const ALLORIGINS_TIMEOUT_MS = 3000;  // Timeout za allorigins proxy
+  const VELOCITY_WINDOW_MS = 60000; // Prozor za chat velocity (1 min)
+  const VIEWER_SAMPLES_CAP = 60;    // Maksimalan broj uzoraka gledaoca
+  const CHAT_FEED_MAX_MSGS = 40;    // Maksimalan broj poruka u live feed-u
+  const BAN_LOGS_MAX = 30;    // Maksimalan broj ban logova u memoriji
+  const SAVE_DEBOUNCE_MS = 10000; // Debounce za localStorage čuvanje
 
   /* ── Global Error Handling for Unhandled Promise Rejections (identično Kickaj/Kickot) ── */
   if (typeof window !== 'undefined') {
@@ -52,41 +52,41 @@
   };
 
   /* ── Supabase Configuration ── */
-  const supabaseUrl     = window.CONFIG?.SUPABASE?.URL;
+  const supabaseUrl = window.CONFIG?.SUPABASE?.URL;
   const supabaseAnonKey = window.CONFIG?.SUPABASE?.ANON_KEY;
-  const storageKey      = window.CONFIG?.SUPABASE?.STORAGE_KEY || 'kickbot-supabase-auth';
+  const storageKey = window.CONFIG?.SUPABASE?.STORAGE_KEY || 'kickbot-supabase-auth';
 
   /* ── State ── */
-  let sb                 = null;
-  let currentUser        = null;
+  let sb = null;
+  let currentUser = null;
   let _currentUserProfile = null;
-  let userPlan           = 'free';
-  let userChannels       = [];
-  let activeChannelObj   = null;
-  let channelName        = '';
-  let channelId          = null;
-  let chatroomId         = null;
-  let kickWebSocket      = null;
-  let pingInterval       = null;
-  let pollInterval       = null;
-  let uptimeInterval     = null;
-  let velocityInterval   = null;
-  let gateDismissed      = false;
-  let isTrackingActive   = true;
-  let isMuted            = false;
-  let soundVolume        = 0.5;
-  let streamStartTime    = null;
-  let activeChatFilter   = 'all';
-  let pastStreamsList    = [];
-  let isSavingStream     = false;
+  let userPlan = 'free';
+  let userChannels = [];
+  let activeChannelObj = null;
+  let channelName = '';
+  let channelId = null;
+  let chatroomId = null;
+  let kickWebSocket = null;
+  let pingInterval = null;
+  let pollInterval = null;
+  let uptimeInterval = null;
+  let velocityInterval = null;
+  let gateDismissed = false;
+  let isTrackingActive = true;
+  let isMuted = false;
+  let soundVolume = 0.5;
+  let streamStartTime = null;
+  let activeChatFilter = 'all';
+  let pastStreamsList = [];
+  let isSavingStream = false;
   let currentSessionDbId = null;
   let currentStreamTitle = '';
   let isStreamCurrentlyLive = false;
 
   // Rolling message timestamps for exact velocity calculation (last 60s)
   let rollingMessageTimes = [];
-  let currentVelocity    = 0;
-  let peakVelocity       = 0;
+  let currentVelocity = 0;
+  let peakVelocity = 0;
 
   // Real Language & Demographic Telemetry
   let detectedGeoRegion = 'Automatska telemetrija';
@@ -117,9 +117,9 @@
 
   /* ── Notifications & Changelog Data iz Baze (identično Kickot) ── */
   let notifications = [];
-  let changelogs    = [];
+  let changelogs = [];
   let activeNotifTab = 'obavestenja';
-  let readNotifIds   = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
+  let readNotifIds = JSON.parse(localStorage.getItem('read_notif_ids') || '[]');
 
   /* ── Supabase Init ── */
   if (window.supabase && supabaseUrl && supabaseAnonKey) {
@@ -194,7 +194,7 @@
         const data = await res.json();
         if (data?.avatar) return data.avatar;
       }
-    } catch (_) {}
+    } catch (_) { }
     return null;
   }
 
@@ -387,16 +387,16 @@
         updateStreamStatusUI('loading');
         await loadSavedSessionStats(channelName);
         connectToRealKickChat();
-        loadRealKickChannelData(channelName).catch(() => {});
+        loadRealKickChannelData(channelName).catch(() => { });
 
         if (pollInterval) clearInterval(pollInterval);
         pollInterval = setInterval(() => {
           if (channelName && isTrackingActive) {
-            loadRealKickChannelData(channelName).catch(() => {});
+            loadRealKickChannelData(channelName).catch(() => { });
           }
         }, POLL_INTERVAL_MS);
 
-        fetchPastStreams().catch(() => {});
+        fetchPastStreams().catch(() => { });
       }
 
       // Asinhrono popuni nedostajuće avatare
@@ -693,8 +693,8 @@
     updateStreamStatusUI('loading');
     await loadSavedSessionStats(channelName);
     connectToRealKickChat();
-    loadRealKickChannelData(channelName).catch(() => {});
-    fetchPastStreams().catch(() => {});
+    loadRealKickChannelData(channelName).catch(() => { });
+    fetchPastStreams().catch(() => { });
   };
 
   /* ════════════════════════════════════════
@@ -726,7 +726,7 @@
           if (botData.id) channelId = botData.id;
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // 2. Sekundarno: Netlify proxy funkcija (samo na produkciji, ne na localhostu)
     if (!channelData && typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -741,7 +741,7 @@
         if (netlifyRes.ok) {
           channelData = await netlifyRes.json();
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // 3. Tercijarno: Allorigins raw & get fallback
@@ -768,7 +768,7 @@
         };
 
         channelData = await Promise.any([fetchRaw(), fetchGet()]);
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // Ažuriraj vizuelne elemente kanala
@@ -832,7 +832,7 @@
       // Strim je sigurno OFFLINE
       if (isStreamCurrentlyLive) {
         isStreamCurrentlyLive = false;
-        fetchPastStreams().catch(() => {});
+        fetchPastStreams().catch(() => { });
       }
 
       // Ako trenutno nije live, očisti sve metrike i liste, a zadrži samo grafike (hourlyCounts)
@@ -938,7 +938,7 @@
   ════════════════════════════════════════ */
   async function connectToRealKickChat() {
     if (kickWebSocket) {
-      try { kickWebSocket.close(); } catch (_) {}
+      try { kickWebSocket.close(); } catch (_) { }
       kickWebSocket = null;
     }
 
@@ -1265,12 +1265,12 @@
     if (viewers >= 3000) { baseHourlyRate = 60.00; tierLabel = 'KCIP ELITE'; }
     else if (viewers >= 1500) { baseHourlyRate = 45.00; tierLabel = 'KCIP TIER 1'; }
     else if (viewers >= 1000) { baseHourlyRate = 35.00; tierLabel = 'KCIP TIER 1'; }
-    else if (viewers >= 500)  { baseHourlyRate = 25.00; tierLabel = 'KCIP TIER 2'; }
-    else if (viewers >= 250)  { baseHourlyRate = 18.00; tierLabel = 'KCIP TIER 2'; }
-    else if (viewers >= 100)  { baseHourlyRate = 16.00; tierLabel = 'KCIP CLASS 1'; } // Zvanični KCIP Class 1 ($16/h za ~100)
-    else if (viewers >= 50)   { baseHourlyRate = 8.00;  tierLabel = 'KCIP CLASS 2'; }
-    else if (viewers >= 25)   { baseHourlyRate = 4.00;  tierLabel = 'KCIP ASPIRING'; }
-    else if (viewers >= 10)   { baseHourlyRate = 2.00;  tierLabel = 'COMMUNITY TIER'; }
+    else if (viewers >= 500) { baseHourlyRate = 25.00; tierLabel = 'KCIP TIER 2'; }
+    else if (viewers >= 250) { baseHourlyRate = 18.00; tierLabel = 'KCIP TIER 2'; }
+    else if (viewers >= 100) { baseHourlyRate = 16.00; tierLabel = 'KCIP CLASS 1'; } // Zvanični KCIP Class 1 ($16/h za ~100)
+    else if (viewers >= 50) { baseHourlyRate = 8.00; tierLabel = 'KCIP CLASS 2'; }
+    else if (viewers >= 25) { baseHourlyRate = 4.00; tierLabel = 'KCIP ASPIRING'; }
+    else if (viewers >= 10) { baseHourlyRate = 2.00; tierLabel = 'COMMUNITY TIER'; }
     else { baseHourlyRate = 0; tierLabel = isLive ? 'MIKRO STRIM' : 'OFFLINE'; }
 
     // Zaštita od nerealnih bot cifara: ukoliko je procenat aktivnih čatera ekstremno nizak (<5% publike)
@@ -1831,7 +1831,7 @@
         osc.start(now);
         osc.stop(now + 0.15);
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   /* ════════════════════════════════════════
@@ -1892,14 +1892,14 @@
   /* ── Notifications & Changelog iz Baze (identično Kickot) ── */
   function formatRelativeTime(isoString) {
     if (!isoString) return '';
-    const date      = new Date(isoString);
-    const diffSec   = Math.floor((Date.now() - date.getTime()) / 1000);
-    const diffMin   = Math.floor(diffSec / 60);
+    const date = new Date(isoString);
+    const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+    const diffMin = Math.floor(diffSec / 60);
     const diffHours = Math.floor(diffMin / 60);
-    const diffDays  = Math.floor(diffHours / 24);
+    const diffDays = Math.floor(diffHours / 24);
 
-    if (diffSec < 60)   return 'Upravo sada';
-    if (diffMin < 60)   return `Pre ${diffMin} min`;
+    if (diffSec < 60) return 'Upravo sada';
+    if (diffMin < 60) return `Pre ${diffMin} min`;
     if (diffHours < 24) return `Pre ${diffHours} h`;
     return `Pre ${diffDays} d`;
   }
@@ -1925,7 +1925,7 @@
         updateNotifBadgeUI();
         renderNotifContent();
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   async function loadChangelogs() {
@@ -1952,25 +1952,25 @@
         });
         renderNotifContent();
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   function updateNotifBadgeUI() {
     const unreadCount = notifications.filter(n => !readNotifIds.includes(String(n.id))).length;
     const badge = document.getElementById('notifBadge');
-    const btn   = document.getElementById('notifBellBtn');
+    const btn = document.getElementById('notifBellBtn');
 
     if (badge) {
       badge.style.display = unreadCount > 0 ? 'flex' : 'none';
-      badge.textContent   = unreadCount > 99 ? '99+' : String(unreadCount);
+      badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
     }
     if (btn) {
       if (unreadCount > 0) {
         btn.style.borderColor = 'var(--an-red, #ef4444)';
-        btn.style.color       = 'var(--an-red, #ef4444)';
+        btn.style.color = 'var(--an-red, #ef4444)';
       } else {
         btn.style.borderColor = '';
-        btn.style.color       = '';
+        btn.style.color = '';
       }
     }
   }
@@ -2003,8 +2003,8 @@
         }
 
         const opacityStyle = isRead ? 'opacity: 0.55;' : '';
-        const borderStyle  = isRead ? 'border: 1px solid rgba(255,255,255,0.05);' : `border: 1px solid ${color}40; box-shadow: 0 4px 14px ${color}15;`;
-        const bgStyle      = isRead ? 'background: rgba(255,255,255,0.02);' : 'background: rgba(255,255,255,0.04);';
+        const borderStyle = isRead ? 'border: 1px solid rgba(255,255,255,0.05);' : `border: 1px solid ${color}40; box-shadow: 0 4px 14px ${color}15;`;
+        const bgStyle = isRead ? 'background: rgba(255,255,255,0.02);' : 'background: rgba(255,255,255,0.04);';
         const formattedTime = formatRelativeTime(n.timestamp);
 
         return `
@@ -2203,7 +2203,7 @@
 
     const triggerEl = modalTriggerElements.get(id);
     if (triggerEl && typeof triggerEl.focus === 'function') {
-      try { triggerEl.focus(); } catch (_) {}
+      try { triggerEl.focus(); } catch (_) { }
       modalTriggerElements.delete(id);
     }
   };
@@ -2451,7 +2451,7 @@ Generisano u Kickan Studio.`;
           }
         }
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   let saveSessionTimeout = null;
@@ -2484,7 +2484,7 @@ Generisano u Kickan Studio.`;
         hourlyCounts: liveStats.hourlyCounts
       };
       localStorage.setItem(`kickan_session_${slug}`, JSON.stringify(payload));
-    } catch (_) {}
+    } catch (_) { }
   }
 
   /* ════════════════════════════════════════
@@ -2931,7 +2931,7 @@ Generisano u Kickan Studio.`;
           ${escapeHtml(durationStr)}
         </span>
         <span class="psd-meta-dot"></span>
-        <span class="psd-meta-item" style="color:var(--an-muted);">Arhivovano: ${escapeHtml(formatDateTime(stream.updated_at || stream.started_at))}</span>
+        <span class="psd-meta-item" style="color:var(--an-muted);">Arhivirano: ${escapeHtml(formatDateTime(stream.updated_at || stream.started_at))}</span>
       </div>
 
       <!-- Stat cards -->

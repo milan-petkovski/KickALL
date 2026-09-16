@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kickot • Plutajući Muzički Plejer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js?v=20260916-v3"></script>
+  <script src="js/config.js?v=20260916-v3"></script>
+  <style>
+    :root {
+      --bg: #0b0e14;
+      --card-bg: rgba(22, 27, 34, 0.85);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #FF0033;
+      --accent-glow: rgba(255, 0, 51, 0.35);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      justify-content: space-between;
+    }
+
+    .player-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-title {
+      font-size: 0.95rem;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-title span {
+      color: var(--accent);
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      background: rgba(83, 252, 24, 0.12);
+      color: #53FC18;
+      border: 1px solid rgba(83, 252, 24, 0.3);
+      padding: 2px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      background: #53FC18;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #53FC18;
+    }
+
+    .player-body {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin: 12px 0;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+
+    .cover-wrap {
+      width: 90px;
+      height: 90px;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+      background: #111;
+    }
+
+    .cover-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+
+    .disk-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle, #1a1a1a 30%, #0d0d0d 70%);
+      color: var(--text-muted);
+    }
+
+    .disk-placeholder.rotating {
+      animation: spin 8s linear infinite;
+    }
+
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+
+    .meta-wrap {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .track-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #fff;
+    }
+
+    .track-requester {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .progress-wrap {
+      margin-top: 6px;
+      cursor: pointer;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+      transition: width 0.3s ease;
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 4px;
+    }
+
+    .buttons-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ctrl-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .play-btn {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 14px var(--accent-glow);
+      transition: all 0.2s ease;
+    }
+
+    .play-btn:hover {
+      transform: scale(1.05);
+      background: #e6002e;
+    }
+
+    .volume-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      max-width: 140px;
+    }
+
+    .volume-slider {
+      flex: 1;
+      accent-color: var(--accent);
+      height: 4px;
+      cursor: pointer;
+    }
+
+    .status-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    .status-left {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* Embedded YouTube Player inside this popout window */
+    #popoutYtEngine {
+      position: fixed;
+      bottom: 0;
+      right: 0;
+      width: 160px;
+      height: 90px;
+      opacity: 0.08;
+      pointer-events: none;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="player-header">
+    <div class="brand-wrap">
+      <div class="brand-title">Kick<span>ot</span> Plejer</div>
+      <span class="live-badge"><span class="live-dot"></span> <span id="channelNameDisplay">Kanal</span></span>
+    </div>
+    <div style="font-size: 0.72rem; color: var(--text-muted);" id="queueLengthText">0 pesama</div>
+  </div>
+
+  <div class="player-body">
+    <div class="cover-wrap">
+      <img id="trackCover" class="cover-img" alt="Cover" />
+      <div id="trackDisk" class="disk-placeholder">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V5l12-2v13"></path>
+          <circle cx="6" cy="18" r="3"></circle>
+          <circle cx="18" cy="16" r="3"></circle>
+        </svg>
+      </div>
+    </div>
+
+    <div class="meta-wrap">
+      <div class="track-title" id="trackTitle">Nema pesama u redu</div>
+      <div class="track-requester" id="trackRequester">Sačekajte muzičku želju iz četa</div>
+
+      <div class="progress-wrap" onclick="seekPopout(event)">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+        <div class="time-row">
+          <span id="curTime">0:00</span>
+          <span id="totTime">0:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls-row">
+    <div class="buttons-group">
+      <button class="ctrl-btn" onclick="skipTrack()" title="Preskoči pesmu" type="button" aria-label="Preskoči">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="5 4 15 12 5 20 5 4"></polygon>
+          <line x1="19" y1="5" x2="19" y2="19"></line>
+        </svg>
+      </button>
+      <button class="play-btn" id="popoutPlayBtn" onclick="togglePopoutPlay()" title="Pusti / Pauziraj" type="button" aria-label="Pusti">
+        <svg id="popoutPlayIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
+      </button>
+    </div>
+
+    <div class="volume-group">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+      </svg>
+      <input type="range" min="0" max="100" value="80" class="volume-slider" id="volSlider" oninput="setPopoutVolume(this.value)" />
+    </div>
+  </div>
+
+  <div class="status-footer">
+    <div class="status-left">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#53FC18" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <span>Odvojen prozor • Zvuk radi 100% neprekidno</span>
+    </div>
+    <span id="engineStatus">Povezan</span>
+  </div>
+
+  <!-- YouTube Audio Host -->
+  <div id="popoutYtEngine">
+    <div id="ytPopoutPlayer"></div>
+  </div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const channelId = urlParams.get('channel');
+    const channelName = urlParams.get('name') || 'Kanal';
+
+    document.getElementById('channelNameDisplay').textContent = '@' + channelName;
+
+    const sbUrl = window.SUPABASE_URL || 'https://default.supabase.co';
+    const sbKey = window.SUPABASE_ANON_KEY || '';
+    const supabase = window.supabase ? window.supabase.createClient(sbUrl, sbKey) : null;
+
+    let queue = [];
+    let curIndex = 0;
+    let isPlaying = false;
+    let curSeconds = 0;
+    let volume = 80;
+    let ytPlayer = null;
+    let isYtReady = false;
+    let progressTimer = null;
+    let currentYtId = null;
+
+    function formatTime(s) {
+      const m = Math.floor(s / 60);
+      const sec = String(s % 60).padStart(2, '0');
+      return `${m}:${sec}`;
+    }
+
+    function updateUI() {
+      const song = queue[curIndex];
+      const titleEl = document.getElementById('trackTitle');
+      const reqEl = document.getElementById('trackRequester');
+      const coverEl = document.getElementById('trackCover');
+      const diskEl = document.getElementById('trackDisk');
+      const playIcon = document.getElementById('popoutPlayIcon');
+      const countEl = document.getElementById('queueLengthText');
+
+      countEl.textContent = `${queue.length} pesama`;
+
+      if (!song) {
+        titleEl.textContent = 'Nema pesama u redu';
+        reqEl.textContent = 'Sačekajte muzičku želju iz četa';
+        coverEl.style.display = 'none';
+        diskEl.style.display = 'flex';
+        diskEl.classList.remove('rotating');
+        document.getElementById('progressBar').style.width = '0%';
+        document.getElementById('curTime').textContent = '0:00';
+        document.getElementById('totTime').textContent = '0:00';
+        playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+        return;
+      }
+
+      titleEl.textContent = song.artist ? `${song.artist} - ${song.title}` : song.title;
+      reqEl.textContent = `Zatražio: @${song.requester || 'Gledalac'}`;
+
+      if (song.coverUrl) {
+        coverEl.src = song.coverUrl;
+        coverEl.style.display = 'block';
+        diskEl.style.display = 'none';
+      } else {
+        coverEl.style.display = 'none';
+        diskEl.style.display = 'flex';
+        if (isPlaying) diskEl.classList.add('rotating');
+        else diskEl.classList.remove('rotating');
+      }
+
+      const dur = song.duration || 210;
+      document.getElementById('totTime').textContent = formatTime(dur);
+      document.getElementById('curTime').textContent = formatTime(curSeconds);
+      const pct = dur > 0 ? Math.min(100, (curSeconds / dur) * 100) : 0;
+      document.getElementById('progressBar').style.width = `${pct}%`;
+
+      if (isPlaying) {
+        playIcon.innerHTML = '<rect x="5" y="4" width="4" height="16"></rect><rect x="15" y="4" width="4" height="16"></rect>';
+      } else {
+        playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+      }
+    }
+
+    function startTimer() {
+      if (progressTimer) clearInterval(progressTimer);
+      progressTimer = setInterval(() => {
+        const song = queue[curIndex];
+        if (!song) return;
+
+        if (ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+          try {
+            const ct = ytPlayer.getCurrentTime();
+            if (ct && !isNaN(ct)) curSeconds = Math.floor(ct);
+            const d = ytPlayer.getDuration();
+            if (d && !isNaN(d) && d > 0 && Math.round(d) !== song.duration) {
+              song.duration = Math.round(d);
+            }
+          } catch (_) {}
+        } else {
+          curSeconds++;
+        }
+
+        updateUI();
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (progressTimer) {
+        clearInterval(progressTimer);
+        progressTimer = null;
+      }
+    }
+
+    function playAudio() {
+      const song = queue[curIndex];
+      if (!song) {
+        isPlaying = false;
+        currentYtId = null;
+        stopTimer();
+        updateUI();
+        return;
+      }
+
+      const ytId = song.ytId || (song.id && song.id.length === 11 ? song.id : null);
+      if (!ytId) return;
+
+      currentYtId = ytId;
+      curSeconds = 0;
+      isPlaying = true;
+
+      if (ytPlayer && isYtReady) {
+        try {
+          if (ytPlayer.unMute) ytPlayer.unMute();
+          if (ytPlayer.setVolume) ytPlayer.setVolume(volume);
+          ytPlayer.loadVideoById({ videoId: ytId, startSeconds: 0 });
+          ytPlayer.playVideo();
+        } catch (_) {}
+      }
+
+      startTimer();
+      updateUI();
+    }
+
+    function togglePopoutPlay() {
+      if (queue.length === 0) return;
+      if (isPlaying) {
+        isPlaying = false;
+        if (ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+        stopTimer();
+      } else {
+        isPlaying = true;
+        if (ytPlayer && ytPlayer.playVideo) {
+          ytPlayer.unMute();
+          ytPlayer.setVolume(volume);
+          ytPlayer.playVideo();
+        } else {
+          playAudio();
+        }
+        startTimer();
+      }
+      updateUI();
+    }
+
+    function skipTrack() {
+      stopTimer();
+      curSeconds = 0;
+      currentYtId = null;
+
+      if (queue.length > 0) {
+        queue.splice(curIndex, 1);
+        if (curIndex >= queue.length) curIndex = 0;
+      }
+
+      // Snimi u Supabase
+      if (supabase && channelId) {
+        supabase.from('song_request').update({ queue: queue, updated_at: new Date().toISOString() }).eq('channel_id', channelId).eq('type', 'config').then(() => {});
+      }
+
+      if (queue.length === 0) {
+        isPlaying = false;
+        if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+      } else {
+        playAudio();
+      }
+      updateUI();
+    }
+
+    function seekPopout(event) {
+      const song = queue[curIndex];
+      if (!song) return;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const clickX = event.clientX - rect.left;
+      const pct = Math.max(0, Math.min(1, clickX / rect.width));
+      const dur = song.duration || 210;
+      const target = Math.floor(pct * dur);
+      curSeconds = target;
+      if (ytPlayer && ytPlayer.seekTo) {
+        ytPlayer.seekTo(target, true);
+      }
+      updateUI();
+    }
+
+    function setPopoutVolume(val) {
+      volume = parseInt(val) || 0;
+      if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(volume);
+    }
+
+    // YouTube API init
+    window.onYouTubeIframeAPIReady = function () {
+      ytPlayer = new YT.Player('ytPopoutPlayer', {
+        height: '100%',
+        width: '100%',
+        videoId: 'jNQXAC9IVRw',
+        playerVars: {
+          autoplay: 0,
+          controls: 0,
+          playsinline: 1,
+          origin: window.location.origin
+        },
+        events: {
+          onReady: () => {
+            isYtReady = true;
+            if (queue.length > 0) {
+              playAudio();
+            }
+          },
+          onStateChange: (e) => {
+            if (e.data === YT.PlayerState.ENDED) {
+              skipTrack();
+            } else if (e.data === YT.PlayerState.PLAYING) {
+              isPlaying = true;
+              ytPlayer.unMute();
+              ytPlayer.setVolume(volume);
+              updateUI();
+            }
+          }
+        }
+      });
+    };
+
+    // Supabase load & realtime
+    if (supabase && channelId) {
+      supabase.from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
+        .then(({ data }) => {
+          if (data && Array.isArray(data.queue)) {
+            const wasEmpty = queue.length === 0;
+            queue = data.queue;
+            updateUI();
+            if (wasEmpty && queue.length > 0 && isYtReady) {
+              playAudio();
+            }
+          }
+        });
+
+      supabase.channel(`popout_sr_${channelId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'song_request',
+          filter: `channel_id=eq.${channelId}`
+        }, payload => {
+          if (payload.new && Array.isArray(payload.new.queue)) {
+            const wasEmpty = queue.length === 0;
+            queue = payload.new.queue;
+            updateUI();
+            if (wasEmpty && queue.length > 0) {
+              playAudio();
+            }
+          }
+        })
+        .subscribe();
+    }
+  </script>
+</body>
+</html>

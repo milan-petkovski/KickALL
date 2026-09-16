@@ -200,62 +200,80 @@ async function obrisiPoruku(chatroomId, messageId) {
     const channelName = channelState ? channelState.channelUsername : chatroomId;
     const sendRoomId = (channelState && channelState.realChatroomId) ? channelState.realChatroomId : chatroomId;
 
-    // Ako je Kick vratio 401/403 (nedostatak moderator permisija ili sesije), preskoči pozive tokom cooldown prozora
+    // Ako je prethodno zabeležen nedostatak ovlašćenja, sačekaj kratak prozor pre novog pokušaja
     if (channelState && channelState.deleteUnauthorizedUntil && Date.now() < channelState.deleteUnauthorizedUntil) {
         return false;
     }
 
+    // 1. Zvanični Kick Public API v1: DELETE https://api.kick.com/public/v1/chat/:message_id
     try {
-        let headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        };
+        const accessToken = await kickAuth.getAccessToken();
+        if (accessToken) {
+            const publicApiUrl = `https://api.kick.com/public/v1/chat/${encodeURIComponent(messageId)}`;
+            const resPublic = await fetch(publicApiUrl, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                }
+            });
 
-        try {
-            const scrapingHeaders = await kickScrapingHeaders();
-            if (scrapingHeaders) {
-                headers = { ...scrapingHeaders, ...headers };
-            }
-        } catch (_) {}
-
-        if (!headers['authorization']) {
-            const accessToken = await kickAuth.getAccessToken();
-            if (accessToken) {
-                headers['authorization'] = `Bearer ${accessToken}`;
+            if (resPublic.ok) {
+                if (channelState) channelState.deleteUnauthorizedUntil = 0;
+                log('INFO', `[${channelName}] Poruka ${messageId} uspešno obrisana preko zvaničnog Kick Public API-ja.`);
+                return true;
+            } else if (resPublic.status === 429) {
+                const retryAfterHeader = resPublic.headers?.get ? resPublic.headers.get('retry-after') : null;
+                const waitMs = retryAfterHeader ? parseInt(retryAfterHeader, 10) * 1000 : 5000;
+                if (channelState) {
+                    channelState.rateLimitUntil = Math.max(channelState.rateLimitUntil || 0, Date.now() + waitMs);
+                }
+                log('WARN', `[${channelName}] Kick 429 Rate limit pri brisanju poruke ${messageId}.`);
+                return false;
             }
         }
+    } catch (publicErr) {
+        log('WARN', `[${channelName}] Greška pri brisanju preko Kick Public API: ${publicErr.message}`);
+    }
 
+    // 2. Fallback na v2 chatrooms endpoint sa gotScraping (zaobilazi Cloudflare bot zaštitu)
+    try {
+        const { gotScraping } = await import('got-scraping');
         const url = `https://kick.com/api/v2/chatrooms/${sendRoomId}/messages/${messageId}`;
-        const res = await fetch(url, {
+        const headers = await kickScrapingHeaders();
+
+        const res = await gotScraping({
+            url,
             method: 'DELETE',
-            headers
+            headers,
+            retry: { limit: 0 }
         });
 
-        if (res.ok) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+            if (channelState) channelState.deleteUnauthorizedUntil = 0;
             log('INFO', `[${channelName}] Poruka ${messageId} uspešno obrisana sa lajva.`);
             return true;
-        } else if (res.status === 401 || res.status === 403) {
+        } else if (res.statusCode === 401 || res.statusCode === 403) {
             if (channelState) {
-                channelState.deleteUnauthorizedUntil = Date.now() + 15 * 60 * 1000;
+                // Postavi kraći cooldown od 2 minuta (umesto 15)
+                channelState.deleteUnauthorizedUntil = Date.now() + 2 * 60 * 1000;
             }
-            log('WARN', `[${channelName}] Bot nema moderator permisije ili aktivnu sesiju za brisanje poruka na Kick-u (HTTP ${res.status}). Pauziram zahteve za brisanje na 15 minuta radi sprečavanja spamovanja grešaka.`);
+            log('WARN', `[${channelName}] Kick API je vratio HTTP ${res.statusCode} pri brisanju poruke ${messageId}. Proveriti moderator permisije bota.`);
             return false;
-        } else if (res.status === 429) {
-            const retryAfterHeader = res.headers?.get ? res.headers.get('retry-after') : null;
-            const waitMs = retryAfterHeader ? parseInt(retryAfterHeader, 10) * 1000 : 5000;
+        } else if (res.statusCode === 429) {
+            const waitMs = 5000;
             if (channelState) {
                 channelState.rateLimitUntil = Math.max(channelState.rateLimitUntil || 0, Date.now() + waitMs);
             }
             log('WARN', `[${channelName}] Kick 429 Rate limit pri brisanju poruke ${messageId}. Primenjujem backoff od ${waitMs}ms.`);
             return false;
         } else {
-            let bodyText = '';
-            try { bodyText = await res.text(); } catch (_) {}
-            log('WARN', `[${channelName}] Neuspešno brisanje poruke ${messageId}: HTTP ${res.status} - ${bodyText.slice(0, 100)}`);
+            let bodyText = typeof res.body === 'string' ? res.body.slice(0, 100) : '';
+            log('WARN', `[${channelName}] Neuspešno brisanje poruke ${messageId}: HTTP ${res.statusCode} - ${bodyText}`);
             return false;
         }
     } catch (err) {
-        log('WARN', `[${channelName}] Greška pri brisanju poruke ${messageId}: ${err.message}`);
+        log('WARN', `[${channelName}] Greška pri fallback brisanju poruke ${messageId}: ${err.message}`);
         return false;
     }
 }

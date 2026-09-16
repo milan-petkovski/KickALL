@@ -150,6 +150,7 @@ const defaultBuiltinRanks = {
     // Ekonomija
     'rank': 'everyone',
     'level': 'everyone',
+    'levelup': 'everyone',
     'xp': 'everyone',
     'points': 'everyone',
     'poeni': 'everyone',
@@ -443,10 +444,19 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
     }
 
     // ─── NIVOI & EKONOMIJA ─────────────────────────────────────────
-    if (porukaNormalized.startsWith('!rank') || porukaNormalized.startsWith('!level') || porukaNormalized.startsWith('!xp')) {
+    if (cmdName === 'levelup') {
+        const target = porukaSredjena.slice(8).trim();
+        if (utils.proveraKulauna(chatroomId, '!levelup', username, undefined, () => {
+            economy.handleLevelUp(chatroomId, username, target);
+        })) return;
+        economy.handleLevelUp(chatroomId, username, target);
+        return;
+    }
+
+    if (cmdName === 'rank' || cmdName === 'level' || cmdName === 'xp') {
         let target = '';
-        if (porukaNormalized.startsWith('!rank')) target = porukaSredjena.slice(5).trim();
-        else if (porukaNormalized.startsWith('!level')) target = porukaSredjena.slice(6).trim();
+        if (cmdName === 'rank') target = porukaSredjena.slice(5).trim();
+        else if (cmdName === 'level') target = porukaSredjena.slice(6).trim();
         else target = porukaSredjena.slice(3).trim();
         if (utils.proveraKulauna(chatroomId, '!rank', username, undefined, () => {
             economy.handleRank(chatroomId, username, target);
@@ -694,11 +704,11 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         return;
     }
 
-    if (porukaNormalized.startsWith('!alkotest') || porukaNormalized.startsWith('!alcohol') || porukaNormalized.startsWith('!bac')) {
+    if (cmdName === 'alkotest' || cmdName === 'alcohol' || cmdName === 'bac') {
         if (channelState.feature_games === false) return;
         let target = '';
-        if (porukaNormalized.startsWith('!alkotest')) target = porukaSredjena.slice(9).trim();
-        else if (porukaNormalized.startsWith('!alcohol')) target = porukaSredjena.slice(8).trim();
+        if (cmdName === 'alkotest') target = porukaSredjena.slice(9).trim();
+        else if (cmdName === 'alcohol') target = porukaSredjena.slice(8).trim();
         else target = porukaSredjena.slice(4).trim();
         if (utils.proveraKulauna(chatroomId, '!alkotest', username)) return;
         commands.handleAlkotest(chatroomId, username, target);
@@ -736,6 +746,13 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         if (channelState.feature_songrequest === false) return;
         if (utils.proveraKulauna(chatroomId, '!queue', username)) return;
         commands.handleSongQueue(chatroomId);
+        return;
+    }
+
+    if (porukaNormalized === '!currentsong' || porukaNormalized === '!trenutnapesma' || porukaNormalized === '!np' || porukaNormalized === '!pesmasvira') {
+        if (channelState.feature_songrequest === false) return;
+        if (utils.proveraKulauna(chatroomId, '!currentsong', username)) return;
+        commands.handleCurrentSong(chatroomId);
         return;
     }
 

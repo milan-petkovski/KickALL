@@ -2027,10 +2027,12 @@ function setActiveChannel(ch) {
 
   // Pretplati se na Supabase Realtime izmene iz baze za ažuriranje Song Request reda i bot podešavanja u realnom vremenu
   setupRealtimeSongQueueSubscription(ch.id);
+  loadBotConfig();
 }
 
 let activeConfigSubscription = null;
 let activeLeaderboardSubscription = null;
+let songQueueBackgroundPoller = null;
 
 function setupRealtimeSongQueueSubscription(channelId) {
   if (activeConfigSubscription) {
@@ -2041,6 +2043,10 @@ function setupRealtimeSongQueueSubscription(channelId) {
     sb.removeChannel(activeLeaderboardSubscription);
     activeLeaderboardSubscription = null;
   }
+  if (songQueueBackgroundPoller) {
+    clearInterval(songQueueBackgroundPoller);
+    songQueueBackgroundPoller = null;
+  }
 
   if (!channelId) return;
 
@@ -2048,37 +2054,66 @@ function setupRealtimeSongQueueSubscription(channelId) {
   getSbPanels().from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
     .then(({ data }) => {
       if (data && Array.isArray(data.queue)) {
-        localSongQueue = data.queue;
-        if (typeof renderSongQueue === 'function') renderSongQueue();
-        if (typeof updatePlayerUI === 'function') updatePlayerUI();
+        if (typeof syncSongQueueFromRemote === 'function') {
+          syncSongQueueFromRemote(data.queue);
+        } else {
+          localSongQueue = data.queue;
+          if (typeof renderSongQueue === 'function') renderSongQueue();
+          if (typeof updatePlayerUI === 'function') updatePlayerUI();
+        }
       }
     }).catch(() => { });
 
   // Pretplata na bazu u realnom vremenu (Realtime na song_request)
-  activeConfigSubscription = sb.channel(`song_request_${channelId}`)
+  activeConfigSubscription = sb.channel(`song_request_realtime_${channelId}`)
     .on('postgres_changes', {
       event: '*',
-      schema: '*',
+      schema: 'public',
       table: 'song_request',
       filter: `channel_id=eq.${channelId}`
     }, payload => {
       if (payload.new && Array.isArray(payload.new.queue)) {
-        localSongQueue = payload.new.queue;
-        if (typeof renderSongQueue === 'function') renderSongQueue();
-        if (typeof updatePlayerUI === 'function') updatePlayerUI();
+        if (typeof syncSongQueueFromRemote === 'function') {
+          syncSongQueueFromRemote(payload.new.queue);
+        } else {
+          localSongQueue = payload.new.queue;
+          if (typeof renderSongQueue === 'function') renderSongQueue();
+          if (typeof updatePlayerUI === 'function') updatePlayerUI();
+        }
       } else {
         // Fallback: Ponovo učitaj iz baze ako payload nije sadržao ceo queue
         getSbPanels().from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
           .then(({ data }) => {
             if (data && Array.isArray(data.queue)) {
-              localSongQueue = data.queue;
-              if (typeof renderSongQueue === 'function') renderSongQueue();
-              if (typeof updatePlayerUI === 'function') updatePlayerUI();
+              if (typeof syncSongQueueFromRemote === 'function') {
+                syncSongQueueFromRemote(data.queue);
+              } else {
+                localSongQueue = data.queue;
+                if (typeof renderSongQueue === 'function') renderSongQueue();
+                if (typeof updatePlayerUI === 'function') updatePlayerUI();
+              }
             }
           }).catch(() => { });
       }
     })
     .subscribe();
+
+  // Pozadinski sinhronizacioni poller (garantuje da pesma kreće čak i ako je tab u pozadini)
+  songQueueBackgroundPoller = setInterval(() => {
+    if (!activeChannel || activeChannel.id !== channelId) return;
+    getSbPanels().from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
+      .then(({ data }) => {
+        if (data && Array.isArray(data.queue)) {
+          const remoteLen = data.queue.length;
+          const localLen = localSongQueue.length;
+          if (remoteLen !== localLen || (remoteLen > 0 && !isPlaying) || (remoteLen > 0 && data.queue[0]?.id !== localSongQueue[0]?.id)) {
+            if (typeof syncSongQueueFromRemote === 'function') {
+              syncSongQueueFromRemote(data.queue);
+            }
+          }
+        }
+      }).catch(() => { });
+  }, 3000);
 
   // Pretplata na bazu u realnom vremenu (Realtime izmene u leaderboard i leaderboard_daily tabelama za ovaj kanal)
   activeLeaderboardSubscription = sb.channel(`leaderboard_realtime_${channelId}`)
@@ -4783,9 +4818,13 @@ async function loadBotConfig() {
           if (document.getElementById('cfgSongRequestMaxDuration')) document.getElementById('cfgSongRequestMaxDuration').value = srData.max_duration_seconds ?? 360;
 
           if (Array.isArray(srData.queue)) {
-            localSongQueue = srData.queue;
-            renderSongQueue();
-            updatePlayerUI();
+            if (typeof syncSongQueueFromRemote === 'function') {
+              syncSongQueueFromRemote(srData.queue);
+            } else {
+              localSongQueue = srData.queue;
+              renderSongQueue();
+              updatePlayerUI();
+            }
           }
         }
       }).catch(() => { });
@@ -6112,30 +6151,7 @@ function setupRealtimeChannels() {
       loadBotConfig();
     })
     .subscribe();
-
-  realtimeSongRequestSub = sb.channel('public:song_request_sub')
-    .on('postgres_changes', {
-      event: '*',
-      schema: '*',
-      table: 'song_request',
-      filter: `channel_id=eq.${activeChannel.id}`
-    }, payload => {
-      if (payload.new && Array.isArray(payload.new.queue)) {
-        localSongQueue = payload.new.queue;
-        if (typeof renderSongQueue === 'function') renderSongQueue();
-        if (typeof updatePlayerUI === 'function') updatePlayerUI();
-      } else {
-        getSbPanels().from('song_request').select('queue').eq('channel_id', activeChannel.id).eq('type', 'config').maybeSingle()
-          .then(({ data }) => {
-            if (data && Array.isArray(data.queue)) {
-              localSongQueue = data.queue;
-              if (typeof renderSongQueue === 'function') renderSongQueue();
-              if (typeof updatePlayerUI === 'function') updatePlayerUI();
-            }
-          }).catch(() => { });
-      }
-    })
-    .subscribe();
+  setupRealtimeSongQueueSubscription(activeChannel.id);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -9074,17 +9090,157 @@ let playerVolume = 80;
 
 let ytPlayer = null;
 let isYtReady = false;
+let pendingPlay = false;
+let autoplayUnlockerAttached = false;
+let currentPlayingYtId = null;
 
-// YouTube Iframe API callback
-window.onYouTubeIframeAPIReady = function () {
+let audioWakeCtx = null;
+let audioWakeNode = null;
+let silentAudioEl = null;
+
+function ensureAudioPipelineActive() {
+  try {
+    // 1. Looping silent HTML5 Audio element
+    if (!silentAudioEl) {
+      silentAudioEl = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+      silentAudioEl.loop = true;
+      silentAudioEl.volume = 0.001;
+    }
+    if (silentAudioEl.paused) {
+      silentAudioEl.play().catch(() => { });
+    }
+
+    // 2. Continuous silent Web Audio node
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!audioWakeCtx && AudioContextClass) {
+      audioWakeCtx = new AudioContextClass();
+    }
+    if (audioWakeCtx) {
+      if (audioWakeCtx.state === 'suspended') {
+        audioWakeCtx.resume().catch(() => { });
+      }
+      if (audioWakeCtx.state === 'running' && !audioWakeNode) {
+        const buffer = audioWakeCtx.createBuffer(1, audioWakeCtx.sampleRate * 2, audioWakeCtx.sampleRate);
+        audioWakeNode = audioWakeCtx.createBufferSource();
+        audioWakeNode.buffer = buffer;
+        audioWakeNode.loop = true;
+        const gain = audioWakeCtx.createGain();
+        gain.gain.value = 0.00001;
+        audioWakeNode.connect(gain);
+        gain.connect(audioWakeCtx.destination);
+        audioWakeNode.start();
+      }
+    }
+  } catch (_) { }
+
+  if (isPlaying && ytPlayer && typeof ytPlayer.playVideo === 'function') {
+    try {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+      const st = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+      if (st !== 1 && st !== 3) {
+        ytPlayer.playVideo();
+      }
+    } catch (_) { }
+  }
+}
+
+const keepAudioAwake = ensureAudioPipelineActive;
+
+window.addEventListener('click', ensureAudioPipelineActive, { passive: true });
+window.addEventListener('keydown', ensureAudioPipelineActive, { passive: true });
+window.addEventListener('touchstart', ensureAudioPipelineActive, { passive: true });
+window.addEventListener('pointerdown', ensureAudioPipelineActive, { passive: true });
+
+document.addEventListener('visibilitychange', () => {
+  ensureAudioPipelineActive();
+  if (!document.hidden && isPlaying && ytPlayer) {
+    try {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+      const st = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+      if (st !== 1 && st !== 3 && ytPlayer.playVideo) {
+        ytPlayer.playVideo();
+      }
+    } catch (_) { }
+  }
+});
+
+function attachAutoplayUnlocker() {
+  if (autoplayUnlockerAttached) return;
+  autoplayUnlockerAttached = true;
+  const unlock = () => {
+    autoplayUnlockerAttached = false;
+    document.removeEventListener('click', unlock, true);
+    document.removeEventListener('keydown', unlock, true);
+    document.removeEventListener('touchstart', unlock, true);
+    ensureAudioPipelineActive();
+    if (isPlaying && ytPlayer && ytPlayer.playVideo && typeof ytPlayer.playVideo === 'function') {
+      try {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+        ytPlayer.playVideo();
+      } catch (_) { }
+    }
+  };
+  document.addEventListener('click', unlock, true);
+  document.addEventListener('keydown', unlock, true);
+  document.addEventListener('touchstart', unlock, true);
+}
+
+function openPopoutPlayer() {
+  if (!activeChannel) {
+    showToast('warning', 'Izaberite najpre kanal.');
+    return;
+  }
+  const width = 480;
+  const height = 400;
+  const left = Math.round((window.screen.width / 2) - (width / 2));
+  const top = Math.round((window.screen.height / 2) - (height / 2));
+  const popout = window.open(
+    `player.html?channel=${encodeURIComponent(activeChannel.id)}&name=${encodeURIComponent(activeChannel.username)}`,
+    'KickotPopoutMusicPlayer',
+    `width=${width},height=${height},top=${top},left=${left},status=no,menubar=no,toolbar=no,location=no,resizable=yes`
+  );
+  if (popout) {
+    popout.focus();
+    showToast('success', 'Plutajući plejer je otvoren u odvojenom prozoru!');
+  } else {
+    showToast('warning', 'Pregledač je blokirao pop-up prozor. Molimo dozvolite pop-up za Kickot.');
+  }
+}
+window.openPopoutPlayer = openPopoutPlayer;
+
+function initYouTubeAudioEngine(preferredVideoId) {
+  if (ytPlayer && isYtReady) return;
+  if (!window.YT || !window.YT.Player) return;
+
+  const curSong = localSongQueue[currentSongIndex];
+  const hasQueueSong = curSong && (curSong.ytId || extractYouTubeId(curSong.id) || extractYouTubeId(curSong.title));
+  // Pre-warm: Ako nemamo pesmu, učitaj YouTube sa standby videom tako da iframe već živi u DOM-u pre nego što korisnik ode na Kick tab
+  const videoIdToLoad = preferredVideoId || hasQueueSong || 'jNQXAC9IVRw';
+  const shouldAutoplay = !!(preferredVideoId || (hasQueueSong && isPlaying) || pendingPlay);
+
+  let hostEl = document.getElementById('ytAudioPlayer');
+  if (!hostEl) {
+    const container = document.getElementById('ytAudioPlayerContainer') || document.getElementById('srGlobalAudioEngine');
+    if (container) {
+      container.innerHTML = '<div id="ytAudioPlayer"></div>';
+      hostEl = document.getElementById('ytAudioPlayer');
+    }
+  }
+  if (!hostEl) return;
+
   try {
     ytPlayer = new YT.Player('ytAudioPlayer', {
       height: '100%',
       width: '100%',
+      videoId: videoIdToLoad,
       playerVars: {
-        autoplay: 1,
-        controls: 1,
-        disablekb: 0,
+        autoplay: shouldAutoplay ? 1 : 0,
+        mute: 1, // Startuj utišano da browser pozadinska politika ne blokira YouTube iframe
+        controls: 0,
+        disablekb: 1,
         fs: 0,
         rel: 0,
         playsinline: 1,
@@ -9096,41 +9252,105 @@ window.onYouTubeIframeAPIReady = function () {
         'onError': onYtPlayerError
       }
     });
+    window.ytPlayer = ytPlayer;
   } catch (e) {
     console.warn('[YouTube Audio Engine] API error:', e);
   }
+}
+
+// YouTube Iframe API callback
+window.onYouTubeIframeAPIReady = function () {
+  initYouTubeAudioEngine();
 };
+
+// Proveri da li je YT API već bio učitan ili se učitava sa malim zakašnjenjem
+if (window.YT && window.YT.Player) {
+  setTimeout(() => { initYouTubeAudioEngine(); }, 50);
+} else {
+  let ytCheckAttempts = 0;
+  const ytCheckTimer = setInterval(() => {
+    ytCheckAttempts++;
+    if (window.YT && window.YT.Player) {
+      clearInterval(ytCheckTimer);
+      initYouTubeAudioEngine();
+    } else if (ytCheckAttempts > 60) {
+      clearInterval(ytCheckTimer);
+    }
+  }, 200);
+}
 
 function onYtPlayerReady(_event) {
   isYtReady = true;
+  window.ytPlayer = ytPlayer;
   if (ytPlayer) {
     try {
-      if (ytPlayer.unMute) ytPlayer.unMute();
-      if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume);
+      const iframe = ytPlayer.getIframe ? ytPlayer.getIframe() : null;
+      if (iframe) {
+        iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
+        iframe.setAttribute('title', 'YouTube Audio Engine');
+      }
+      if (!document.hidden && (localSongQueue.length > 0 || pendingPlay)) {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+      }
+      if (localSongQueue.length > 0 && (isPlaying || pendingPlay)) {
+        if (ytPlayer.playVideo) ytPlayer.playVideo();
+      }
     } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
+  }
+  // Pokreni pesmu ako imamo red ili je reprodukcija na čekanju
+  if (localSongQueue.length > 0 && (isPlaying || pendingPlay)) {
+    pendingPlay = false;
+    playCurrentAudio();
   }
 }
 
 function onYtPlayerStateChange(event) {
   if (!event) return;
   if (event.data === YT.PlayerState.ENDED) {
-    skipSong();
+    // Završena pesma -> automatski pređi na sledeću pesmu iz reda
+    currentPlayingYtId = null;
+    skipSong(true);
   } else if (event.data === YT.PlayerState.PLAYING) {
     isPlaying = true;
+    if (ytPlayer) {
+      try {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+      } catch (_) { }
+      if (typeof ytPlayer.getDuration === 'function') {
+        const realDur = ytPlayer.getDuration();
+        if (realDur && !isNaN(realDur) && realDur > 0) {
+          const curSong = localSongQueue[currentSongIndex];
+          if (curSong && Math.round(realDur) !== curSong.duration) {
+            curSong.duration = Math.round(realDur);
+            saveSongRequestConfig(true);
+          }
+        }
+      }
+    }
     startTimer();
     updatePlayerUI();
     renderSongQueue();
   } else if (event.data === YT.PlayerState.PAUSED) {
-    isPlaying = false;
-    stopTimer();
-    updatePlayerUI();
-    renderSongQueue();
+    if (isPlaying && document.hidden && ytPlayer && ytPlayer.playVideo) {
+      try {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        ytPlayer.playVideo();
+      } catch (_) { }
+    } else {
+      isPlaying = false;
+      stopTimer();
+      updatePlayerUI();
+      renderSongQueue();
+    }
   }
 }
 
 function onYtPlayerError(event) {
-  console.warn('[YouTube Audio Engine] Video error, skipping song:', event ? event.data : '');
-  setTimeout(() => { skipSong(); }, 1500);
+  console.warn('[YouTube Audio Engine] Video error, skipping to next song:', event ? event.data : '');
+  showToast('warning', 'Pesma sa YouTube-a nije dostupna za reprodukciju. Prelazim na sledeću...');
+  setTimeout(() => { skipSong(true); }, 1200);
 }
 
 function extractYouTubeId(urlOrText) {
@@ -9152,9 +9372,33 @@ function startTimer() {
     if (ytPlayer && ytPlayer.getCurrentTime && typeof ytPlayer.getCurrentTime === 'function') {
       const curr = ytPlayer.getCurrentTime();
       if (curr && !isNaN(curr)) currentTimeSeconds = Math.floor(curr);
+      if (ytPlayer.getDuration && typeof ytPlayer.getDuration === 'function') {
+        const realDur = ytPlayer.getDuration();
+        if (realDur && !isNaN(realDur) && realDur > 0 && Math.round(realDur) !== currentSong.duration) {
+          currentSong.duration = Math.round(realDur);
+          renderSongQueue();
+        }
+      }
     } else {
       currentTimeSeconds++;
     }
+
+    // NIKADA ne prekidaj pesmu ako YouTube plejer aktivno reprodukuje zvuk! (PlayerState 1 = PLAYING, 3 = BUFFERING)
+    let isYtActivelyStreaming = false;
+    if (ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+      const st = ytPlayer.getPlayerState();
+      if (st === 1 || st === 3) {
+        isYtActivelyStreaming = true;
+      }
+    }
+
+    // Sigurnosni fallback auto-advance samo ako YouTube NIJE više aktivan, a vreme je premašilo trajanje za > 4s
+    if (!isYtActivelyStreaming && currentSong.duration > 5 && currentTimeSeconds >= (currentSong.duration + 4)) {
+      currentPlayingYtId = null;
+      skipSong(true);
+      return;
+    }
+
     updatePlayerUI();
   }, 1000);
 }
@@ -9177,7 +9421,7 @@ function renderSongQueue() {
   const queueCount = document.getElementById('queueCount');
   if (!queueList) return;
 
-  queueCount.textContent = `${localSongQueue.length} pesama`;
+  if (queueCount) queueCount.textContent = `${localSongQueue.length} pesama`;
 
   // Vizuelno ograničavanje Add dugmeta na osnovu plana
   const sqLimits = getPlanLimits();
@@ -9234,7 +9478,49 @@ function renderSongQueue() {
   }).join('');
 }
 
+function updateMiniPlayerUI() {
+  const miniPlayer = document.getElementById('srMiniPlayer');
+  if (!miniPlayer) return;
+
+  const currentSong = localSongQueue[currentSongIndex];
+  if (!currentSong || localSongQueue.length === 0) {
+    miniPlayer.style.display = 'none';
+    return;
+  }
+
+  miniPlayer.style.display = 'flex';
+  const miniTitle = document.getElementById('srMiniTitle');
+  const miniRequester = document.getElementById('srMiniRequester');
+  const miniCover = document.getElementById('srMiniCover');
+  const miniPlayIcon = document.getElementById('srMiniPlayIcon');
+
+  if (miniTitle) {
+    miniTitle.textContent = currentSong.title || 'Pesma';
+    miniTitle.title = (currentSong.artist ? `${currentSong.artist} - ` : '') + currentSong.title;
+  }
+  if (miniRequester) {
+    miniRequester.textContent = currentSong.requester ? `@${currentSong.requester}` : 'Zahtev';
+  }
+  if (miniCover) {
+    miniCover.src = currentSong.coverUrl || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100&auto=format&fit=crop&q=80';
+    if (isPlaying) {
+      miniCover.classList.add('playing');
+    } else {
+      miniCover.classList.remove('playing');
+    }
+  }
+  if (miniPlayIcon) {
+    if (isPlaying) {
+      miniPlayIcon.innerHTML = '<rect x="4" y="3" width="5" height="18" fill="currentColor"/><rect x="15" y="3" width="5" height="18" fill="currentColor"/>';
+    } else {
+      miniPlayIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/>';
+    }
+  }
+}
+
 function updatePlayerUI() {
+  updateMiniPlayerUI();
+
   const playerTitle = document.getElementById('playerTitle');
   const playerRequester = document.getElementById('playerRequester');
   const playerProgress = document.getElementById('playerProgress');
@@ -9248,7 +9534,6 @@ function updatePlayerUI() {
   if (!playerTitle) return;
 
   const currentSong = localSongQueue[currentSongIndex];
-  const ytIframe = document.getElementById('ytAudioPlayer');
 
   if (!currentSong) {
     playerTitle.textContent = 'Nema pesama u redu';
@@ -9258,14 +9543,30 @@ function updatePlayerUI() {
     if (playerTotalTime) playerTotalTime.textContent = '0:00';
     if (playerCoverImg) { playerCoverImg.style.setProperty('display', 'none', 'important'); playerCoverImg.src = ''; }
     if (playerDisk) { playerDisk.style.setProperty('display', 'flex', 'important'); playerDisk.style.animationPlayState = 'paused'; }
-    if (ytIframe) ytIframe.style.setProperty('display', 'none', 'important');
     if (playerSourceBadge) playerSourceBadge.style.setProperty('display', 'none', 'important');
     if (playIcon) {
       playIcon.setAttribute('viewBox', '0 0 24 24');
       playIcon.style.marginLeft = '2px';
-      playIcon.innerHTML = '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" />';
+      playIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />';
     }
     return;
+  }
+
+  // Preuzmi žive podatke iz YouTube plejera ako su dostupni
+  const player = ytPlayer || window.ytPlayer;
+  if (player && typeof player.getCurrentTime === 'function' && isPlaying) {
+    try {
+      const cur = player.getCurrentTime();
+      if (cur && !isNaN(cur)) currentTimeSeconds = Math.floor(cur);
+    } catch (_) { }
+  }
+  if (player && typeof player.getDuration === 'function' && isPlaying) {
+    try {
+      const d = player.getDuration();
+      if (d && !isNaN(d) && d > 0 && Math.round(d) !== currentSong.duration) {
+        currentSong.duration = Math.round(d);
+      }
+    } catch (_) { }
   }
 
   const titleText = currentSong.artist ? `${currentSong.artist} - ${currentSong.title}` : currentSong.title;
@@ -9274,7 +9575,7 @@ function updatePlayerUI() {
   if (playerTotalTime) playerTotalTime.textContent = formatDuration(currentSong.duration);
   if (playerCurrentTime) playerCurrentTime.textContent = formatDuration(currentTimeSeconds);
   if (playerProgress) {
-    const pct = currentSong.duration > 0 ? (currentTimeSeconds / currentSong.duration) * 100 : 0;
+    const pct = currentSong.duration > 0 ? Math.min(100, (currentTimeSeconds / currentSong.duration) * 100) : 0;
     playerProgress.style.width = `${pct}%`;
   }
 
@@ -9282,11 +9583,12 @@ function updatePlayerUI() {
     playerCoverImg.src = currentSong.coverUrl;
     playerCoverImg.style.setProperty('display', 'block', 'important');
     if (playerDisk) playerDisk.style.setProperty('display', 'none', 'important');
-    if (ytIframe) ytIframe.style.setProperty('display', 'none', 'important');
   } else {
     if (playerCoverImg) playerCoverImg.style.setProperty('display', 'none', 'important');
-    if (playerDisk) playerDisk.style.setProperty('display', 'none', 'important');
-    if (ytIframe) ytIframe.style.setProperty('display', 'block', 'important');
+    if (playerDisk) {
+      playerDisk.style.setProperty('display', 'flex', 'important');
+      playerDisk.style.animationPlayState = isPlaying ? 'running' : 'paused';
+    }
   }
 
   if (playerSourceBadge) {
@@ -9309,7 +9611,15 @@ function updatePlayerUI() {
 
 async function playCurrentAudio() {
   const currentSong = localSongQueue[currentSongIndex];
-  if (!currentSong) return;
+  if (!currentSong) {
+    isPlaying = false;
+    currentPlayingYtId = null;
+    stopTimer();
+    updatePlayerUI();
+    return;
+  }
+
+  ensureAudioPipelineActive();
 
   let ytId = currentSong.ytId || extractYouTubeId(currentSong.id) || extractYouTubeId(currentSong.title);
 
@@ -9324,10 +9634,32 @@ async function playCurrentAudio() {
     currentSong.coverUrl = `https://img.youtube.com/vi/${ytId}/hqdefault.jpg`;
   }
 
-  if (ytPlayer && ytId) {
+  // Ako ova ista pesma već aktivno svira u plejeru, ne prekidaj je ponovnim učitavanjem
+  if (ytId && currentPlayingYtId === ytId && isPlaying && ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+    const st = ytPlayer.getPlayerState();
+    if (st === 1 || st === 3) {
+      try {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+      } catch (_) { }
+      return;
+    }
+  }
+
+  currentPlayingYtId = ytId;
+  currentTimeSeconds = 0;
+
+  const isBackground = document.hidden;
+
+  if (ytPlayer && ytId && isYtReady) {
     try {
-      if (ytPlayer.unMute) ytPlayer.unMute();
-      if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
+      if (isBackground) {
+        // U pozadinskom tabu: obavezno prvo mute da browser/YouTube ne blokira autoplay
+        if (ytPlayer.mute) ytPlayer.mute();
+      } else {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+      }
     } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
 
     if (ytPlayer.loadVideoById) {
@@ -9335,13 +9667,41 @@ async function playCurrentAudio() {
         videoId: ytId,
         startSeconds: 0
       });
-      if (ytPlayer.playVideo) ytPlayer.playVideo();
+      if (ytPlayer.playVideo) {
+        try {
+          ytPlayer.playVideo();
+        } catch (_) { }
+      }
+
+      // Pozadinski watchdog koji prati startovanje i automatski odmutira ton čim krene streaming
+      let bgCheckCount = 0;
+      const bgWatchdog = setInterval(() => {
+        bgCheckCount++;
+        if (!isPlaying || !ytPlayer || bgCheckCount > 30) {
+          clearInterval(bgWatchdog);
+          return;
+        }
+        try {
+          const state = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+          if (state === 1) { // 1 = PLAYING!
+            if (ytPlayer.unMute) ytPlayer.unMute();
+            if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+            clearInterval(bgWatchdog);
+          } else if (state === 2 || state === -1 || state === 5) {
+            // Ako je YouTube ostao u paused/unstarted stanju dok je tab u pozadini
+            if (ytPlayer.playVideo) ytPlayer.playVideo();
+          }
+        } catch (_) { }
+      }, 250);
     }
     isPlaying = true;
     startTimer();
   } else {
+    // Ako YouTube API još uvek učitava u pozadini, pokreni ga sa tačnim video ID-jem
+    pendingPlay = true;
     isPlaying = true;
     startTimer();
+    initYouTubeAudioEngine(ytId);
   }
   updatePlayerUI();
   renderSongQueue();
@@ -9352,6 +9712,8 @@ async function togglePlayback() {
     showToast('info', 'Dodajte najpre neku pesmu u red.');
     return;
   }
+
+  ensureAudioPipelineActive();
 
   if (isPlaying) {
     isPlaying = false;
@@ -9368,7 +9730,7 @@ async function togglePlayback() {
       } else {
         try {
           if (ytPlayer.unMute) ytPlayer.unMute();
-          if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 100);
+          if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
           if (ytPlayer.playVideo) ytPlayer.playVideo();
         } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
         startTimer();
@@ -9382,9 +9744,10 @@ async function togglePlayback() {
   renderSongQueue();
 }
 
-async function skipSong() {
+async function skipSong(isAutoAdvance = false) {
   stopTimer();
   currentTimeSeconds = 0;
+  currentPlayingYtId = null;
 
   if (localSongQueue.length > 0) {
     localSongQueue.splice(currentSongIndex, 1);
@@ -9397,10 +9760,17 @@ async function skipSong() {
 
   if (localSongQueue.length === 0) {
     isPlaying = false;
-    if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
-    showToast('info', 'Završeno puštanje svih pesama iz reda.');
+    if (ytPlayer && ytPlayer.stopVideo) {
+      try { ytPlayer.stopVideo(); } catch (_) { }
+    }
+    if (!isAutoAdvance) {
+      showToast('info', 'Završeno puštanje svih pesama iz reda.');
+    }
   } else {
     playCurrentAudio();
+    if (!isAutoAdvance) {
+      showToast('info', 'Pesma je preskočena.');
+    }
   }
 
   updatePlayerUI();
@@ -9425,6 +9795,69 @@ async function previousSong() {
   }
 
   playCurrentAudio();
+}
+
+function syncSongQueueFromRemote(newQueue) {
+  if (!Array.isArray(newQueue)) return;
+
+  const wasEmpty = localSongQueue.length === 0;
+  const currentlyPlaying = localSongQueue[currentSongIndex];
+
+  const isYtActivelyStreaming = ytPlayer && typeof ytPlayer.getPlayerState === 'function' &&
+    (ytPlayer.getPlayerState() === 1 || ytPlayer.getPlayerState() === 3);
+  const isPlaybackActive = isPlaying || isYtActivelyStreaming;
+
+  // 1. Ako je red prazan u bazi:
+  if (newQueue.length === 0) {
+    localSongQueue = [];
+    currentSongIndex = 0;
+    currentTimeSeconds = 0;
+    isPlaying = false;
+    currentPlayingYtId = null;
+    stopTimer();
+    if (ytPlayer && ytPlayer.stopVideo) {
+      try { ytPlayer.stopVideo(); } catch (_) { }
+    }
+    renderSongQueue();
+    updatePlayerUI();
+    return;
+  }
+
+  // 2. Ako ništa nije sviralo ili je red bio prazan, a stigle su nove pesme -> startuj automatski!
+  if (!isPlaybackActive || wasEmpty || !currentlyPlaying) {
+    localSongQueue = newQueue;
+    currentSongIndex = 0;
+    renderSongQueue();
+    updatePlayerUI();
+    playCurrentAudio();
+    return;
+  }
+
+  // 3. Ako pesma već svira -> zadrži trenutnu pesmu i njenu poziciju, a ažuriraj ostatak reda
+  const matchIdx = newQueue.findIndex(s =>
+    (s.id && currentlyPlaying.id && s.id === currentlyPlaying.id) ||
+    (s.ytId && currentlyPlaying.ytId && s.ytId === currentlyPlaying.ytId) ||
+    (s.title === currentlyPlaying.title && s.requester === currentlyPlaying.requester)
+  );
+
+  if (matchIdx !== -1) {
+    // Sačuvaj stvarno trajanje očitano sa YouTube API-ja
+    if (currentlyPlaying.duration && currentlyPlaying.duration > 0) {
+      newQueue[matchIdx].duration = currentlyPlaying.duration;
+    }
+    localSongQueue = newQueue;
+    currentSongIndex = matchIdx;
+  } else {
+    // Ako je trenutna pesma uklonjena u bazi sa drugog uređaja
+    localSongQueue = newQueue;
+    if (currentSongIndex >= localSongQueue.length) {
+      currentSongIndex = 0;
+    }
+  }
+
+  renderSongQueue();
+  updatePlayerUI();
+  setTimeout(enrichQueueDurations, 600);
 }
 
 async function saveSongRequestConfig(silent) {
@@ -9491,12 +9924,19 @@ function seekPlayer(event) {
   if (width <= 0) return;
   const pct = Math.max(0, Math.min(1, clickX / width));
 
-  const targetSeconds = Math.floor(pct * (currentSong.duration || 0));
+  const player = ytPlayer || window.ytPlayer;
+  let effectiveDuration = currentSong.duration || 0;
+  if (player && typeof player.getDuration === 'function') {
+    const d = player.getDuration();
+    if (d && !isNaN(d) && d > 0) effectiveDuration = Math.round(d);
+  }
+
+  const targetSeconds = Math.floor(pct * effectiveDuration);
   currentTimeSeconds = targetSeconds;
 
-  if (window.ytPlayer && typeof window.ytPlayer.seekTo === 'function') {
+  if (player && typeof player.seekTo === 'function') {
     try {
-      window.ytPlayer.seekTo(targetSeconds, true);
+      player.seekTo(targetSeconds, true);
     } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
   }
 
@@ -9550,17 +9990,63 @@ async function searchYouTubeVideoId(query) {
 
 async function fetchExactYouTubeDuration(ytId) {
   if (!ytId) return 0;
+
+  // 1. Zvanični Netlify Backend search endpoint
+  try {
+    const res = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(ytId)}`, { signal: AbortSignal.timeout(4000) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.duration && data.duration > 0) {
+        return Math.round(Number(data.duration));
+      }
+    }
+  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
+
+  // 2. Fallback: allorigins proxy
   try {
     const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + ytId)}`, { signal: AbortSignal.timeout(3500) });
     if (res.ok) {
       const html = await res.text();
-      const match = html.match(/"approxDurationMs":"(\d+)"/);
+      const match = html.match(/"approxDurationMs":"(\d+)"/) || html.match(/"lengthSeconds":"(\d+)"/);
       if (match && match[1]) {
-        return Math.round(parseInt(match[1]) / 1000);
+        return Math.round(parseInt(match[1]) / (match[1].length > 6 ? 1000 : 1));
       }
     }
   } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
+
   return 0;
+}
+
+let isEnrichingDurations = false;
+async function enrichQueueDurations() {
+  if (isEnrichingDurations || !localSongQueue || localSongQueue.length === 0) return;
+  isEnrichingDurations = true;
+  let hasUpdates = false;
+
+  try {
+    for (let i = 0; i < localSongQueue.length; i++) {
+      const song = localSongQueue[i];
+      if (!song) continue;
+      // Ako pesma ima podrazumevano trajanje (210s) ili nema trajanje
+      if (!song.duration || song.duration === 210 || song.duration <= 0) {
+        const ytId = song.ytId || extractYouTubeId(song.id) || extractYouTubeId(song.title);
+        if (ytId) {
+          const exactDur = await fetchExactYouTubeDuration(ytId);
+          if (exactDur > 0 && exactDur !== song.duration) {
+            song.duration = exactDur;
+            hasUpdates = true;
+            renderSongQueue();
+            updatePlayerUI();
+          }
+        }
+      }
+    }
+    if (hasUpdates) {
+      saveSongRequestConfig(true);
+    }
+  } finally {
+    isEnrichingDurations = false;
+  }
 }
 
 async function resolveYouTubeSongSmart(query) {
@@ -9791,6 +10277,8 @@ window.previousSong = previousSong;
 window.updateVolume = updateVolume;
 window.seekPlayer = seekPlayer;
 window.saveSongRequestConfig = saveSongRequestConfig;
+window.syncSongQueueFromRemote = syncSongQueueFromRemote;
+window.updateMiniPlayerUI = updateMiniPlayerUI;
 window.switchEconomyTab = switchEconomyTab;
 window.updateEconomyPreviews = updateEconomyPreviews;
 window.saveEconomyConfig = saveEconomyConfig;
@@ -9834,6 +10322,7 @@ window.confirmCustomBotAuth = confirmCustomBotAuth;
 window.disconnectCustomBot = disconnectCustomBot;
 window.updateCustomBotStatusUI = updateCustomBotStatusUI;
 window.getBotSenderIdentity = getBotSenderIdentity;
+window.enrichQueueDurations = enrichQueueDurations;
 
 // Initial rendering of notification content on page load
 window.addEventListener('DOMContentLoaded', () => {
@@ -9844,6 +10333,7 @@ window.addEventListener('DOMContentLoaded', () => {
   renderNotifContent();
   renderSongQueue();
   updatePlayerUI();
+  setTimeout(enrichQueueDurations, 1200);
 });
 
 

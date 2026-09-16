@@ -382,6 +382,25 @@
 </div>
 </div>
 <div class="topbar-right kx-3">
+<!-- Topbar Song Request Mini Player Indicator -->
+<div class="sr-mini-player" id="srMiniPlayer" style="display: none;">
+<img alt="Cover" class="sr-mini-cover" id="srMiniCover" src="" />
+<div class="sr-mini-info" onclick="switchPanel('songs')" title="Otvori Song Request panel">
+<span class="sr-mini-title" id="srMiniTitle">Pesma</span>
+<span class="sr-mini-requester" id="srMiniRequester">Zahtev</span>
+</div>
+<button class="sr-mini-btn" id="srMiniPlayBtn" onclick="togglePlayback()" title="Pusti / Pauziraj" type="button" aria-label="Pusti ili pauziraj">
+<svg fill="none" height="14" id="srMiniPlayIcon" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="14">
+<polygon points="5 3 19 12 5 21 5 3"></polygon>
+</svg>
+</button>
+<button class="sr-mini-btn" onclick="skipSong()" title="Preskoči pesmu" type="button" aria-label="Preskoči pesmu">
+<svg fill="none" height="13" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24" width="13">
+<polygon points="5 4 15 12 5 20 5 4"></polygon>
+<line x1="19" x2="19" y1="5" y2="19"></line>
+</svg>
+</button>
+</div>
 <!-- Bot Active Master Switch Pill -->
 <div class="bot-toggle-wrap kx-8">
 <span class="bot-toggle-label kx-9" id="botToggleLabel">Bot:
@@ -3174,7 +3193,11 @@
 <p class="panel-desc">Upravljajte muzičkim željama gledalaca u realnom vremenu i puštajte pesme sa
                 YouTube-a direktno u dashboardu.</p>
 </div>
-<div class="panel-header-toggle">
+<div class="panel-header-toggle" style="display: flex; align-items: center; gap: 12px;">
+<button type="button" class="btn btn-sm btn-outline" onclick="openPopoutPlayer()" style="display: inline-flex; align-items: center; gap: 6px; border-color: rgba(255, 0, 51, 0.4); color: #fff; font-size: 0.8rem; padding: 6px 12px; border-radius: 8px;" title="Otvori u odvojenom mini prozoru koji nikada ne pauzira muziku dok si na Kick-u">
+<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+<span>Plutajući Plejer</span>
+</button>
 <span class="panel-header-toggle__label">Song Request:</span>
 <label class="toggle-switch">
 <input checked="" id="cfgFeatureSongRequestMaster" onchange="toggleModuleFromHeader('cfgSongRequestEnabled', this.checked)" type="checkbox"/>
@@ -3190,9 +3213,8 @@
   <div class="sr-col">
     <!-- Music Player Card -->
     <div class="sr-player-card">
-      <!-- Album Art & YouTube Player Container -->
+      <!-- Album Art & Cover Container -->
       <div class="sr-cover-wrapper" id="playerCoverWrap">
-        <iframe allow="autoplay; encrypted-media; picture-in-picture" class="kx-167" frameborder="0" id="ytAudioPlayer" src="https://www.youtube.com/embed/?enablejsapi=1&amp;autoplay=1&amp;playsinline=1" title="YouTube Audio Player"></iframe>
         <img alt="Album Cover" class="sr-cover-img" id="playerCoverImg" src="" />
         <div class="sr-disk-placeholder" id="playerDisk">
           <svg fill="none" height="54" stroke="rgba(255,255,255,0.75)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="54">
@@ -6432,6 +6454,10 @@ Podesite novo stanje poena za gledaoca.
 </div>
 </div>
 </div>
+<!-- Persistent Global YouTube Audio Engine Host -->
+<div id="srGlobalAudioEngine" class="sr-global-audio-engine" aria-hidden="true">
+  <div id="ytAudioPlayerContainer"><div id="ytAudioPlayer"></div></div>
+</div>
 <!-- Toast Container -->
 <div aria-atomic="true" aria-live="polite" class="toast-container" id="toastContainer"></div>
 <!-- Toast System & Optimization -->
@@ -6445,7 +6471,7 @@ Podesite novo stanje poena za gledaoca.
 <!-- Avatar Cache Module (IndexedDB) -->
 <script src="js/avatar-cache.js?v=20260916-v3"></script>
 <!-- YouTube Iframe API for Audio Player -->
-<script src="https://www.youtube.com/iframe_api" defer></script>
+<script src="https://www.youtube.com/iframe_api"></script>
 <!-- Main Dashboard Core Script -->
 <script src="js/dashboard.js?v=20260916-v3"></script>
 <!-- KickALL Data Layer & Analytics -->

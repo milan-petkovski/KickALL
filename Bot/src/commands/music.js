@@ -105,6 +105,14 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
             const lenMatch = html.match(/"lengthSeconds":"(\d+)"/);
             if (lenMatch && lenMatch[1]) {
                 duration = parseInt(lenMatch[1], 10);
+            } else {
+                const lenTextMatch = html.match(/"lengthText":\s*\{\s*"accessibility":\s*\{[^}]*\}\s*,\s*"simpleText":\s*"([^"]+)"\}/) ||
+                                     html.match(/"lengthText":\s*\{\s*"simpleText":\s*"([^"]+)"\}/);
+                if (lenTextMatch && lenTextMatch[1]) {
+                    const parts = lenTextMatch[1].split(':').map(p => parseInt(p, 10));
+                    if (parts.length === 2) duration = parts[0] * 60 + parts[1];
+                    else if (parts.length === 3) duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+                }
             }
         } catch (_) { }
     }
@@ -112,6 +120,38 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
     if (!ytId) {
         posaljiPoruku(chatroomId, `❌ @${sender}, nije bilo moguće pronaći pesmu "${query}" na YouTube-u. Pokušaj sa tačnim nazivom ili YouTube linkom.`);
         return;
+    }
+
+    // Ako još uvek nemamo tačno trajanje (direktan link ili ga pretraga nije vratila), dohvati sa watch stranice
+    if (ytId && (!duration || duration <= 0)) {
+        try {
+            const https = require('https');
+            const watchUrl = `https://www.youtube.com/watch?v=${ytId}`;
+            const watchHtml = await new Promise((res) => {
+                const req = https.get(watchUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                        'Accept-Language': 'en-US,en;q=0.9'
+                    }
+                }, (resp) => {
+                    let data = '';
+                    resp.on('data', chunk => data += chunk);
+                    resp.on('end', () => res(data));
+                });
+                req.on('error', () => res(''));
+                req.setTimeout(3500, () => { req.destroy(); res(''); });
+            });
+
+            const durMatch = watchHtml.match(/"approxDurationMs":"(\d+)"/);
+            if (durMatch && durMatch[1]) {
+                duration = Math.round(parseInt(durMatch[1], 10) / 1000);
+            } else {
+                const secMatch = watchHtml.match(/"lengthSeconds":"(\d+)"/);
+                if (secMatch && secMatch[1]) {
+                    duration = parseInt(secMatch[1], 10);
+                }
+            }
+        } catch (_) { }
     }
 
     // Provera duplikata u redu po ytId ili naslovu
@@ -221,8 +261,22 @@ async function handleSkipSong(chatroomId, sender, senderObj) {
     posaljiPoruku(chatroomId, `⏭️ Moderacija (@${sender}) je preskočila pesmu: ${skipped.artist && skipped.artist !== 'YouTube' ? skipped.artist + ' - ' : ''}${skipped.title}`);
 }
 
+function handleCurrentSong(chatroomId) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || channelState.feature_songrequest === false) return;
+    const queue = channelState.songrequest_settings?.queue || [];
+    if (queue.length === 0) {
+        posaljiPoruku(chatroomId, `🎵 Trenutno se ne pušta nijedna pesma.`);
+        return;
+    }
+    const current = queue[0];
+    posaljiPoruku(chatroomId, `🎶 Trenutno svira: "${current.artist && current.artist !== 'YouTube' ? current.artist + ' - ' : ''}${current.title}" (Zatražio: @${current.requester})`);
+}
+
 module.exports = {
     handlePesma,
     handleSongQueue,
-    handleSkipSong
+    handleSkipSong,
+    handleCurrentSong
 };
+
