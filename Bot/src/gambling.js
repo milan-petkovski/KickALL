@@ -98,15 +98,16 @@ function handleSlots(chatroomId, sender, amountRaw) {
 
     if (s1 === s2 && s2 === s3) {
         if (s1 === '7️⃣' || s1 === '💎') {
-            dobitak = p.iznos * 10;
-            porukaDobitka = `💎🔥 JACKPOT 10x! Osvojio si +${dobitak.toLocaleString()} ${p.valuta}! 🔥💎`;
+            dobitak = p.iznos * 7;
+            porukaDobitka = `💎🔥 JACKPOT 7x! Osvojio si +${dobitak.toLocaleString()} ${p.valuta}! 🔥💎`;
         } else {
-            dobitak = p.iznos * 5;
-            porukaDobitka = `🎉 3 u nizu 5x! Osvojio si +${dobitak.toLocaleString()} ${p.valuta}! 🎉`;
+            dobitak = p.iznos * 4;
+            porukaDobitka = `🎉 3 u nizu 4x! Osvojio si +${dobitak.toLocaleString()} ${p.valuta}! 🎉`;
         }
     } else if (s1 === s2 || s2 === s3 || s1 === s3) {
-        dobitak = Math.floor(p.iznos * 1.5);
-        porukaDobitka = `✨ 2 u nizu! Dobio si nazad +${dobitak.toLocaleString()} ${p.valuta}! ✨`;
+        // Utešna nagrada: vraća 75% uloga (blagi gubitak umesto profita)
+        dobitak = Math.floor(p.iznos * 0.75);
+        porukaDobitka = `✨ 2 u nizu! Utešna nagrada: vraćeno ${dobitak.toLocaleString()} ${p.valuta}. ✨`;
     } else {
         dobitak = 0;
         porukaDobitka = `❌ Izgubio si ${p.iznos.toLocaleString()} ${p.valuta}! Više sreće drugi put! 💸`;
@@ -129,21 +130,25 @@ function handleRoulette(chatroomId, sender, optionRaw, amountRaw) {
     if (!p.valid) return;
 
     const opcija  = optionRaw.toLowerCase().trim();
-    const loptica = Math.floor(Math.random() * 37);
-    const jeCrvena = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(loptica);
-    const bojaLoptice = loptica === 0 ? 'Zelena' : (jeCrvena ? 'Crvena' : 'Crna');
+    // 0 do 37 gde je 37 dupla nula '00' (američki rulet — veća prednost kuće)
+    const loptica = Math.floor(Math.random() * 38);
+    const jeZelena = (loptica === 0 || loptica === 37);
+    const displayBroj = loptica === 37 ? '00' : String(loptica);
+    const crveniBrojevi = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
+    const jeCrvena = crveniBrojevi.includes(loptica);
+    const bojaLoptice = jeZelena ? 'Zelena' : (jeCrvena ? 'Crvena' : 'Crna');
 
     let pobeda = false;
     let mnozilac = 0;
 
-    if (opcija === 'crvena' || opcija === 'red')        { if (jeCrvena && loptica !== 0) { pobeda = true; mnozilac = 2; } }
-    else if (opcija === 'crna' || opcija === 'black')   { if (!jeCrvena && loptica !== 0) { pobeda = true; mnozilac = 2; } }
-    else if (opcija === 'par' || opcija === 'even')     { if (loptica !== 0 && loptica % 2 === 0) { pobeda = true; mnozilac = 2; } }
-    else if (opcija === 'nepar' || opcija === 'odd')    { if (loptica !== 0 && loptica % 2 !== 0) { pobeda = true; mnozilac = 2; } }
+    if (opcija === 'crvena' || opcija === 'red')        { if (jeCrvena && !jeZelena) { pobeda = true; mnozilac = 1.85; } }
+    else if (opcija === 'crna' || opcija === 'black')   { if (!jeCrvena && !jeZelena) { pobeda = true; mnozilac = 1.85; } }
+    else if (opcija === 'par' || opcija === 'even')     { if (!jeZelena && loptica % 2 === 0) { pobeda = true; mnozilac = 1.85; } }
+    else if (opcija === 'nepar' || opcija === 'odd')    { if (!jeZelena && loptica % 2 !== 0) { pobeda = true; mnozilac = 1.85; } }
     else {
         const ciljniBroj = parseInt(opcija, 10);
         if (!isNaN(ciljniBroj) && ciljniBroj >= 0 && ciljniBroj <= 36) {
-            if (loptica === ciljniBroj) { pobeda = true; mnozilac = 36; }
+            if (loptica === ciljniBroj) { pobeda = true; mnozilac = 35; }
         } else {
             posaljiPoruku(chatroomId, `❌ Neispravna opcija! Izaberi crvena/crna/par/nepar ili broj 0-36.`);
             return;
@@ -151,12 +156,12 @@ function handleRoulette(chatroomId, sender, optionRaw, amountRaw) {
     }
 
     if (pobeda) {
-        const dobitak = p.iznos * mnozilac;
+        const dobitak = Math.floor(p.iznos * mnozilac);
         p.user.coins = (p.user.coins || 0) - p.iznos + dobitak;
-        posaljiPoruku(chatroomId, `🎡 Loptica je pala na ${loptica} (${bojaLoptice})! @${p.cleanSender} je POBEDIO i osvojio +${dobitak.toLocaleString()} ${p.valuta}! 🎉`);
+        posaljiPoruku(chatroomId, `🎡 Loptica je pala na ${displayBroj} (${bojaLoptice})! @${p.cleanSender} je POBEDIO i osvojio +${dobitak.toLocaleString()} ${p.valuta}! 🎉`);
     } else {
         p.user.coins = (p.user.coins || 0) - p.iznos;
-        posaljiPoruku(chatroomId, `🎡 Loptica je pala na ${loptica} (${bojaLoptice})! @${p.cleanSender} je izgubio ${p.iznos.toLocaleString()} ${p.valuta}! 💸`);
+        posaljiPoruku(chatroomId, `🎡 Loptica je pala na ${displayBroj} (${bojaLoptice})! @${p.cleanSender} je izgubio ${p.iznos.toLocaleString()} ${p.valuta}! 💸`);
     }
     markirajDirtyIZaplanujSave(p.channelState, chatroomId, p.userKey);
 }
@@ -180,8 +185,19 @@ function handleCoinflip(chatroomId, sender, sideRaw, amountRaw) {
         return;
     }
 
-    const ishod  = Math.random() < 0.5 ? 'pismo' : 'glava';
-    const pobeda = (izabranaStrana === ishod);
+    const roll = Math.random() * 100;
+
+    // 6% šanse da novčić padne na ivicu (kuća nosi ulog)
+    if (roll < 6) {
+        p.user.coins = (p.user.coins || 0) - p.iznos;
+        posaljiPoruku(chatroomId, `🪙 Novčić se zaustavio na IVICI! @${p.cleanSender} je izgubio ${p.iznos.toLocaleString()} ${p.valuta}! Kuća nosi ulog! 💸`);
+        markirajDirtyIZaplanujSave(p.channelState, chatroomId, p.userKey);
+        return;
+    }
+
+    // 44% šanse za pobedu korisnika (roll 6 do 50), 50% za suprotnu stranu (roll >= 50)
+    const pobeda = roll < 50;
+    const ishod = pobeda ? izabranaStrana : (izabranaStrana === 'pismo' ? 'glava' : 'pismo');
 
     if (pobeda) {
         p.user.coins = (p.user.coins || 0) + p.iznos;
@@ -298,16 +314,23 @@ function handleWheel(chatroomId, sender, amountRaw) {
     const p = proveriUlog(chatroomId, sender, amountRaw);
     if (!p.valid) return;
 
-    const opcije = [
-        { label: '0x ❌', mult: 0 },
-        { label: '0.5x 📉', mult: 0.5 },
-        { label: '1.5x 📈', mult: 1.5 },
-        { label: '2x 🚀', mult: 2.0 },
-        { label: '3x 🔥', mult: 3.0 },
-        { label: '5x 👑', mult: 5.0 }
-    ];
+    // Težinske verovatnoće točka: 70% gubici (0x ili 0.5x), samo 1% za 5x Jackpot
+    const roll = Math.random() * 100;
+    let pick;
+    if (roll < 45) {
+        pick = { label: '0x ❌', mult: 0 };
+    } else if (roll < 70) {
+        pick = { label: '0.5x 📉', mult: 0.5 };
+    } else if (roll < 86) {
+        pick = { label: '1.2x 📈', mult: 1.2 };
+    } else if (roll < 95) {
+        pick = { label: '1.5x 🚀', mult: 1.5 };
+    } else if (roll < 99) {
+        pick = { label: '2x 🔥', mult: 2.0 };
+    } else {
+        pick = { label: '5x 👑', mult: 5.0 };
+    }
 
-    const pick   = opcije[Math.floor(Math.random() * opcije.length)];
     const dobitak = Math.floor(p.iznos * pick.mult);
     const razlika = dobitak - p.iznos;
 
