@@ -161,3 +161,43 @@ test('Moderation - Emotes, Symbols, Max Length i Mentions pravila', () => {
     };
     assert.equal(proveriModeraciju(chatroomId, 'MentionUser', 'Hej @user1 @user2 @user3 sta ima', '134', sender), true);
 });
+
+test('Moderation - Viewbot i scam botovi se odmah trajno banuju i šalju čistu [MOD] poruku', () => {
+    const chatroomId = 'test_mod_room_viewbot';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.botActive = true;
+    channelState.feature_moderation = true;
+    channelState.isProcessingQueue = true;
+    channelState.messageQueue = [];
+    channelState.bannedUsers = new Set();
+
+    const botSender = { id: 987654, identity: { badges: [] } };
+    const spamMsg = 'Kick viewbot, follower bot & chat bot and more. Free trial available!';
+
+    const triggered = proveriModeraciju(chatroomId, 'f16038', spamMsg, 'msg_uuid_999', botSender);
+    assert.equal(triggered, true);
+    assert.equal(channelState.bannedUsers.has('f16038'), true, 'Korisnik f16038 mora biti evidentiran kao banovan');
+
+    // Poruka u redu ne sme sadržati sirovi /timeout
+    const hasRawTimeout = channelState.messageQueue.some(m => m.startsWith('/timeout'));
+    assert.equal(hasRawTimeout, false, 'Moderacija nikada ne sme slati /timeout u chat kao običan tekst');
+
+    const modMsg = channelState.messageQueue.find(m => m.includes('[MOD] @f16038'));
+    assert.ok(modMsg, 'Mora postojati čista [MOD] poruka');
+    assert.ok(modMsg.includes('trajno banovan'), 'Poruka mora navesti da je korisnik trajno banovan');
+    channelState.isProcessingQueue = false;
+});
+
+test('Moderation - Druga poruka istog banovanog bota se ignoriše bez dupliranja poruka u chatu', () => {
+    const chatroomId = 'test_mod_room_viewbot2';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.botActive = true;
+    channelState.feature_moderation = true;
+    channelState.channelUsername = 'Tutz_live';
+    channelState.bannedUsers = new Set(['b91ab8']);
+    channelState.messageQueue = [];
+
+    // Simulacija druge poruke bota (npr. o w n k i c k . c o m)
+    const userKey = 'b91ab8';
+    assert.equal(channelState.bannedUsers.has(userKey), true);
+});

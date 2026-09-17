@@ -202,7 +202,12 @@ const defaultBuiltinRanks = {
     'redpesama': 'everyone',
     'skip': 'moderator',
     'skipsong': 'moderator',
-    'preskocipesmu': 'moderator'
+    'preskocipesmu': 'moderator',
+
+    // Moderacija
+    'ban': 'moderator',
+    'timeout': 'moderator',
+    'utisi': 'moderator'
 };
 
 function getUserRankLevel(username, senderObj, channelUsername) {
@@ -1084,6 +1089,18 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
     if (porukaNormalized.startsWith('!delcom ') || porukaNormalized.startsWith('!obrisikomandu ')) {
         const cmdRaw = porukaNormalized.startsWith('!delcom ') ? porukaSredjena.slice(8).trim() : porukaSredjena.slice(15).trim();
         await commands.handleDelCommand(chatroomId, username, cmdRaw, senderObj);
+        return;
+    }
+
+    if (porukaNormalized.startsWith('!ban ') || porukaNormalized === '!ban') {
+        const textRaw = porukaSredjena.slice(4).trim();
+        await commands.handleBan(chatroomId, username, textRaw, senderObj);
+        return;
+    }
+
+    if (porukaNormalized.startsWith('!timeout ') || porukaNormalized === '!timeout' || porukaNormalized.startsWith('!utisi ') || porukaNormalized === '!utisi') {
+        const textRaw = (porukaNormalized.startsWith('!timeout') ? porukaSredjena.slice(8) : porukaSredjena.slice(6)).trim();
+        await commands.handleTimeout(chatroomId, username, textRaw, senderObj);
         return;
     }
 

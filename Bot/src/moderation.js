@@ -1,9 +1,9 @@
-const { posaljiPoruku, obrisiPoruku } = require('./messenger');
+const { posaljiPoruku, obrisiPoruku, banujKorisnika, timeoutKorisnika } = require('./messenger');
 const { log } = require('./utils');
 const state = require('./state');
 const { normalizujZaPoredjenje, despaceText } = require('./spam');
 
-const VIEW_BOT_SPAM_REGEX = /\b(viewbot|view-bot|follower\s*bot|chat\s*bot|typical\s*panels|save\s*99%|buy\s*followers|kickbotting|ownkick|kickview|cheap\s*viewers|viewer\s*bot)\b/i;
+const VIEW_BOT_SPAM_REGEX = /\b(viewbot|view-bot|viewer\s*bot|follower\s*bot|chat\s*bot|typical\s*panels|save\s*99%|buy\s*followers|kickbotting|ownkick|kickview|cheap\s*viewers|cheap\s*chatters|chatters\s*with\s*custom|pay\s*only\s*for\s*what\s*you\s*use|free\s*trial\s*available)\b/i;
 const DOMAIN_URL_REGEX = /(https?:\/\/[^\s]+|([a-zA-Z0-9-]{2,}\.)+(com|net|org|io|gg|xyz|site|ru|tv|me|info|biz|live|top|online|store|club|app|dev)\b[^\s]*)/gi;
 
 /**
@@ -63,8 +63,8 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
     const despaced = despaceText(content);
     if (!triggerReason && (VIEW_BOT_SPAM_REGEX.test(content) || VIEW_BOT_SPAM_REGEX.test(despaced))) {
         triggerReason = 'Viewbot / nedozvoljena reklama';
-        filterAction = 'timeout';
-        filterTimeout = 86400;
+        filterAction = 'ban';
+        filterTimeout = null;
     }
 
     if (!triggerReason && settings.links_enabled) {
@@ -227,20 +227,21 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
     if (triggerReason) {
         const finalAction = filterAction || settings.action_type || 'delete';
         const finalTimeout = (filterTimeout !== null && filterTimeout !== undefined && filterTimeout !== '') ? parseInt(filterTimeout) : (settings.timeout_duration_secs || 600);
-        kazniKorisnika(chatroomId, username, messageId, triggerReason, finalAction, finalTimeout);
+        kazniKorisnika(chatroomId, username, messageId, triggerReason, finalAction, finalTimeout, senderObj);
         return true;
     }
     
     return false;
 }
 
-function kazniKorisnika(chatroomId, username, messageId, reason, actionType, timeoutDuration) {
+function kazniKorisnika(chatroomId, username, messageId, reason, actionType, timeoutDuration, senderObj = null) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
     const act = actionType || 'delete';
     const duration = timeoutDuration !== undefined ? timeoutDuration : 600;
     const userKey = username.toLowerCase();
+    const userId = senderObj?.id || senderObj?.user_id || null;
 
     // Beleži u streamAnalytics za Kickan
     try {
@@ -248,11 +249,22 @@ function kazniKorisnika(chatroomId, username, messageId, reason, actionType, tim
         streamAnalytics.recordModerationAction(chatroomId, act.toUpperCase(), username, 'Kickot Bot', reason);
     } catch (_) {}
 
-    if (act === 'timeout') {
+    if (act === 'ban') {
+        if (!channelState.bannedUsers) {
+            channelState.bannedUsers = new Set();
+        }
+        channelState.bannedUsers.add(userKey);
+
         if (messageId) obrisiPoruku(chatroomId, messageId);
-        posaljiPoruku(chatroomId, `/timeout ${username} ${duration} Automatska moderacija: ${reason}`);
-        posaljiPoruku(chatroomId, `@${username} je privremeno udaljen iz čata (Kazna: ${reason}).`);
-        log('MOD', `[${channelState.channelUsername || chatroomId}] Timeout ${username} for ${duration}s. Reason: ${reason}`);
+        banujKorisnika(chatroomId, username, reason, userId);
+        posaljiPoruku(chatroomId, `[MOD] @${username} je trajno banovan (Razlog: ${reason}).`);
+        log('MOD', `[${channelState.channelUsername || chatroomId}] Ban ${username}. Reason: ${reason}`);
+    } else if (act === 'timeout') {
+        if (messageId) obrisiPoruku(chatroomId, messageId);
+        timeoutKorisnika(chatroomId, username, duration, reason, userId);
+        const minuti = Math.max(1, Math.round(duration / 60));
+        posaljiPoruku(chatroomId, `[MOD] @${username} je utišan na ${minuti} min (Razlog: ${reason}).`);
+        log('MOD', `[${channelState.channelUsername || chatroomId}] Timeout ${username} for ${duration}s (${minuti}m). Reason: ${reason}`);
     } else if (act === 'warn') {
         if (messageId) obrisiPoruku(chatroomId, messageId);
         if (!channelState.warningsCount) {
@@ -262,29 +274,29 @@ function kazniKorisnika(chatroomId, username, messageId, reason, actionType, tim
         channelState.warningsCount.set(userKey, warnCount);
         
         if (warnCount >= 3) {
-            posaljiPoruku(chatroomId, `/timeout ${username} ${duration} Previše upozorenja`);
-            posaljiPoruku(chatroomId, `@${username} je privremeno udaljen zbog uzastopnih prekršaja pravila čata.`);
+            timeoutKorisnika(chatroomId, username, duration, 'Prekoračen broj opomena (3/3)', userId);
+            posaljiPoruku(chatroomId, `[MOD] @${username} je privremeno utišan zbog 3 opomene.`);
             channelState.warningsCount.set(userKey, 0); // reset
             log('MOD', `[${channelState.channelUsername || chatroomId}] Timeout ${username} due to 3 warnings.`);
         } else {
-            posaljiPoruku(chatroomId, `@${username} upozorenje (${warnCount}/3): Nemojte kršiti pravila čata! (${reason})`);
+            posaljiPoruku(chatroomId, `[MOD] @${username}, opomena (${warnCount}/3): ${reason}.`);
             log('MOD', `[${channelState.channelUsername || chatroomId}] Warned ${username} (${warnCount}/3). Reason: ${reason}`);
         }
     } else {
-        // Just delete: obrisiPoruku vrati true samo ako je poruka stvarno obrisana na Kick-u
+        // Just delete
         if (messageId) {
             obrisiPoruku(chatroomId, messageId).then((isDeleted) => {
                 if (isDeleted) {
-                    posaljiPoruku(chatroomId, `@${username} tvoja poruka je obrisana (Razlog: ${reason}).`);
+                    posaljiPoruku(chatroomId, `[MOD] @${username}, poruka je uklonjena (Razlog: ${reason}).`);
                     log('MOD', `[${channelState.channelUsername || chatroomId}] Deleted message from ${username}. Reason: ${reason}`);
                 } else {
-                    log('WARN', `[${channelState.channelUsername || chatroomId}] Brisanje poruke korisnika ${username} nije uspelo na Kick-u (Security policy ili API greška). Poruka o brisanju nije poslata.`);
+                    log('WARN', `[${channelState.channelUsername || chatroomId}] Brisanje poruke korisnika ${username} nije uspelo na Kick-u (Security policy ili API greška).`);
                 }
             }).catch((err) => {
                 log('ERR', `[${channelState.channelUsername || chatroomId}] Neočekivana greška pri brisanju: ${err.message}`);
             });
         } else {
-            posaljiPoruku(chatroomId, `@${username} tvoja poruka je obrisana (Razlog: ${reason}).`);
+            posaljiPoruku(chatroomId, `[MOD] @${username}, poruka je uklonjena (Razlog: ${reason}).`);
             log('MOD', `[${channelState.channelUsername || chatroomId}] Deleted message from ${username}. Reason: ${reason}`);
         }
     }

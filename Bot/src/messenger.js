@@ -278,12 +278,191 @@ async function obrisiPoruku(chatroomId, messageId) {
     }
 }
 
+async function banujKorisnika(chatroomId, username, reason = 'Automatska moderacija', userId = null) {
+    if (!chatroomId || !username) return false;
+    const channelState = state.getChannelState(chatroomId);
+    const channelName = channelState ? channelState.channelUsername : chatroomId;
+
+    let targetUserId = userId;
+
+    // 1. Zvanični Kick Public API v1: POST https://api.kick.com/public/v1/moderation/bans
+    try {
+        const accessToken = await kickAuth.getAccessToken();
+        const broadcasterId = await kickAuth.getBroadcasterUserId(channelName);
+
+        if (!targetUserId) {
+            try {
+                const { gotScraping } = await import('got-scraping');
+                const userRes = await gotScraping({
+                    url: `https://kick.com/api/v2/channels/${encodeURIComponent(channelName)}/users/${encodeURIComponent(username)}`,
+                    headers: await kickScrapingHeaders(),
+                    responseType: 'json',
+                    retry: { limit: 0 }
+                });
+                if (userRes.body && (userRes.body.id || userRes.body.user_id)) {
+                    targetUserId = userRes.body.id || userRes.body.user_id;
+                }
+            } catch (_) {}
+        }
+
+        if (accessToken && broadcasterId && targetUserId) {
+            const resPublic = await fetch('https://api.kick.com/public/v1/moderation/bans', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    broadcaster_user_id: Number(broadcasterId) || broadcasterId,
+                    user_id: Number(targetUserId) || targetUserId,
+                    reason: reason || 'Automatska moderacija'
+                })
+            });
+
+            if (resPublic.ok) {
+                log('INFO', `[${channelName}] Korisnik @${username} (ID: ${targetUserId}) uspešno banovan preko zvaničnog Kick Public API-ja.`);
+                return true;
+            } else if (resPublic.status === 429) {
+                log('WARN', `[${channelName}] Kick 429 Rate limit pri banovanju korisnika ${username}.`);
+            } else {
+                const errText = await resPublic.text();
+                log('WARN', `[${channelName}] Kick Public API ban neuspešan (HTTP ${resPublic.status}): ${errText}`);
+            }
+        }
+    } catch (publicErr) {
+        log('WARN', `[${channelName}] Greška pri banovanju preko Kick Public API: ${publicErr.message}`);
+    }
+
+    // 2. Fallback na v2 bans endpoint preko gotScraping
+    try {
+        const { gotScraping } = await import('got-scraping');
+        const url = `https://kick.com/api/v2/channels/${encodeURIComponent(channelName)}/bans`;
+        const headers = await kickScrapingHeaders();
+
+        const res = await gotScraping({
+            url,
+            method: 'POST',
+            headers,
+            json: {
+                banned_username: username,
+                permanent: true,
+                reason: reason || 'Automatska moderacija'
+            },
+            retry: { limit: 0 }
+        });
+
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+            log('INFO', `[${channelName}] Korisnik @${username} uspešno banovan preko Kick v2 API-ja.`);
+            return true;
+        } else {
+            log('WARN', `[${channelName}] Neuspešan Kick v2 ban korisnika ${username}: HTTP ${res.statusCode}`);
+            return false;
+        }
+    } catch (err) {
+        log('WARN', `[${channelName}] Greška pri fallback banovanju korisnika ${username}: ${err.message}`);
+        return false;
+    }
+}
+
+async function timeoutKorisnika(chatroomId, username, durationSeconds = 600, reason = 'Automatska moderacija', userId = null) {
+    if (!chatroomId || !username) return false;
+    const channelState = state.getChannelState(chatroomId);
+    const channelName = channelState ? channelState.channelUsername : chatroomId;
+
+    let targetUserId = userId;
+    const durationMinutes = Math.max(1, Math.min(10080, Math.ceil(durationSeconds / 60)));
+
+    // 1. Zvanični Kick Public API v1: POST https://api.kick.com/public/v1/moderation/bans (sa duration u minutima)
+    try {
+        const accessToken = await kickAuth.getAccessToken();
+        const broadcasterId = await kickAuth.getBroadcasterUserId(channelName);
+
+        if (!targetUserId) {
+            try {
+                const { gotScraping } = await import('got-scraping');
+                const userRes = await gotScraping({
+                    url: `https://kick.com/api/v2/channels/${encodeURIComponent(channelName)}/users/${encodeURIComponent(username)}`,
+                    headers: await kickScrapingHeaders(),
+                    responseType: 'json',
+                    retry: { limit: 0 }
+                });
+                if (userRes.body && (userRes.body.id || userRes.body.user_id)) {
+                    targetUserId = userRes.body.id || userRes.body.user_id;
+                }
+            } catch (_) {}
+        }
+
+        if (accessToken && broadcasterId && targetUserId) {
+            const resPublic = await fetch('https://api.kick.com/public/v1/moderation/bans', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    broadcaster_user_id: Number(broadcasterId) || broadcasterId,
+                    user_id: Number(targetUserId) || targetUserId,
+                    duration: durationMinutes,
+                    reason: reason || 'Automatska moderacija'
+                })
+            });
+
+            if (resPublic.ok) {
+                log('INFO', `[${channelName}] Korisnik @${username} (ID: ${targetUserId}) uspešno utišan na ${durationMinutes}m preko zvaničnog Kick Public API-ja.`);
+                return true;
+            } else if (resPublic.status === 429) {
+                log('WARN', `[${channelName}] Kick 429 Rate limit pri timeout-u korisnika ${username}.`);
+            } else {
+                const errText = await resPublic.text();
+                log('WARN', `[${channelName}] Kick Public API timeout neuspešan (HTTP ${resPublic.status}): ${errText}`);
+            }
+        }
+    } catch (publicErr) {
+        log('WARN', `[${channelName}] Greška pri timeout-u preko Kick Public API: ${publicErr.message}`);
+    }
+
+    // 2. Fallback na v2 bans endpoint preko gotScraping
+    try {
+        const { gotScraping } = await import('got-scraping');
+        const url = `https://kick.com/api/v2/channels/${encodeURIComponent(channelName)}/bans`;
+        const headers = await kickScrapingHeaders();
+
+        const res = await gotScraping({
+            url,
+            method: 'POST',
+            headers,
+            json: {
+                banned_username: username,
+                permanent: false,
+                duration: durationMinutes,
+                reason: reason || 'Automatska moderacija'
+            },
+            retry: { limit: 0 }
+        });
+
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+            log('INFO', `[${channelName}] Korisnik @${username} uspešno utišan na ${durationMinutes}m preko Kick v2 API-ja.`);
+            return true;
+        } else {
+            log('WARN', `[${channelName}] Neuspešan Kick v2 timeout korisnika ${username}: HTTP ${res.statusCode}`);
+            return false;
+        }
+    } catch (err) {
+        log('WARN', `[${channelName}] Greška pri fallback timeout-u korisnika ${username}: ${err.message}`);
+        return false;
+    }
+}
+
 module.exports = {
     posaljiPoruku,
     posaljiIPinujPoruku,
     pinujPoruku,
     odpinujPoruku,
     obrisiPoruku,
+    banujKorisnika,
+    timeoutKorisnika,
     izvrsiSlanje,
     processQueue,
     scheduleQueueDrain,

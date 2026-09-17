@@ -89,6 +89,46 @@ test('Kickaj - Sprečavanje ponovnog učešća već izvučenih pobednika', () =>
   assert.equal(participantsMap.has('novigledalac'), true);
 });
 
+test('Kickaj - Bot nalozi (KickotBot, Nightbot, Botrix) i strimer se nikada ne dodaju u giveaway', () => {
+  const participantsMap = new Map();
+  const winnersList = [];
+  const channelName = 'Tutz_live';
+
+  function processChatMessage(user) {
+    const key = user.username.toLowerCase().replace(/^@/, '');
+    const knownBots = ['kickotbot', 'botrix', 'nightbot', 'streamelements', 'streamlabs'];
+    if (user.isBot || knownBots.includes(key)) {
+      return 'rejected_bot';
+    }
+    if (user.isBroadcaster || (channelName && key === channelName.toLowerCase())) {
+      return 'rejected_broadcaster';
+    }
+    if (participantsMap.has(key)) return 'already_in_pool';
+    participantsMap.set(key, { username: user.username });
+    return 'added';
+  }
+
+  // KickotBot šalje automatsku najavu koja sadrži ključnu reč !gw
+  const resBot1 = processChatMessage({ username: 'KickotBot', message: '[GIVEAWAY] Prijave su otvorene! Upišite "!gw"', isBot: true });
+  assert.equal(resBot1, 'rejected_bot', 'KickotBot nikada ne sme ući u sopstveni giveaway');
+  assert.equal(participantsMap.has('kickotbot'), false);
+
+  // Spoljni bot Nightbot
+  const resBot2 = processChatMessage({ username: 'Nightbot', message: '!gw' });
+  assert.equal(resBot2, 'rejected_bot', 'Poznati eksterni botovi ne smeju ući u giveaway');
+  assert.equal(participantsMap.has('nightbot'), false);
+
+  // Strimer
+  const resStreamer = processChatMessage({ username: 'Tutz_live', message: '!gw', isBroadcaster: true });
+  assert.equal(resStreamer, 'rejected_broadcaster', 'Strimer ne sme ući u giveaway');
+  assert.equal(participantsMap.has('tutz_live'), false);
+
+  // Pravi gledalac
+  const resUser = processChatMessage({ username: 'PraviGledalac123', message: '!gw' });
+  assert.equal(resUser, 'added', 'Legitimni gledalac mora uspešno ući u giveaway');
+  assert.equal(participantsMap.has('pravigledalac123'), true);
+});
+
 test('Kickaj - Izvoz pobednika u hronološkom redosledu (prvi osvojio = broj 1)', () => {
   // winnersList čuva najnovije na početku (unshift)
   const winnersList = [

@@ -2,7 +2,7 @@ const config = require('./config');
 const state = require('./state');
 const { log } = require('./utils');
 const { smanjiPoruku } = require('./database');
-const { posaljiPoruku } = require('./messenger');
+const { posaljiPoruku, banujKorisnika } = require('./messenger');
 
 // Nevidljivi/zero-width unicode karakteri i bidi override oznake koje spam-raid nalozi koriste
 // da bi "identičnu" poruku učinili tehnički drugačijom i tako zaobišli detekciju duplikata.
@@ -28,7 +28,7 @@ function despaceText(tekst) {
         .replace(/\s*([./])\s*/g, '$1');
 }
 
-const BOT_SPAM_REGEX = /\b(viewbot|view-bot|follower\s*bot|chat\s*bot|typical\s*panels|save\s*99%|buy\s*followers|kickbotting|ownkick|kickview|cheap\s*viewers|viewer\s*bot)\b/i;
+const BOT_SPAM_REGEX = /\b(viewbot|view-bot|viewer\s*bot|follower\s*bot|chat\s*bot|typical\s*panels|save\s*99%|buy\s*followers|kickbotting|ownkick|kickview|cheap\s*viewers|cheap\s*chatters|chatters\s*with\s*custom|pay\s*only\s*for\s*what\s*you\s*use|free\s*trial\s*available)\b/i;
 const SPAM_DOMAIN_PATTERN = /\b([a-zA-Z0-9-]{3,}\.)+(com|net|org|io|gg|xyz|site|ru|top|live|store|club|app|tv|me|info)\b/i;
 
 function daLiJeBotSpam(poruka) {
@@ -42,7 +42,7 @@ function daLiJeBotSpam(poruka) {
     return false;
 }
 
-function spamFilter(chatroomId, username, poruka) {
+function spamFilter(chatroomId, username, poruka, senderObj = null) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return false;
 
@@ -52,8 +52,12 @@ function spamFilter(chatroomId, username, poruka) {
     // ── 0. Provera viewbot / promo spam botova ────────────────────────────────
     const jeKomanda = poruka.startsWith(channelState.PREFIX || '!') || poruka.startsWith('!');
     if (!jeKomanda && daLiJeBotSpam(poruka)) {
-        log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [viewbot/reklama]: blokirano od ${username}: "${poruka}"`);
-        posaljiPoruku(chatroomId, `/timeout ${username} 86400 Promo bot spam`);
+        log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [viewbot/reklama]: blokirano i banovano od ${username}: "${poruka}"`);
+        if (!channelState.bannedUsers) channelState.bannedUsers = new Set();
+        channelState.bannedUsers.add(userKey);
+        const userId = senderObj?.id || senderObj?.user_id || null;
+        banujKorisnika(chatroomId, username, 'Nedozvoljen bot / promo spam', userId);
+        posaljiPoruku(chatroomId, `[MOD] @${username} je trajno banovan (Zabranjen bot / spam reklama).`);
         return true;
     }
     

@@ -2996,9 +2996,11 @@ if (typeof localStorage === 'undefined') {
               const badges = payload?.sender?.identity?.badges || payload?.sender?.badges || payload?.badges || [];
               let isSub = false;
               let subMonths = 0;
+              let isBroadcaster = false;
               if (Array.isArray(badges)) {
                 for (const b of badges) {
                   const t = (typeof b === 'string' ? b : b.type || '').toLowerCase();
+                  if (t.includes('broadcaster')) isBroadcaster = true;
                   if (t.includes('sub') || t.includes('founder')) {
                     isSub = true;
                     if (typeof b.count === 'number') subMonths = Math.max(subMonths, b.count);
@@ -3011,10 +3013,11 @@ if (typeof localStorage === 'undefined') {
                   }
                 }
               }
+              const isBot = !!payload?.sender?.is_bot;
               if (window.handleWinnerChatMessage) {
                 window.handleWinnerChatMessage(sender, text);
               }
-              processChatMessage({ username: sender, isSub, subMonths, message: text });
+              processChatMessage({ username: sender, isSub, subMonths, message: text, isBot, isBroadcaster });
             }
           }
         } catch (e) { /* */ }
@@ -3333,6 +3336,13 @@ if (typeof localStorage === 'undefined') {
     if (settings.followDuration > 0 && typeof user.followDays === 'number' && user.followDays < settings.followDuration) return false;
 
     const key = user.username.toLowerCase().replace(/^@/, '');
+    const knownBots = ['kickotbot', 'botrix', 'nightbot', 'streamelements', 'streamlabs'];
+    if (user.isBot || knownBots.includes(key)) {
+      return false;
+    }
+    if (user.isBroadcaster || (channelName && key === channelName.toLowerCase())) {
+      return false;
+    }
     if (isUserBlacklisted(key)) {
       return false;
     }

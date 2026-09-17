@@ -237,10 +237,95 @@ async function handleDelCommand(chatroomId, sender, cmdRaw, senderObj) {
     }
 }
 
+async function handleBan(chatroomId, sender, textRaw, senderObj) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const userKey = sender.toLowerCase();
+    const isStreamer = userKey === channelState.channelUsername.toLowerCase();
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || [];
+    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+
+    if (!isMod) {
+        posaljiPoruku(chatroomId, `[MOD] @${sender}, samo moderatori i strimer mogu banovati korisnike.`);
+        return;
+    }
+
+    if (!textRaw || !textRaw.trim()) {
+        posaljiPoruku(chatroomId, `[MOD] Upotreba: !ban @korisnik [razlog]`);
+        return;
+    }
+
+    const parts = textRaw.trim().split(/\s+/);
+    const target = parts[0].replace(/^@/, '').trim();
+    const reason = parts.slice(1).join(' ') || 'Banovan od strane moderatora';
+
+    if (!target) {
+        posaljiPoruku(chatroomId, `[MOD] Upotreba: !ban @korisnik [razlog]`);
+        return;
+    }
+
+    if (!channelState.bannedUsers) channelState.bannedUsers = new Set();
+    channelState.bannedUsers.add(target.toLowerCase());
+
+    const { banujKorisnika } = require('../messenger');
+    await banujKorisnika(chatroomId, target, reason);
+    posaljiPoruku(chatroomId, `[MOD] @${target} je trajno banovan od strane @${sender} (Razlog: ${reason}).`);
+}
+
+async function handleTimeout(chatroomId, sender, textRaw, senderObj) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const userKey = sender.toLowerCase();
+    const isStreamer = userKey === channelState.channelUsername.toLowerCase();
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || [];
+    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+
+    if (!isMod) {
+        posaljiPoruku(chatroomId, `[MOD] @${sender}, samo moderatori i strimer mogu utišati korisnike.`);
+        return;
+    }
+
+    if (!textRaw || !textRaw.trim()) {
+        posaljiPoruku(chatroomId, `[MOD] Upotreba: !timeout @korisnik [trajanje: 10m/300s] [razlog]`);
+        return;
+    }
+
+    const parts = textRaw.trim().split(/\s+/);
+    const target = parts[0].replace(/^@/, '').trim();
+    let durationSec = 600;
+    let reasonIndex = 1;
+
+    if (parts[1]) {
+        const timeMatch = parts[1].match(/^(\d+)([smhd]?)$/i);
+        if (timeMatch) {
+            const val = parseInt(timeMatch[1], 10);
+            const unit = (timeMatch[2] || 's').toLowerCase();
+            if (unit === 'm') durationSec = val * 60;
+            else if (unit === 'h') durationSec = val * 3600;
+            else if (unit === 'd') durationSec = val * 86400;
+            else durationSec = val;
+            reasonIndex = 2;
+        }
+    }
+
+    const reason = parts.slice(reasonIndex).join(' ') || 'Utišan od strane moderatora';
+    const minuti = Math.max(1, Math.round(durationSec / 60));
+
+    const { timeoutKorisnika } = require('../messenger');
+    await timeoutKorisnika(chatroomId, target, durationSec, reason);
+    posaljiPoruku(chatroomId, `[MOD] @${target} je utišan na ${minuti} min od strane @${sender} (Razlog: ${reason}).`);
+}
+
 module.exports = {
     handleResetLeaderboard,
     handleOsvezi,
     handlePermit,
     handleAddCommand,
-    handleDelCommand
+    handleDelCommand,
+    handleBan,
+    handleTimeout
 };

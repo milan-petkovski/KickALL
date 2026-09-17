@@ -283,6 +283,13 @@ async function obradiPusherPoruku(data) {
             return;
         }
 
+        // Ako je korisnik već banovan u ovoj sesiji (npr. spam bot koji je poslao 2 poruke u sekundi), odmah odbaci
+        if (channelState.bannedUsers && channelState.bannedUsers.has(userKey)) {
+            const messageId = chatData.id || chatData.messageId || null;
+            if (messageId) messenger.obrisiPoruku(chatroomId, messageId);
+            return;
+        }
+
         // Stream Analytics za Kickan
         try {
             streamAnalytics.recordChatMessage(
@@ -303,7 +310,7 @@ async function obradiPusherPoruku(data) {
         }
 
         // Anti-spam filter (izuzimamo strimera i bot komande)
-        if (userKey !== channelState.channelUsername.toLowerCase() && !startsWithPrefix && spam.spamFilter(chatroomId, username, poruka)) {
+        if (userKey !== channelState.channelUsername.toLowerCase() && !startsWithPrefix && spam.spamFilter(chatroomId, username, poruka, chatData.sender)) {
             if (messageId) messenger.obrisiPoruku(chatroomId, messageId);
             return;
         }
