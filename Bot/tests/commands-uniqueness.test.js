@@ -110,3 +110,54 @@ test('Commands Uniqueness - Provera unikatnosti svih ugrađenih komandi u dashbo
     }
 });
 
+test('Commands - handleRulet zaštićuje strimera i moderatore od timeout-a', () => {
+    const chatroomId = 'test_room_rulet_immune';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.channelUsername = 'teststreamer';
+    channelState.isProcessingQueue = true;
+    channelState.messageQueue = [];
+
+    // Simuliramo poziv od strane strimera
+    const streamerSender = { id: 111, identity: { badges: [{ type: 'broadcaster' }] } };
+    
+    // Forsiramo da padne metak
+    const originalRandom = Math.random;
+    Math.random = () => 0.99; // zadnja komora (metak = true)
+    try {
+        commands.handleRulet(chatroomId, 'teststreamer', streamerSender);
+        assert.equal(channelState.messageQueue.length, 1);
+        const msg = channelState.messageQueue[0];
+        assert.ok(msg.includes('zaštićen je od timeout-a'), 'Strimeru mora biti javljena zaštita');
+
+        // Moderator test
+        channelState.messageQueue = [];
+        const modSender = { id: 222, identity: { badges: [{ type: 'moderator' }] } };
+        commands.handleRulet(chatroomId, 'moduser', modSender);
+        assert.equal(channelState.messageQueue.length, 1);
+        const modMsg = channelState.messageQueue[0];
+        assert.ok(modMsg.includes('zaštićen je od timeout-a'), 'Moderatoru mora biti javljena zaštita');
+    } finally {
+        Math.random = originalRandom;
+    }
+});
+
+test('Commands - handleRulet za običnog gledaoca najavljuje 60s timeout kada popije metak', () => {
+    const chatroomId = 'test_room_rulet_viewer';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.channelUsername = 'teststreamer';
+    channelState.isProcessingQueue = true;
+    channelState.messageQueue = [];
+
+    const viewerSender = { id: 333, identity: { badges: [] } };
+    const originalRandom = Math.random;
+    Math.random = () => 0.99; // metak
+    try {
+        commands.handleRulet(chatroomId, 'viewer123', viewerSender);
+        assert.equal(channelState.messageQueue.length, 1);
+        const msg = channelState.messageQueue[0];
+        assert.ok(msg.includes('Timeout 60s') || msg.includes('1 minut') || msg.includes('60 sekundi'));
+    } finally {
+        Math.random = originalRandom;
+    }
+});
+

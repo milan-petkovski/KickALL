@@ -1,5 +1,7 @@
 const { isValidUsername, sanitizeInput } = require('../utils');
-const { posaljiPoruku } = require('../messenger');
+const { posaljiPoruku, timeoutKorisnika } = require('../messenger');
+const state = require('../state');
+const streamAnalytics = require('../streamAnalytics');
 
 // ─── IQ TEST ─────────────────────────────────────────────────────────────────
 function handleIq(chatroomId, sender, targetRaw) {
@@ -134,18 +136,39 @@ function handleRoll(chatroomId, sender, targetRaw) {
 }
 
 // ─── RUSKI RULET ─────────────────────────────────────────────────────────────
-function handleRulet(chatroomId, sender) {
+function handleRulet(chatroomId, sender, senderObj = null) {
     if (!isValidUsername(sender)) return;
     const cleanSender = sanitizeInput(sender);
     const komore = [false, false, false, false, false, true]; // 1 u 6 šansa
     const metak = komore[Math.floor(Math.random() * komore.length)];
     if (metak) {
+        const channelState = state.getChannelState(chatroomId);
+        const channelName = (channelState?.channelUsername || '').toLowerCase();
+        const userLower = sender.toLowerCase();
+
+        // Zaštita: Strimeri i moderatori ne mogu dobiti timeout
+        const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+        const badges = identity.badges || [];
+        const isBroadcaster = userLower === channelName || badges.some(b => b.type === 'broadcaster');
+        const isModerator = badges.some(b => b.type === 'moderator');
+
+        if (isBroadcaster || isModerator) {
+            const uloga = isBroadcaster ? 'strimer' : 'moderator';
+            posaljiPoruku(chatroomId, `🛡️ KLIK... BUM! @${cleanSender} je popio metak, ali kao ${uloga} ima pancir i zaštićen je od timeout-a! 🦾`);
+            return;
+        }
+
         const porazi = [
-            `💀 KLIK... BUM! @${cleanSender} je popio metak u ruskom ruletu! Bolje sreće u sledećem životu. 🪦`,
-            `💀 KLIK... ŠKLJOC... BUM! @${cleanSender} je izvukao kraći kraj. Počivaj u miru! 🥀`,
-            `💀 KLIK... BUM! @${cleanSender} je eliminisan iz četa (simulirano)! Kakav hrabar, ali tragičan pokušaj! 🔫`
+            `💀 KLIK... BUM! @${cleanSender} je popio metak u ruskom ruletu! Timeout 60s. Počivaj u miru! 🪦`,
+            `💀 KLIK... ŠKLJOC... BUM! @${cleanSender} je izvukao kraći kraj! Vidimo se za 1 minut. 🥀`,
+            `💀 KLIK... BUM! Metak u cevi! @${cleanSender} je eliminisan iz četa na 60 sekundi! 🔫`
         ];
         posaljiPoruku(chatroomId, porazi[Math.floor(Math.random() * porazi.length)]);
+
+        // Pravi Kick timeout preko novog moderacijskog sistema (60 sekundi)
+        const userId = senderObj && senderObj.id ? senderObj.id : null;
+        timeoutKorisnika(chatroomId, sender, 60, 'Ruski rulet', userId);
+        streamAnalytics.recordModerationAction(chatroomId, 'TIMEOUT', sender, 'Kickot Bot', 'Ruski rulet');
     } else {
         const prezivljavanja = [
             `🔫 KLIK... Prazno! @${cleanSender} je preživeo ovu rundu ruskog ruleta. Znoj se cedi sa čela... 😰`,

@@ -705,7 +705,7 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
     if (porukaNormalized.startsWith('!ruskirulet') || porukaNormalized.startsWith('!rr') || porukaNormalized.startsWith('!russianroulette')) {
         if (channelState.feature_games === false) return;
         if (utils.proveraKulauna(chatroomId, '!ruskirulet', username)) return;
-        commands.handleRulet(chatroomId, username);
+        commands.handleRulet(chatroomId, username, senderObj);
         return;
     }
 

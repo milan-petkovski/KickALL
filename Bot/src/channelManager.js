@@ -36,14 +36,29 @@ async function proveriDaLiJeLive(chatroomId) {
 
             if (database.KORISTI_SUPABASE && database.supabase) {
                 try {
-                    await database.supabase
+                    const { data: updatedRows, error: updateErr } = await database.supabase
                         .from('channels')
-                        .upsert({
-                            id: realId,
-                            username: channelUsername,
+                        .update({
                             is_active: liveState,
                             updated_at: new Date().toISOString()
-                        }, { onConflict: 'id' });
+                        })
+                        .ilike('username', channelUsername)
+                        .select('id');
+
+                    if (updateErr) {
+                        throw updateErr;
+                    }
+
+                    if (!updatedRows || updatedRows.length === 0) {
+                        await database.supabase
+                            .from('channels')
+                            .upsert({
+                                id: realId,
+                                username: channelUsername,
+                                is_active: liveState,
+                                updated_at: new Date().toISOString()
+                            }, { onConflict: 'username' });
+                    }
                 } catch (dbErr) {
                     utils.log('ERR', `[${channelUsername}] Greška pri upisu statusa strima u bazu: ${dbErr.message}`);
                 }
@@ -407,7 +422,7 @@ async function syncPendingSubscriptions() {
     try {
         const { data: users, error } = await database.supabase
             .from('user_profiles')
-            .select('id, plan, plan_tier, subscription_status');
+            .select('id, plan, subscription_status');
 
         if (error || !users) return;
 
@@ -415,7 +430,7 @@ async function syncPendingSubscriptions() {
             for (const chatroomId of Object.keys(state.channels)) {
                 const chState = state.channels[chatroomId];
                 if (chState && chState.userId === user.id) {
-                    const expectedPlan = (user.plan_tier || user.plan || 'free').toLowerCase();
+                    const expectedPlan = (user.plan || 'free').toLowerCase();
                     if (chState.userPlan !== expectedPlan) {
                         utils.log('INFO', `[RETRY-SYNC] Osvežavam plan za korisnika ${user.id} (@${chState.channelUsername}): ${chState.userPlan} -> ${expectedPlan}`);
                         await database.ucitajUserPlan(user.id, chatroomId);
