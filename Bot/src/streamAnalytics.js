@@ -74,7 +74,7 @@ async function onStreamLive(chatroomId, channelUsername, livestreamData = {}, fa
 
     // Proveri da li u bazi već postoji otvorena sesija za ovaj kanal (npr. nakon restarta bota)
     let dbRecord = null;
-    if (KORISTI_SUPABASE && supabase) {
+    if (KORISTI_SUPABASE && supabase && !idKey.startsWith('test_')) {
         try {
             const { data, error } = await supabase
                 .from('kickan')
@@ -307,10 +307,14 @@ async function onStreamOffline(chatroomId, channelUsername) {
 async function flushSession(session, _isFinal = false) {
     if (!session || !KORISTI_SUPABASE || !supabase) return;
 
-    if (!session.userId) {
+    // Zaobiđi testne sobe kako se u produkcionu bazu ne bi upisivali lažni testni podaci
+    if (session.chatroomId && String(session.chatroomId).startsWith('test_')) return;
+
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!session.userId || !UUID_REGEX.test(String(session.userId))) {
         session.userId = await resolveOwnerUserId(session.channelName);
-        if (!session.userId) {
-            log('WARN', `[StreamAnalytics] Nije pronađen user_id za kanal @${session.channelName}. Upis u public.kickan se odlaže.`);
+        if (!session.userId || !UUID_REGEX.test(String(session.userId))) {
+            log('WARN', `[StreamAnalytics] Nije pronađen validan user_id za kanal @${session.channelName}. Upis u public.kickan se odlaže.`);
             return;
         }
     }

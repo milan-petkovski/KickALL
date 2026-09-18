@@ -39,6 +39,7 @@ async function proveriDaLiJeLive(chatroomId) {
                     const { data: updatedRows, error: updateErr } = await database.supabase
                         .from('channels')
                         .update({
+                            id: realId,
                             is_active: liveState,
                             updated_at: new Date().toISOString()
                         })

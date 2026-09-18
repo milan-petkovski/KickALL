@@ -1261,10 +1261,11 @@ async function sacuvajEkonomiju(chatroomId) {
 
 async function syncChatroomId(channelName, realChatroomId) {
     try {
+        if (!KORISTI_SUPABASE || !supabase || !channelName || !realChatroomId) return;
         await supabase
             .from('channels')
-            .update({ chatroom_id: String(realChatroomId) })
-            .eq('username', channelName);
+            .update({ id: String(realChatroomId), updated_at: new Date().toISOString() })
+            .ilike('username', channelName);
     } catch (err) {
         log('ERR', `Greška u syncChatroomId: ${err.message || err}`);
     }
