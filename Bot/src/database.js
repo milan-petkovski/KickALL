@@ -15,6 +15,7 @@ const KORISTI_SUPABASE = true;
 
 async function ucitajLeaderboard(chatroomId) {
     try {
+        if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) return;
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
         const channelUsername = channelState.channelUsername || chatroomId;
@@ -91,6 +92,12 @@ async function ucitajLeaderboard(chatroomId) {
 async function sacuvajLeaderboard(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || !channelState.leaderboardDirty) return;
+    if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) {
+        channelState.leaderboardDirty = false;
+        channelState.leaderboardDeltas = {};
+        channelState.leaderboardDailyDeltas = {};
+        return;
+    }
     return runWithLeaderboardLock(channelState, async () => {
         try {
             const trenutniMesec = dobijTrenutniMesec();
@@ -377,6 +384,7 @@ function smanjiPoruku(chatroomId, username, iznos) {
 
 async function ucitajLjubav(chatroomId) {
     try {
+        if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) return;
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
         const channelUsername = channelState.channelUsername || chatroomId;
@@ -430,6 +438,11 @@ async function ucitajLjubav(chatroomId) {
 async function sacuvajLjubav(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || !channelState.loveDirty) return;
+    if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) {
+        channelState.loveDirty = false;
+        if (channelState.dirtyLoveKeys) channelState.dirtyLoveKeys.clear();
+        return;
+    }
     try {
         const allKeys = new Set([
             ...Object.keys(channelState.loveModifiers || {}),
@@ -518,6 +531,7 @@ async function sacuvajLjubav(chatroomId) {
 }
 
 function osigurajCuvanjeLjubavi(chatroomId) {
+    if (String(chatroomId).startsWith('test_')) return;
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
     if (!channelState.loveSaveTimer) {
@@ -731,7 +745,7 @@ const BUILTIN_CMD_TO_DB_KEY = {
 
 function evidentirajKoriscenjeKomande(chatroomId, rawCmdName) {
     try {
-        if (!KORISTI_SUPABASE) return;
+        if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) return;
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
 
@@ -770,7 +784,7 @@ function evidentirajKoriscenjeKomande(chatroomId, rawCmdName) {
 
 async function sacuvajCommandUsage(chatroomId) {
     try {
-        if (!KORISTI_SUPABASE) return;
+        if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) return;
         const channelState = state.getChannelState(chatroomId);
         if (!channelState || !channelState.commandUsageDeltas) return;
 
@@ -836,7 +850,7 @@ async function sacuvajCommandUsage(chatroomId) {
 
 async function ucitajAlerts(chatroomId) {
     try {
-        if (!KORISTI_SUPABASE) return;
+        if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) return;
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
 
@@ -865,7 +879,7 @@ async function ucitajAlerts(chatroomId) {
 
 async function ucitajAutoAnnounces(chatroomId) {
     try {
-        if (!KORISTI_SUPABASE) return;
+        if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) return;
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
 
@@ -891,6 +905,7 @@ async function ucitajAutoAnnounces(chatroomId) {
 const _botConfigInFlight = new Map();
 
 async function ucitajBotConfig(chatroomId) {
+    if (String(chatroomId).startsWith('test_')) return;
     // In-flight guard: ako je reload već u toku za ovaj kanal, sačekaj isti promise
     if (_botConfigInFlight.has(chatroomId)) {
         return _botConfigInFlight.get(chatroomId);
@@ -898,7 +913,7 @@ async function ucitajBotConfig(chatroomId) {
 
     const loadPromise = (async () => {
         try {
-            if (!KORISTI_SUPABASE) return;
+            if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) return;
             const channelState = state.getChannelState(chatroomId);
             if (!channelState) return;
 
@@ -1164,7 +1179,7 @@ async function posaljiKickovAlert(userId, alertType, payloadData) {
 
 async function ucitajEkonomiju(chatroomId) {
     try {
-        if (!KORISTI_SUPABASE) return;
+        if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) return;
         const channelState = state.getChannelState(chatroomId);
         if (!channelState) return;
         const channelUsername = channelState.channelUsername || chatroomId;
@@ -1208,7 +1223,11 @@ async function sacuvajEkonomiju(chatroomId) {
     if (!channelState || !channelState.economyDirty) return;
 
     try {
-        if (!KORISTI_SUPABASE) return;
+        if (!KORISTI_SUPABASE || String(chatroomId).startsWith('test_')) {
+            channelState.economyDirty = false;
+            if (channelState.economyDeltas) channelState.economyDeltas.clear();
+            return;
+        }
 
         const dirtyUsers = channelState.economyDeltas;
         if (!dirtyUsers || dirtyUsers.size === 0) {

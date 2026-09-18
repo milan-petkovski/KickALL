@@ -322,7 +322,7 @@ function handlePrihvatiBrak(chatroomId, receiver) {
     channelState.loveDirty = true;
     osigurajCuvanjeLjubavi(chatroomId);
 
-    if (KORISTI_SUPABASE) {
+    if (KORISTI_SUPABASE && !String(chatroomId).startsWith('test_')) {
         (async () => {
             try {
                 const [u1, u2] = [cleanSender, cleanTarget].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -404,7 +404,7 @@ function handleRazvod(chatroomId, sender, targetRaw) {
     channelState.loveDirty = true;
     osigurajCuvanjeLjubavi(chatroomId);
 
-    if (KORISTI_SUPABASE) {
+    if (KORISTI_SUPABASE && !String(chatroomId).startsWith('test_')) {
         (async () => {
             try {
                 const [u1, u2] = [sLower, tLower].sort();
