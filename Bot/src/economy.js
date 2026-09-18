@@ -1,6 +1,6 @@
 const state = require('./state');
 const config = require('./config');
-const { sanitizeInput, isValidUsername } = require('./utils');
+const { sanitizeInput, isValidUsername, ponistiKulaun } = require('./utils');
 const { posaljiPoruku } = require('./messenger');
 
 // ─── MATEMATIKA NIVOA I XP-A ─────────────────────────────────────────────────
@@ -115,7 +115,11 @@ function dodajXP(chatroomId, username, xpBonus = 15, pointsBonus = 5, isSub = fa
         const valuta = dobijNazivValute(channelState);
         const titula = dobijTitulu(noviNivo);
 
-        if (channelState.level_up_announce !== false) {
+        // Anti-duplikat: objavljujemo level-up samo ako vec nije objavljen za ovaj nivo
+        if (!channelState.lastAnnouncedLevel) channelState.lastAnnouncedLevel = {};
+        const lastAnn = channelState.lastAnnouncedLevel[key] || 0;
+        if (channelState.level_up_announce !== false && noviNivo > lastAnn) {
+            channelState.lastAnnouncedLevel[key] = noviNivo;
             posaljiPoruku(chatroomId, `🎉 LEVEL UP! @${cleanUsername} je skočio na Level ${noviNivo} (${titula})! Dobio je +${bonusCoins} ${valuta} bonus! 🚀`);
         }
     }
@@ -298,11 +302,17 @@ function handleDaily(chatroomId, sender) {
     user.coins = (user.coins || 0) + ukupnoCoins;
     user.level = izracunajNivo(user.xp);
     if (user.level > stariNivo && channelState.level_up_announce !== false) {
-        const titula = dobijTitulu(user.level);
-        const bonusCoins = user.level * 50;
-        user.coins += bonusCoins;
-        const valuta = dobijNazivValute(channelState);
-        posaljiPoruku(chatroomId, `🎉 LEVEL UP! @${clean} je skočio na Level ${user.level} (${titula})! +${bonusCoins} ${valuta} bonus! 🚀`);
+        // Anti-duplikat: objavljujemo level-up samo ako vec nije objavljen za ovaj nivo
+        if (!channelState.lastAnnouncedLevel) channelState.lastAnnouncedLevel = {};
+        const lastAnn = channelState.lastAnnouncedLevel[key] || 0;
+        if (user.level > lastAnn) {
+            channelState.lastAnnouncedLevel[key] = user.level;
+            const titula = dobijTitulu(user.level);
+            const bonusCoins = user.level * 50;
+            user.coins += bonusCoins;
+            const valuta = dobijNazivValute(channelState);
+            posaljiPoruku(chatroomId, `🎉 LEVEL UP! @${clean} je skočio na Level ${user.level} (${titula})! +${bonusCoins} ${valuta} bonus! 🚀`);
+        }
     }
 
     oznakiKaoPromenjenIZaplanujSave(channelState, chatroomId, key);
@@ -312,7 +322,7 @@ function handleDaily(chatroomId, sender) {
 }
 
 // ─── KOMANDA: !givepoints / !dajpoene ────────────────────────────────────────
-function handleGivePoints(chatroomId, sender, arg1Raw, arg2Raw) {
+function handleGivePoints(chatroomId, sender, arg1Raw, arg2Raw, onSuccess) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
 
@@ -330,16 +340,19 @@ function handleGivePoints(chatroomId, sender, arg1Raw, arg2Raw) {
     const a2Lower = a2Clean.toLowerCase();
 
     if (!a1Clean && !a2Clean) {
+        ponistiKulaun(chatroomId, '!give', cleanSender);
         posaljiPoruku(chatroomId, `🎁 @${cleanSender}, označi korisnika i navedi iznos! Upotreba: !give @korisnik <iznos> (npr. !give @user 100)`);
         return;
     }
 
     const numKeywords = ['all', 'sve', 'half', 'pola'];
-    const isArg1Num = /^\d+$/.test(a1Clean) || numKeywords.includes(a1Lower);
-    const isArg2Num = /^\d+$/.test(a2Clean) || numKeywords.includes(a2Lower);
+    const isNumLike = (s, l) => /^[\d\s.,_]+$/.test(s) || /^\d+(\.\d+)?[km]?$/i.test(s) || numKeywords.includes(l);
+    const isArg1Num = isNumLike(a1Clean, a1Lower);
+    const isArg2Num = isNumLike(a2Clean, a2Lower);
 
     // Ako je unet samo jedan argument:
     if (a1Clean && !a2Clean) {
+        ponistiKulaun(chatroomId, '!give', cleanSender);
         if (isArg1Num) {
             // Unet je samo iznos (npr. !give 100 ili !give sve)
             posaljiPoruku(chatroomId, `🎁 @${cleanSender}, označi korisnika kome šalješ ${a1Clean} ${valuta}! Upotreba: !give @korisnik ${a1Clean}`);
@@ -374,6 +387,7 @@ function handleGivePoints(chatroomId, sender, arg1Raw, arg2Raw) {
 
     const target = targetRaw ? targetRaw.split(/\s+/)[0].replace(/^@/, '').trim() : '';
     if (!target || !isValidUsername(target)) {
+        ponistiKulaun(chatroomId, '!give', cleanSender);
         posaljiPoruku(chatroomId, `🎁 @${cleanSender}, označi korisnika i navedi iznos! Upotreba: !give @korisnik <iznos> (npr. !give @user 100)`);
         return;
     }
@@ -382,6 +396,7 @@ function handleGivePoints(chatroomId, sender, arg1Raw, arg2Raw) {
     const targetKey   = cleanTarget.toLowerCase();
 
     if (senderKey === targetKey) {
+        ponistiKulaun(chatroomId, '!give', cleanSender);
         posaljiPoruku(chatroomId, `😂 @${cleanSender}, ne možeš poslati poene samom sebi!`);
         return;
     }
@@ -391,16 +406,27 @@ function handleGivePoints(chatroomId, sender, arg1Raw, arg2Raw) {
 
     let iznos = 0;
     const arg = (amountRaw || '').toLowerCase().trim();
-    if (arg === 'all' || arg === 'sve')        iznos = senderCoins;
-    else if (arg === 'half' || arg === 'pola') iznos = Math.floor(senderCoins / 2);
-    else                                        iznos = parseInt(arg, 10);
+    if (arg === 'all' || arg === 'sve') {
+        iznos = senderCoins;
+    } else if (arg === 'half' || arg === 'pola') {
+        iznos = Math.floor(senderCoins / 2);
+    } else if (/^\d+(\.\d+)?k$/.test(arg)) {
+        iznos = Math.floor(parseFloat(arg) * 1000);
+    } else if (/^\d+(\.\d+)?m$/.test(arg)) {
+        iznos = Math.floor(parseFloat(arg) * 1000000);
+    } else {
+        const cleaned = arg.replace(/[\s.,_]/g, '');
+        iznos = parseInt(cleaned, 10);
+    }
 
     if (isNaN(iznos) || iznos <= 0) {
+        ponistiKulaun(chatroomId, '!give', cleanSender);
         posaljiPoruku(chatroomId, `❌ @${cleanSender}, navedi ispravan broj poena za slanje! (npr. !give @${cleanTarget} 100)`);
         return;
     }
 
     if (senderCoins < iznos) {
+        ponistiKulaun(chatroomId, '!give', cleanSender);
         posaljiPoruku(chatroomId, `❌ @${cleanSender}, nemaš dovoljno poena! Tvoj balans je: ${senderCoins.toLocaleString()} ${valuta}.`);
         return;
     }
@@ -415,6 +441,7 @@ function handleGivePoints(chatroomId, sender, arg1Raw, arg2Raw) {
     oznakiKaoPromenjenIZaplanujSave(channelState, chatroomId, targetKey);
 
     posaljiPoruku(chatroomId, `💸 @${cleanSender} je uspešno prebacio ${iznos.toLocaleString()} ${valuta} korisniku @${cleanTarget}!`);
+    if (typeof onSuccess === 'function') onSuccess();
 }
 
 // ─── KOMANDA: !toplevel ──────────────────────────────────────────────────────

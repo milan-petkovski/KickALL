@@ -270,8 +270,12 @@ async function handleBan(chatroomId, sender, textRaw, senderObj) {
     channelState.bannedUsers.add(target.toLowerCase());
 
     const { banujKorisnika } = require('../messenger');
-    await banujKorisnika(chatroomId, target, reason);
-    posaljiPoruku(chatroomId, `[MOD] @${target} je trajno banovan od strane @${sender} (Razlog: ${reason}).`);
+    const ok = await banujKorisnika(chatroomId, target, reason);
+    if (ok) {
+        posaljiPoruku(chatroomId, `[MOD] @${target} je trajno banovan od strane @${sender}.`);
+    } else {
+        posaljiPoruku(chatroomId, `[MOD] Banovanje korisnika @${target} nije uspelo na Kick-u.`);
+    }
 }
 
 async function handleTimeout(chatroomId, sender, textRaw, senderObj) {
@@ -316,8 +320,12 @@ async function handleTimeout(chatroomId, sender, textRaw, senderObj) {
     const minuti = Math.max(1, Math.round(durationSec / 60));
 
     const { timeoutKorisnika } = require('../messenger');
-    await timeoutKorisnika(chatroomId, target, durationSec, reason);
-    posaljiPoruku(chatroomId, `[MOD] @${target} je utišan na ${minuti} min od strane @${sender} (Razlog: ${reason}).`);
+    const ok = await timeoutKorisnika(chatroomId, target, durationSec, reason);
+    if (ok) {
+        posaljiPoruku(chatroomId, `[MOD] @${target} je utišan na ${minuti} min od strane @${sender}.`);
+    } else {
+        posaljiPoruku(chatroomId, `[MOD] Utišavanje korisnika @${target} nije uspelo na Kick-u.`);
+    }
 }
 
 module.exports = {

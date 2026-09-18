@@ -4,6 +4,30 @@ const { posaljiPoruku } = require('./messenger');
 const { dobijNazivValute } = require('./economy');
 const { sanitizeInput, isValidUsername } = require('./utils');
 
+function ponistiCooldownIgre(chatroomId, gameName, username) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || !channelState.cooldowns || !username) return;
+    const mapa = {
+        'slot': ['!slot', '!slots'],
+        'slots': ['!slot', '!slots'],
+        'tocak': ['!tocak', '!wheel', '!spin'],
+        'wheel': ['!tocak', '!wheel', '!spin'],
+        'spin': ['!tocak', '!wheel', '!spin'],
+        'coinflip': ['!coinflip', '!flip', '!piskoglava', '!gamble', '!kockaj'],
+        'flip': ['!coinflip', '!flip'],
+        'rulet': ['!rulet', '!roulette', '!rullete'],
+        'roulette': ['!rulet', '!roulette', '!rullete'],
+        'duel': ['!duel', '!dvoboj'],
+        'dvoboj': ['!duel', '!dvoboj']
+    };
+    const keys = mapa[gameName.toLowerCase()] || [`!${gameName}`];
+    const cleanUser = String(username).toLowerCase();
+    for (const k of keys) {
+        delete channelState.cooldowns[`${k}::${cleanUser}`];
+        delete channelState.cooldowns[k];
+    }
+}
+
 // ─── HELPER: Dohvati economy korisnika ───────────────────────────────────────
 function dohvatiEkonomiju(channelState, key, displayName) {
     if (!channelState.economy[key]) {
@@ -45,6 +69,7 @@ function proveriUlog(chatroomId, sender, amountRaw, gameName = 'igra') {
     if (!channelState) return { valid: false };
 
     if (channelState.feature_games === false || (channelState.planLimits && channelState.planLimits.allowGambling === false)) {
+        ponistiCooldownIgre(chatroomId, gameName, clean);
         posaljiPoruku(chatroomId, `❌ @${clean}, Kazino igre i komande kockanja su dostupne u PRO i ELITE paketima.`);
         return { valid: false };
     }
@@ -73,28 +98,41 @@ function proveriUlog(chatroomId, sender, amountRaw, gameName = 'igra') {
             primer = `!duel @korisnik 100`;
             icon = '⚔️';
         }
+        ponistiCooldownIgre(chatroomId, gameName, clean);
         posaljiPoruku(chatroomId, `${icon} @${clean}, navedi ulog! Upotreba: !${gameName} <iznos> (npr. ${primer} ili !${gameName} all)`);
         return { valid: false };
     }
 
     let iznos = 0;
     const arg = cleanAmount.toLowerCase();
-    if (arg === 'all' || arg === 'sve')        iznos = trenutniCoins;
-    else if (arg === 'half' || arg === 'pola') iznos = Math.floor(trenutniCoins / 2);
-    else                                        iznos = parseInt(arg, 10);
+    if (arg === 'all' || arg === 'sve') {
+        iznos = trenutniCoins;
+    } else if (arg === 'half' || arg === 'pola') {
+        iznos = Math.floor(trenutniCoins / 2);
+    } else if (/^\d+(\.\d+)?k$/.test(arg)) {
+        iznos = Math.floor(parseFloat(arg) * 1000);
+    } else if (/^\d+(\.\d+)?m$/.test(arg)) {
+        iznos = Math.floor(parseFloat(arg) * 1000000);
+    } else {
+        const cleaned = arg.replace(/[\s.,_]/g, '');
+        iznos = parseInt(cleaned, 10);
+    }
 
     if (isNaN(iznos) || iznos <= 0) {
+        ponistiCooldownIgre(chatroomId, gameName, clean);
         posaljiPoruku(chatroomId, `❌ @${clean}, navedi ispravan broj uloga! (npr. !${gameName} 100 ili !${gameName} all)`);
         return { valid: false };
     }
 
     if (iznos > trenutniCoins) {
+        ponistiCooldownIgre(chatroomId, gameName, clean);
         posaljiPoruku(chatroomId, `❌ @${clean}, nemaš dovoljno poena! Tvoj balans: ${trenutniCoins.toLocaleString()} ${valuta}.`);
         return { valid: false };
     }
 
     const maxGamble = channelState.max_gamble_amount || 5000;
     if (iznos > maxGamble) {
+        ponistiCooldownIgre(chatroomId, gameName, clean);
         posaljiPoruku(chatroomId, `⚠️ @${clean}, maksimalni ulog po igri na ovom kanalu je ${maxGamble.toLocaleString()} ${valuta}! Proveri komandom !limit`);
         return { valid: false };
     }

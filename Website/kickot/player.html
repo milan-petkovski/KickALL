@@ -284,9 +284,11 @@
       right: 0;
       width: 160px;
       height: 90px;
-      opacity: 0.08;
+      opacity: 0.015;
+      filter: brightness(0);
       pointer-events: none;
-      z-index: 1000;
+      z-index: 1;
+      overflow: hidden;
     }
   </style>
 </head>
@@ -373,15 +375,26 @@
 
     document.getElementById('channelNameDisplay').textContent = '@' + channelName;
 
-    const sbUrl = window.SUPABASE_URL || 'https://default.supabase.co';
-    const sbKey = window.SUPABASE_ANON_KEY || '';
-    const supabase = window.supabase ? window.supabase.createClient(sbUrl, sbKey) : null;
+    const sbUrl = (window.CONFIG && window.CONFIG.SUPABASE && window.CONFIG.SUPABASE.URL) || 'https://rcukparptzzyssqdmydt.supabase.co';
+    const sbKey = (window.CONFIG && window.CONFIG.SUPABASE && window.CONFIG.SUPABASE.ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+    const sbClient = window.supabase ? window.supabase.createClient(sbUrl, sbKey) : null;
 
     let queue = [];
     let curIndex = 0;
     let isPlaying = false;
     let curSeconds = 0;
-    let volume = 80;
+    let volume = (function () {
+      try {
+        const saved = localStorage.getItem('kickot_sr_volume');
+        if (saved !== null) {
+          const parsed = parseInt(saved, 10);
+          if (!isNaN(parsed) && parsed >= 0 && parsed <= 100) return parsed;
+        }
+      } catch (_) { }
+      return 80;
+    })();
+    const initVolSlider = document.getElementById('volSlider');
+    if (initVolSlider) initVolSlider.value = volume;
     let ytPlayer = null;
     let isYtReady = false;
     let progressTimer = null;
@@ -474,6 +487,23 @@
       }
     }
 
+    let hasPopoutInteracted = false;
+    function unlockPopoutAudio() {
+      hasPopoutInteracted = true;
+      const b = document.getElementById('popoutUnlockBanner');
+      if (b) b.style.display = 'none';
+      if (ytPlayer) {
+        try {
+          if (ytPlayer.unMute) ytPlayer.unMute();
+          if (ytPlayer.setVolume) ytPlayer.setVolume(volume);
+          if (isPlaying && ytPlayer.playVideo) ytPlayer.playVideo();
+        } catch (_) {}
+      }
+    }
+    window.addEventListener('click', unlockPopoutAudio, { passive: true });
+    window.addEventListener('pointerdown', unlockPopoutAudio, { passive: true });
+    window.addEventListener('keydown', unlockPopoutAudio, { passive: true });
+
     function playAudio() {
       const song = queue[curIndex];
       if (!song) {
@@ -484,12 +514,17 @@
         return;
       }
 
-      const ytId = song.ytId || (song.id && song.id.length === 11 ? song.id : null);
+      const ytId = song.ytId || (song.id ? song.id.replace(/^yt_/, '') : null);
       if (!ytId) return;
 
       currentYtId = ytId;
       curSeconds = 0;
       isPlaying = true;
+
+      if (!hasPopoutInteracted) {
+        const b = document.getElementById('popoutUnlockBanner');
+        if (b) b.style.display = 'block';
+      }
 
       if (ytPlayer && isYtReady) {
         try {
@@ -535,8 +570,8 @@
       }
 
       // Snimi u Supabase
-      if (supabase && channelId) {
-        supabase.from('song_request').update({ queue: queue, updated_at: new Date().toISOString() }).eq('channel_id', channelId).eq('type', 'config').then(() => {});
+      if (sbClient && channelId) {
+        sbClient.from('song_request').update({ queue: queue, updated_at: new Date().toISOString() }).eq('channel_id', channelId).eq('type', 'config').then(() => {});
       }
 
       if (queue.length === 0) {
@@ -565,20 +600,27 @@
 
     function setPopoutVolume(val) {
       volume = parseInt(val) || 0;
+      try {
+        localStorage.setItem('kickot_sr_volume', String(volume));
+      } catch (_) { }
       if (ytPlayer && ytPlayer.setVolume) ytPlayer.setVolume(volume);
     }
 
     // YouTube API init
     window.onYouTubeIframeAPIReady = function () {
-      ytPlayer = new YT.Player('ytPopoutPlayer', {
+      const curSong = queue && queue[curIndex];
+      const initialVideoId = (curSong && (curSong.ytId || (curSong.id ? curSong.id.replace(/^yt_/, '') : null))) || 'jNQXAC9IVRw';
+      const opts = {
         height: '100%',
         width: '100%',
-        videoId: 'jNQXAC9IVRw',
+        videoId: initialVideoId,
         playerVars: {
-          autoplay: 0,
+          autoplay: curSong ? 1 : 0,
+          mute: 1,
           controls: 0,
+          enablejsapi: 1,
           playsinline: 1,
-          origin: window.location.origin
+          origin: (window.location && window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://kickall.app')
         },
         events: {
           onReady: () => {
@@ -596,14 +638,24 @@
               ytPlayer.setVolume(volume);
               updateUI();
             }
+          },
+          onError: (e) => {
+            console.warn('[Kickot Popout Player] YouTube reprodukcija greška (kod ' + (e ? e.data : 'unknown') + '), automatski preskačem...');
+            if (queue && queue.length > 0) {
+              skipTrack();
+            }
           }
         }
-      });
+      };
+      if (initialVideoId) {
+        opts.videoId = initialVideoId;
+      }
+      ytPlayer = new YT.Player('ytPopoutPlayer', opts);
     };
 
     // Supabase load & realtime
-    if (supabase && channelId) {
-      supabase.from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
+    if (sbClient && channelId) {
+      sbClient.from('song_request').select('queue').eq('channel_id', channelId).eq('type', 'config').maybeSingle()
         .then(({ data }) => {
           if (data && Array.isArray(data.queue)) {
             const wasEmpty = queue.length === 0;
@@ -615,18 +667,57 @@
           }
         });
 
-      supabase.channel(`popout_sr_${channelId}`)
+      sbClient.channel(`popout_sr_${channelId}`)
+        .on('broadcast', { event: 'player_control' }, payload => {
+          if (payload && payload.payload) {
+            if (payload.payload.volume !== undefined) {
+              const v = parseInt(payload.payload.volume, 10);
+              if (!isNaN(v) && v !== volume) setPopoutVolume(v);
+            }
+            if (payload.payload.playback_state) {
+              if (payload.payload.playback_state === 'paused' && isPlaying) {
+                togglePopoutPlay();
+              } else if (payload.payload.playback_state === 'playing' && !isPlaying) {
+                togglePopoutPlay();
+              }
+            }
+          }
+        })
         .on('postgres_changes', {
           event: '*',
           schema: 'public',
           table: 'song_request',
           filter: `channel_id=eq.${channelId}`
         }, payload => {
+          if (payload.new) {
+            if (payload.new.volume !== undefined) {
+              const v = parseInt(payload.new.volume, 10);
+              if (!isNaN(v) && v !== volume) setPopoutVolume(v);
+            }
+            if (payload.new.playback_state) {
+              if (payload.new.playback_state === 'paused' && isPlaying) {
+                togglePopoutPlay();
+              } else if (payload.new.playback_state === 'playing' && !isPlaying) {
+                togglePopoutPlay();
+              }
+            }
+          }
           if (payload.new && Array.isArray(payload.new.queue)) {
             const wasEmpty = queue.length === 0;
+            const currentSong = queue[curIndex];
             queue = payload.new.queue;
             updateUI();
-            if (wasEmpty && queue.length > 0) {
+            if (queue.length === 0) {
+              isPlaying = false;
+              if (ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+              stopTimer();
+              updateUI();
+            } else if (wasEmpty || !currentSong || !queue.some(s => (s.id && currentSong.id && s.id === currentSong.id) || (s.ytId && currentSong.ytId && s.ytId === currentSong.ytId))) {
+              // Red je bio prazan ili je trenutna pesma preskočena/uklonjena sa drugog uređaja/četa
+              if (curIndex >= queue.length) curIndex = 0;
+              curSeconds = 0;
+              currentYtId = null;
+              stopTimer();
               playAudio();
             }
           }

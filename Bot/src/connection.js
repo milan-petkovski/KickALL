@@ -311,7 +311,7 @@ async function obradiPusherPoruku(data) {
 
         // Anti-spam filter (izuzimamo strimera i bot komande)
         if (userKey !== channelState.channelUsername.toLowerCase() && !startsWithPrefix && spam.spamFilter(chatroomId, username, poruka, chatData.sender)) {
-            if (messageId) messenger.obrisiPoruku(chatroomId, messageId);
+            // Samo upozorenje bez brisanja poruka
             return;
         }
 

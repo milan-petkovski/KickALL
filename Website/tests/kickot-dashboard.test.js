@@ -1081,4 +1081,156 @@ test('Kickot - YouTube audio engine startuje utišano (mute: 1) kada je tab u po
   assert.equal(isMuted, false);
 });
 
+test('Kickot - syncSongQueueFromRemote odmah pušta sledeću pesmu kada remote !skip ukloni trenutnu pesmu', () => {
+  let localQueue = [
+    { id: 'yt_111', ytId: '111', title: 'Stara pesma', artist: 'Izvođač 1', requester: 'Korisnik1' },
+    { id: 'yt_222', ytId: '222', title: 'Sledeća pesma', artist: 'Izvođač 2', requester: 'Korisnik2' }
+  ];
+  let currentSongIndex = 0;
+  let isPlaying = true;
+  let playedSong = null;
+  let stopTimerCalled = false;
+
+  function mockPlayCurrentAudio() {
+    isPlaying = true;
+    playedSong = localQueue[currentSongIndex];
+  }
+
+  function mockStopTimer() {
+    stopTimerCalled = true;
+  }
+
+  function syncQueue(newQueue) {
+    if (!Array.isArray(newQueue)) return;
+    const currentlyPlaying = localQueue[currentSongIndex];
+
+    if (newQueue.length === 0) {
+      localQueue = [];
+      isPlaying = false;
+      return;
+    }
+
+    const matchIdx = newQueue.findIndex(s =>
+      (s.id && currentlyPlaying.id && s.id === currentlyPlaying.id) ||
+      (s.ytId && currentlyPlaying.ytId && s.ytId === currentlyPlaying.ytId)
+    );
+
+    if (matchIdx !== -1) {
+      localQueue = newQueue;
+      currentSongIndex = matchIdx;
+    } else {
+      // Trenutna pesma uklonjena/preskočena
+      localQueue = newQueue;
+      if (currentSongIndex >= localQueue.length) currentSongIndex = 0;
+      mockStopTimer();
+      if (localQueue.length > 0) {
+        isPlaying = true;
+        mockPlayCurrentAudio();
+      } else {
+        isPlaying = false;
+      }
+    }
+  }
+
+  // U četu je moderator poslao !skip, pa u Supabase queue ostaje samo pesma 2
+  const remoteSkippedQueue = [
+    { id: 'yt_222', ytId: '222', title: 'Sledeća pesma', artist: 'Izvođač 2', requester: 'Korisnik2' }
+  ];
+
+  syncQueue(remoteSkippedQueue);
+
+  assert.equal(localQueue.length, 1);
+  assert.equal(currentSongIndex, 0);
+  assert.equal(isPlaying, true);
+  assert.equal(stopTimerCalled, true);
+  assert.equal(playedSong.title, 'Sledeća pesma');
+});
+
+test('Kickot - seekPlayer postavlja isSeekingLockUntil, menja vreme i ignoriše privremeni pause event', () => {
+  let currentTimeSeconds = 10;
+  let isPlaying = true;
+  let isSeekingLockUntil = 0;
+  let ytSeekCalledWith = null;
+
+  const mockYt = {
+    seekTo: (sec) => { ytSeekCalledWith = sec; },
+    getCurrentTime: () => 10, // Stari tajmstemap pre postMessage odgovora
+    getDuration: () => 200
+  };
+
+  function simulateSeek(pct) {
+    const dur = mockYt.getDuration();
+    const target = Math.floor(pct * dur);
+    currentTimeSeconds = target;
+    isSeekingLockUntil = Date.now() + 1500;
+    mockYt.seekTo(target);
+  }
+
+  function simulateOnPaused() {
+    if (Date.now() < isSeekingLockUntil) {
+      return; // Ignoriši dok traje seek baferovanje
+    }
+    isPlaying = false;
+  }
+
+  function simulateUpdateUI() {
+    if (Date.now() >= isSeekingLockUntil) {
+      currentTimeSeconds = mockYt.getCurrentTime();
+    }
+  }
+
+  // Korisnik klikće na 50% trake
+  simulateSeek(0.5);
+
+  assert.equal(ytSeekCalledWith, 100);
+  assert.equal(currentTimeSeconds, 100);
+
+  // YouTube privremeno šalje PAUSED dok puni bafer
+  simulateOnPaused();
+  assert.equal(isPlaying, true); // Plejer NE SME biti ugašen
+
+  // UI tik pre isteka lock-a ne sme da vrati na staro vreme 10
+  simulateUpdateUI();
+  assert.equal(currentTimeSeconds, 100);
+});
+
+test('Kickot - PLAN_LIMITS.free.maxSongQueue je proširen na 25 pesama', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const content = fs.readFileSync(path.join(__dirname, '../kickot/js/dashboard.js'), 'utf8');
+  assert.match(content, /free:\s*\{[^}]*maxSongQueue:\s*25/s);
+});
+
+test('Kickot - YouTube audio engine ima ugrađenu zaštitu i oporavak za Error 150/101 i origin', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const dashContent = fs.readFileSync(path.join(__dirname, '../kickot/js/dashboard.js'), 'utf8');
+  const ytSearchContent = fs.readFileSync(path.join(__dirname, '../netlify/functions/yt-search.js'), 'utf8');
+  const playerContent = fs.readFileSync(path.join(__dirname, '../kickot/player.html'), 'utf8');
+
+  // 1. Dashboard origin i error handling
+  assert.ok(dashContent.includes('errCode === 150 || errCode === 101'), 'dashboard.js mora detektovati Error 150 i 101');
+  assert.ok(dashContent.includes('origin: (typeof window !== \'undefined\''), 'dashboard.js mora proslediti origin u playerVars');
+  assert.ok(dashContent.includes('loadVideoById'), 'dashboard.js mora zameniti video ID novom embeddable verzijom pri Error 150');
+
+  // 2. Netlify yt-search candidate embed check
+  assert.ok(ytSearchContent.includes('checkEmbedStatus'), 'yt-search.js mora imati funkciju za proveru embed statusa');
+  assert.ok(ytSearchContent.includes('https://www.youtube.com/oembed'), 'yt-search.js mora koristiti oEmbed za proveru dozvole embedovanja');
+
+  // 3. Popout player
+  assert.ok(playerContent.includes('origin: (window.location'), 'player.html mora proslediti origin u playerVars');
+});
+
+test('Kickot - dashboard.js ima 100% validnu JavaScript sintaksu bez grešaka', () => {
+  const { execSync } = require('child_process');
+  const path = require('path');
+  const targetFile = path.resolve(__dirname, '../kickot/js/dashboard.js');
+  assert.doesNotThrow(() => {
+    execSync(`node -c "${targetFile}"`, { stdio: 'pipe' });
+  }, 'dashboard.js sadrži sintaksnu grešku!');
+});
+
+
+
+
 

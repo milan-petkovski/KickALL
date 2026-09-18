@@ -7074,12 +7074,16 @@ input[type="number"]::-webkit-inner-spin-button {
   flex-direction: column !important;
   gap: 8px !important;
   z-index: 1 !important;
+  cursor: pointer !important;
 }
 
 .sr-progress-bar-wrap {
   width: 100% !important;
-  height: 6px !important;
-  background: rgba(255, 255, 255, 0.08) !important;
+  height: 8px !important;
+  padding: 6px 0 !important;
+  box-sizing: content-box !important;
+  background-clip: content-box !important;
+  background: rgba(255, 255, 255, 0.1) !important;
   border-radius: 4px !important;
   position: relative !important;
   cursor: pointer !important;
@@ -7088,16 +7092,17 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .sr-progress-bar-wrap:hover {
-  height: 8px !important;
+  height: 10px !important;
 }
 
 .sr-progress-fill {
-  width: 0% !important;
+  width: 0%;
   height: 100% !important;
   background: linear-gradient(90deg, #ff0033 0%, #ff4b4b 100%) !important;
   border-radius: 4px !important;
   box-shadow: 0 0 10px rgba(255, 0, 51, 0.6) !important;
-  transition: width 0.1s linear !important;
+  transition: width 0.2s linear !important;
+  pointer-events: none !important;
 }
 
 .sr-time-row {
@@ -7709,9 +7714,10 @@ button:active,
   right: 0 !important;
   width: 200px !important;
   height: 120px !important;
-  opacity: 0.08 !important;
+  opacity: 0.015 !important;
+  filter: brightness(0) !important;
   pointer-events: none !important;
-  z-index: 1000 !important;
+  z-index: 1 !important;
   overflow: hidden !important;
 }
 
@@ -7722,6 +7728,7 @@ button:active,
   border: none !important;
   pointer-events: none !important;
 }
+
 
 /* ══ Topbar Song Request Mini Player ══ */
 .sr-mini-player {

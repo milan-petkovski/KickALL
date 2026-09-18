@@ -13,6 +13,7 @@ let keshTokeni = null;       // { access_token, refresh_token, expires_at }
 let keshSesija = null;       // session_cookie string (keš)
 let refreshTimer = null;
 let broadcasterIdCache = {}; // username -> user_id
+let _refreshInFlight = null; // Mutex: aktivan promise osvežavanja tokena (sprečava race condition)
 
 async function ucitajTokene() {
     if (keshTokeni) return keshTokeni;
@@ -74,31 +75,44 @@ async function sacuvajTokene(data) {
 }
 
 async function razmeniTokenZaOsvezavanje(refreshToken) {
-    const res = await fetch('https://id.kick.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            grant_type: 'refresh_token',
-            client_id: config.KICK_CLIENT_ID,
-            client_secret: config.KICK_CLIENT_SECRET,
-            refresh_token: refreshToken
-        }).toString()
-    });
-
-    if (!res.ok) {
-        const errText = await res.text();
-        throw new Error(`Osvežavanje Kick tokena neuspešno: HTTP ${res.status} - ${errText}`);
+    // Mutex: ako je osvežavanje već u toku, sačekaj isti promise umesto da pokreneš novi
+    if (_refreshInFlight) {
+        return _refreshInFlight;
     }
 
-    const data = await res.json();
-    const noviTokeni = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token || refreshToken, // Kick ponekad vrati isti refresh_token
-        expires_at: Date.now() + ((data.expires_in || 3600) * 1000)
-    };
-    await sacuvajTokene(noviTokeni);
-    log('INFO', '[AUTH] Kick bot token uspešno osvežen preko refresh_token-a.');
-    return noviTokeni;
+    _refreshInFlight = (async () => {
+        try {
+            const res = await fetch('https://id.kick.com/oauth/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    grant_type: 'refresh_token',
+                    client_id: config.KICK_CLIENT_ID,
+                    client_secret: config.KICK_CLIENT_SECRET,
+                    refresh_token: refreshToken
+                }).toString()
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(`Osvežavanje Kick tokena neuspešno: HTTP ${res.status} - ${errText}`);
+            }
+
+            const data = await res.json();
+            const noviTokeni = {
+                access_token: data.access_token,
+                refresh_token: data.refresh_token || refreshToken, // Kick ponekad vrati isti refresh_token
+                expires_at: Date.now() + ((data.expires_in || 7200) * 1000) // default 2h
+            };
+            await sacuvajTokene(noviTokeni);
+            log('INFO', '[AUTH] Kick bot token uspešno osvežen preko refresh_token-a.');
+            return noviTokeni;
+        } finally {
+            _refreshInFlight = null;
+        }
+    })();
+
+    return _refreshInFlight;
 }
 
 /**
@@ -123,13 +137,15 @@ async function getAccessToken() {
  */
 function zakaziAutoOsvezavanje() {
     if (refreshTimer) clearInterval(refreshTimer);
+    // Proveravamo svakih 90 minuta (token traje 2h, osvežavamo ~30 min pre isteka)
+    // getAccessToken() interno proverava expires_at i osvežava samo kad je potrebno
     refreshTimer = setInterval(async () => {
         try {
             await getAccessToken();
         } catch (err) {
             log('ERR', `[AUTH] Automatsko osvežavanje Kick tokena nije uspelo: ${err.message}`);
         }
-    }, 15 * 60 * 1000).unref(); // proverava na svakih 15 minuta, osvežava kad je blizu isteka
+    }, 90 * 60 * 1000).unref();
 }
 
 /**

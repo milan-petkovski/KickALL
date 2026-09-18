@@ -887,145 +887,159 @@ async function ucitajAutoAnnounces(chatroomId) {
     }
 }
 
+// Guard mapa: sprečava paralelne reload-ove istog kanala
+const _botConfigInFlight = new Map();
+
 async function ucitajBotConfig(chatroomId) {
-    try {
-        if (!KORISTI_SUPABASE) return;
-        const channelState = state.getChannelState(chatroomId);
-        if (!channelState) return;
-        const _channelUsername = channelState.channelUsername || 'Nepoznat';
-
-        const { data, error } = await supabase
-            .from('bot_config')
-            .select('*')
-            .eq('channel_id', chatroomId)
-            .maybeSingle();
-
-        if (error) throw error;
-
-        if (data) {
-            if (data.user_id) {
-                await ucitajUserPlan(data.user_id, chatroomId);
-            }
-
-            const limits = channelState.planLimits || config.PLAN_LIMITS.free;
-
-            // Dinamički override u stanju kanala uz poštovanje limita plana
-            channelState.PREFIX = data.prefix || '!';
-            channelState.COOLDOWN_MS = Math.max(data.cooldown_ms ?? 3000, limits.minCooldownMs || 3000);
-            channelState.SPAM_THRESHOLD = data.spam_threshold ?? 3;
-            channelState.SPAM_WINDOW_MS = data.spam_window_ms ?? 15000;
-
-            if (data.stream_pin_msg) {
-                channelState.STREAM_START_PIN_MESSAGE = data.stream_pin_msg;
-            } else {
-                channelState.STREAM_START_PIN_MESSAGE = '';
-            }
-
-            channelState.feature_leaderboard = limits.allowLeaderboard && (data.feature_leaderboard ?? true);
-            channelState.feature_watchtime = limits.allowWatchtime && (data.feature_watchtime ?? true);
-            channelState.feature_games = limits.allowGambling && (data.feature_games ?? true);
-            channelState.feature_love = limits.allowLove && (data.feature_love ?? true);
-            channelState.feature_moderation = limits.allowAdvancedModeration && (data.feature_moderation ?? false);
-            channelState.feature_autoresponse = data.feature_autoresponse ?? true;
-            channelState.feature_songrequest = limits.allowSongRequest && (data.feature_songrequest ?? false);
-            channelState.welcome_message = data.welcome_message || '';
-            channelState.botActive = data.bot_active || false;
-            channelState.announce_interval_mins = data.announce_interval_mins ?? 15;
-            channelState.announce_message_threshold = data.announce_message_threshold ?? 30;
-            channelState.announce_time_enabled = data.announce_time_enabled ?? true;
-            channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
-
-            // Paralelizujemo ucitajAlerts, ucitajAutoAnnounces i 4 specifične tabele podešavanja radi maksimalne brzine
-            const [_alertsRes, _annRes, modRes, mgRes, srRes, rankRes] = await Promise.allSettled([
-                ucitajAlerts(chatroomId),
-                ucitajAutoAnnounces(chatroomId),
-                sbPanels.from('moderation').select('settings').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),
-                sbPanels.from('mini_games').select('enabled, max_bet').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),
-                sbPanels.from('song_request').select('*').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),
-                sbPanels.from('ranking').select('*').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle()
-            ]);
-
-            // Moderation
-            if (modRes.status === 'fulfilled' && !modRes.value.error && modRes.value.data) {
-                channelState.moderationSettings = modRes.value.data.settings || {};
-            } else {
-                channelState.moderationSettings = {};
-            }
-
-            // Mini games
-            if (mgRes.status === 'fulfilled' && !mgRes.value.error && mgRes.value.data) {
-                channelState.max_gamble_amount = mgRes.value.data.max_bet ?? 5000;
-                channelState.gamble_enabled = mgRes.value.data.enabled ?? true;
-            } else {
-                channelState.max_gamble_amount = 5000;
-                channelState.gamble_enabled = true;
-            }
-
-            // Song request
-            if (srRes.status === 'fulfilled' && !srRes.value.error && srRes.value.data) {
-                const srData = srRes.value.data;
-                channelState.feature_songrequest = srData.enabled ?? false;
-                channelState.songrequest_settings = {
-                    request_role: srData.request_role || 'everyone',
-                    cost_points: srData.cost_points ?? 0,
-                    points_price: srData.cost_points ?? 0,
-                    max_duration_seconds: srData.max_duration_seconds ?? 360,
-                    queue: Array.isArray(srData.queue) ? srData.queue : []
-                };
-            } else {
-                channelState.feature_songrequest = false;
-                channelState.songrequest_settings = { request_role: 'everyone', cost_points: 0, points_price: 0, max_duration_seconds: 360, queue: [] };
-            }
-
-            // Ranking
-            if (rankRes.status === 'fulfilled' && !rankRes.value.error && rankRes.value.data) {
-                const rankData = rankRes.value.data;
-                channelState.currency_name = rankData.currency_name || 'Koins';
-                channelState.points_per_msg = rankData.points_per_msg ?? 5;
-                channelState.smart_chat_validation = rankData.smart_chat_validation ?? true;
-                channelState.first_interaction_bonus = rankData.first_interaction_bonus ?? 100;
-                channelState.points_per_watchtime = rankData.points_per_watchtime ?? 20;
-                channelState.level_up_announce = rankData.level_up_announce ?? true;
-                channelState.sub_multiplier = rankData.sub_multiplier ?? 2.0;
-                channelState.sub_bonus_per_msg = rankData.sub_bonus_per_msg ?? 10;
-                channelState.points_per_sub = rankData.points_per_sub ?? 1000;
-                channelState.points_per_gift_sub = rankData.points_per_gift_sub ?? 2000;
-                channelState.points_per_100_kicks = rankData.points_per_100_kicks ?? 500;
-                channelState.daily_streak_bonus = rankData.points_daily_streak ?? 150;
-                channelState.host_raid_bonus = rankData.points_per_raid ?? 300;
-
-                const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
-                const rawStore = Array.isArray(rankData.store_items) ? rankData.store_items : [];
-                channelState.store_items = rawStore.slice(0, maxStoreItems);
-            } else if (rankRes.status === 'rejected') {
-                log('ERR', `Greška pri učitavanju ranking podešavanja za ${chatroomId}: ${rankRes.reason?.message}`);
-            }
-
-            if (data.channel_name && data.channel_name !== channelState.channelUsername) {
-                channelState.channelUsername = data.channel_name;
-            }
-
-            log('INFO', `⚙️ Bot konfiguracija sinhronizovana za @${channelState.channelUsername} (${limits.name} Plan). Prefix: '${channelState.PREFIX}', Aktivan: ${channelState.botActive}`);
-
-            try {
-                const channelManager = require('./channelManager');
-                if (channelManager && typeof channelManager.pokreniAutoAnnounceTajmer === 'function') {
-                    channelManager.pokreniAutoAnnounceTajmer(channelState.realChatroomId || chatroomId);
-                }
-            } catch (_) {}
-        } else {
-            channelState.botActive = false;
-            channelState.autoAnnounces = [];
-            try {
-                const channelManager = require('./channelManager');
-                if (channelManager && typeof channelManager.pokreniAutoAnnounceTajmer === 'function') {
-                    channelManager.pokreniAutoAnnounceTajmer(channelState.realChatroomId || chatroomId);
-                }
-            } catch (_) {}
-        }
-    } catch (err) {
-        log('ERR', `Greška pri učitavanju bot konfiguracije za ${chatroomId}: ${err.message}`);
+    // In-flight guard: ako je reload već u toku za ovaj kanal, sačekaj isti promise
+    if (_botConfigInFlight.has(chatroomId)) {
+        return _botConfigInFlight.get(chatroomId);
     }
+
+    const loadPromise = (async () => {
+        try {
+            if (!KORISTI_SUPABASE) return;
+            const channelState = state.getChannelState(chatroomId);
+            if (!channelState) return;
+
+            const { data, error } = await supabase
+                .from('bot_config')
+                .select('*')
+                .eq('channel_id', chatroomId)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            if (data) {
+                if (data.user_id) {
+                    await ucitajUserPlan(data.user_id, chatroomId);
+                }
+
+                const limits = channelState.planLimits || config.PLAN_LIMITS.free;
+
+                // Dinamički override u stanju kanala uz poštovanje limita plana
+                channelState.PREFIX = data.prefix || '!';
+                channelState.COOLDOWN_MS = Math.max(data.cooldown_ms ?? 3000, limits.minCooldownMs || 3000);
+                channelState.SPAM_THRESHOLD = data.spam_threshold ?? 3;
+                channelState.SPAM_WINDOW_MS = data.spam_window_ms ?? 15000;
+
+                if (data.stream_pin_msg) {
+                    channelState.STREAM_START_PIN_MESSAGE = data.stream_pin_msg;
+                } else {
+                    channelState.STREAM_START_PIN_MESSAGE = '';
+                }
+
+                channelState.feature_leaderboard = limits.allowLeaderboard && (data.feature_leaderboard ?? true);
+                channelState.feature_watchtime = limits.allowWatchtime && (data.feature_watchtime ?? true);
+                channelState.feature_games = limits.allowGambling && (data.feature_games ?? true);
+                channelState.feature_love = limits.allowLove && (data.feature_love ?? true);
+                channelState.feature_moderation = limits.allowAdvancedModeration && (data.feature_moderation ?? false);
+                channelState.feature_autoresponse = data.feature_autoresponse ?? true;
+                channelState.feature_songrequest = limits.allowSongRequest && (data.feature_songrequest ?? false);
+                channelState.welcome_message = data.welcome_message || '';
+                channelState.botActive = data.bot_active || false;
+                channelState.announce_interval_mins = data.announce_interval_mins ?? 15;
+                channelState.announce_message_threshold = data.announce_message_threshold ?? 30;
+                channelState.announce_time_enabled = data.announce_time_enabled ?? true;
+                channelState.announce_msg_enabled = data.announce_msg_enabled ?? true;
+
+                // Paralelizujemo ucitajAlerts, ucitajAutoAnnounces i 4 specifične tabele podešavanja radi maksimalne brzine
+                const [_alertsRes, _annRes, modRes, mgRes, srRes, rankRes] = await Promise.allSettled([
+                    ucitajAlerts(chatroomId),
+                    ucitajAutoAnnounces(chatroomId),
+                    sbPanels.from('moderation').select('settings').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),
+                    sbPanels.from('mini_games').select('enabled, max_bet').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),
+                    sbPanels.from('song_request').select('*').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle(),
+                    sbPanels.from('ranking').select('*').eq('channel_id', chatroomId).eq('type', 'config').maybeSingle()
+                ]);
+
+                // Moderation
+                if (modRes.status === 'fulfilled' && !modRes.value.error && modRes.value.data) {
+                    channelState.moderationSettings = modRes.value.data.settings || {};
+                } else {
+                    channelState.moderationSettings = {};
+                }
+
+                // Mini games
+                if (mgRes.status === 'fulfilled' && !mgRes.value.error && mgRes.value.data) {
+                    channelState.max_gamble_amount = mgRes.value.data.max_bet ?? 5000;
+                    channelState.gamble_enabled = mgRes.value.data.enabled ?? true;
+                } else {
+                    channelState.max_gamble_amount = 5000;
+                    channelState.gamble_enabled = true;
+                }
+
+                // Song request
+                if (srRes.status === 'fulfilled' && !srRes.value.error && srRes.value.data) {
+                    const srData = srRes.value.data;
+                    channelState.feature_songrequest = srData.enabled ?? false;
+                    channelState.songrequest_settings = {
+                        request_role: srData.request_role || 'everyone',
+                        cost_points: srData.cost_points ?? 0,
+                        points_price: srData.cost_points ?? 0,
+                        max_duration_seconds: srData.max_duration_seconds ?? 360,
+                        queue: Array.isArray(srData.queue) ? srData.queue : []
+                    };
+                } else {
+                    channelState.feature_songrequest = false;
+                    channelState.songrequest_settings = { request_role: 'everyone', cost_points: 0, points_price: 0, max_duration_seconds: 360, queue: [] };
+                }
+
+                // Ranking
+                if (rankRes.status === 'fulfilled' && !rankRes.value.error && rankRes.value.data) {
+                    const rankData = rankRes.value.data;
+                    channelState.currency_name = rankData.currency_name || 'Koins';
+                    channelState.points_per_msg = rankData.points_per_msg ?? 5;
+                    channelState.smart_chat_validation = rankData.smart_chat_validation ?? true;
+                    channelState.first_interaction_bonus = rankData.first_interaction_bonus ?? 100;
+                    channelState.points_per_watchtime = rankData.points_per_watchtime ?? 20;
+                    channelState.level_up_announce = rankData.level_up_announce ?? true;
+                    channelState.sub_multiplier = rankData.sub_multiplier ?? 2.0;
+                    channelState.sub_bonus_per_msg = rankData.sub_bonus_per_msg ?? 10;
+                    channelState.points_per_sub = rankData.points_per_sub ?? 1000;
+                    channelState.points_per_gift_sub = rankData.points_per_gift_sub ?? 2000;
+                    channelState.points_per_100_kicks = rankData.points_per_100_kicks ?? 500;
+                    channelState.daily_streak_bonus = rankData.points_daily_streak ?? 150;
+                    channelState.host_raid_bonus = rankData.points_per_raid ?? 300;
+
+                    const maxStoreItems = channelState.userPlan === 'free' ? 10 : (channelState.userPlan === 'pro' ? 50 : 999999);
+                    const rawStore = Array.isArray(rankData.store_items) ? rankData.store_items : [];
+                    channelState.store_items = rawStore.slice(0, maxStoreItems);
+                } else if (rankRes.status === 'rejected') {
+                    log('ERR', `Greška pri učitavanju ranking podešavanja za ${chatroomId}: ${rankRes.reason?.message}`);
+                }
+
+                if (data.channel_name && data.channel_name !== channelState.channelUsername) {
+                    channelState.channelUsername = data.channel_name;
+                }
+
+                log('INFO', `⚙️ Bot konfiguracija sinhronizovana za @${channelState.channelUsername} (${(channelState.planLimits || config.PLAN_LIMITS.free).name} Plan). Prefix: '${channelState.PREFIX}', Aktivan: ${channelState.botActive}`);
+
+                try {
+                    const channelManager = require('./channelManager');
+                    if (channelManager && typeof channelManager.pokreniAutoAnnounceTajmer === 'function') {
+                        channelManager.pokreniAutoAnnounceTajmer(channelState.realChatroomId || chatroomId);
+                    }
+                } catch (_) {}
+            } else {
+                channelState.botActive = false;
+                channelState.autoAnnounces = [];
+                try {
+                    const channelManager = require('./channelManager');
+                    if (channelManager && typeof channelManager.pokreniAutoAnnounceTajmer === 'function') {
+                        channelManager.pokreniAutoAnnounceTajmer(channelState.realChatroomId || chatroomId);
+                    }
+                } catch (_) {}
+            }
+        } catch (err) {
+            log('ERR', `Greška pri učitavanju bot konfiguracije za ${chatroomId}: ${err.message}`);
+        } finally {
+            _botConfigInFlight.delete(chatroomId);
+        }
+    })();
+
+    _botConfigInFlight.set(chatroomId, loadPromise);
+    return loadPromise;
 }
 
 async function ucitajSveAktivneKanale() {
@@ -1053,7 +1067,7 @@ async function sacuvajSongQueue(chatroomId, queue) {
         if (!channelState.songrequest_settings) channelState.songrequest_settings = {};
         channelState.songrequest_settings.queue = queue;
 
-        if (KORISTI_SUPABASE) {
+        if (KORISTI_SUPABASE && !chatroomId.startsWith('test_')) {
             const { error } = await sbPanels
                 .from('song_request')
                 .upsert({
@@ -1071,6 +1085,59 @@ async function sacuvajSongQueue(chatroomId, queue) {
         }
     } catch (err) {
         log('ERR', `Greška pri čuvanju song request reda za ${chatroomId}: ${err.message}`);
+    }
+}
+
+async function azurirajSongRequestPodesavanja(chatroomId, updateFields) {
+    try {
+        const channelState = state.getChannelState(chatroomId);
+        if (!channelState) return;
+        if (!channelState.songrequest_settings) channelState.songrequest_settings = {};
+        Object.assign(channelState.songrequest_settings, updateFields);
+
+        if (KORISTI_SUPABASE && !chatroomId.startsWith('test_')) {
+            // Realtime Broadcast prema Dashboard-u i Popout Plejeru (npr. volume, playback_state)
+            try {
+                if (supabase) {
+                    const chDashboard = supabase.channel(`song_request_realtime_${chatroomId}`);
+                    await chDashboard.send({
+                        type: 'broadcast',
+                        event: 'player_control',
+                        payload: updateFields
+                    });
+                    const chPopout = supabase.channel(`popout_sr_${chatroomId}`);
+                    await chPopout.send({
+                        type: 'broadcast',
+                        event: 'player_control',
+                        payload: updateFields
+                    });
+                }
+            } catch (bErr) {
+                // Tihi broadcast fallback
+            }
+
+            // Iz updateFields izdvajamo isključivo stvarne kolone tabele song_request
+            const validCols = {};
+            if (updateFields.enabled !== undefined) validCols.enabled = updateFields.enabled;
+            if (updateFields.request_role !== undefined) validCols.request_role = updateFields.request_role;
+            if (updateFields.cost_points !== undefined) validCols.cost_points = updateFields.cost_points;
+            if (updateFields.max_duration_seconds !== undefined) validCols.max_duration_seconds = updateFields.max_duration_seconds;
+            if (updateFields.queue !== undefined) validCols.queue = updateFields.queue;
+
+            if (Object.keys(validCols).length > 0) {
+                const { error } = await sbPanels
+                    .from('song_request')
+                    .upsert({
+                        channel_id: chatroomId,
+                        type: 'config',
+                        ...validCols,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'channel_id,type' });
+                if (error) throw error;
+            }
+        }
+    } catch (err) {
+        log('ERR', `Greška pri ažuriranju song request podešavanja za ${chatroomId}: ${err.message}`);
     }
 }
 
@@ -1250,7 +1317,7 @@ function postaviRealtimeSlusalac() {
                 (payload) => {
                     const chatroomId = payload?.new?.channel_id || payload?.old?.channel_id;
                     if (chatroomId) {
-                        // Debounce od 1.5 sekundi kako uzastopni autosave-ovi ne bi spamovali reload
+                        // Debounce od 3 sekunde kako uzastopni autosave-ovi ne bi spamovali reload
                         if (realtimeConfigDebounceTimers.has(chatroomId)) {
                             clearTimeout(realtimeConfigDebounceTimers.get(chatroomId));
                         }
@@ -1258,15 +1325,52 @@ function postaviRealtimeSlusalac() {
                             realtimeConfigDebounceTimers.delete(chatroomId);
                             log('INFO', `[REALTIME] Detektovana izmena u bot_config za chatroomId ${chatroomId}. Sinhronizujem u realnom vremenu...`);
                             await ucitajBotConfig(chatroomId);
-                        }, 1500);
+                        }, 3000);
                         if (timer && typeof timer.unref === 'function') timer.unref();
                         realtimeConfigDebounceTimers.set(chatroomId, timer);
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'song_request' },
+                (payload) => {
+                    const chatroomId = payload?.new?.channel_id || payload?.old?.channel_id;
+                    if (chatroomId) {
+                        const channelState = state.getChannelState(chatroomId);
+                        if (channelState) {
+                            if (payload.eventType === 'DELETE') {
+                                if (channelState.songrequest_settings) channelState.songrequest_settings.queue = [];
+                            } else if (payload.new) {
+                                if (!channelState.songrequest_settings) channelState.songrequest_settings = {};
+                                if (Array.isArray(payload.new.queue)) {
+                                    channelState.songrequest_settings.queue = payload.new.queue;
+                                }
+                                if (payload.new.enabled !== undefined) {
+                                    channelState.feature_songrequest = !!payload.new.enabled;
+                                }
+                                if (payload.new.max_duration_seconds !== undefined) {
+                                    channelState.songrequest_settings.max_duration_seconds = payload.new.max_duration_seconds;
+                                }
+                                if (payload.new.cost_points !== undefined) {
+                                    channelState.songrequest_settings.cost_points = payload.new.cost_points;
+                                    channelState.songrequest_settings.points_price = payload.new.cost_points;
+                                }
+                                if (payload.new.request_role !== undefined) {
+                                    channelState.songrequest_settings.request_role = payload.new.request_role;
+                                }
+                            }
+                        }
                     }
                 }
             )
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     log('INFO', '[REALTIME] Supabase Realtime CDC sinhronizacija aktivna za izmene bota u realnom vremenu.');
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    log('WARN', `[REALTIME] Supabase Realtime CDC konekcija prekinuta (status: ${status}). Supabase će automatski pokušati reko-nekciju.`);
+                } else if (status === 'CLOSED') {
+                    log('WARN', '[REALTIME] Supabase Realtime CDC kanal zatvoren.');
                 }
             });
     } catch (err) {
@@ -1279,6 +1383,7 @@ module.exports = {
     sbPanels,
     KORISTI_SUPABASE,
     sacuvajSongQueue,
+    azurirajSongRequestPodesavanja,
     ucitajLeaderboard,
     ucitajEkonomiju,
     sacuvajEkonomiju,

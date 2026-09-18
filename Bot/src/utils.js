@@ -311,6 +311,16 @@ function proveraKulauna(chatroomId, kljuc, username, customCooldownMs, onReadyCa
 }
 
 /**
+ * Poništava cooldown za komandu (npr. ako je komanda odbijena zbog neispravnog unosa ili balansa)
+ */
+function ponistiKulaun(chatroomId, kljuc, username) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState || !channelState.cooldowns) return;
+    const storageKey = getCooldownKey(kljuc, username);
+    delete channelState.cooldowns[storageKey];
+}
+
+/**
  * Prevođenje vremenskih uslova sa engleskog na srpski
  */
 function prevediVreme(opis) {
@@ -454,6 +464,7 @@ module.exports = {
     dobijTrenutniMesec,
     dobijTrenutniDan,
     proveraKulauna,
+    ponistiKulaun,
     prevediVreme,
     formatTemplateMessage,
     formatAlertMessage,

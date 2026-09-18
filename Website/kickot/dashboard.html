@@ -3193,10 +3193,14 @@
 <p class="panel-desc">Upravljajte muzičkim željama gledalaca u realnom vremenu i puštajte pesme sa
                 YouTube-a direktno u dashboardu.</p>
 </div>
-<div class="panel-header-toggle" style="display: flex; align-items: center; gap: 12px;">
-<button type="button" class="btn btn-sm btn-outline" onclick="openPopoutPlayer()" style="display: inline-flex; align-items: center; gap: 6px; border-color: rgba(255, 0, 51, 0.4); color: #fff; font-size: 0.8rem; padding: 6px 12px; border-radius: 8px;" title="Otvori u odvojenom mini prozoru koji nikada ne pauzira muziku dok si na Kick-u">
-<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-<span>Plutajući Plejer</span>
+<div class="panel-header-toggle" style="display: flex; align-items: center; gap: 10px;">
+<button type="button" class="btn btn-sm btn-outline" onclick="openNowPlayingWidgetModal()" style="display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-color: rgba(83, 252, 24, 0.4); color: #53FC18; font-size: 0.8rem; padding: 0 14px; height: 34px; line-height: 1; border-radius: 8px;" title="Kopiraj link OBS widgeta za strim">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display: block; flex-shrink: 0; margin-top: 1px;"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+<span style="display: inline-flex; align-items: center; line-height: 1;">OBS Widget</span>
+</button>
+<button type="button" class="btn btn-sm btn-outline" onclick="openPopoutPlayer()" style="display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-color: rgba(255, 0, 51, 0.4); color: #fff; font-size: 0.8rem; padding: 0 14px; height: 34px; line-height: 1; border-radius: 8px;" title="Otvori u odvojenom mini prozoru koji nikada ne pauzira muziku dok si na Kick-u">
+<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display: block; flex-shrink: 0; margin-top: 1px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+<span style="display: inline-flex; align-items: center; line-height: 1;">Plutajući Plejer</span>
 </button>
 <span class="panel-header-toggle__label">Song Request:</span>
 <label class="toggle-switch">
@@ -3232,7 +3236,7 @@
       </div>
 
       <!-- Progress Bar -->
-      <div class="sr-progress-container">
+      <div class="sr-progress-container" onclick="seekPlayer(event)">
         <div class="sr-progress-bar-wrap" onclick="seekPlayer(event)">
           <div class="sr-progress-fill" id="playerProgress"></div>
         </div>
@@ -3265,10 +3269,12 @@
 
       <!-- Volume Slider -->
       <div class="sr-volume-container">
-        <svg fill="none" height="16" stroke="var(--text-muted)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="16">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
-        </svg>
+        <button type="button" onclick="toggleMute()" title="Isključi / Uključi zvuk" style="background: none; border: none; cursor: pointer; padding: 0; display: flex; align-items: center; color: var(--text-muted);">
+          <svg id="volumeIcon" fill="none" height="16" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" viewbox="0 0 24 24" width="16">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        </button>
         <input class="sr-volume-slider" id="playerVolumeSlider" max="100" min="0" oninput="updateVolume(this.value)" type="range" value="50"/>
       </div>
     </div>
@@ -3349,14 +3355,18 @@
             <option value="moderator">Moderatori</option>
           </select>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;">
           <div class="config-field">
             <label class="config-label kx-195">Cena u poenima:</label>
             <input class="form-input" id="cfgSongRequestCost" min="0" onchange="saveSongRequestConfig(true)" oninput="debouncedAutoSaveConfig()" type="number" value="0"/>
           </div>
           <div class="config-field">
-            <label class="config-label kx-195">Maks. trajanje (sekundi):</label>
+            <label class="config-label kx-195">Maks. trajanje (sek):</label>
             <input class="form-input" id="cfgSongRequestMaxDuration" min="30" onchange="saveSongRequestConfig(true)" oninput="debouncedAutoSaveConfig()" type="number" value="360"/>
+          </div>
+          <div class="config-field">
+            <label class="config-label kx-195">Maks. po korisniku:</label>
+            <input class="form-input" id="cfgSongRequestMaxPerUser" min="1" max="50" onchange="saveSongRequestConfig(true)" oninput="debouncedAutoSaveConfig()" type="number" value="3" title="Maksimalan broj aktivnih pesama u redu čekanja po jednom gledaocu"/>
           </div>
         </div>
       </div>
@@ -6473,7 +6483,7 @@ Podesite novo stanje poena za gledaoca.
 <!-- YouTube Iframe API for Audio Player -->
 <script src="https://www.youtube.com/iframe_api"></script>
 <!-- Main Dashboard Core Script -->
-<script src="js/dashboard.js?v=20260916-v3"></script>
+<script src="js/dashboard.js?v=20260918-v8"></script>
 <!-- KickALL Data Layer & Analytics -->
 <script src="../js/data-layer.js?v=20260916-v3" defer></script>
 <script src="../js/route-tracking.js?v=20260916-v3" defer></script>

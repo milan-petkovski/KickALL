@@ -200,9 +200,33 @@ const defaultBuiltinRanks = {
     'queue': 'everyone',
     'songqueue': 'everyone',
     'redpesama': 'everyone',
-    'skip': 'moderator',
-    'skipsong': 'moderator',
-    'preskocipesmu': 'moderator',
+    'currentsong': 'everyone',
+    'np': 'everyone',
+    'mojapesma': 'everyone',
+    'mysong': 'everyone',
+    'kada': 'everyone',
+    'otkazi': 'everyone',
+    'cancelsong': 'everyone',
+    'cancelsr': 'everyone',
+    'skip': 'everyone',
+    'skipsong': 'everyone',
+    'preskocipesmu': 'everyone',
+    'clearqueue': 'moderator',
+    'ocistired': 'moderator',
+    'voteskip': 'everyone',
+    'vs': 'everyone',
+    'preskoci': 'everyone',
+    'songlink': 'everyone',
+    'yt': 'everyone',
+    'link': 'everyone',
+    'pesmalink': 'everyone',
+    'volume': 'moderator',
+    'zvuk': 'moderator',
+    'glasnoca': 'moderator',
+    'pause': 'moderator',
+    'pauza': 'moderator',
+    'resume': 'moderator',
+    'nastavi': 'moderator',
 
     // Moderacija
     'ban': 'moderator',
@@ -215,7 +239,7 @@ function getUserRankLevel(username, senderObj, channelUsername) {
     if (userKey === (channelUsername || '').toLowerCase() || (config.SUPER_ADMIN_USERNAME && userKey === config.SUPER_ADMIN_USERNAME)) return 5; // Streamer / Creator
 
     const identity = senderObj && senderObj.identity ? senderObj.identity : {};
-    const badges = identity.badges || [];
+    const badges = identity.badges || (Array.isArray(senderObj?.badges) ? senderObj.badges : (senderObj?.sender?.identity?.badges || []));
 
     if (badges.some(b => b.type === 'broadcaster')) return 5;
     if (badges.some(b => b.type === 'moderator')) return 4;
@@ -504,8 +528,17 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         else if (porukaNormalized.startsWith('!dajpoene ')) rest = porukaSredjena.slice(10).trim();
 
         const parts = rest ? rest.split(/\s+/).filter(Boolean) : [];
-        const arg1 = parts[0] || '';
-        const arg2 = parts[1] || '';
+        let arg1 = parts[0] || '';
+        let arg2 = parts[1] || '';
+        if (parts.length > 2) {
+            if (parts[0].startsWith('@')) {
+                arg1 = parts[0];
+                arg2 = parts.slice(1).join(' ');
+            } else if (parts[parts.length - 1].startsWith('@')) {
+                arg1 = parts.slice(0, -1).join(' ');
+                arg2 = parts[parts.length - 1];
+            }
+        }
         if (utils.proveraKulauna(chatroomId, '!give', username)) return;
         economy.handleGivePoints(chatroomId, username, arg1, arg2);
         return;
@@ -595,12 +628,19 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         else if (porukaNormalized.startsWith('!rullete')) rest = porukaSredjena.slice(8).trim();
         else rest = porukaSredjena.slice(6).trim();
         const parts = rest.split(/\s+/).filter(Boolean);
-        if (parts.length > 2) {
-            messenger.posaljiPoruku(chatroomId, `@${username} U ruletu biraš jednu opciju i ulog! Upotreba: !rulet <crvena/crna/par/nepar/0-36> <iznos> (npr. !rulet 0 5000 ili !rulet crvena 1000)`);
-            return;
-        }
         const opt = parts[0] || '';
-        const amount = parts[1] || '';
+        let amount = '';
+        if (parts.length > 2) {
+            const isRestNumber = parts.slice(1).every(p => /^[\d.,_]+$/.test(p) || /^\d+(\.\d+)?[km]?$/i.test(p));
+            if (isRestNumber) {
+                amount = parts.slice(1).join(' ');
+            } else {
+                messenger.posaljiPoruku(chatroomId, `@${username} U ruletu biraš jednu opciju i ulog! Upotreba: !rulet <crvena/crna/par/nepar/0-36> <iznos> (npr. !rulet 0 5000 ili !rulet crvena 1000)`);
+                return;
+            }
+        } else {
+            amount = parts[1] || '';
+        }
         if (utils.proveraKulauna(chatroomId, '!roulette', username, undefined, () => {
             gambling.handleRoulette(chatroomId, username, opt, amount);
         })) return;
@@ -623,9 +663,27 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         else if (porukaNormalized.startsWith('!gamble ')) rest = porukaSredjena.slice(8).trim();
         else rest = porukaSredjena.slice(8).trim();
 
-        const parts = rest.split(/\s+/);
-        const side = parts[0] || 'glava';
-        const amount = parts[1] || parts[0] || '';
+        const parts = rest.split(/\s+/).filter(Boolean);
+        let side = 'glava';
+        let amount = '';
+        if (parts.length > 2) {
+            const p0Lower = (parts[0] || '').toLowerCase();
+            const pLastLower = (parts[parts.length - 1] || '').toLowerCase();
+            const validSides = ['glava', 'pismo', 'heads', 'tails', 'head', 'tail', 'g', 'p', 'h', 't'];
+            if (validSides.includes(p0Lower)) {
+                side = parts[0];
+                amount = parts.slice(1).join(' ');
+            } else if (validSides.includes(pLastLower)) {
+                side = parts[parts.length - 1];
+                amount = parts.slice(0, -1).join(' ');
+            } else {
+                side = parts[0] || 'glava';
+                amount = parts.slice(1).join(' ');
+            }
+        } else {
+            side = parts[0] || 'glava';
+            amount = parts[1] || parts[0] || '';
+        }
         if (utils.proveraKulauna(chatroomId, '!coinflip', username, undefined, () => {
             gambling.handleCoinflip(chatroomId, username, side, amount);
         })) return;
@@ -702,8 +760,9 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         return;
     }
 
-    if (porukaNormalized.startsWith('!ruskirulet') || porukaNormalized.startsWith('!rr') || porukaNormalized.startsWith('!russianroulette')) {
+    if (porukaNormalized.startsWith('!ruskirulet') || porukaNormalized === '!rr' || porukaNormalized.startsWith('!rr ') || porukaNormalized.startsWith('!russianroulette')) {
         if (channelState.feature_games === false) return;
+        // !rr ne podrzava tagovanje (@user) - tiho ignorisemo argument
         if (utils.proveraKulauna(chatroomId, '!ruskirulet', username)) return;
         commands.handleRulet(chatroomId, username, senderObj);
         return;
@@ -761,9 +820,62 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         return;
     }
 
+    if (porukaNormalized === '!mojapesma' || porukaNormalized === '!mysong' || porukaNormalized === '!kada' || porukaNormalized === '!kadce') {
+        if (channelState.feature_songrequest === false) return;
+        if (utils.proveraKulauna(chatroomId, '!mojapesma', username)) return;
+        commands.handleMySong(chatroomId, username);
+        return;
+    }
+
+    if (porukaNormalized === '!otkazi' || porukaNormalized === '!cancelsong' || porukaNormalized === '!cancelsr' || porukaNormalized === '!removesong') {
+        if (channelState.feature_songrequest === false) return;
+        commands.handleCancelSong(chatroomId, username);
+        return;
+    }
+
+    if (porukaNormalized === '!clearqueue' || porukaNormalized === '!ocistired') {
+        if (channelState.feature_songrequest === false) return;
+        commands.handleClearQueue(chatroomId, username, senderObj);
+        return;
+    }
+
     if (porukaNormalized === '!skip' || porukaNormalized === '!skipsong' || porukaNormalized === '!preskocipesmu') {
         if (channelState.feature_songrequest === false) return;
         commands.handleSkipSong(chatroomId, username, senderObj);
+        return;
+    }
+
+    if (porukaNormalized === '!voteskip' || porukaNormalized === '!vs' || porukaNormalized === '!preskoci') {
+        if (channelState.feature_songrequest === false) return;
+        commands.handleVoteSkip(chatroomId, username);
+        return;
+    }
+
+    if (porukaNormalized === '!songlink' || porukaNormalized === '!yt' || porukaNormalized === '!link' || porukaNormalized === '!pesmalink') {
+        if (channelState.feature_songrequest === false) return;
+        commands.handleSongLink(chatroomId, username);
+        return;
+    }
+
+    if (porukaNormalized === '!volume' || porukaNormalized.startsWith('!volume ') ||
+        porukaNormalized === '!zvuk' || porukaNormalized.startsWith('!zvuk ') ||
+        porukaNormalized === '!glasnoca' || porukaNormalized.startsWith('!glasnoca ')) {
+        if (channelState.feature_songrequest === false) return;
+        const volParts = porukaSredjena.trim().split(/\s+/);
+        const volArg = volParts.length > 1 ? volParts[1] : '';
+        commands.handleSetVolume(chatroomId, username, volArg, senderObj);
+        return;
+    }
+
+    if (porukaNormalized === '!pause' || porukaNormalized === '!pauza') {
+        if (channelState.feature_songrequest === false) return;
+        commands.handleTogglePause(chatroomId, username, 'pause', senderObj);
+        return;
+    }
+
+    if (porukaNormalized === '!resume' || porukaNormalized === '!nastavi' || porukaNormalized === '!play') {
+        if (channelState.feature_songrequest === false) return;
+        commands.handleTogglePause(chatroomId, username, 'resume', senderObj);
         return;
     }
 
@@ -785,7 +897,7 @@ async function obradiKomandu({ chatroomId, username, porukaSredjena, porukaLower
         return;
     }
 
-    if (porukaNormalized.startsWith('!love')) {
+    if (porukaNormalized === '!love' || porukaNormalized.startsWith('!love ')) {
         if (channelState.feature_love === false) return;
         const args = porukaSredjena.slice(5).trim();
         if (utils.proveraKulauna(chatroomId, '!love', username)) return;

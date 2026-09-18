@@ -56,10 +56,20 @@ function spamFilter(chatroomId, username, poruka, senderObj = null) {
         if (!channelState.bannedUsers) channelState.bannedUsers = new Set();
         channelState.bannedUsers.add(userKey);
         const userId = senderObj?.id || senderObj?.user_id || null;
-        banujKorisnika(chatroomId, username, 'Nedozvoljen bot / promo spam', userId);
-        posaljiPoruku(chatroomId, `[MOD] @${username} je trajno banovan (Zabranjen bot / spam reklama).`);
+        banujKorisnika(chatroomId, username, 'Nedozvoljen bot / promo spam', userId).then((ok) => {
+            if (ok) {
+                posaljiPoruku(chatroomId, `[MOD] @${username} je trajno banovan.`);
+            }
+        }).catch(() => {});
         return true;
     }
+
+    // Moderatori i strimer su izuzeti iz filtera za identične poruke i brzo kucanje
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || (Array.isArray(senderObj?.badges) ? senderObj.badges : []);
+    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') ||
+                  userKey === (channelState.channelUsername || '').toLowerCase();
+    if (isMod) return false;
     
     // ── 1. Provera identičnih poruka ──────────────────────────────────────────
     // Komande (poruke koje počinju sa prefiksom kanala ili '!') ne podležu proveri identičnih poruka

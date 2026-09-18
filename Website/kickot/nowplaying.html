@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Kickot • OBS Now Playing Widget</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/config.js?v=20260916-v3"></script>
+  <script src="js/config.js?v=20260916-v3"></script>
+  <style>
+    :root {
+      --widget-bg: rgba(13, 17, 23, 0.88);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #FF0033;
+      --accent-glow: rgba(255, 0, 51, 0.4);
+      --kick-green: #53FC18;
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background: transparent;
+      color: var(--text);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100vh;
+      width: 100vw;
+      padding: 16px;
+    }
+
+    .now-playing-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--widget-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), 0 0 20px rgba(255, 0, 51, 0.12);
+      max-width: 480px;
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(14px) scale(0.98);
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .now-playing-card.active {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .cover-wrap {
+      width: 60px;
+      height: 60px;
+      border-radius: 8px;
+      overflow: hidden;
+      flex-shrink: 0;
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #111;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .cover-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .info-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .source-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #fff;
+      background: var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    .equalizer-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2.5px;
+      height: 12px;
+    }
+
+    .eq-bar {
+      width: 2.5px;
+      background: var(--kick-green);
+      border-radius: 1px;
+      animation: bounce 0.8s ease-in-out infinite alternate;
+    }
+
+    .eq-bar:nth-child(1) { height: 4px; animation-delay: 0.1s; }
+    .eq-bar:nth-child(2) { height: 10px; animation-delay: 0.3s; }
+    .eq-bar:nth-child(3) { height: 6px; animation-delay: 0.2s; }
+    .eq-bar:nth-child(4) { height: 12px; animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0% { height: 3px; }
+      100% { height: 12px; }
+    }
+
+    .track-title {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.25;
+    }
+
+    .track-artist {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .requester-tag {
+      font-size: 0.68rem;
+      color: var(--kick-green);
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .progress-bar-container {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+      transition: width 0.4s linear;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="now-playing-card" id="card">
+    <div class="cover-wrap">
+      <img id="coverImg" class="cover-img" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80" alt="Cover" />
+    </div>
+
+    <div class="info-wrap">
+      <div class="header-row">
+        <span class="source-tag">Kickot Music</span>
+        <div class="equalizer-bars">
+          <div class="eq-bar"></div>
+          <div class="eq-bar"></div>
+          <div class="eq-bar"></div>
+          <div class="eq-bar"></div>
+        </div>
+      </div>
+
+      <div class="track-title" id="trackTitle">Pesma</div>
+      <div class="track-artist" id="trackArtist">Izvođač</div>
+      <div class="requester-tag" id="trackRequester">Zatražio: @Gledalac</div>
+    </div>
+
+    <div class="progress-bar-container">
+      <div class="progress-bar-fill" id="progressBar"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const urlParams = new URLSearchParams(window.location.search);
+      const channelId = urlParams.get('channel') || '';
+
+      const sbUrl = (window.CONFIG && window.CONFIG.SUPABASE && window.CONFIG.SUPABASE.URL) || 'https://rcukparptzzyssqdmydt.supabase.co';
+      const sbKey = (window.CONFIG && window.CONFIG.SUPABASE && window.CONFIG.SUPABASE.ANON_KEY) || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjdWtwYXJwdHp6eXNzcWRteWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzc3NzEsImV4cCI6MjA5OTA1Mzc3MX0.5FLpFchORq6h5O0q5HWWYBiRD6qCPZKGjx3Zo4UhlJc';
+      const sbClient = window.supabase ? window.supabase.createClient(sbUrl, sbKey) : null;
+
+      const card = document.getElementById('card');
+      const coverImg = document.getElementById('coverImg');
+      const trackTitle = document.getElementById('trackTitle');
+      const trackArtist = document.getElementById('trackArtist');
+      const trackRequester = document.getElementById('trackRequester');
+      const progressBar = document.getElementById('progressBar');
+
+      let currentSong = null;
+      let songStartTime = Date.now();
+      let songDuration = 210;
+      let progressInterval = null;
+
+      function renderSong(song) {
+        if (!song) {
+          // Ako je otvoren preview parametar u tabu, prikaži standby demo
+          const isPreview = urlParams.get('preview') === '1' || urlParams.get('preview') === 'true' || !channelId;
+          if (isPreview) {
+            card.classList.add('active');
+            trackTitle.textContent = 'Kickot Song Request';
+            trackArtist.textContent = 'Čekanje pesme iz četa...';
+            trackArtist.style.display = 'block';
+            trackRequester.textContent = 'Zatražite: !pesma <naziv>';
+            coverImg.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
+            progressBar.style.width = '35%';
+            return;
+          }
+
+          card.classList.remove('active');
+          currentSong = null;
+          if (progressInterval) clearInterval(progressInterval);
+          return;
+        }
+
+        const isNew = !currentSong || (currentSong.ytId !== song.ytId && currentSong.id !== song.id);
+        currentSong = song;
+
+        trackTitle.textContent = song.title || 'Pesma';
+        trackArtist.textContent = song.artist && song.artist !== 'YouTube' ? song.artist : '';
+        trackArtist.style.display = trackArtist.textContent ? 'block' : 'none';
+        trackRequester.textContent = `Zatražio: @${song.requester || 'Gledalac'}`;
+
+        if (song.coverUrl) {
+          coverImg.src = song.coverUrl;
+        } else if (song.ytId) {
+          coverImg.src = `https://img.youtube.com/vi/${song.ytId}/hqdefault.jpg`;
+        } else {
+          coverImg.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&auto=format&fit=crop&q=80';
+        }
+
+        songDuration = song.duration || 210;
+        if (isNew) {
+          songStartTime = Date.now();
+        }
+
+        card.classList.add('active');
+
+        if (progressInterval) clearInterval(progressInterval);
+        progressInterval = setInterval(() => {
+          const elapsed = (Date.now() - songStartTime) / 1000;
+          const pct = Math.min(100, Math.max(0, (elapsed / songDuration) * 100));
+          progressBar.style.width = `${pct}%`;
+        }, 1000);
+      }
+
+      if (sbClient && channelId) {
+        // Inicijalno učitavanje
+        sbClient.from('song_request')
+          .select('queue')
+          .eq('channel_id', channelId)
+          .eq('type', 'config')
+          .maybeSingle()
+          .then(({ data, error }) => {
+            if (!error && data && Array.isArray(data.queue) && data.queue.length > 0) {
+              renderSong(data.queue[0]);
+            } else {
+              renderSong(null);
+            }
+          }).catch(() => {
+            renderSong(null);
+          });
+
+        // Realtime pretplata na izmene
+        sbClient.channel(`obs_np_${channelId}`)
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'song_request',
+            filter: `channel_id=eq.${channelId}`
+          }, payload => {
+            if (payload.new && Array.isArray(payload.new.queue)) {
+              if (payload.new.queue.length > 0) {
+                renderSong(payload.new.queue[0]);
+              } else {
+                renderSong(null);
+              }
+            }
+          })
+          .subscribe();
+      } else {
+        renderSong(null);
+      }
+    })();
+  </script>
+</body>
+</html>

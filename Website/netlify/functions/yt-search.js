@@ -62,6 +62,19 @@ exports.handler = async function (event, _context) {
   }
 
   try {
+    async function checkEmbedStatus(id) {
+      if (!id) return { ok: false, status: 400, data: null };
+      try {
+        const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`, {
+          signal: AbortSignal.timeout(2000)
+        });
+        const data = res.ok ? await res.json() : null;
+        return { ok: res.ok, status: res.status, data };
+      } catch (_) {
+        return { ok: false, status: 500, data: null };
+      }
+    }
+
     let directVideoId = null;
     const directMatch = query.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/) ||
                         (query.length === 11 && /^[\w-]{11}$/.test(query) ? [null, query] : null);
@@ -69,10 +82,60 @@ exports.handler = async function (event, _context) {
       directVideoId = directMatch[1];
     }
 
-    const searchUrl = directVideoId
-      ? `https://www.youtube.com/watch?v=${directVideoId}`
-      : `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+    let searchQuery = query;
 
+    if (directVideoId) {
+      const directCheck = await checkEmbedStatus(directVideoId);
+      if (directCheck.ok) {
+        let duration = 0;
+        try {
+          const wRes = await fetch(`https://www.youtube.com/watch?v=${directVideoId}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(3000)
+          });
+          if (wRes.ok) {
+            const wHtml = await wRes.text();
+            const wApprox = wHtml.match(/"approxDurationMs":"(\d+)"/);
+            if (wApprox && wApprox[1]) {
+              duration = Math.round(parseInt(wApprox[1], 10) / 1000);
+            } else {
+              const wSec = wHtml.match(/"lengthSeconds":"(\d+)"/);
+              if (wSec && wSec[1]) duration = parseInt(wSec[1], 10);
+            }
+          }
+        } catch (_) {}
+
+        return {
+          statusCode: 200,
+          headers: {
+            ...corsHeaders,
+            'Access-Control-Allow-Headers': 'Content-Type'
+          },
+          body: JSON.stringify({
+            videoId: directVideoId,
+            title: directCheck.data ? directCheck.data.title : query,
+            uploader: directCheck.data ? directCheck.data.author_name : 'YouTube',
+            coverUrl: `https://img.youtube.com/vi/${directVideoId}/hqdefault.jpg`,
+            duration: (duration && !isNaN(duration)) ? duration : 0
+          })
+        };
+      } else {
+        // Direct video has embedding disabled (401) or is inaccessible
+        try {
+          const wRes = await fetch(`https://www.youtube.com/watch?v=${directVideoId}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            signal: AbortSignal.timeout(3000)
+          });
+          if (wRes.ok) {
+            const wHtml = await wRes.text();
+            const tMatch = wHtml.match(/<title>(.*?)(?:\s*-\s*YouTube)?<\/title>/);
+            if (tMatch && tMatch[1]) searchQuery = tMatch[1].trim();
+          }
+        } catch (_) {}
+      }
+    }
+
+    const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
     const response = await fetch(searchUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -86,16 +149,17 @@ exports.handler = async function (event, _context) {
 
     const html = await response.text();
 
-    // Extract videoId using multiple robust patterns
-    let videoId = directVideoId;
-    if (!videoId) {
-      const videoIdMatch = html.match(/"videoId":"([\w-]{11})"/) || html.match(/\/watch\?v=([\w-]{11})/);
-      if (videoIdMatch && videoIdMatch[1]) {
-        videoId = videoIdMatch[1];
+    // Extract all candidate video IDs
+    const idRegex = /"videoId":"([\w-]{11})"/g;
+    const candidates = [];
+    let m;
+    while ((m = idRegex.exec(html)) !== null) {
+      if (!candidates.includes(m[1]) && m[1] !== 'dQw4w9WgXcQ' && m[1] !== directVideoId) {
+        candidates.push(m[1]);
       }
     }
 
-    if (!videoId) {
+    if (candidates.length === 0) {
       return {
         statusCode: 404,
         headers: corsHeaders,
@@ -103,54 +167,43 @@ exports.handler = async function (event, _context) {
       };
     }
 
-    // Attempt to extract title with multiple fallback patterns
-    let title = null;
-    const titleMatch = html.match(/"title":\s*\{\s*"runs":\s*\[\s*\{\s*"text":\s*"([^"]+)"/) ||
-                       html.match(/"title":\s*\{\s*"simpleText":\s*"([^"]+)"/) ||
-                       html.match(/<meta name="title" content="([^"]+)">/);
-    if (titleMatch && titleMatch[1]) {
-      title = titleMatch[1];
-    }
-    if (!title || title.trim() === '') {
-      const pageTitleMatch = html.match(/<title>(.*?) - YouTube<\/title>/);
-      title = (pageTitleMatch && pageTitleMatch[1]) ? pageTitleMatch[1] : (query || 'YouTube Video');
-    }
+    let selectedId = null;
+    let selectedTitle = '';
+    let selectedUploader = 'YouTube';
+    let selectedDuration = 0;
 
-    // Attempt to extract uploader / channel with multiple fallback patterns
-    let uploader = 'YouTube';
-    const uploaderMatch = html.match(/"ownerText":\s*\{\s*"runs":\s*\[\s*\{\s*"text":\s*"([^"]+)"/) ||
-                          html.match(/"longBylineText":\s*\{\s*"runs":\s*\[\s*\{\s*"text":\s*"([^"]+)"/) ||
-                          html.match(/"shortBylineText":\s*\{\s*"runs":\s*\[\s*\{\s*"text":\s*"([^"]+)"/);
-    if (uploaderMatch && uploaderMatch[1]) {
-      uploader = uploaderMatch[1];
-    }
+    // Check candidate videos for embed permission via oEmbed (prevents Error 150)
+    for (const candId of candidates.slice(0, 7)) {
+      const chk = await checkEmbedStatus(candId);
+      if (chk.ok) {
+        selectedId = candId;
+        selectedTitle = chk.data?.title || '';
+        selectedUploader = chk.data?.author_name || 'YouTube';
 
-    // Attempt to extract duration in seconds
-    let duration = 0;
-    const approxDurMatch = html.match(/"approxDurationMs":"(\d+)"/);
-    if (approxDurMatch && approxDurMatch[1]) {
-      duration = Math.round(parseInt(approxDurMatch[1], 10) / 1000);
-    }
-    if (!duration || isNaN(duration)) {
-      const lengthSecMatch = html.match(/"lengthSeconds":"(\d+)"/);
-      if (lengthSecMatch && lengthSecMatch[1]) {
-        duration = parseInt(lengthSecMatch[1], 10);
-      }
-    }
-    if (!duration || isNaN(duration)) {
-      const lengthTextMatch = html.match(/"lengthText":\s*\{\s*"accessibility":\s*\{[^}]*\}\s*,\s*"simpleText":\s*"([^"]+)"\}/) ||
-                              html.match(/"lengthText":\s*\{\s*"simpleText":\s*"([^"]+)"\}/);
-      if (lengthTextMatch && lengthTextMatch[1]) {
-        const parts = lengthTextMatch[1].split(':').map(p => parseInt(p, 10));
-        if (parts.length === 2) duration = parts[0] * 60 + parts[1];
-        else if (parts.length === 3) duration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+        // Extract duration from the search HTML chunk near this candidate
+        const pos = html.indexOf(candId);
+        if (pos !== -1) {
+          const chunk = html.substring(pos, pos + 3000);
+          const durMatch = chunk.match(/"lengthText":\{.*?"simpleText":"(\d+:\d+(?::\d+)?)"\}/s);
+          if (durMatch && durMatch[1]) {
+            const parts = durMatch[1].split(':').map(p => parseInt(p, 10));
+            if (parts.length === 2) selectedDuration = parts[0] * 60 + parts[1];
+            else if (parts.length === 3) selectedDuration = parts[0] * 3600 + parts[1] * 60 + parts[2];
+          }
+        }
+        break;
       }
     }
 
-    // Secondary fetch on watch page if duration was not found on search results
-    if ((!duration || duration === 0) && videoId) {
+    // Fallback if none in top candidates passed oEmbed
+    if (!selectedId) {
+      selectedId = candidates[0];
+    }
+
+    // If title or duration still missing, fetch watch page
+    if ((!selectedDuration || selectedDuration === 0 || !selectedTitle) && selectedId) {
       try {
-        const watchRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+        const watchRes = await fetch(`https://www.youtube.com/watch?v=${selectedId}`, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept-Language': 'en-US,en;q=0.9'
@@ -159,17 +212,27 @@ exports.handler = async function (event, _context) {
         });
         if (watchRes.ok) {
           const watchHtml = await watchRes.text();
-          const wApprox = watchHtml.match(/"approxDurationMs":"(\d+)"/);
-          if (wApprox && wApprox[1]) {
-            duration = Math.round(parseInt(wApprox[1], 10) / 1000);
-          } else {
-            const wSec = watchHtml.match(/"lengthSeconds":"(\d+)"/);
-            if (wSec && wSec[1]) {
-              duration = parseInt(wSec[1], 10);
+          if (!selectedDuration || selectedDuration === 0) {
+            const wApprox = watchHtml.match(/"approxDurationMs":"(\d+)"/);
+            if (wApprox && wApprox[1]) {
+              selectedDuration = Math.round(parseInt(wApprox[1], 10) / 1000);
+            } else {
+              const wSec = watchHtml.match(/"lengthSeconds":"(\d+)"/);
+              if (wSec && wSec[1]) {
+                selectedDuration = parseInt(wSec[1], 10);
+              }
             }
+          }
+          if (!selectedTitle) {
+            const pageTitleMatch = watchHtml.match(/<title>(.*?)(?:\s*-\s*YouTube)?<\/title>/);
+            if (pageTitleMatch && pageTitleMatch[1]) selectedTitle = pageTitleMatch[1].trim();
           }
         }
       } catch (_) { }
+    }
+
+    if (!selectedTitle) {
+      selectedTitle = searchQuery || 'YouTube Track';
     }
 
     return {
@@ -179,11 +242,11 @@ exports.handler = async function (event, _context) {
         'Access-Control-Allow-Headers': 'Content-Type'
       },
       body: JSON.stringify({
-        videoId: videoId,
-        title: title,
-        uploader: uploader,
-        coverUrl: `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
-        duration: (duration && !isNaN(duration)) ? duration : 0
+        videoId: selectedId,
+        title: selectedTitle,
+        uploader: selectedUploader,
+        coverUrl: `https://img.youtube.com/vi/${selectedId}/hqdefault.jpg`,
+        duration: (selectedDuration && !isNaN(selectedDuration)) ? selectedDuration : 0
       })
     };
   } catch (error) {

@@ -246,17 +246,56 @@ body.has-scrolled .header {
     contain: layout style;
 }
 
-@media (min-width: 969px) {
+@media (min-width: 992px) {
     .hero-section {
-        height: 100vh;
-        height: 100dvh;
+        min-height: 100vh;
+        min-height: 100dvh;
+        height: auto;
+    }
+}
+
+@media (min-width: 992px) and (max-height: 760px) {
+    .hero-section {
+        padding: 70px 0 20px 0;
+    }
+    .hero-title {
+        font-size: clamp(2rem, 3.2vw, 2.7rem) !important;
+        margin-bottom: 12px !important;
+    }
+    .hero-description {
+        font-size: 0.95rem !important;
+        margin-bottom: 18px !important;
+        line-height: 1.5 !important;
+    }
+    .hero-actions {
+        margin-bottom: 8px;
+    }
+    .hero-note {
+        margin-top: 10px !important;
+    }
+    .hero-trust-stack {
+        margin-top: 12px !important;
+        padding-top: 10px !important;
+    }
+    .hero-glass-card {
+        padding: 18px 20px !important;
+    }
+    .telemetry-metric {
+        padding: 12px !important;
+        margin-bottom: 12px !important;
+    }
+    .metric-num-glow {
+        font-size: 1.9rem !important;
+    }
+    .telemetry-grid {
+        margin-bottom: 12px !important;
     }
 }
 
 .hero-container {
     display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
-    gap: 44px;
+    grid-template-columns: 1.12fr 0.88fr;
+    gap: clamp(24px, 3vw, 44px);
     align-items: center;
     position: relative;
     z-index: 1;
@@ -1793,7 +1832,7 @@ body.has-scrolled .header {
    14. RESPONSIVE OPTIMIZATIONS
    ═════════════════════════════════════════════ */
 
-@media (max-width: 1024px) {
+@media (max-width: 991px) {
     .features-grid { grid-template-columns: repeat(2, 1fr); }
     .stats-bar-grid { grid-template-columns: repeat(2, 1fr); }
     .performanse-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1802,7 +1841,101 @@ body.has-scrolled .header {
     .testimonials-grid { grid-template-columns: 1fr; max-width: 500px; margin: 0 auto; }
 }
 
-@media (max-width: 968px) {
+/* Laptops & Medium Screens (992px - 1240px) */
+@media (min-width: 992px) and (max-width: 1240px) {
+    .hero-container {
+        grid-template-columns: 1.12fr 0.88fr !important;
+        gap: clamp(20px, 2.5vw, 36px) !important;
+    }
+    .hero-content {
+        max-width: 100% !important;
+        text-align: left !important;
+    }
+    .hero-title {
+        font-size: clamp(2.2rem, 3.2vw, 3.2rem) !important;
+        line-height: 1.12 !important;
+        margin-bottom: 16px !important;
+    }
+    .hero-description {
+        font-size: clamp(0.95rem, 1.1vw, 1.08rem) !important;
+        line-height: 1.55 !important;
+        margin-bottom: 22px !important;
+    }
+    .hero-actions {
+        justify-content: flex-start !important;
+    }
+    .hero-trust-stack {
+        justify-content: flex-start !important;
+    }
+    .hero-visual {
+        display: block !important;
+        width: 100% !important;
+        max-width: 480px !important;
+    }
+    .hero-glass-card {
+        padding: 20px 22px !important;
+    }
+    .telemetry-metric {
+        padding: 14px !important;
+        margin-bottom: 14px !important;
+    }
+    .metric-num-glow {
+        font-size: clamp(1.8rem, 2.5vw, 2.25rem) !important;
+    }
+}
+
+/* Tablets (768px - 991px) */
+@media (min-width: 768px) and (max-width: 991px) {
+    .hero-section {
+        min-height: auto;
+        padding: 105px 20px 50px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        overflow: visible;
+    }
+    .hero-container {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        max-width: 640px;
+        margin: 0 auto;
+        gap: 28px;
+        text-align: center;
+    }
+    .hero-content {
+        max-width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        margin: 0 auto;
+        text-align: center;
+    }
+    .hero-actions { 
+        justify-content: center; 
+        width: 100%;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+    .hero-trust-stack { justify-content: center; }
+    .hero-visual {
+        display: block !important;
+        width: 100%;
+        max-width: 480px;
+        margin: 0 auto;
+    }
+    .kickbot-grid { grid-template-columns: 1fr; }
+    .support-container { grid-template-columns: 1fr; }
+    .footer-container { grid-template-columns: 1fr; gap: 36px; }
+}
+
+/* Mobile (<= 767px) */
+@media (max-width: 767px) {
     .hero-section {
         height: 100vh;
         height: 100dvh;
@@ -1816,8 +1949,8 @@ body.has-scrolled .header {
         overflow: hidden;
     }
     .hero-container {
-        display: flex;
-        flex-direction: column;
+        display: flex !important;
+        flex-direction: column !important;
         justify-content: center;
         align-items: center;
         width: 100%;

@@ -210,7 +210,7 @@ const PLAN_LIMITS = {
     badgeClass: 'plan-badge-free',
     maxCustomCommands: 50,
     maxAutoAnnounces: 5,
-    maxSongQueue: 5,
+    maxSongQueue: 25,
     maxLeaderboardItems: 20,
     maxLoveMarriages: 50, // 50 parova = 100 ljudi
     customBotAllowed: false,
@@ -2066,12 +2066,40 @@ function setupRealtimeSongQueueSubscription(channelId) {
 
   // Pretplata na bazu u realnom vremenu (Realtime na song_request)
   activeConfigSubscription = sb.channel(`song_request_realtime_${channelId}`)
+    .on('broadcast', { event: 'player_control' }, payload => {
+      if (payload && payload.payload) {
+        if (payload.payload.volume !== undefined && typeof updateVolume === 'function') {
+          const v = parseInt(payload.payload.volume, 10);
+          if (!isNaN(v) && v !== playerVolume) updateVolume(v);
+        }
+        if (payload.payload.playback_state) {
+          if (payload.payload.playback_state === 'paused' && isPlaying && typeof togglePlayback === 'function') {
+            togglePlayback();
+          } else if (payload.payload.playback_state === 'playing' && !isPlaying && typeof togglePlayback === 'function') {
+            togglePlayback();
+          }
+        }
+      }
+    })
     .on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'song_request',
       filter: `channel_id=eq.${channelId}`
     }, payload => {
+      if (payload.new) {
+        if (payload.new.volume !== undefined && typeof updateVolume === 'function') {
+          const v = parseInt(payload.new.volume, 10);
+          if (!isNaN(v) && v !== playerVolume) updateVolume(v);
+        }
+        if (payload.new.playback_state) {
+          if (payload.new.playback_state === 'paused' && isPlaying && typeof togglePlayback === 'function') {
+            togglePlayback();
+          } else if (payload.new.playback_state === 'playing' && !isPlaying && typeof togglePlayback === 'function') {
+            togglePlayback();
+          }
+        }
+      }
       if (payload.new && Array.isArray(payload.new.queue)) {
         if (typeof syncSongQueueFromRemote === 'function') {
           syncSongQueueFromRemote(payload.new.queue);
@@ -4816,6 +4844,10 @@ async function loadBotConfig() {
           if (document.getElementById('cfgSongRequestRank')) document.getElementById('cfgSongRequestRank').value = srData.request_role || 'everyone';
           if (document.getElementById('cfgSongRequestCost')) document.getElementById('cfgSongRequestCost').value = srData.cost_points ?? 0;
           if (document.getElementById('cfgSongRequestMaxDuration')) document.getElementById('cfgSongRequestMaxDuration').value = srData.max_duration_seconds ?? 360;
+          if (document.getElementById('cfgSongRequestMaxPerUser')) {
+            const savedMax = localStorage.getItem(`sr_max_per_user_${activeChannel.id}`);
+            document.getElementById('cfgSongRequestMaxPerUser').value = savedMax ? parseInt(savedMax, 10) : (srData.max_songs_per_user ?? 3);
+          }
 
           if (Array.isArray(srData.queue)) {
             if (typeof syncSongQueueFromRemote === 'function') {
@@ -9084,54 +9116,73 @@ function handleFeedbackFormSubmit(event) {
 let localSongQueue = [];
 let currentSongIndex = 0;
 let isPlaying = false;
+let userPausedManually = false;
 let playbackInterval = null;
 let currentTimeSeconds = 0;
-let playerVolume = 80;
+let playerVolume = (function () {
+  try {
+    const saved = localStorage.getItem('kickot_sr_volume');
+    if (saved !== null) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed > 0 && parsed <= 100) return parsed;
+    }
+  } catch (_) { }
+  return 80;
+})();
 
 let ytPlayer = null;
 let isYtReady = false;
 let pendingPlay = false;
 let autoplayUnlockerAttached = false;
 let currentPlayingYtId = null;
+let isSeekingLockUntil = 0;
 
 let audioWakeCtx = null;
 let audioWakeNode = null;
 let silentAudioEl = null;
+let userHasInteracted = false;
 
-function ensureAudioPipelineActive() {
-  try {
-    // 1. Looping silent HTML5 Audio element
-    if (!silentAudioEl) {
-      silentAudioEl = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-      silentAudioEl.loop = true;
-      silentAudioEl.volume = 0.001;
-    }
-    if (silentAudioEl.paused) {
-      silentAudioEl.play().catch(() => { });
-    }
+function ensureAudioPipelineActive(isUserGesture = false) {
+  if (isUserGesture) {
+    userHasInteracted = true;
+  }
+  const canActivateAudio = userHasInteracted || (typeof navigator !== 'undefined' && navigator.userActivation && navigator.userActivation.hasBeenActive);
 
-    // 2. Continuous silent Web Audio node
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!audioWakeCtx && AudioContextClass) {
-      audioWakeCtx = new AudioContextClass();
-    }
-    if (audioWakeCtx) {
-      if (audioWakeCtx.state === 'suspended') {
-        audioWakeCtx.resume().catch(() => { });
+  if (canActivateAudio) {
+    try {
+      // 1. Looping silent HTML5 Audio element
+      if (!silentAudioEl) {
+        silentAudioEl = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+        silentAudioEl.loop = true;
+        silentAudioEl.volume = 0.001;
       }
-      if (audioWakeCtx.state === 'running' && !audioWakeNode) {
-        const buffer = audioWakeCtx.createBuffer(1, audioWakeCtx.sampleRate * 2, audioWakeCtx.sampleRate);
-        audioWakeNode = audioWakeCtx.createBufferSource();
-        audioWakeNode.buffer = buffer;
-        audioWakeNode.loop = true;
-        const gain = audioWakeCtx.createGain();
-        gain.gain.value = 0.00001;
-        audioWakeNode.connect(gain);
-        gain.connect(audioWakeCtx.destination);
-        audioWakeNode.start();
+      if (silentAudioEl.paused) {
+        silentAudioEl.play().catch(() => { });
       }
-    }
-  } catch (_) { }
+
+      // 2. Continuous silent Web Audio node
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!audioWakeCtx && AudioContextClass) {
+        audioWakeCtx = new AudioContextClass();
+      }
+      if (audioWakeCtx) {
+        if (audioWakeCtx.state === 'suspended' && (isUserGesture || (navigator.userActivation && navigator.userActivation.isActive))) {
+          audioWakeCtx.resume().catch(() => { });
+        }
+        if (audioWakeCtx.state === 'running' && !audioWakeNode) {
+          const buffer = audioWakeCtx.createBuffer(1, audioWakeCtx.sampleRate * 2, audioWakeCtx.sampleRate);
+          audioWakeNode = audioWakeCtx.createBufferSource();
+          audioWakeNode.buffer = buffer;
+          audioWakeNode.loop = true;
+          const gain = audioWakeCtx.createGain();
+          gain.gain.value = 0.00001;
+          audioWakeNode.connect(gain);
+          gain.connect(audioWakeCtx.destination);
+          audioWakeNode.start();
+        }
+      }
+    } catch (_) { }
+  }
 
   if (isPlaying && ytPlayer && typeof ytPlayer.playVideo === 'function') {
     try {
@@ -9147,46 +9198,69 @@ function ensureAudioPipelineActive() {
 
 const keepAudioAwake = ensureAudioPipelineActive;
 
-window.addEventListener('click', ensureAudioPipelineActive, { passive: true });
-window.addEventListener('keydown', ensureAudioPipelineActive, { passive: true });
-window.addEventListener('touchstart', ensureAudioPipelineActive, { passive: true });
-window.addEventListener('pointerdown', ensureAudioPipelineActive, { passive: true });
-
-document.addEventListener('visibilitychange', () => {
-  ensureAudioPipelineActive();
-  if (!document.hidden && isPlaying && ytPlayer) {
+function onGlobalAudioInteraction() {
+  ensureAudioPipelineActive(true);
+  if (ytPlayer) {
     try {
       if (ytPlayer.unMute) ytPlayer.unMute();
       if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
-      const st = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
-      if (st !== 1 && st !== 3 && ytPlayer.playVideo) {
-        ytPlayer.playVideo();
+      if (localSongQueue.length > 0 && !userPausedManually) {
+        const st = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+        if (st !== 1 && st !== 3 && ytPlayer.playVideo) {
+          ytPlayer.playVideo();
+          isPlaying = true;
+          startTimer();
+          updatePlayerUI();
+        }
+      }
+    } catch (_) { }
+  }
+}
+
+window.addEventListener('click', onGlobalAudioInteraction, { passive: true });
+window.addEventListener('keydown', onGlobalAudioInteraction, { passive: true });
+window.addEventListener('touchstart', onGlobalAudioInteraction, { passive: true });
+window.addEventListener('pointerdown', onGlobalAudioInteraction, { passive: true });
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    ensureAudioPipelineActive();
+    if (ytPlayer) {
+      try {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+        if (localSongQueue.length > 0 && !userPausedManually) {
+          const st = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+          if (st !== 1 && st !== 3 && ytPlayer.playVideo) {
+            ytPlayer.playVideo();
+            isPlaying = true;
+            startTimer();
+            updatePlayerUI();
+          }
+        }
+      } catch (_) { }
+    }
+  }
+});
+
+window.addEventListener('focus', () => {
+  ensureAudioPipelineActive();
+  if (ytPlayer) {
+    try {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+      if (localSongQueue.length > 0 && !userPausedManually) {
+        const st = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+        if (st !== 1 && st !== 3 && ytPlayer.playVideo) {
+          ytPlayer.playVideo();
+          isPlaying = true;
+          startTimer();
+          updatePlayerUI();
+        }
       }
     } catch (_) { }
   }
 });
-
-function attachAutoplayUnlocker() {
-  if (autoplayUnlockerAttached) return;
-  autoplayUnlockerAttached = true;
-  const unlock = () => {
-    autoplayUnlockerAttached = false;
-    document.removeEventListener('click', unlock, true);
-    document.removeEventListener('keydown', unlock, true);
-    document.removeEventListener('touchstart', unlock, true);
-    ensureAudioPipelineActive();
-    if (isPlaying && ytPlayer && ytPlayer.playVideo && typeof ytPlayer.playVideo === 'function') {
-      try {
-        if (ytPlayer.unMute) ytPlayer.unMute();
-        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
-        ytPlayer.playVideo();
-      } catch (_) { }
-    }
-  };
-  document.addEventListener('click', unlock, true);
-  document.addEventListener('keydown', unlock, true);
-  document.addEventListener('touchstart', unlock, true);
-}
 
 function openPopoutPlayer() {
   if (!activeChannel) {
@@ -9211,47 +9285,343 @@ function openPopoutPlayer() {
 }
 window.openPopoutPlayer = openPopoutPlayer;
 
+function openNowPlayingWidgetModal() {
+  if (!activeChannel) {
+    showToast('warning', 'Izaberite najpre kanal.');
+    return;
+  }
+
+  const origin = window.location.origin;
+  const widgetUrl = `${origin}/kickot/nowplaying.html?channel=${encodeURIComponent(activeChannel.id)}`;
+
+  let modal = document.getElementById('nowPlayingObsModal');
+  if (modal) {
+    modal.remove();
+  }
+
+  modal = document.createElement('div');
+  modal.id = 'nowPlayingObsModal';
+  modal.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(4, 7, 13, 0.82);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeInModal 0.2s ease-out;
+  `;
+
+  modal.innerHTML = `
+    <div style="
+      background: #11141c;
+      border: 1px solid rgba(83, 252, 24, 0.25);
+      border-radius: 16px;
+      max-width: 640px;
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.8), 0 0 35px rgba(83, 252, 24, 0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      color: #f1f5f9;
+      font-family: inherit;
+    ">
+      <!-- Modal Header -->
+      <div style="
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 24px;
+        background: rgba(255, 255, 255, 0.02);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      ">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: rgba(83, 252, 24, 0.12);
+            border: 1px solid rgba(83, 252, 24, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #53fc18;
+          ">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: #fff;">OBS Studio - Now Playing Overlay</h3>
+            <p style="margin: 2px 0 0; font-size: 0.78rem; color: #94a3b8;">Prozirni widget za prikaz trenutne pesme na strimu u realnom vremenu</p>
+          </div>
+        </div>
+        <button type="button" id="closeObsModalBtn" style="
+          background: transparent;
+          border: none;
+          color: #94a3b8;
+          cursor: pointer;
+          padding: 6px;
+          border-radius: 8px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s ease;
+        " onmouseover="this.style.color='#fff'; this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.color='#94a3b8'; this.style.background='transparent'">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
+        <!-- URL Input & Copy Button -->
+        <div>
+          <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #cbd5e1; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
+            Link izvora za OBS Studio (Browser Source)
+          </label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" readonly id="obsWidgetUrlInput" value="${widgetUrl}" style="
+              flex: 1;
+              background: #090c12;
+              border: 1px solid rgba(255, 255, 255, 0.12);
+              border-radius: 10px;
+              padding: 10px 14px;
+              color: #53fc18;
+              font-family: 'JetBrains Mono', monospace, Consolas, sans-serif;
+              font-size: 0.85rem;
+              outline: none;
+              user-select: all;
+            " onclick="this.select()">
+            <button type="button" id="copyObsWidgetUrlBtn" style="
+              background: #53fc18;
+              color: #000;
+              font-weight: 700;
+              font-size: 0.85rem;
+              border: none;
+              border-radius: 10px;
+              padding: 0 18px;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+              transition: all 0.2s ease;
+              white-space: nowrap;
+            " onmouseover="this.style.filter='brightness(1.1)'" onmouseout="this.style.filter='none'">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              <span>Kopiraj Link</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Instructions Box -->
+        <div style="
+          background: rgba(83, 252, 24, 0.04);
+          border: 1px dashed rgba(83, 252, 24, 0.25);
+          border-radius: 12px;
+          padding: 14px 16px;
+          font-size: 0.82rem;
+          color: #94a3b8;
+          line-height: 1.55;
+        ">
+          <div style="font-weight: 700; color: #53fc18; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            Uputstvo za podešavanje u OBS Studio:
+          </div>
+          <ol style="margin: 0; padding-left: 20px;">
+            <li>U OBS-u kliknite na <strong style="color: #fff;">+ (Add Source)</strong> i izaberite <strong style="color: #fff;">Browser</strong>.</li>
+            <li>Zalepite kopirani link u polje <strong style="color: #fff;">URL</strong>.</li>
+            <li>Postavite <strong style="color: #fff;">Width: 560</strong> i <strong style="color: #fff;">Height: 140</strong> (pozadina je automatski prozirna).</li>
+            <li>Označite opciju <strong style="color: #fff;">"Shutdown source when not visible"</strong> i kliknite OK.</li>
+          </ol>
+        </div>
+
+        <!-- Live Preview -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.78rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px;">Pregled uživo (Live Preview)</span>
+            <a href="${widgetUrl}" target="_blank" rel="noopener noreferrer" style="
+              font-size: 0.78rem;
+              color: #53fc18;
+              text-decoration: none;
+              display: inline-flex;
+              align-items: center;
+              gap: 4px;
+            " onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+              Otvori u novoj kartici
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+            </a>
+          </div>
+          <div style="
+            background: #080a0f;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 12px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 16px 16px;
+          ">
+            <iframe src="${widgetUrl}" style="
+              width: 560px;
+              height: 120px;
+              border: none;
+              border-radius: 10px;
+              pointer-events: none;
+            " loading="lazy"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="
+        display: flex;
+        justify-content: flex-end;
+        padding: 16px 24px;
+        background: rgba(255, 255, 255, 0.02);
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+      ">
+        <button type="button" id="closeObsModalBottomBtn" style="
+          background: rgba(255, 255, 255, 0.08);
+          color: #e2e8f0;
+          font-weight: 600;
+          font-size: 0.85rem;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          border-radius: 8px;
+          padding: 8px 20px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+        " onmouseover="this.style.background='rgba(255,255,255,0.15)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+          Zatvori
+        </button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const closeModal = () => {
+    modal.remove();
+    document.removeEventListener('keydown', onEsc);
+  };
+
+  const onEsc = (e) => {
+    if (e.key === 'Escape') closeModal();
+  };
+
+  document.addEventListener('keydown', onEsc);
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  const closeBtn = document.getElementById('closeObsModalBtn');
+  if (closeBtn) closeBtn.onclick = closeModal;
+
+  const closeBottomBtn = document.getElementById('closeObsModalBottomBtn');
+  if (closeBottomBtn) closeBottomBtn.onclick = closeModal;
+
+  const copyBtn = document.getElementById('copyObsWidgetUrlBtn');
+  if (copyBtn) {
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(widgetUrl).then(() => {
+        const originalContent = copyBtn.innerHTML;
+        copyBtn.innerHTML = `
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>Kopirano!</span>
+        `;
+        copyBtn.style.background = '#38bdf8';
+        copyBtn.style.color = '#000';
+        showToast('success', 'Link OBS widgeta je kopiran u clipboard!');
+        setTimeout(() => {
+          copyBtn.innerHTML = originalContent;
+          copyBtn.style.background = '#53fc18';
+          copyBtn.style.color = '#000';
+        }, 2200);
+      }).catch(() => {
+        showToast('warning', 'Označite i kopirajte link ručno iz polja.');
+      });
+    };
+  }
+}
+window.openNowPlayingWidgetModal = openNowPlayingWidgetModal;
+
 function initYouTubeAudioEngine(preferredVideoId) {
-  if (ytPlayer && isYtReady) return;
+  if (ytPlayer && (isYtReady || typeof ytPlayer.loadVideoById === 'function')) {
+    if (preferredVideoId) {
+      try {
+        ytPlayer.loadVideoById({ videoId: preferredVideoId, startSeconds: 0 });
+        if (ytPlayer.playVideo) ytPlayer.playVideo();
+      } catch (_) { }
+    }
+    return;
+  }
   if (!window.YT || !window.YT.Player) return;
 
   const curSong = localSongQueue[currentSongIndex];
   const hasQueueSong = curSong && (curSong.ytId || extractYouTubeId(curSong.id) || extractYouTubeId(curSong.title));
-  // Pre-warm: Ako nemamo pesmu, učitaj YouTube sa standby videom tako da iframe već živi u DOM-u pre nego što korisnik ode na Kick tab
   const videoIdToLoad = preferredVideoId || hasQueueSong || 'jNQXAC9IVRw';
   const shouldAutoplay = !!(preferredVideoId || (hasQueueSong && isPlaying) || pendingPlay);
 
-  let hostEl = document.getElementById('ytAudioPlayer');
-  if (!hostEl) {
-    const container = document.getElementById('ytAudioPlayerContainer') || document.getElementById('srGlobalAudioEngine');
-    if (container) {
-      container.innerHTML = '<div id="ytAudioPlayer"></div>';
-      hostEl = document.getElementById('ytAudioPlayer');
+  const container = document.getElementById('ytAudioPlayerContainer') || document.getElementById('srGlobalAudioEngine');
+  if (container) {
+    if (ytPlayer) {
+      try { ytPlayer.destroy(); } catch (_) { }
+      ytPlayer = null;
     }
+    container.innerHTML = '<div id="ytAudioPlayer"></div>';
   }
+
+  let hostEl = document.getElementById('ytAudioPlayer');
   if (!hostEl) return;
 
   try {
-    ytPlayer = new YT.Player('ytAudioPlayer', {
+    const playerOpts = {
       height: '100%',
       width: '100%',
       videoId: videoIdToLoad,
       playerVars: {
         autoplay: shouldAutoplay ? 1 : 0,
-        mute: 1, // Startuj utišano da browser pozadinska politika ne blokira YouTube iframe
+        mute: 1, // Startuj utišano da browser ne blokira pokretanje iframe-a
+        enablejsapi: 1,
         controls: 0,
         disablekb: 1,
         fs: 0,
         rel: 0,
         playsinline: 1,
-        origin: window.location.origin
+        origin: (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://kickall.app')
       },
       events: {
         'onReady': onYtPlayerReady,
         'onStateChange': onYtPlayerStateChange,
         'onError': onYtPlayerError
       }
-    });
+    };
+    ytPlayer = new YT.Player('ytAudioPlayer', playerOpts);
     window.ytPlayer = ytPlayer;
   } catch (e) {
     console.warn('[YouTube Audio Engine] API error:', e);
@@ -9289,18 +9659,17 @@ function onYtPlayerReady(_event) {
         iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture');
         iframe.setAttribute('title', 'YouTube Audio Engine');
       }
-      if (!document.hidden && (localSongQueue.length > 0 || pendingPlay)) {
-        if (ytPlayer.unMute) ytPlayer.unMute();
-        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
-      }
-      if (localSongQueue.length > 0 && (isPlaying || pendingPlay)) {
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+      if (localSongQueue.length > 0 && !userPausedManually) {
         if (ytPlayer.playVideo) ytPlayer.playVideo();
       }
     } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
   }
-  // Pokreni pesmu ako imamo red ili je reprodukcija na čekanju
-  if (localSongQueue.length > 0 && (isPlaying || pendingPlay)) {
+  // Pokreni pesmu automatski ako imamo pesama u redu ili je reprodukcija na čekanju
+  if (localSongQueue.length > 0 && !userPausedManually) {
     pendingPlay = false;
+    isPlaying = true;
     playCurrentAudio();
   }
 }
@@ -9313,6 +9682,7 @@ function onYtPlayerStateChange(event) {
     skipSong(true);
   } else if (event.data === YT.PlayerState.PLAYING) {
     isPlaying = true;
+    userPausedManually = false;
     if (ytPlayer) {
       try {
         if (ytPlayer.unMute) ytPlayer.unMute();
@@ -9333,28 +9703,84 @@ function onYtPlayerStateChange(event) {
     updatePlayerUI();
     renderSongQueue();
   } else if (event.data === YT.PlayerState.PAUSED) {
-    if (isPlaying && document.hidden && ytPlayer && ytPlayer.playVideo) {
-      try {
-        if (ytPlayer.unMute) ytPlayer.unMute();
-        ytPlayer.playVideo();
-      } catch (_) { }
-    } else {
+    if (Date.now() < isSeekingLockUntil) {
+      // Ignorišemo privremeno PAUSED stanje dok YouTube procesira seekTo
+      return;
+    }
+    if (userPausedManually || localSongQueue.length === 0) {
       isPlaying = false;
       stopTimer();
       updatePlayerUI();
       renderSongQueue();
+    } else {
+      // Ako je YouTube pauzirao zbog pozadine ili browser autoplay provere, automatski nastavi
+      if (ytPlayer && ytPlayer.playVideo) {
+        try {
+          if (ytPlayer.unMute) ytPlayer.unMute();
+          if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+          ytPlayer.playVideo();
+        } catch (_) { }
+      }
     }
   }
 }
 
-function onYtPlayerError(event) {
-  console.warn('[YouTube Audio Engine] Video error, skipping to next song:', event ? event.data : '');
+async function onYtPlayerError(event) {
+  const errCode = event ? event.data : '';
+  console.warn('[YouTube Audio Engine] Video error:', errCode);
+  if (!currentPlayingYtId || localSongQueue.length === 0) return;
+
+  const currentSong = localSongQueue[currentSongIndex];
+  if (!currentSong) return;
+
+  // Greška 150 ili 101 znači da je vlasnik videa zabranio embedovanje (oEmbed 401)
+  if (errCode === 150 || errCode === 101) {
+    currentSong._embedErrorRetries = (currentSong._embedErrorRetries || 0) + 1;
+    if (currentSong._embedErrorRetries <= 2) {
+      const searchTerms = `${currentSong.artist && currentSong.artist !== 'YouTube' ? currentSong.artist + ' ' : ''}${currentSong.title || ''}`.trim();
+      console.log(`[YouTube Audio Engine] Error ${errCode} na videu ${currentPlayingYtId}. Tražim alternativnu dostupnu verziju za: "${searchTerms}"`);
+      showToast('info', 'Originalni video ne dozvoljava embedovanje. Pronalazim dostupnu verziju pesme...');
+
+      try {
+        const altRes = await fetch(`${getYtSearchEndpoint()}?q=${encodeURIComponent(searchTerms)}`, { signal: AbortSignal.timeout(5000) });
+        if (altRes.ok) {
+          const altData = await altRes.json();
+          if (altData && altData.videoId && altData.videoId !== currentPlayingYtId) {
+            currentSong.ytId = altData.videoId;
+            currentSong.coverUrl = altData.coverUrl || `https://img.youtube.com/vi/${altData.videoId}/hqdefault.jpg`;
+            if (altData.duration && altData.duration > 0) currentSong.duration = Math.round(Number(altData.duration));
+            currentPlayingYtId = altData.videoId;
+            currentTimeSeconds = 0;
+            saveSongRequestConfig(true);
+            renderSongQueue();
+            updatePlayerUI();
+            if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
+              ytPlayer.loadVideoById({ videoId: altData.videoId, startSeconds: 0 });
+              if (ytPlayer.unMute) ytPlayer.unMute();
+              if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+              if (ytPlayer.playVideo) ytPlayer.playVideo();
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        console.debug('[Kickot] Error finding alternative video:', e);
+      }
+    }
+  }
+
   showToast('warning', 'Pesma sa YouTube-a nije dostupna za reprodukciju. Prelazim na sledeću...');
-  setTimeout(() => { skipSong(true); }, 1200);
+  setTimeout(() => {
+    if (localSongQueue.length > 0 && !userPausedManually) {
+      skipSong(true);
+    }
+  }, 1200);
 }
 
 function extractYouTubeId(urlOrText) {
-  if (!urlOrText) return null;
+  if (!urlOrText || typeof urlOrText !== 'string') return null;
+  const cleaned = urlOrText.trim().replace(/^yt_/, '');
+  if (/^[\w-]{11}$/.test(cleaned)) return cleaned;
   const match = urlOrText.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
   return match && match[1] ? match[1] : null;
 }
@@ -9369,17 +9795,29 @@ function startTimer() {
       updatePlayerUI();
       return;
     }
-    if (ytPlayer && ytPlayer.getCurrentTime && typeof ytPlayer.getCurrentTime === 'function') {
-      const curr = ytPlayer.getCurrentTime();
-      if (curr && !isNaN(curr)) currentTimeSeconds = Math.floor(curr);
-      if (ytPlayer.getDuration && typeof ytPlayer.getDuration === 'function') {
-        const realDur = ytPlayer.getDuration();
-        if (realDur && !isNaN(realDur) && realDur > 0 && Math.round(realDur) !== currentSong.duration) {
-          currentSong.duration = Math.round(realDur);
-          renderSongQueue();
+    let hasLiveYtTime = false;
+    if (Date.now() >= isSeekingLockUntil && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+      try {
+        const state = typeof ytPlayer.getPlayerState === 'function' ? ytPlayer.getPlayerState() : -1;
+        if (state === 1) {
+          const curr = ytPlayer.getCurrentTime();
+          if (curr !== null && curr !== undefined && !isNaN(curr) && curr > 0) {
+            currentTimeSeconds = Math.floor(curr);
+            hasLiveYtTime = true;
+          }
         }
-      }
-    } else {
+        if (ytPlayer.getDuration && typeof ytPlayer.getDuration === 'function') {
+          const realDur = ytPlayer.getDuration();
+          if (realDur && !isNaN(realDur) && realDur > 0 && Math.round(realDur) !== currentSong.duration) {
+            currentSong.duration = Math.round(realDur);
+            renderSongQueue();
+            saveSongRequestConfig(true);
+          }
+        }
+      } catch (_) { }
+    }
+
+    if (!hasLiveYtTime && Date.now() >= isSeekingLockUntil) {
       currentTimeSeconds++;
     }
 
@@ -9411,6 +9849,7 @@ function stopTimer() {
 }
 
 function formatDuration(secs) {
+  if (!secs || isNaN(secs) || secs <= 0) return '0:00';
   const m = Math.floor(secs / 60);
   const s = String(secs % 60).padStart(2, '0');
   return `${m}:${s}`;
@@ -9466,8 +9905,10 @@ function renderSongQueue() {
             <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 2px;">${song.artist ? escapeHtml(song.artist) + ' • ' : ''}Zatražio: ${escapeHtml(song.requester)} • ${formatDuration(song.duration)}</div>
           </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
           ${isActive && isPlaying ? '<span style="font-size: 0.72rem; color: #FF0033; font-weight: 700; display: flex; align-items: center; gap: 4px; background: rgba(255,0,51,0.1); padding: 3px 8px; border-radius: 4px; border: 1px solid rgba(255,0,51,0.2);"><span class="status-dot" style="background: #FF0033; width:6px; height:6px; box-shadow:0 0 6px #FF0033;"></span> Svira</span>' : ''}
+          ${!isActive && index > 1 ? `<button type="button" class="btn btn-sm btn-text" onclick="moveSongUp(${index})" style="color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center;" title="Pomeri gore"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg></button>` : ''}
+          ${!isActive && index >= 1 && index < localSongQueue.length - 1 ? `<button type="button" class="btn btn-sm btn-text" onclick="moveSongDown(${index})" style="color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center;" title="Pomeri dole"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg></button>` : ''}
           ${!isActive ? `<button type="button" class="btn btn-sm btn-outline" onclick="playSongNow(${index})" style="font-size: 0.72rem; padding: 3px 8px; border-color: rgba(255,0,51,0.3); color: #FF0033;" title="Pusti odmah">Pusti</button>` : ''}
           <button type="button" class="btn btn-sm btn-text" onclick="removeSong(${index})" style="color: var(--text-muted); cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center;" title="Ukloni pesmu">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -9552,19 +9993,23 @@ function updatePlayerUI() {
     return;
   }
 
-  // Preuzmi žive podatke iz YouTube plejera ako su dostupni
+  // Preuzmi žive podatke iz YouTube plejera samo ako aktivno strimuje zvuk (state === 1)
   const player = ytPlayer || window.ytPlayer;
-  if (player && typeof player.getCurrentTime === 'function' && isPlaying) {
+  if (Date.now() >= isSeekingLockUntil && player && typeof player.getCurrentTime === 'function' && isPlaying) {
     try {
-      const cur = player.getCurrentTime();
-      if (cur && !isNaN(cur)) currentTimeSeconds = Math.floor(cur);
+      const state = typeof player.getPlayerState === 'function' ? player.getPlayerState() : -1;
+      if (state === 1) {
+        const cur = player.getCurrentTime();
+        if (cur !== null && cur !== undefined && !isNaN(cur) && cur > 0) currentTimeSeconds = Math.floor(cur);
+      }
     } catch (_) { }
   }
-  if (player && typeof player.getDuration === 'function' && isPlaying) {
+  if (player && typeof player.getDuration === 'function') {
     try {
       const d = player.getDuration();
       if (d && !isNaN(d) && d > 0 && Math.round(d) !== currentSong.duration) {
         currentSong.duration = Math.round(d);
+        if (localSongQueue.length > 0) saveSongRequestConfig(true);
       }
     } catch (_) { }
   }
@@ -9576,7 +10021,7 @@ function updatePlayerUI() {
   if (playerCurrentTime) playerCurrentTime.textContent = formatDuration(currentTimeSeconds);
   if (playerProgress) {
     const pct = currentSong.duration > 0 ? Math.min(100, (currentTimeSeconds / currentSong.duration) * 100) : 0;
-    playerProgress.style.width = `${pct}%`;
+    playerProgress.style.setProperty('width', `${pct}%`, 'important');
   }
 
   if (currentSong.coverUrl && playerCoverImg) {
@@ -9607,6 +10052,11 @@ function updatePlayerUI() {
       playIcon.innerHTML = '<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" />';
     }
   }
+
+  const volSlider = document.getElementById('playerVolumeSlider');
+  if (volSlider && volSlider.value != playerVolume && document.activeElement !== volSlider) {
+    volSlider.value = playerVolume;
+  }
 }
 
 async function playCurrentAudio() {
@@ -9620,6 +10070,7 @@ async function playCurrentAudio() {
   }
 
   ensureAudioPipelineActive();
+  userPausedManually = false;
 
   let ytId = currentSong.ytId || extractYouTubeId(currentSong.id) || extractYouTubeId(currentSong.title);
 
@@ -9649,17 +10100,10 @@ async function playCurrentAudio() {
   currentPlayingYtId = ytId;
   currentTimeSeconds = 0;
 
-  const isBackground = document.hidden;
-
-  if (ytPlayer && ytId && isYtReady) {
+  if (ytPlayer && ytId && (isYtReady || typeof ytPlayer.loadVideoById === 'function')) {
     try {
-      if (isBackground) {
-        // U pozadinskom tabu: obavezno prvo mute da browser/YouTube ne blokira autoplay
-        if (ytPlayer.mute) ytPlayer.mute();
-      } else {
-        if (ytPlayer.unMute) ytPlayer.unMute();
-        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
-      }
+      if (ytPlayer.unMute) ytPlayer.unMute();
+      if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
     } catch (_) { console.debug('[Kickot] Handled non-critical error:', _); }
 
     if (ytPlayer.loadVideoById) {
@@ -9672,8 +10116,12 @@ async function playCurrentAudio() {
           ytPlayer.playVideo();
         } catch (_) { }
       }
+      try {
+        if (ytPlayer.unMute) ytPlayer.unMute();
+        if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
+      } catch (_) { }
 
-      // Pozadinski watchdog koji prati startovanje i automatski odmutira ton čim krene streaming
+      // Watchdog koji prati startovanje i garantuje odmutiran ton i zadatu jačinu čim krene streaming
       let bgCheckCount = 0;
       const bgWatchdog = setInterval(() => {
         bgCheckCount++;
@@ -9683,12 +10131,23 @@ async function playCurrentAudio() {
         }
         try {
           const state = ytPlayer.getPlayerState ? ytPlayer.getPlayerState() : -1;
+          if (ytPlayer.getDuration && typeof ytPlayer.getDuration === 'function') {
+            const d = ytPlayer.getDuration();
+            const curSong = localSongQueue[currentSongIndex];
+            if (d && !isNaN(d) && d > 0 && curSong && Math.round(d) !== curSong.duration) {
+              curSong.duration = Math.round(d);
+              updatePlayerUI();
+              renderSongQueue();
+              saveSongRequestConfig(true);
+            }
+          }
           if (state === 1) { // 1 = PLAYING!
             if (ytPlayer.unMute) ytPlayer.unMute();
             if (ytPlayer.setVolume) ytPlayer.setVolume(playerVolume || 80);
-            clearInterval(bgWatchdog);
+            if (typeof ytPlayer.isMuted === 'function' && !ytPlayer.isMuted()) {
+              clearInterval(bgWatchdog);
+            }
           } else if (state === 2 || state === -1 || state === 5) {
-            // Ako je YouTube ostao u paused/unstarted stanju dok je tab u pozadini
             if (ytPlayer.playVideo) ytPlayer.playVideo();
           }
         } catch (_) { }
@@ -9717,12 +10176,14 @@ async function togglePlayback() {
 
   if (isPlaying) {
     isPlaying = false;
+    userPausedManually = true;
     if (ytPlayer && ytPlayer.pauseVideo) {
       ytPlayer.pauseVideo();
     }
     stopTimer();
   } else {
     isPlaying = true;
+    userPausedManually = false;
     if (ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
       const state = ytPlayer.getPlayerState();
       if (state === -1 || state === 5 || state === 0 || state === undefined) {
@@ -9751,9 +10212,7 @@ async function skipSong(isAutoAdvance = false) {
 
   if (localSongQueue.length > 0) {
     localSongQueue.splice(currentSongIndex, 1);
-    if (currentSongIndex >= localSongQueue.length) {
-      currentSongIndex = 0;
-    }
+    currentSongIndex = 0;
   }
 
   saveSongRequestConfig(true);
@@ -9845,13 +10304,26 @@ function syncSongQueueFromRemote(newQueue) {
     if (currentlyPlaying.duration && currentlyPlaying.duration > 0) {
       newQueue[matchIdx].duration = currentlyPlaying.duration;
     }
+    if (matchIdx > 0) {
+      newQueue.splice(0, matchIdx);
+    }
     localSongQueue = newQueue;
-    currentSongIndex = matchIdx;
+    currentSongIndex = 0;
   } else {
-    // Ako je trenutna pesma uklonjena u bazi sa drugog uređaja
+    // Ako je trenutna pesma uklonjena u bazi sa drugog uređaja ili preko !skip komande u četu
     localSongQueue = newQueue;
-    if (currentSongIndex >= localSongQueue.length) {
-      currentSongIndex = 0;
+    currentSongIndex = 0;
+    currentTimeSeconds = 0;
+    currentPlayingYtId = null;
+    stopTimer();
+    if (localSongQueue.length > 0) {
+      isPlaying = true;
+      playCurrentAudio();
+    } else {
+      isPlaying = false;
+      if (ytPlayer && ytPlayer.stopVideo) {
+        try { ytPlayer.stopVideo(); } catch (_) { }
+      }
     }
   }
 
@@ -9868,15 +10340,18 @@ async function saveSongRequestConfig(silent) {
   const rankSelect = document.getElementById('cfgSongRequestRank');
   const costInput = document.getElementById('cfgSongRequestCost');
   const maxDurationInput = document.getElementById('cfgSongRequestMaxDuration');
+  const maxPerUserInput = document.getElementById('cfgSongRequestMaxPerUser');
 
   const isMasterEnabled = masterToggle ? masterToggle.checked : true;
   const isEnabled = songToggle ? songToggle.checked : true;
 
   const costPoints = costInput ? parseInt(costInput.value) || 0 : 0;
   const maxDur = maxDurationInput ? parseInt(maxDurationInput.value) || 360 : 360;
+  const maxPerUser = maxPerUserInput ? parseInt(maxPerUserInput.value) || 3 : 3;
   const role = rankSelect ? rankSelect.value : 'everyone';
 
   try {
+    localStorage.setItem(`sr_max_per_user_${activeChannel.id}`, maxPerUser);
     const { error } = await sb.from('song_request')
       .upsert({
         channel_id: activeChannel.id,
@@ -9906,19 +10381,74 @@ async function saveSongRequestConfig(silent) {
   updateOverviewModulesUI();
 }
 
+let preMuteVolume = 50;
+
+function toggleMute() {
+  if (playerVolume > 0) {
+    preMuteVolume = playerVolume;
+    updateVolume(0);
+  } else {
+    updateVolume(preMuteVolume || 50);
+  }
+}
+
 async function updateVolume(val) {
   playerVolume = parseInt(val) || 0;
-  if (ytPlayer && ytPlayer.setVolume) {
-    ytPlayer.setVolume(playerVolume);
+  try {
+    localStorage.setItem('kickot_sr_volume', String(playerVolume));
+  } catch (_) { }
+  const slider = document.getElementById('playerVolumeSlider');
+  if (slider && slider.value != playerVolume) {
+    slider.value = playerVolume;
   }
+  const volIcon = document.getElementById('volumeIcon') || document.querySelector('.sr-volume-container svg');
+  if (volIcon) {
+    if (playerVolume === 0) {
+      volIcon.innerHTML = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line>';
+      volIcon.style.stroke = '#EF4444';
+    } else {
+      volIcon.innerHTML = '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>';
+      volIcon.style.stroke = 'var(--text-muted)';
+    }
+  }
+  if (ytPlayer) {
+    try {
+      if (playerVolume > 0 && ytPlayer.unMute) {
+        ytPlayer.unMute();
+      }
+      if (ytPlayer.setVolume) {
+        ytPlayer.setVolume(playerVolume);
+      }
+    } catch (_) { }
+  }
+}
+
+function moveSongUp(index) {
+  if (index <= 1 || index >= localSongQueue.length) return;
+  const temp = localSongQueue[index];
+  localSongQueue[index] = localSongQueue[index - 1];
+  localSongQueue[index - 1] = temp;
+  renderSongQueue();
+  saveSongRequestConfig(true);
+  showToast('info', 'Pesma pomerena naviše u redu.');
+}
+
+function moveSongDown(index) {
+  if (index < 1 || index >= localSongQueue.length - 1) return;
+  const temp = localSongQueue[index];
+  localSongQueue[index] = localSongQueue[index + 1];
+  localSongQueue[index + 1] = temp;
+  renderSongQueue();
+  saveSongRequestConfig(true);
+  showToast('info', 'Pesma pomerena naniže u redu.');
 }
 
 function seekPlayer(event) {
   const currentSong = localSongQueue[currentSongIndex];
   if (!currentSong) return;
 
-  const progressBar = event.currentTarget;
-  const rect = progressBar.getBoundingClientRect();
+  const barWrap = document.querySelector('.sr-progress-bar-wrap') || event.currentTarget;
+  const rect = barWrap.getBoundingClientRect();
   const clickX = event.clientX - rect.left;
   const width = rect.width;
   if (width <= 0) return;
@@ -9933,6 +10463,7 @@ function seekPlayer(event) {
 
   const targetSeconds = Math.floor(pct * effectiveDuration);
   currentTimeSeconds = targetSeconds;
+  isSeekingLockUntil = Date.now() + 1500;
 
   if (player && typeof player.seekTo === 'function') {
     try {
@@ -9940,7 +10471,31 @@ function seekPlayer(event) {
     } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
   }
 
+  // Ako nije sviralo, automatski pokreni reprodukciju
+  if (!isPlaying && player && typeof player.playVideo === 'function') {
+    try {
+      if (player.unMute) player.unMute();
+      player.playVideo();
+    } catch (_) {}
+  }
+  isPlaying = true;
+  startTimer();
+
+  const playerProgress = document.getElementById('playerProgress');
+  const playerCurrentTime = document.getElementById('playerCurrentTime');
+  if (playerProgress) playerProgress.style.setProperty('width', `${pct * 100}%`, 'important');
+  if (playerCurrentTime) playerCurrentTime.textContent = formatDuration(targetSeconds);
+
   updatePlayerUI();
+}
+
+function getYtSearchEndpoint() {
+  if (typeof window !== 'undefined' && window.location) {
+    if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return 'https://kickall.app/.netlify/functions/yt-search';
+    }
+  }
+  return '/.netlify/functions/yt-search';
 }
 
 async function searchYouTubeVideoId(query) {
@@ -9952,35 +10507,11 @@ async function searchYouTubeVideoId(query) {
 
   // 1. Zvanični KickALL Netlify Backend Search Endpoint
   try {
-    const res = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${getYtSearchEndpoint()}?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(4500) });
     if (res.ok) {
       const data = await res.json();
       if (data && data.videoId) {
         return data.videoId;
-      }
-    }
-  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
-
-  // 2. Fallback: allorigins proxy
-  try {
-    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery))}`, { signal: AbortSignal.timeout(4000) });
-    if (res.ok) {
-      const html = await res.text();
-      const match = html.match(/"videoId":"([\w-]{11})"/);
-      if (match && match[1]) {
-        return match[1];
-      }
-    }
-  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
-
-  // 3. Fallback: corsproxy
-  try {
-    const res = await fetch(`https://corsproxy.io/?${encodeURIComponent('https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery))}`, { signal: AbortSignal.timeout(4000) });
-    if (res.ok) {
-      const html = await res.text();
-      const match = html.match(/"videoId":"([\w-]{11})"/);
-      if (match && match[1]) {
-        return match[1];
       }
     }
   } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
@@ -9991,25 +10522,21 @@ async function searchYouTubeVideoId(query) {
 async function fetchExactYouTubeDuration(ytId) {
   if (!ytId) return 0;
 
-  // 1. Zvanični Netlify Backend search endpoint
+  // 1. Proveri da li ytPlayer trenutno ima ovaj video
+  if (ytPlayer && typeof ytPlayer.getDuration === 'function') {
+    try {
+      const d = ytPlayer.getDuration();
+      if (d && !isNaN(d) && d > 0) return Math.round(d);
+    } catch (_) { }
+  }
+
+  // 2. Zvanični Netlify Backend search endpoint
   try {
-    const res = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(ytId)}`, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${getYtSearchEndpoint()}?q=${encodeURIComponent(ytId)}`, { signal: AbortSignal.timeout(4500) });
     if (res.ok) {
       const data = await res.json();
       if (data && data.duration && data.duration > 0) {
         return Math.round(Number(data.duration));
-      }
-    }
-  } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
-
-  // 2. Fallback: allorigins proxy
-  try {
-    const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + ytId)}`, { signal: AbortSignal.timeout(3500) });
-    if (res.ok) {
-      const html = await res.text();
-      const match = html.match(/"approxDurationMs":"(\d+)"/) || html.match(/"lengthSeconds":"(\d+)"/);
-      if (match && match[1]) {
-        return Math.round(parseInt(match[1]) / (match[1].length > 6 ? 1000 : 1));
       }
     }
   } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
@@ -10057,23 +10584,33 @@ async function resolveYouTubeSongSmart(query) {
   const ytIdMatch = extractYouTubeId(cleanQuery);
   if (ytIdMatch) {
     let exactDuration = await fetchExactYouTubeDuration(ytIdMatch);
+    let title = `YouTube Track (${ytIdMatch})`;
+    let artist = 'YouTube';
     try {
       const oembedRes = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${ytIdMatch}&format=json`);
       if (oembedRes.ok) {
         const oembed = await oembedRes.json();
-        return {
-          ytId: ytIdMatch,
-          title: oembed.title || `YouTube Track (${ytIdMatch})`,
-          artist: oembed.author_name || 'YouTube',
-          coverUrl: `https://img.youtube.com/vi/${ytIdMatch}/hqdefault.jpg`,
-          duration: exactDuration > 0 ? exactDuration : 210
-        };
+        if (oembed.title) title = oembed.title;
+        if (oembed.author_name) artist = oembed.author_name;
       }
     } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
+
+    if (!exactDuration || exactDuration <= 0) {
+      try {
+        const ytRes = await fetch(`${getYtSearchEndpoint()}?q=${encodeURIComponent(ytIdMatch)}`, { signal: AbortSignal.timeout(4500) });
+        if (ytRes.ok) {
+          const data = await ytRes.json();
+          if (data && data.duration && data.duration > 0) exactDuration = Math.round(Number(data.duration));
+          if (data && data.title && title.startsWith('YouTube Track')) title = data.title;
+          if (data && data.uploader && artist === 'YouTube') artist = data.uploader;
+        }
+      } catch (_) { }
+    }
+
     return {
       ytId: ytIdMatch,
-      title: `YouTube Track (${ytIdMatch})`,
-      artist: 'YouTube',
+      title: title,
+      artist: artist,
       coverUrl: `https://img.youtube.com/vi/${ytIdMatch}/hqdefault.jpg`,
       duration: exactDuration > 0 ? exactDuration : 210
     };
@@ -10081,7 +10618,7 @@ async function resolveYouTubeSongSmart(query) {
 
   // 2. Netlify Serverless YouTube Search
   try {
-    const ytRes = await fetch(`/.netlify/functions/yt-search?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(5000) });
+    const ytRes = await fetch(`${getYtSearchEndpoint()}?q=${encodeURIComponent(cleanQuery)}`, { signal: AbortSignal.timeout(5000) });
     if (ytRes.ok) {
       const data = await ytRes.json();
       if (data && data.videoId) {
@@ -10107,7 +10644,7 @@ async function resolveYouTubeSongSmart(query) {
     }
   } catch (e) { console.debug('[Kickot] Handled non-critical error:', e); }
 
-  // 3. Fallback: Pronađi Video ID preko klijentskog proxy-ja
+  // 3. Fallback: Pronađi Video ID preko klijentskog hendlera
   const foundYtId = await searchYouTubeVideoId(cleanQuery);
   let artist = '';
   let title = cleanQuery;
@@ -10258,8 +10795,13 @@ function clearSongQueue() {
 function playSongNow(index) {
   if (index < 0 || index >= localSongQueue.length) return;
 
-  currentSongIndex = index;
+  // Sve pesme pre izabrane su već odsvirane -> uklanjamo ih iz reda
+  if (index > 0) {
+    localSongQueue.splice(0, index);
+  }
+  currentSongIndex = 0;
   currentTimeSeconds = 0;
+  currentPlayingYtId = null;
   isPlaying = true;
 
   playCurrentAudio();

@@ -257,16 +257,15 @@ function kazniKorisnika(chatroomId, username, messageId, reason, actionType, tim
 
         if (messageId) obrisiPoruku(chatroomId, messageId);
         banujKorisnika(chatroomId, username, reason, userId);
-        posaljiPoruku(chatroomId, `[MOD] @${username} je trajno banovan (Razlog: ${reason}).`);
+        posaljiPoruku(chatroomId, `[MOD] @${username} je trajno banovan.`);
         log('MOD', `[${channelState.channelUsername || chatroomId}] Ban ${username}. Reason: ${reason}`);
     } else if (act === 'timeout') {
         if (messageId) obrisiPoruku(chatroomId, messageId);
-        timeoutKorisnika(chatroomId, username, duration, reason, userId);
         const minuti = Math.max(1, Math.round(duration / 60));
-        posaljiPoruku(chatroomId, `[MOD] @${username} je utišan na ${minuti} min (Razlog: ${reason}).`);
+        timeoutKorisnika(chatroomId, username, duration, reason, userId);
+        posaljiPoruku(chatroomId, `[MOD] @${username} je utišan na ${minuti} min.`);
         log('MOD', `[${channelState.channelUsername || chatroomId}] Timeout ${username} for ${duration}s (${minuti}m). Reason: ${reason}`);
     } else if (act === 'warn') {
-        if (messageId) obrisiPoruku(chatroomId, messageId);
         if (!channelState.warningsCount) {
             channelState.warningsCount = new Map();
         }
@@ -274,31 +273,23 @@ function kazniKorisnika(chatroomId, username, messageId, reason, actionType, tim
         channelState.warningsCount.set(userKey, warnCount);
         
         if (warnCount >= 3) {
-            timeoutKorisnika(chatroomId, username, duration, 'Prekoračen broj opomena (3/3)', userId);
-            posaljiPoruku(chatroomId, `[MOD] @${username} je privremeno utišan zbog 3 opomene.`);
+            timeoutKorisnika(chatroomId, username, duration, 'Prekoracen broj opomena (3/3)', userId).then((ok) => {
+                if (ok) {
+                    posaljiPoruku(chatroomId, `[MOD] @${username} je privremeno utisan zbog 3 opomene.`);
+                } else {
+                    log('WARN', `[${channelState.channelUsername || chatroomId}] Timeout (warn 3/3) ${username} nije uspeo na Kick API-ju.`);
+                }
+            }).catch(() => {});
             channelState.warningsCount.set(userKey, 0); // reset
             log('MOD', `[${channelState.channelUsername || chatroomId}] Timeout ${username} due to 3 warnings.`);
         } else {
-            posaljiPoruku(chatroomId, `[MOD] @${username}, opomena (${warnCount}/3): ${reason}.`);
+            posaljiPoruku(chatroomId, `[MOD] @${username}, opomena (${warnCount}/3).`);
             log('MOD', `[${channelState.channelUsername || chatroomId}] Warned ${username} (${warnCount}/3). Reason: ${reason}`);
         }
     } else {
-        // Just delete
-        if (messageId) {
-            obrisiPoruku(chatroomId, messageId).then((isDeleted) => {
-                if (isDeleted) {
-                    posaljiPoruku(chatroomId, `[MOD] @${username}, poruka je uklonjena (Razlog: ${reason}).`);
-                    log('MOD', `[${channelState.channelUsername || chatroomId}] Deleted message from ${username}. Reason: ${reason}`);
-                } else {
-                    log('WARN', `[${channelState.channelUsername || chatroomId}] Brisanje poruke korisnika ${username} nije uspelo na Kick-u (Security policy ili API greška).`);
-                }
-            }).catch((err) => {
-                log('ERR', `[${channelState.channelUsername || chatroomId}] Neočekivana greška pri brisanju: ${err.message}`);
-            });
-        } else {
-            posaljiPoruku(chatroomId, `[MOD] @${username}, poruka je uklonjena (Razlog: ${reason}).`);
-            log('MOD', `[${channelState.channelUsername || chatroomId}] Deleted message from ${username}. Reason: ${reason}`);
-        }
+        // Samo upozorenje u chatu, bez brisanja poruke
+        posaljiPoruku(chatroomId, `[MOD] @${username}, molim te postuj pravila chata.`);
+        log('MOD', `[${channelState.channelUsername || chatroomId}] Upozoren ${username}. Reason: ${reason}`);
     }
 }
 
