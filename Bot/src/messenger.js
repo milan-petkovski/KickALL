@@ -455,6 +455,83 @@ async function timeoutKorisnika(chatroomId, username, durationSeconds = 600, rea
     }
 }
 
+async function unbanujKorisnika(chatroomId, username, userId = null) {
+    if (!chatroomId || !username) return false;
+    const channelState = state.getChannelState(chatroomId);
+    const channelName = channelState ? channelState.channelUsername : chatroomId;
+
+    if (channelState && channelState.bannedUsers) {
+        channelState.bannedUsers.delete(username.toLowerCase());
+    }
+
+    let targetUserId = userId;
+
+    // 1. Zvanični Kick Public API v1: DELETE https://api.kick.com/public/v1/moderation/bans
+    try {
+        const accessToken = await kickAuth.getAccessToken();
+        const broadcasterId = await kickAuth.getBroadcasterUserId(channelName);
+
+        if (!targetUserId) {
+            try {
+                const { gotScraping } = await import('got-scraping');
+                const userRes = await gotScraping({
+                    url: `https://kick.com/api/v2/channels/${encodeURIComponent(channelName)}/users/${encodeURIComponent(username)}`,
+                    headers: await kickScrapingHeaders(),
+                    responseType: 'json',
+                    retry: { limit: 0 }
+                });
+                if (userRes.body && (userRes.body.id || userRes.body.user_id)) {
+                    targetUserId = userRes.body.id || userRes.body.user_id;
+                }
+            } catch (_) {}
+        }
+
+        if (accessToken && broadcasterId && targetUserId) {
+            const resPublic = await fetch('https://api.kick.com/public/v1/moderation/bans', {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    broadcaster_user_id: Number(broadcasterId) || broadcasterId,
+                    user_id: Number(targetUserId) || targetUserId
+                })
+            });
+
+            if (resPublic.ok) {
+                log('INFO', `[${channelName}] Korisnik @${username} uspešno unbanovan preko Kick Public API-ja.`);
+                return true;
+            }
+        }
+    } catch (publicErr) {
+        log('WARN', `[${channelName}] Greška pri unbanovanju preko Kick Public API: ${publicErr.message}`);
+    }
+
+    // 2. Fallback na v2 bans endpoint preko gotScraping
+    try {
+        const { gotScraping } = await import('got-scraping');
+        const url = `https://kick.com/api/v2/channels/${encodeURIComponent(channelName)}/bans/${encodeURIComponent(username)}`;
+        const headers = await kickScrapingHeaders();
+
+        const res = await gotScraping({
+            url,
+            method: 'DELETE',
+            headers,
+            retry: { limit: 0 }
+        });
+
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+            log('INFO', `[${channelName}] Korisnik @${username} uspešno unbanovan preko Kick v2 API-ja.`);
+            return true;
+        }
+    } catch (err) {
+        log('WARN', `[${channelName}] Greška pri fallback unbanovanju korisnika ${username}: ${err.message}`);
+    }
+    return true;
+}
+
 module.exports = {
     posaljiPoruku,
     posaljiIPinujPoruku,
@@ -462,6 +539,7 @@ module.exports = {
     odpinujPoruku,
     obrisiPoruku,
     banujKorisnika,
+    unbanujKorisnika,
     timeoutKorisnika,
     izvrsiSlanje,
     processQueue,

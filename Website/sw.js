@@ -136,7 +136,12 @@ self.addEventListener('fetch', (event) => {
         const cachedResponse = await caches.match(event.request);
         if (cachedResponse) return cachedResponse;
         // Ultimate fallback to index.html
-        return caches.match('/index.html');
+        const fallback = await caches.match('/index.html');
+        if (fallback) return fallback;
+        return new Response('<!DOCTYPE html><html><body>Offline</body></html>', {
+          status: 503,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' }
+        });
       }
     })());
   } else {
@@ -189,15 +194,19 @@ self.addEventListener('fetch', (event) => {
               // Return offline fallback for CSS/JS
               if (event.request.url.endsWith('.css') ||
                 event.request.url.endsWith('.js')) {
-                return new Response('Offline - Resource not available', {
+                return new Response('/* Offline - Resource not available */', {
                   status: 503,
-                  headers: { 'Content-Type': 'text/plain' }
+                  headers: { 'Content-Type': event.request.url.endsWith('.css') ? 'text/css' : 'application/javascript' }
                 });
               }
+              return new Response('Offline - Resource not available', {
+                status: 503,
+                headers: { 'Content-Type': 'text/plain' }
+              });
             });
         })
         .catch((_error) => {
-          return fetch(event.request);
+          return fetch(event.request).catch(() => new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } }));
         })
     );
   }

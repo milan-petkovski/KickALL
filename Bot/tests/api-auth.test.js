@@ -107,3 +107,31 @@ test('Bot API Auth & Security - podrška za rotaciju tajnih ključeva (comma-sep
     }
 });
 
+test('Bot API - /api/kick/reload throttle sprečava duple zahteve unutar 2.5 sekunde', async () => {
+    process.env.INTERNAL_API_SECRET = 'secret_test_token_987';
+    const testServer = http.createServer(handleHttpRequest);
+    await new Promise(resolve => testServer.listen(0, resolve));
+    const port = testServer.address().port;
+
+    try {
+        const res1 = await fetch(`http://127.0.0.1:${port}/api/kick/reload?chatroom_id=room_throttle_test`, {
+            headers: { 'X-Internal-Token': 'secret_test_token_987' }
+        });
+        assert.equal(res1.status, 200);
+        const data1 = await res1.json();
+        assert.equal(data1.success, true);
+        assert.equal(data1.message, 'Reloaded successfully');
+
+        // Drugi uzastopni poziv odmah nakon prvog mora biti throttled (status 200, bez ponovnog reload-a)
+        const res2 = await fetch(`http://127.0.0.1:${port}/api/kick/reload?chatroom_id=room_throttle_test`, {
+            headers: { 'X-Internal-Token': 'secret_test_token_987' }
+        });
+        assert.equal(res2.status, 200);
+        const data2 = await res2.json();
+        assert.equal(data2.success, true);
+        assert.ok(data2.message.includes('throttled'));
+    } finally {
+        testServer.close();
+    }
+});
+

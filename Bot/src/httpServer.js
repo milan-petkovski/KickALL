@@ -8,6 +8,9 @@ const kickAuth = require('./kickAuth');
 const messenger = require('./messenger');
 const channelManager = require('./channelManager');
 
+const reloadTimestamps = new Map();
+const RELOAD_THROTTLE_MS = 2500;
+
 const ALLOWED_KICK_REDIRECT_URIS = new Set([
     'http://localhost:5500/auth/kick/callback',
     'http://localhost:5500/auth/kick/callback/',
@@ -716,6 +719,20 @@ async function handleHttpRequest(req, res) {
                 res.end(JSON.stringify({ error: 'Missing chatroom_id parameter' }));
                 return;
             }
+
+            const now = Date.now();
+            if (reloadTimestamps.size > 500) {
+                for (const [key, ts] of reloadTimestamps.entries()) {
+                    if (now - ts > 60000) reloadTimestamps.delete(key);
+                }
+            }
+            const lastReload = reloadTimestamps.get(chatroomId) || 0;
+            if (now - lastReload < RELOAD_THROTTLE_MS) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: true, message: 'Reload throttled (recently reloaded)' }));
+                return;
+            }
+            reloadTimestamps.set(chatroomId, now);
 
             try {
                 const cs = state.getChannelState(chatroomId);

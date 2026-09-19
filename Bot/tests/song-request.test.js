@@ -63,7 +63,7 @@ test('Song Request - handleVoteSkip glasanje i registracija glasova', async () =
     // Prvi glas
     await commands.handleVoteSkip(chatroomId, 'User1');
     assert.equal(channelState.messageQueue.length, 1);
-    assert.ok(channelState.messageQueue[0].includes('1/3 glasova'));
+    assert.ok(channelState.messageQueue[0].includes('1/5 glasova'));
 
     // Dupli glas od istog korisnika se odbija
     channelState.messageQueue = [];
@@ -75,7 +75,66 @@ test('Song Request - handleVoteSkip glasanje i registracija glasova', async () =
     channelState.messageQueue = [];
     await commands.handleVoteSkip(chatroomId, 'User2');
     assert.equal(channelState.messageQueue.length, 1);
-    assert.ok(channelState.messageQueue[0].includes('2/3 glasova'));
+    assert.ok(channelState.messageQueue[0].includes('2/5 glasova'));
+});
+
+test('Song Request - voteskip glasovi se prate isključivo po pesmi i ne prenose se na sledeću pesmu', async () => {
+    const chatroomId = 'test_room_sr_voteskip_isolation_1';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.channelUsername = 'teststreamer';
+    channelState.feature_songrequest = true;
+    channelState.isProcessingQueue = true;
+    channelState.messageQueue = [];
+
+    channelState.songrequest_settings = {
+        queue: [
+            { id: 'yt_song1', title: 'Pesma 1', artist: 'Izvodjac 1', ytId: 'song1', requester: 'Requester1' },
+            { id: 'yt_song2', title: 'Pesma 2', artist: 'Izvodjac 2', ytId: 'song2', requester: 'Requester2' },
+            { id: 'yt_song3', title: 'Pesma 3', artist: 'Izvodjac 3', ytId: 'song3', requester: 'Requester3' }
+        ]
+    };
+
+    // 1. Korisnici glasaju za prvu pesmu (3 glasa)
+    await commands.handleVoteSkip(chatroomId, 'UserA');
+    await commands.handleVoteSkip(chatroomId, 'UserB');
+    channelState.messageQueue = [];
+    await commands.handleVoteSkip(chatroomId, 'UserC');
+    assert.equal(channelState.messageQueue.length, 1);
+    assert.ok(channelState.messageQueue[0].includes('3/5 glasova'));
+
+    // 2. Naručilac prve pesme je preskače sa !skip
+    channelState.messageQueue = [];
+    await commands.handleSkipSong(chatroomId, 'Requester1');
+    assert.equal(channelState.messageQueue.length, 1);
+    assert.ok(channelState.messageQueue[0].includes('preskočio pesmu'));
+    assert.equal(channelState.songrequest_settings.queue[0].id, 'yt_song2');
+
+    // 3. UserA (koji je već glasao za Pesmu 1) sada glasa za Pesmu 2
+    // Mora biti prihvaćen i brojač mora početi od 1/5, a ne 4/5!
+    channelState.messageQueue = [];
+    await commands.handleVoteSkip(chatroomId, 'UserA');
+    assert.equal(channelState.messageQueue.length, 1);
+    assert.ok(channelState.messageQueue[0].includes('1/5 glasova'));
+    assert.ok(!channelState.messageQueue[0].includes('već si glasao'));
+
+    // 4. Glasaju još 4 korisnika do 5/5
+    await commands.handleVoteSkip(chatroomId, 'UserB');
+    await commands.handleVoteSkip(chatroomId, 'UserC');
+    await commands.handleVoteSkip(chatroomId, 'UserD');
+    channelState.messageQueue = [];
+    await commands.handleVoteSkip(chatroomId, 'UserE');
+
+    // Pesma 2 mora biti preskočena i mora se pustiti Pesma 3
+    assert.equal(channelState.messageQueue.length, 1);
+    assert.ok(channelState.messageQueue[0].includes('preskočena većinom glasova'));
+    assert.ok(channelState.messageQueue[0].includes('(5/5)'));
+    assert.equal(channelState.songrequest_settings.queue[0].id, 'yt_song3');
+
+    // 5. UserA glasa za Pesmu 3 -> ponovo počinje od 1/5!
+    channelState.messageQueue = [];
+    await commands.handleVoteSkip(chatroomId, 'UserA');
+    assert.equal(channelState.messageQueue.length, 1);
+    assert.ok(channelState.messageQueue[0].includes('1/5 glasova'));
 });
 
 test('Song Request - handleSetVolume podesava jacinu zvuka u rasponu 0-100', async () => {
@@ -89,7 +148,13 @@ test('Song Request - handleSetVolume podesava jacinu zvuka u rasponu 0-100', asy
     // Obican gledalac bez permisija
     await commands.handleSetVolume(chatroomId, 'RegularViewer', '50');
     assert.equal(channelState.messageQueue.length, 1);
-    assert.ok(channelState.messageQueue[0].includes('samo moderatori i strimer mogu'));
+    assert.ok(channelState.messageQueue[0].includes('samo strimer i @Milan_567 mogu'));
+
+    // Milan_567 postavlja jačinu zvuka
+    channelState.messageQueue = [];
+    await commands.handleSetVolume(chatroomId, 'Milan_567', '60');
+    assert.equal(channelState.messageQueue.length, 1);
+    assert.ok(channelState.messageQueue[0].includes('podešena na 60%'));
 
     // Strimer unosi nevazecu vrednost
     channelState.messageQueue = [];
@@ -167,4 +232,14 @@ test('Song Request - Ogranicenje maksimalnog broja pesama po korisniku', async (
     await commands.handlePesma(chatroomId, 'userspammer', 'neka nova pesma');
     assert.equal(channelState.messageQueue.length, 1);
     assert.ok(channelState.messageQueue[0].includes('već imaš 2 pesme na čekanju u redu'));
+});
+
+test('Song Request - formatDuration precizno formatira trajanje pesme u minute i sekunde', () => {
+    const { formatDuration } = require('../src/commands/music');
+    assert.equal(formatDuration(360), '6m');
+    assert.equal(formatDuration(372), '6m 12s');
+    assert.equal(formatDuration(45), '45s');
+    assert.equal(formatDuration(480), '8m');
+    assert.equal(formatDuration(605), '10m 5s');
+    assert.equal(formatDuration(0), '0s');
 });

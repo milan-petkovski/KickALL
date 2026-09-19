@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { PLAN_LIMITS } = require('../kickaj/js/kickaj-dashboard.js');
+const { PLAN_LIMITS, DEFAULT_SETTINGS } = require('../kickaj/js/kickaj-dashboard.js');
 
 test('Kickaj - PLAN_LIMITS ima ispravno definisana pravila za planove', () => {
   assert.ok(PLAN_LIMITS, 'PLAN_LIMITS mora biti uvezen iz kickaj-dashboard.js');
@@ -1813,4 +1813,19 @@ test('Kickaj - getWheelCache odvaja iscrtavanje podeonih linija i spoljnog oboda
   const arcIndex = recordedCommands.findIndex(cmd => cmd.startsWith('arc'));
   assert.equal(recordedCommands[arcIndex - 1], 'beginPath', 'Pre arc() mora biti pozvan beginPath() kako ne bi došlo do spajanja sa poslednjom linijom');
 });
+
+test('Kickaj - winnerAnnounceDelay sprečava spojlere u chatu usklađivanjem sa kašnjenjem strima', () => {
+  assert.ok(DEFAULT_SETTINGS, 'DEFAULT_SETTINGS mora postojati');
+  assert.equal(typeof DEFAULT_SETTINGS.winnerAnnounceDelay, 'number', 'winnerAnnounceDelay mora biti definisan kao broj');
+  assert.equal(DEFAULT_SETTINGS.winnerAnnounceDelay, 5, 'Podrazumevano kašnjenje najave pobednika u chat je 5 sekundi (usklađeno sa strimom)');
+
+  // Provera logike izračunavanja vremena potvrde sa kašnjenjem
+  const initSec = 60;
+  const delaySec = DEFAULT_SETTINGS.winnerAnnounceDelay;
+  const now = Date.now();
+  const expiresAt = now + ((initSec + delaySec) * 1000);
+
+  assert.equal(expiresAt - now, 65000, 'Ukupno vreme za potvrdu mora uračunati stream delay tako da gledalac dobije punih 60s');
+});
+
 

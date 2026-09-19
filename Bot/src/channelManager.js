@@ -255,6 +255,8 @@ async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
 
         // Učitavamo in-memory podatke za ovaj kanal paralelno radi bržeg pokretanja
         await Promise.allSettled([
+            database.ucitajBotConfig(chatroomId),
+            database.ucitajSongQueue(chatroomId),
             database.ucitajLeaderboard(chatroomId),
             database.ucitajEkonomiju(chatroomId),
             database.ucitajLjubav(chatroomId),
@@ -368,7 +370,11 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     channelState.feature_moderation = limits.allowAdvancedModeration && (dbConfig.feature_moderation ?? false);
     channelState.feature_autoresponse = dbConfig.feature_autoresponse ?? true;
     channelState.feature_songrequest = limits.allowSongRequest && (dbConfig.feature_songrequest ?? false);
-    channelState.songrequest_settings = dbConfig.songrequest_settings || {};
+    if (dbConfig.songrequest_settings && Object.keys(dbConfig.songrequest_settings).length > 0) {
+        channelState.songrequest_settings = dbConfig.songrequest_settings;
+    } else if (!channelState.songrequest_settings) {
+        channelState.songrequest_settings = { queue: [] };
+    }
     channelState.botActive = dbConfig.bot_active || false;
 
     await database.ucitajAutoAnnounces(dbConfig.channel_id);

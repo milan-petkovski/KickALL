@@ -11,45 +11,44 @@ function handleTop(chatroomId, numRaw) {
     if (!channelState) return;
 
     const rawStr = (numRaw || '').trim();
-    const lowerRaw = rawStr.toLowerCase();
+    const tokens = rawStr.split(/\s+/).filter(Boolean);
 
-    // 1. Provera za pod-leaderboarde: watchtime, coins/poeni, nivoi/level
-    if (lowerRaw.startsWith('watchtime') || lowerRaw.startsWith('watch') || lowerRaw.startsWith('gledanje') || lowerRaw.startsWith('sati')) {
-        const remainingArg = rawStr.replace(/^(watchtime|watch|gledanje|sati)/i, '').trim();
+    // 1. Provera za pod-leaderboarde u bilo kom redosledu reči (npr. "!top 15 watchtime", "!top watchtime 15")
+    const watchtimeIdx = tokens.findIndex(t => /^(watchtime|watch|gledanje|sati)$/i.test(t));
+    if (watchtimeIdx !== -1) {
+        const remainingTokens = tokens.filter((_, idx) => idx !== watchtimeIdx);
         const watchtimeMod = require('../watchtime');
         if (channelState.feature_watchtime !== false) {
-            watchtimeMod.handleTopWatchtime(chatroomId, remainingArg);
+            watchtimeMod.handleTopWatchtime(chatroomId, remainingTokens.join(' '));
         } else {
             posaljiPoruku(chatroomId, `⚠️ Watchtime sistem je trenutno isključen na ovom kanalu.`);
         }
         return;
     }
 
-    if (lowerRaw.startsWith('coins') || lowerRaw.startsWith('coin') || lowerRaw.startsWith('poeni') || lowerRaw.startsWith('pare') || lowerRaw.startsWith('bal') || lowerRaw.startsWith('novac')) {
-        const remainingArg = rawStr.replace(/^(coins|coin|poeni|pare|bal|novac)/i, '').trim();
+    const coinsIdx = tokens.findIndex(t => /^(coins|coin|poeni|poen|pare|bal|novac|points|point)$/i.test(t));
+    if (coinsIdx !== -1) {
+        const remainingTokens = tokens.filter((_, idx) => idx !== coinsIdx);
         const economyMod = require('../economy');
-        economyMod.handleTopCoins(chatroomId, remainingArg);
+        economyMod.handleTopCoins(chatroomId, remainingTokens.join(' '));
         return;
     }
 
-    if (lowerRaw.startsWith('level') || lowerRaw.startsWith('xp') || lowerRaw.startsWith('nivo') || lowerRaw.startsWith('lvl')) {
-        const remainingArg = rawStr.replace(/^(level|xp|nivo|lvl)/i, '').trim();
+    const levelIdx = tokens.findIndex(t => /^(level|lvl|xp|nivo|nivoi)$/i.test(t));
+    if (levelIdx !== -1) {
+        const remainingTokens = tokens.filter((_, idx) => idx !== levelIdx);
         const economyMod = require('../economy');
-        economyMod.handleTopLevel(chatroomId, remainingArg);
+        economyMod.handleTopLevel(chatroomId, remainingTokens.join(' '));
         return;
     }
 
     // 2. Chatters / Poruke aktivnost (podrazumevano ili preko ključnih reči)
-    let cleanedArg = rawStr;
-    if (lowerRaw.startsWith('chatters') || lowerRaw.startsWith('chatter') || lowerRaw.startsWith('poruke') || lowerRaw.startsWith('poruka') || lowerRaw.startsWith('chat')) {
-        cleanedArg = rawStr.replace(/^(chatters|chatter|poruke|poruka|chat)/i, '').trim();
-    }
-
-    const tokens = cleanedArg.split(/\s+/).filter(Boolean);
+    const chatIdx = tokens.findIndex(t => /^(chatters|chatter|poruke|poruka|chat|aktivnost|messages)$/i.test(t));
+    const activeTokens = chatIdx !== -1 ? tokens.filter((_, idx) => idx !== chatIdx) : tokens;
     let limit = 5;
     let period = 'month'; // default: mesec
 
-    for (const token of tokens) {
+    for (const token of activeTokens) {
         const tLower = token.toLowerCase();
         if (['dan', 'danas', 'dnevno', 'today', 'day', 'daily'].includes(tLower)) {
             period = 'day';

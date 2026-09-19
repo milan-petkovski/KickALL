@@ -5473,15 +5473,24 @@ function getBotApiBase() {
   return window.KickotConfig ? window.KickotConfig.api.baseUrl : 'https://kickbot-ihzb.onrender.com';
 }
 
+let _reloadBotDebounceTimer = null;
 function notifyBotToReload() {
   if (!activeChannel) return;
+  const channelId = activeChannel.id;
   const apiBase = getBotApiBase();
-  const targetUrl = `${apiBase}/api/kick/reload?chatroom_id=${activeChannel.id}`;
-  fetch(`/.netlify/functions/api-proxy`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ targetUrl })
-  }).catch(() => { });
+  const targetUrl = `${apiBase}/api/kick/reload?chatroom_id=${channelId}`;
+
+  if (_reloadBotDebounceTimer) {
+    clearTimeout(_reloadBotDebounceTimer);
+  }
+  _reloadBotDebounceTimer = setTimeout(() => {
+    _reloadBotDebounceTimer = null;
+    fetch(`/.netlify/functions/api-proxy`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetUrl })
+    }).catch(() => { });
+  }, 1000);
 }
 
 async function saveModerationSettings(silent = false) {
@@ -11251,15 +11260,16 @@ async function saveMinigamesConfig(silent = false) {
     }, { onConflict: 'channel_id,type' });
 
   // Takođe ažuriramo ranking tabelu kako bi oba izvora bila sinhronizovana
-  await sb.from('ranking')
-    .update({
-      gamble_enabled: gambleEnabled,
-      max_gamble_amount: maxBetVal,
-      updated_at: new Date().toISOString()
-    })
-    .eq('channel_id', activeChannel.id)
-    .eq('type', 'config')
-    .catch(() => { });
+  try {
+    await sb.from('ranking')
+      .update({
+        gamble_enabled: gambleEnabled,
+        max_gamble_amount: maxBetVal,
+        updated_at: new Date().toISOString()
+      })
+      .eq('channel_id', activeChannel.id)
+      .eq('type', 'config');
+  } catch (_) { }
 
   updateMinigamesStatsDisplay();
 
