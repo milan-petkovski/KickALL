@@ -272,8 +272,9 @@ async function obradiPusherPoruku(data) {
             return;
         }
 
+        const porukaTrimmed = poruka.trim();
         const prefix = channelState.PREFIX || '!';
-        const startsWithPrefix = poruka.startsWith(prefix);
+        const startsWithPrefix = porukaTrimmed.startsWith(prefix);
 
         // Ako je automatska poruka od samog bota (i nije komanda), preskačemo da izbegnemo petlje
         if (isBotMsg && !startsWithPrefix) {
@@ -283,11 +284,20 @@ async function obradiPusherPoruku(data) {
             return;
         }
 
+        // Privilegovani nalozi (moderatori, broadcaster, VIP, OG, kanal) nikada ne smeju biti blokirani
+        const senderBadges = chatData.sender?.identity?.badges || chatData.sender?.badges || [];
+        const isPrivilegedUser = senderBadges.some(b => b.type === 'moderator' || b.type === 'broadcaster' || b.type === 'vip' || b.type === 'og') ||
+                                 userKey === (channelState.channelUsername || '').toLowerCase();
+
         // Ako je korisnik već banovan u ovoj sesiji (npr. spam bot koji je poslao 2 poruke u sekundi), odmah odbaci
         if (channelState.bannedUsers && channelState.bannedUsers.has(userKey)) {
-            const messageId = chatData.id || chatData.messageId || null;
-            if (messageId) messenger.obrisiPoruku(chatroomId, messageId);
-            return;
+            if (isPrivilegedUser) {
+                channelState.bannedUsers.delete(userKey);
+            } else {
+                const messageId = chatData.id || chatData.messageId || null;
+                if (messageId) messenger.obrisiPoruku(chatroomId, messageId);
+                return;
+            }
         }
 
         // Stream Analytics za Kickan
@@ -316,9 +326,9 @@ async function obradiPusherPoruku(data) {
         }
 
         // Ako poruka počinje sa prefiksom i posle njega ima razmak (npr. "! komanda"), spoj ih
-        let porukaSredjena = poruka;
+        let porukaSredjena = porukaTrimmed;
         if (startsWithPrefix) {
-            const ostatak = poruka.slice(prefix.length).trim();
+            const ostatak = porukaTrimmed.slice(prefix.length).trim();
             porukaSredjena = prefix + ostatak;
         }
 

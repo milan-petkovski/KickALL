@@ -266,15 +266,63 @@ async function handleBan(chatroomId, sender, textRaw, senderObj) {
         return;
     }
 
-    if (!channelState.bannedUsers) channelState.bannedUsers = new Set();
-    channelState.bannedUsers.add(target.toLowerCase());
+    const targetKey = target.toLowerCase();
+    const streamerKey = (channelState.channelUsername || '').toLowerCase();
+    if (targetKey === streamerKey || targetKey === sender.toLowerCase()) {
+        posaljiPoruku(chatroomId, `[MOD] @${sender}, ne možete banovati sebe ili strimera.`);
+        return;
+    }
 
     const { banujKorisnika } = require('../messenger');
     const ok = await banujKorisnika(chatroomId, target, reason);
     if (ok) {
+        if (!channelState.bannedUsers) channelState.bannedUsers = new Set();
+        channelState.bannedUsers.add(targetKey);
         posaljiPoruku(chatroomId, `[MOD] @${target} je trajno banovan od strane @${sender}.`);
     } else {
+        if (channelState.bannedUsers) channelState.bannedUsers.delete(targetKey);
         posaljiPoruku(chatroomId, `[MOD] Banovanje korisnika @${target} nije uspelo na Kick-u.`);
+    }
+}
+
+async function handleUnban(chatroomId, sender, textRaw, senderObj) {
+    const channelState = state.getChannelState(chatroomId);
+    if (!channelState) return;
+
+    const userKey = sender.toLowerCase();
+    const isStreamer = userKey === (channelState.channelUsername || '').toLowerCase();
+    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
+    const badges = identity.badges || [];
+    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+
+    if (!isMod) {
+        posaljiPoruku(chatroomId, `[MOD] @${sender}, samo moderatori i strimer mogu unbanovati korisnike.`);
+        return;
+    }
+
+    if (!textRaw || !textRaw.trim()) {
+        posaljiPoruku(chatroomId, `[MOD] Upotreba: !unban @korisnik`);
+        return;
+    }
+
+    const parts = textRaw.trim().split(/\s+/);
+    const target = parts[0].replace(/^@/, '').trim();
+    if (!target) {
+        posaljiPoruku(chatroomId, `[MOD] Upotreba: !unban @korisnik`);
+        return;
+    }
+
+    const targetKey = target.toLowerCase();
+    if (channelState.bannedUsers) {
+        channelState.bannedUsers.delete(targetKey);
+    }
+
+    const { unbanujKorisnika } = require('../messenger');
+    const ok = await unbanujKorisnika(chatroomId, target);
+    if (ok) {
+        posaljiPoruku(chatroomId, `[MOD] @${target} je uspešno unbanovan od strane @${sender}.`);
+    } else {
+        posaljiPoruku(chatroomId, `[MOD] @${target} je odblokiran u botu.`);
     }
 }
 
@@ -335,5 +383,6 @@ module.exports = {
     handleAddCommand,
     handleDelCommand,
     handleBan,
+    handleUnban,
     handleTimeout
 };

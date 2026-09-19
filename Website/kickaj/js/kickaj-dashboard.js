@@ -169,7 +169,7 @@ if (typeof localStorage === 'undefined') {
   const DEFAULT_SOUND_VOLUME = 0.5; // podrazumevana jačina zvuka
 
   /* ── Settings ── */
-  let settings = {
+  const DEFAULT_SETTINGS = {
     prize:           '',
     keyword:         '',
     numWinners:      1,
@@ -185,8 +185,10 @@ if (typeof localStorage === 'undefined') {
     soundEnabled:    true,
     volume:          DEFAULT_SOUND_VOLUME,
     announceStart:   true,
-    announceWinner:  true
+    announceWinner:  true,
+    winnerAnnounceDelay: 5
   };
+  let settings = Object.assign({}, DEFAULT_SETTINGS);
 
   const PLAN_LIMITS = {
     free:  { maxParticipants: 500,  animations: ['wheel'],                   sound: false, fullscreen: true  },
@@ -590,6 +592,7 @@ if (typeof localStorage === 'undefined') {
     setChecked('toggleSound',          settings.soundEnabled);
     setChecked('toggleAnnounceStart',  settings.announceStart !== false);
     setChecked('toggleAnnounceWinner', settings.announceWinner !== false);
+    setVal('inputWinnerDelay', settings.winnerAnnounceDelay !== undefined ? settings.winnerAnnounceDelay : 5);
     selectAnimation(settings.animation);
     updateSpinTimeLabel();
     updateVolumeLabel();
@@ -1886,6 +1889,13 @@ if (typeof localStorage === 'undefined') {
     const toggleAnnWinner = document.getElementById('toggleAnnounceWinner');
     if (toggleAnnWinner) toggleAnnWinner.addEventListener('change', (e) => {
       settings.announceWinner = e.target.checked;
+      saveState();
+    });
+
+    const inputWinDelay = document.getElementById('inputWinnerDelay');
+    if (inputWinDelay) inputWinDelay.addEventListener('input', (e) => {
+      const parsed = parseInt(e.target.value, 10);
+      settings.winnerAnnounceDelay = isNaN(parsed) ? 0 : Math.max(0, Math.min(30, parsed));
       saveState();
     });
 
@@ -3627,8 +3637,9 @@ if (typeof localStorage === 'undefined') {
     
     const prizeName = settings.prize || 'Misteriozna Nagrada';
     const initSec = settings.confirmTime || 60;
+    const delaySec = Math.max(0, parseInt(settings.winnerAnnounceDelay, 10) || 0);
     const now = Date.now();
-    const expiresAt = now + (initSec * 1000);
+    const expiresAt = now + ((initSec + delaySec) * 1000);
     const reqFollow = parseInt(settings.followDuration, 10) || 0;
     const winnerId = 'win_' + now + '_' + Math.random().toString(36).slice(2, 7);
 
@@ -3664,7 +3675,13 @@ if (typeof localStorage === 'undefined') {
     showWinnerOverlay(username, prizeName, initSec, isTop5, isFinalChamp);
 
     if (settings.announceWinner) {
-      sendGiveawayWinnerAnnouncement(username, prizeName, initSec);
+      if (delaySec > 0) {
+        setTimeout(() => {
+          sendGiveawayWinnerAnnouncement(username, prizeName, initSec);
+        }, delaySec * 1000);
+      } else {
+        sendGiveawayWinnerAnnouncement(username, prizeName, initSec);
+      }
     }
 
     if (reqFollow > 0) {
@@ -5634,7 +5651,8 @@ if (typeof localStorage === 'undefined') {
       SLICE_COLORS,
       cleanUsername,
       escHtml,
-      escapeHtml
+      escapeHtml,
+      DEFAULT_SETTINGS
     };
   }
 })();

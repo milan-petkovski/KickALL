@@ -3,7 +3,27 @@ const { log } = require('./utils');
 const state = require('./state');
 const { normalizujZaPoredjenje, despaceText } = require('./spam');
 
-const VIEW_BOT_SPAM_REGEX = /\b(viewbot|view-bot|viewer\s*bot|follower\s*bot|chat\s*bot|typical\s*panels|save\s*99%|buy\s*followers|kickbotting|ownkick|kickview|cheap\s*viewers|cheap\s*chatters|chatters\s*with\s*custom|pay\s*only\s*for\s*what\s*you\s*use|free\s*trial\s*available)\b/i;
+// 100% nepobitne fraze i servisi koje koriste isključivo spam botovi za promociju
+const HARD_BOT_PROMO_REGEX = /\b(typical\s*panels|save\s*99%|buy\s*(followers|viewers|chatters)|cheap\s*(viewers|chatters|followers|bots)|kickbotting|ownkick|kickview|pay\s*only\s*for\s*what\s*you\s*use|free\s*trial\s*available|chatters\s*with\s*custom|kick\s*viewbot|viewbot[,\s]+follower\s*bot)\b/i;
+
+// Generički termini za botove koji se kažnjavaju SAMO ako poruka sadrži komercijalne/reklamne reči ili link ka servisu
+const GENERIC_BOT_REGEX = /\b(viewbot|view-bot|viewer\s*bot|follower\s*bot|chat\s*bot)\b/i;
+const PROMO_INDICATOR_REGEX = /\b(cheap|reliable|automated|24\/7|order|discount|deal|packages?|instant|pricing|panel|trial|fast|best\s*service|usd|eur|fees?|billed|no\s*fees|minutes\s*you\s*use|\$|\%)\b|https?:\/\/|[a-z0-9-]+\.(com|net|org|io|gg|xyz|ru|live|store|club|app|dev)/i;
+
+function isViewBotSpam(content, despaced) {
+    if (HARD_BOT_PROMO_REGEX.test(content) || HARD_BOT_PROMO_REGEX.test(despaced)) {
+        return true;
+    }
+    // Ako spominje viewbot/follower bot/chat bot, banuj samo ako ima komercijalni/reklamni kontekst
+    const mentionsBot = GENERIC_BOT_REGEX.test(content) || GENERIC_BOT_REGEX.test(despaced);
+    if (mentionsBot) {
+        const hasPromo = PROMO_INDICATOR_REGEX.test(content) || PROMO_INDICATOR_REGEX.test(despaced);
+        if (hasPromo) {
+            return true;
+        }
+    }
+    return false;
+}
 const DOMAIN_URL_REGEX = /(https?:\/\/[^\s]+|([a-zA-Z0-9-]{2,}\.)+(com|net|org|io|gg|xyz|site|ru|tv|me|info|biz|live|top|online|store|club|app|dev)\b[^\s]*)/gi;
 
 /**
@@ -31,6 +51,7 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
     const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster');
     const isVip = badges.some(b => b.type === 'vip');
     const isSub = badges.some(b => b.type === 'subscriber' || b.type === 'sub');
+    const isOg = badges.some(b => b.type === 'og');
     
     const exemptRoles = settings.exempt_roles || ['moderator'];
     
@@ -61,7 +82,9 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
     
     // ── 2. LINK & VIEWBOT PROTECTION ───────────────────────────────────────
     const despaced = despaceText(content);
-    if (!triggerReason && (VIEW_BOT_SPAM_REGEX.test(content) || VIEW_BOT_SPAM_REGEX.test(despaced))) {
+    // Poznati i poverljivi korisnici (mod, vip, sub, og) nikada ne mogu biti lažno banovani kao viewbot
+    const isTrustedUser = isMod || isVip || isSub || isOg;
+    if (!triggerReason && !isTrustedUser && isViewBotSpam(content, despaced)) {
         triggerReason = 'Viewbot / nedozvoljena reklama';
         filterAction = 'ban';
         filterTimeout = null;

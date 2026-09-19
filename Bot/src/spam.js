@@ -64,13 +64,19 @@ function spamFilter(chatroomId, username, poruka, senderObj = null) {
         return true;
     }
 
-    // Moderatori i strimer su izuzeti iz filtera za identične poruke i brzo kucanje
+    // Moderatori, strimer, VIP i OG korisnici su izuzeti iz filtera za identične poruke i brzo kucanje
     const identity = senderObj && senderObj.identity ? senderObj.identity : {};
-    const badges = identity.badges || (Array.isArray(senderObj?.badges) ? senderObj.badges : []);
-    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') ||
-                  userKey === (channelState.channelUsername || '').toLowerCase();
-    if (isMod) return false;
+    const badges = identity.badges || (Array.isArray(senderObj?.badges) ? senderObj.badges : (senderObj?.sender?.identity?.badges || []));
+    const isExempt = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster' || b.type === 'vip' || b.type === 'og') ||
+                     userKey === (channelState.channelUsername || '').toLowerCase();
+    if (isExempt) return false;
     
+    // Provera da li je poruka kratka reakcija (hype, smeh, pojedinačni emote)
+    const porukaTrim = poruka.trim();
+    const isShortReaction = /^(w+|da+|ne+|l+|haha+|jaja+|xaxa+|lol+|gg+)$/i.test(porukaTrim) ||
+                            porukaTrim.length <= 3 ||
+                            /^(\[emote:\d+:[^\]]+\]\s*)+$/.test(porukaTrim);
+
     // ── 1. Provera identičnih poruka ──────────────────────────────────────────
     // Komande (poruke koje počinju sa prefiksom kanala ili '!') ne podležu proveri identičnih poruka
     // jer je legitimno da korisnici uzastopno igraju igre (npr. !rulet 0 5000, !tocak 5000)
@@ -93,7 +99,9 @@ function spamFilter(chatroomId, username, poruka, senderObj = null) {
     const countRapid = channelState.rapidTracker[userKey].length;
 
     const zadnjeUpozorenje = channelState.lastWarned[userKey] || 0;
-    const limitIdenticna = channelState.SPAM_THRESHOLD !== undefined ? channelState.SPAM_THRESHOLD : config.SPAM_THRESHOLD;
+    const baseLimitIdenticna = channelState.SPAM_THRESHOLD !== undefined ? channelState.SPAM_THRESHOLD : config.SPAM_THRESHOLD;
+    const limitIdenticna = isShortReaction ? Math.max(baseLimitIdenticna, 5) : baseLimitIdenticna;
+    const limitRapid = isShortReaction ? config.RAPID_MSG_THRESHOLD + 2 : config.RAPID_MSG_THRESHOLD;
     const windowIdenticna = channelState.SPAM_WINDOW_MS !== undefined ? channelState.SPAM_WINDOW_MS : config.SPAM_WINDOW_MS;
 
     // Ako je dostignut limit za identične poruke
@@ -122,7 +130,7 @@ function spamFilter(chatroomId, username, poruka, senderObj = null) {
     }
 
     // Ako je dostignut limit za brzo kucanje (bilo koje poruke)
-    if (countRapid === config.RAPID_MSG_THRESHOLD) {
+    if (countRapid === limitRapid) {
         const zadnjiSpam = channelState.lastSpamPenalty[userKey] || 0;
         if (sada - zadnjiSpam >= config.SPAM_PENALTY_COOLDOWN_MS) {
             if (!jeKomanda) {
@@ -143,7 +151,7 @@ function spamFilter(chatroomId, username, poruka, senderObj = null) {
         return true;
     }
 
-    if (countRapid > config.RAPID_MSG_THRESHOLD) {
+    if (countRapid > limitRapid) {
         log('WARN', `[${channelState.channelUsername || chatroomId}] Anti-spam [brzo kucanje]: blokirano od ${username} (${countRapid}x brze poruke)`);
         return true;
     }

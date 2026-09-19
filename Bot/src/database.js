@@ -3,10 +3,24 @@ const config = require('./config');
 const state = require('./state');
 const { log, dobijTrenutniMesec, dobijTrenutniDan, sanitizeInput, isValidUsername, runWithLeaderboardLock } = require('./utils');
 
-// Inicijalizacija Supabase klijenta (fallback na dummy klijent tokom CI testiranja bez .env)
+// Inicijalizacija Supabase klijenta sa stabilnim WebSocket opcijama za Realtime CDC
+const supabaseOptions = {
+    realtime: {
+        heartbeatIntervalMs: 15000,
+        timeout: 20000,
+        params: {
+            eventsPerSecond: 10
+        }
+    },
+    auth: {
+        persistSession: false,
+        autoRefreshToken: false
+    }
+};
+
 const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY)
-    ? createClient(config.SUPABASE_URL, config.SUPABASE_KEY)
-    : createClient('https://dummy.supabase.co', 'dummy_key');
+    ? createClient(config.SUPABASE_URL, config.SUPABASE_KEY, supabaseOptions)
+    : createClient('https://dummy.supabase.co', 'dummy_key', supabaseOptions);
 const sbPanels = supabase;
 // Uvek koristimo Supabase — nema lokalnih fallbackova
 const KORISTI_SUPABASE = true;
@@ -1103,6 +1117,46 @@ async function sacuvajSongQueue(chatroomId, queue) {
     }
 }
 
+async function ucitajSongQueue(chatroomId) {
+    try {
+        if (!KORISTI_SUPABASE || !sbPanels || String(chatroomId).startsWith('test_')) {
+            const channelState = state.getChannelState(chatroomId);
+            return channelState?.songrequest_settings?.queue || [];
+        }
+
+        const { data, error } = await sbPanels
+            .from('song_request')
+            .select('queue, enabled, request_role, cost_points, max_duration_seconds')
+            .eq('channel_id', chatroomId)
+            .eq('type', 'config')
+            .maybeSingle();
+
+        if (error) throw error;
+        if (data) {
+            const channelState = state.getChannelState(chatroomId);
+            if (channelState) {
+                if (!channelState.songrequest_settings) channelState.songrequest_settings = {};
+                channelState.songrequest_settings.queue = Array.isArray(data.queue) ? data.queue : [];
+                if (data.enabled !== undefined) channelState.feature_songrequest = !!data.enabled;
+                if (data.request_role !== undefined) channelState.songrequest_settings.request_role = data.request_role;
+                if (data.cost_points !== undefined) {
+                    channelState.songrequest_settings.cost_points = data.cost_points;
+                    channelState.songrequest_settings.points_price = data.cost_points;
+                }
+                if (data.max_duration_seconds !== undefined) {
+                    channelState.songrequest_settings.max_duration_seconds = data.max_duration_seconds;
+                }
+            }
+            return Array.isArray(data.queue) ? data.queue : [];
+        }
+        return [];
+    } catch (err) {
+        log('ERR', `Greška pri učitavanju song request reda za ${chatroomId}: ${err.message}`);
+        const channelState = state.getChannelState(chatroomId);
+        return channelState?.songrequest_settings?.queue || [];
+    }
+}
+
 async function azurirajSongRequestPodesavanja(chatroomId, updateFields) {
     try {
         const channelState = state.getChannelState(chatroomId);
@@ -1364,6 +1418,14 @@ function postaviRealtimeSlusalac() {
                             } else if (payload.new) {
                                 if (!channelState.songrequest_settings) channelState.songrequest_settings = {};
                                 if (Array.isArray(payload.new.queue)) {
+                                    const oldFirst = channelState.songrequest_settings?.queue?.[0];
+                                    const newFirst = payload.new.queue[0];
+                                    const getSongKey = (s) => s ? (s.uid || s.uuid || s.ytId || s.id || `${s.title || ''}_${s.requester || ''}`) : null;
+                                    const oldId = getSongKey(oldFirst);
+                                    const newId = getSongKey(newFirst);
+                                    if (oldId !== newId || (!oldFirst && newFirst) || (oldFirst && !newFirst)) {
+                                        channelState.songrequest_voteskips = { songId: newId, voters: new Set() };
+                                    }
                                     channelState.songrequest_settings.queue = payload.new.queue;
                                 }
                                 if (payload.new.enabled !== undefined) {
@@ -1403,6 +1465,7 @@ module.exports = {
     sbPanels,
     KORISTI_SUPABASE,
     sacuvajSongQueue,
+    ucitajSongQueue,
     azurirajSongRequestPodesavanja,
     ucitajLeaderboard,
     ucitajEkonomiju,

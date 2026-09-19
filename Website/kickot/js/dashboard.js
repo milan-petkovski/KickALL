@@ -11251,15 +11251,16 @@ async function saveMinigamesConfig(silent = false) {
     }, { onConflict: 'channel_id,type' });
 
   // Takođe ažuriramo ranking tabelu kako bi oba izvora bila sinhronizovana
-  await sb.from('ranking')
-    .update({
-      gamble_enabled: gambleEnabled,
-      max_gamble_amount: maxBetVal,
-      updated_at: new Date().toISOString()
-    })
-    .eq('channel_id', activeChannel.id)
-    .eq('type', 'config')
-    .catch(() => { });
+  try {
+    await sb.from('ranking')
+      .update({
+        gamble_enabled: gambleEnabled,
+        max_gamble_amount: maxBetVal,
+        updated_at: new Date().toISOString()
+      })
+      .eq('channel_id', activeChannel.id)
+      .eq('type', 'config');
+  } catch (_) { }
 
   updateMinigamesStatsDisplay();
 

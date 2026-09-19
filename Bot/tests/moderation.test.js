@@ -201,3 +201,51 @@ test('Moderation - Druga poruka istog banovanog bota se ignoriše bez dupliranja
     const userKey = 'b91ab8';
     assert.equal(channelState.bannedUsers.has(userKey), true);
 });
+
+test('Moderation - Pravi gledaoci koji pitaju za chat bot ili viewbot NE DOBIJAJU ban', () => {
+    const chatroomId = 'test_mod_room_viewbot_safe';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.botActive = true;
+    channelState.feature_moderation = true;
+    channelState.channelUsername = 'Tutz_live';
+    channelState.bannedUsers = new Set();
+
+    const normalUser = { id: 111, identity: { badges: [] } };
+    const ogUser = { id: 222, identity: { badges: [{ type: 'og' }] } };
+
+    // Pitanja običnih gledalaca u chatu ne smeju biti banovana
+    assert.equal(proveriModeraciju(chatroomId, 'Gledalac1', 'koji ti je ovo chat bot?', 'msg1', normalUser), false);
+    assert.equal(proveriModeraciju(chatroomId, 'Gledalac2', 'opet viewbot u chatu brate', 'msg2', normalUser), false);
+    assert.equal(proveriModeraciju(chatroomId, 'Gledalac3', 'jel ima follower bot ovde', 'msg3', normalUser), false);
+    assert.equal(channelState.bannedUsers.size, 0, 'Nijedan pravi gledalac ne sme biti banovan');
+
+    // OG ili VIP korisnik je 100% zaštićen
+    assert.equal(proveriModeraciju(chatroomId, 'StariGledalac', 'Kick viewbot ponuda', 'msg4', ogUser), false);
+});
+
+test('Moderation - Svi stvarni formati viewbot spama iz današnjeg lajva se 100% banuju i brišu', () => {
+    const chatroomId = 'test_mod_real_bots';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.botActive = true;
+    channelState.feature_moderation = true;
+    channelState.bannedUsers = new Set();
+    channelState.messageQueue = [];
+    channelState.isProcessingQueue = true;
+
+    const botSender = { id: 777, identity: { badges: [] } };
+
+    const msg1 = 'Kick viewbot, follower bot & chat bot and more, 24/7 automated, reliable, cheap & fast!';
+    const msg2 = 'Kick viewbot, follower bot & chat bot and more, no fees, only billed for minutes you use!';
+    const msg3 = 'Kick viewbot, follower bot & chat bot and more - pay only for what you use!';
+
+    assert.equal(proveriModeraciju(chatroomId, 'bot_e38c53', msg1, 'm1', botSender), true);
+    assert.equal(channelState.bannedUsers.has('bot_e38c53'), true);
+
+    assert.equal(proveriModeraciju(chatroomId, 'bot_6bf57b', msg2, 'm2', botSender), true);
+    assert.equal(channelState.bannedUsers.has('bot_6bf57b'), true);
+
+    assert.equal(proveriModeraciju(chatroomId, 'bot_3db7e1', msg3, 'm3', botSender), true);
+    assert.equal(channelState.bannedUsers.has('bot_3db7e1'), true);
+});
+
+

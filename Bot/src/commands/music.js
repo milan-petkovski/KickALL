@@ -395,6 +395,7 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
     }
 
     queue.push({
+        uid: 'sr_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
         id: 'yt_' + ytId,
         ytId: ytId,
         title: title,
@@ -411,10 +412,28 @@ async function handlePesma(chatroomId, sender, songName, senderObj) {
     posaljiPoruku(chatroomId, `@${sender}, pesma "${displaySongName}" je uspešno dodata u red za puštanje! (Pozicija u redu: #${queue.length})`);
 }
 
-function handleSongQueue(chatroomId) {
+async function getOrSyncQueue(chatroomId, channelState) {
+    let queue = channelState?.songrequest_settings?.queue;
+    if (!Array.isArray(queue) || queue.length === 0) {
+        try {
+            const database = require('../database');
+            if (typeof database.ucitajSongQueue === 'function') {
+                const freshQueue = await database.ucitajSongQueue(chatroomId);
+                if (Array.isArray(freshQueue) && freshQueue.length > 0) {
+                    if (!channelState.songrequest_settings) channelState.songrequest_settings = {};
+                    channelState.songrequest_settings.queue = freshQueue;
+                    return freshQueue;
+                }
+            }
+        } catch (_) {}
+    }
+    return Array.isArray(queue) ? queue : [];
+}
+
+async function handleSongQueue(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || channelState.feature_songrequest === false) return;
-    const queue = channelState.songrequest_settings?.queue || [];
+    const queue = await getOrSyncQueue(chatroomId, channelState);
     if (queue.length === 0) {
         posaljiPoruku(chatroomId, `Red pesama je trenutno prazan. Zatraži pesmu komandom: !pesma <naziv>`);
         return;
@@ -432,12 +451,9 @@ async function handleSkipSong(chatroomId, sender, senderObj) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || channelState.feature_songrequest === false) return;
     const userKey = sender.toLowerCase();
-    const isStreamer = channelState.channelUsername && userKey === channelState.channelUsername.toLowerCase();
-    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
-    const badges = identity.badges || (Array.isArray(senderObj?.badges) ? senderObj.badges : (senderObj?.sender?.identity?.badges || []));
-    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+    const isStreamer = (channelState.channelUsername && userKey === channelState.channelUsername.toLowerCase()) || userKey === 'milan_567';
 
-    const queue = channelState.songrequest_settings?.queue || [];
+    const queue = await getOrSyncQueue(chatroomId, channelState);
     if (queue.length === 0) {
         posaljiPoruku(chatroomId, `Red pesama je prazan.`);
         return;
@@ -446,25 +462,27 @@ async function handleSkipSong(chatroomId, sender, senderObj) {
     const currentSong = queue[0];
     const isRequester = currentSong && currentSong.requester && currentSong.requester.toLowerCase() === userKey;
 
-    if (!isMod && !isRequester) {
-        posaljiPoruku(chatroomId, `@${sender}, samo moderatori, strimer ili korisnik koji je zatražio pesmu mogu je preskočiti!`);
+    if (!isStreamer && !isRequester) {
+        const requesterTag = currentSong?.requester ? ` (@${currentSong.requester})` : '';
+        posaljiPoruku(chatroomId, `@${sender}, komandu !skip može iskoristiti samo korisnik koji je naručio pesmu${requesterTag} ili strimer. Za glasanje za preskakanje upotrebi komandu !voteskip.`);
         return;
     }
 
     const skipped = queue.shift();
+    channelState.songrequest_voteskips = { songId: null, voters: new Set() };
     const database = require('../database');
     await database.sacuvajSongQueue(chatroomId, queue);
 
     const nextSong = queue.length > 0 ? queue[0] : null;
     const nextMsg = nextSong ? ` | Sledeća na redu: "${nextSong.artist && nextSong.artist !== 'YouTube' ? nextSong.artist + ' - ' : ''}${nextSong.title}"` : ' | Red pesama je sada prazan.';
-    const actor = isMod ? 'Moderacija' : 'Korisnik';
+    const actor = isStreamer ? (userKey === 'milan_567' ? '@Milan_567' : 'Strimer') : 'Naručilac';
     posaljiPoruku(chatroomId, `${actor} (@${sender}) je preskočio pesmu: "${skipped.artist && skipped.artist !== 'YouTube' ? skipped.artist + ' - ' : ''}${skipped.title}"${nextMsg}`);
 }
 
-function handleCurrentSong(chatroomId) {
+async function handleCurrentSong(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || channelState.feature_songrequest === false) return;
-    const queue = channelState.songrequest_settings?.queue || [];
+    const queue = await getOrSyncQueue(chatroomId, channelState);
     if (queue.length === 0) {
         posaljiPoruku(chatroomId, `Trenutno se ne pušta nijedna pesma. Zatraži pesmu komandom: !pesma <naziv>`);
         return;
@@ -474,10 +492,10 @@ function handleCurrentSong(chatroomId) {
     posaljiPoruku(chatroomId, `Trenutno svira: "${current.artist && current.artist !== 'YouTube' ? current.artist + ' - ' : ''}${current.title}"${durationStr} (Zatražio: @${current.requester})`);
 }
 
-function handleMySong(chatroomId, sender) {
+async function handleMySong(chatroomId, sender) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || channelState.feature_songrequest === false) return;
-    const queue = channelState.songrequest_settings?.queue || [];
+    const queue = await getOrSyncQueue(chatroomId, channelState);
     const userKey = sender.toLowerCase();
 
     const userIndices = [];
@@ -512,7 +530,7 @@ function handleMySong(chatroomId, sender) {
 async function handleCancelSong(chatroomId, sender) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || channelState.feature_songrequest === false) return;
-    const queue = channelState.songrequest_settings?.queue || [];
+    const queue = await getOrSyncQueue(chatroomId, channelState);
     const userKey = sender.toLowerCase();
 
     // Tražimo pesmu koja čeka u redu (počevši od kraja reda unazad da otkažemo poslednju dodatu)
@@ -567,7 +585,7 @@ async function handleClearQueue(chatroomId, sender, senderObj) {
         return;
     }
 
-    const queue = channelState.songrequest_settings?.queue || [];
+    const queue = await getOrSyncQueue(chatroomId, channelState);
     if (queue.length === 0) {
         posaljiPoruku(chatroomId, `Red pesama je već prazan.`);
         return;
@@ -583,14 +601,14 @@ async function handleClearQueue(chatroomId, sender, senderObj) {
 async function handleVoteSkip(chatroomId, sender) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || channelState.feature_songrequest === false) return;
-    const queue = channelState.songrequest_settings?.queue || [];
+    const queue = await getOrSyncQueue(chatroomId, channelState);
     if (queue.length === 0) {
         posaljiPoruku(chatroomId, `@${sender}, red pesama je prazan - nema aktivne pesme za preskakanje.`);
         return;
     }
 
     const currentSong = queue[0];
-    const songId = currentSong.ytId || currentSong.id;
+    const songId = currentSong.uid || currentSong.uuid || currentSong.ytId || currentSong.id || `${currentSong.title || ''}_${currentSong.requester || ''}`;
 
     if (!channelState.songrequest_voteskips || channelState.songrequest_voteskips.songId !== songId) {
         channelState.songrequest_voteskips = { songId: songId, voters: new Set() };
@@ -598,7 +616,7 @@ async function handleVoteSkip(chatroomId, sender) {
 
     const tracker = channelState.songrequest_voteskips;
     const userKey = sender.toLowerCase();
-    const needed = 3;
+    const needed = channelState.songrequest_settings?.voteskip_needed || 5;
 
     if (tracker.voters.has(userKey)) {
         posaljiPoruku(chatroomId, `@${sender}, već si glasao za preskakanje ove pesme! (${tracker.voters.size}/${needed} glasova)`);
@@ -623,10 +641,10 @@ async function handleVoteSkip(chatroomId, sender) {
     posaljiPoruku(chatroomId, `Pesma "${skipped.artist && skipped.artist !== 'YouTube' ? skipped.artist + ' - ' : ''}${skipped.title}" je preskočena većinom glasova gledalaca (${needed}/${needed})!${nextMsg}`);
 }
 
-function handleSongLink(chatroomId, sender) {
+async function handleSongLink(chatroomId, sender) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || channelState.feature_songrequest === false) return;
-    const queue = channelState.songrequest_settings?.queue || [];
+    const queue = await getOrSyncQueue(chatroomId, channelState);
     if (queue.length === 0) {
         posaljiPoruku(chatroomId, `@${sender}, trenutno se ne pušta nijedna pesma.`);
         return;
@@ -642,12 +660,10 @@ async function handleSetVolume(chatroomId, sender, volumeStr, senderObj) {
     if (!channelState || channelState.feature_songrequest === false) return;
     const userKey = sender.toLowerCase();
     const isStreamer = channelState.channelUsername && userKey === channelState.channelUsername.toLowerCase();
-    const identity = senderObj && senderObj.identity ? senderObj.identity : {};
-    const badges = identity.badges || (Array.isArray(senderObj?.badges) ? senderObj.badges : (senderObj?.sender?.identity?.badges || []));
-    const isMod = badges.some(b => b.type === 'moderator' || b.type === 'broadcaster') || isStreamer;
+    const isAuthorized = isStreamer || userKey === 'milan_567';
 
-    if (!isMod) {
-        posaljiPoruku(chatroomId, `@${sender}, samo moderatori i strimer mogu podešavati jačinu zvuka muzike!`);
+    if (!isAuthorized) {
+        posaljiPoruku(chatroomId, `@${sender}, samo strimer i @Milan_567 mogu podešavati jačinu zvuka muzike!`);
         return;
     }
 
