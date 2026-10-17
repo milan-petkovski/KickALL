@@ -11,6 +11,8 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
 const SUPER_ADMIN_USERNAME = String(process.env.SUPER_ADMIN_USERNAME || '').toLowerCase();
 const PUSHER_URL = process.env.PUSHER_URL || 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false';
+const REALTIME_WS_URL = process.env.REALTIME_WS_URL || 'wss://realtime.us-east-1.platform.kick.com/connection/websocket';
+const REALTIME_AUTH_URL = process.env.REALTIME_AUTH_URL || 'https://web.kick.com/api/v1/realtime/auth/connection';
 
 module.exports = {
     // Kredencijali i API detalji
@@ -23,6 +25,8 @@ module.exports = {
     SUPABASE_KEY,
     SUPER_ADMIN_USERNAME,
     PUSHER_URL,
+    REALTIME_WS_URL,
+    REALTIME_AUTH_URL,
 
     // Bot podešavanja
     COOLDOWN_MS: 3000,

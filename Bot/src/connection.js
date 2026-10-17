@@ -1,6 +1,8 @@
-// WebSocket / Pusher konekcija ka Kick servisima, deduplikacija događaja i distribucija
+// WebSocket / Realtime (Centrifugo) konekcija ka Kick servisima, deduplikacija događaja i distribucija
 
+const { Centrifuge } = require('centrifuge');
 const WebSocket = require('ws');
+const axios = require('axios');
 const config = require('./config');
 const state = require('./state');
 const utils = require('./utils');
@@ -84,8 +86,12 @@ async function obradiPusherPoruku(data) {
 
     let response;
     try {
-        response = JSON.parse(data);
+        response = typeof data === 'string' ? JSON.parse(data) : data;
     } catch {
+        return;
+    }
+
+    if (!response || typeof response !== 'object') {
         return;
     }
 
@@ -377,7 +383,126 @@ async function obradiPusherPoruku(data) {
     }
 }
 
-function povezi() {
+async function getRealtimeToken() {
+    const postData = JSON.stringify({
+        client_id: `kickotbot-${Date.now()}`
+    });
+
+    const headers = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'x-app-platform': 'web'
+    };
+
+    if (config.BOT_COOKIE) {
+        headers['Cookie'] = config.BOT_COOKIE;
+    }
+    if (config.BEARER_TOKEN) {
+        headers['Authorization'] = config.BEARER_TOKEN.startsWith('Bearer ') ? config.BEARER_TOKEN : `Bearer ${config.BEARER_TOKEN}`;
+    }
+
+    try {
+        const response = await axios.post(config.REALTIME_AUTH_URL, postData, {
+            headers,
+            timeout: 10000
+        });
+
+        if (response.data && response.data.data && response.data.data.token) {
+            return response.data.data.token;
+        }
+        throw new Error('Kick realtime auth API nije vratio token');
+    } catch (err) {
+        if (headers['Cookie'] || headers['Authorization']) {
+            try {
+                const guestRes = await axios.post(config.REALTIME_AUTH_URL, postData, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': headers['User-Agent'],
+                        'Accept': 'application/json',
+                        'x-app-platform': 'web'
+                    },
+                    timeout: 10000
+                });
+                if (guestRes.data?.data?.token) {
+                    return guestRes.data.data.token;
+                }
+            } catch (fallbackErr) {
+                utils.log('ERR', `Greška pri preuzimanju guest realtime tokena: ${fallbackErr.message}`);
+            }
+        }
+        utils.log('ERR', `Greška pri preuzimanju Kick realtime tokena: ${err.message}`);
+        throw err;
+    }
+}
+
+function pretplatiNaChatroom(chatroomId) {
+    if (!state.centrifuge) return;
+    const channelState = state.channels[chatroomId];
+    const subId = channelState?.realChatroomId || chatroomId;
+    const channelName = `chatrooms.${subId}.v2`;
+
+    let sub = state.centrifuge.getSubscription(channelName);
+    if (!sub) {
+        sub = state.centrifuge.newSubscription(channelName);
+        sub.on('subscribed', () => {
+            utils.log('INFO', `Uspešno pretplaćen na kanal četa: ${channelName}`);
+        });
+        sub.on('publication', (ctx) => {
+            obradiRealtimePoruku(channelName, ctx.data);
+        });
+        sub.on('error', (ctx) => {
+            utils.log('WARN', `Centrifugo greška na kanalu ${channelName}: ${ctx.error?.message || ctx.error}`);
+        });
+        sub.subscribe();
+    } else if (sub.state === 'unsubscribed') {
+        sub.subscribe();
+    }
+}
+
+function otkaziPretplatu(chatroomId) {
+    if (!state.centrifuge) return;
+    const channelState = state.channels[chatroomId];
+    const subId = channelState?.realChatroomId || chatroomId;
+    const channelName = `chatrooms.${subId}.v2`;
+
+    const sub = state.centrifuge.getSubscription(channelName);
+    if (sub) {
+        try {
+            sub.unsubscribe();
+            state.centrifuge.removeSubscription(sub);
+            utils.log('INFO', `Otkazana pretplata sa kanala četa: ${channelName}`);
+        } catch (_) {}
+    }
+}
+
+async function obradiRealtimePoruku(channelName, payload) {
+    if (!payload) return;
+    let eventName = payload.event;
+    let eventData = payload.data;
+
+    if (typeof payload === 'string') {
+        try {
+            const parsed = JSON.parse(payload);
+            eventName = parsed.event || eventName;
+            eventData = parsed.data !== undefined ? parsed.data : eventData;
+        } catch (_) {}
+    }
+
+    const response = {
+        channel: channelName,
+        event: eventName,
+        data: eventData
+    };
+
+    return await obradiPusherPoruku(response);
+}
+
+// Globalno izlažemo metode na state radi prevencije kružnih zavisnosti
+state.pretplatiNaChatroom = pretplatiNaChatroom;
+state.otkaziPretplatu = otkaziPretplatu;
+
+async function povezi() {
     if (state.isShuttingDown) {
         utils.log('WARN', 'Gašenje u toku — preskačem ponovno povezivanje na WebSocket.');
         return;
@@ -389,66 +514,61 @@ function povezi() {
     }
 
     if (state.isConnecting) {
-        utils.log('INFO', 'Konekcija na WebSocket je već u toku — preskačem duplirani poziv.');
+        utils.log('INFO', 'Konekcija na Kick Realtime je već u toku — preskačem duplirani poziv.');
         return;
     }
     state.isConnecting = true;
 
-    if (state.ws) {
+    if (state.centrifuge) {
         try {
-            state.ws.removeAllListeners();
-            if (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING) {
-                state.ws.terminate();
-            }
+            state.centrifuge.removeAllListeners();
+            state.centrifuge.disconnect();
         } catch (_) {}
-        state.ws = null;
+        state.centrifuge = null;
     }
 
-    utils.log('INFO', 'Povezujem se na Kick Pusher WebSocket...');
-    const pusherUrl = config.PUSHER_URL || 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false';
-    state.ws = new WebSocket(pusherUrl);
+    utils.log('INFO', 'Povezujem se na Kick Realtime WebSocket (Centrifugo)...');
+    const wsUrl = config.REALTIME_WS_URL || 'wss://realtime.us-east-1.platform.kick.com/connection/websocket';
 
-    state.ws.on('open', () => {
-        state.isConnecting = false;
-        state.isConnected = true;
-        state.reconnectAttempt = 0;
-        utils.log('INFO', 'Uspešno povezan na Kick Pusher!');
+    try {
+        state.centrifuge = new Centrifuge(wsUrl, {
+            websocket: WebSocket,
+            getToken: async () => {
+                return await getRealtimeToken();
+            },
+            maxReconnectDelay: 10000,
+            minReconnectDelay: 1000
+        });
 
-        for (const chatroomId of Object.keys(state.channels)) {
-            const channelState = state.channels[chatroomId];
-            const subId = channelState.realChatroomId || chatroomId;
-            state.ws.send(JSON.stringify({
-                event: 'pusher:subscribe',
-                data: { channel: `chatrooms.${subId}.v2` }
-            }));
-        }
+        state.centrifuge.on('connected', (ctx) => {
+            state.isConnecting = false;
+            state.isConnected = true;
+            state.reconnectAttempt = 0;
+            utils.log('INFO', 'Uspešno povezan na Kick Realtime WebSocket (Centrifugo)!');
 
-        startHeartbeat();
-    });
+            for (const chatroomId of Object.keys(state.channels)) {
+                pretplatiNaChatroom(chatroomId);
+            }
+        });
 
-    state.ws.on('message', obradiPusherPoruku);
+        state.centrifuge.on('disconnected', (ctx) => {
+            state.isConnecting = false;
+            state.isConnected = false;
+            utils.log('WARN', `Kick Realtime konekcija zatvorena. Kod: ${ctx.code}, Razlog: ${ctx.reason || 'nema'}`);
+        });
 
-    state.ws.on('close', (kod, razlog) => {
+        state.centrifuge.on('error', (ctx) => {
+            state.isConnecting = false;
+            utils.log('ERR', `Kick Realtime greška: ${ctx.error?.message || ctx.error}`);
+        });
+
+        state.centrifuge.connect();
+    } catch (err) {
         state.isConnecting = false;
         state.isConnected = false;
-        stopHeartbeat();
-        utils.log('WARN', `WebSocket konekcija zatvorena. Kod: ${kod}, Razlog: ${razlog || 'nema'}`);
-        const isImmediate = kod === 4200 || kod === 4201 || kod === 4202;
-        scheduleReconnect(isImmediate);
-    });
-
-    state.ws.on('error', (greska) => {
-        state.isConnecting = false;
-        const isTransient = greska.code === 'ECONNRESET' ||
-                            greska.code === 'ETIMEDOUT' ||
-                            greska.code === 'EPIPE' ||
-                            (greska.message && greska.message.includes('ECONNRESET'));
-        if (isTransient) {
-            utils.log('WARN', `WebSocket prolazni prekid veze (${greska.code || 'ECONNRESET'}): ${greska.message}`);
-        } else {
-            utils.log('ERR', `WebSocket greška: ${greska.message}`);
-        }
-    });
+        utils.log('ERR', `Neuspešno pokretanje Kick Realtime klijenta: ${err.message}`);
+        scheduleReconnect();
+    }
 }
 
 function prekiniKonekciju() {
@@ -456,6 +576,13 @@ function prekiniKonekciju() {
     if (state.reconnectTimer) {
         clearTimeout(state.reconnectTimer);
         state.reconnectTimer = null;
+    }
+    if (state.centrifuge) {
+        try {
+            state.centrifuge.removeAllListeners();
+            state.centrifuge.disconnect();
+        } catch (_) {}
+        state.centrifuge = null;
     }
     if (state.ws) {
         try {
@@ -476,5 +603,9 @@ module.exports = {
     startHeartbeat,
     stopHeartbeat,
     prekiniKonekciju,
-    obradiPusherPoruku
+    obradiPusherPoruku,
+    obradiRealtimePoruku,
+    pretplatiNaChatroom,
+    otkaziPretplatu,
+    getRealtimeToken
 };

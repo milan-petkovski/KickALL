@@ -2915,7 +2915,7 @@ if (typeof localStorage === 'undefined') {
       return false;
     }
 
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
       let resolved = false;
       const timeout = setTimeout(() => {
         if (!resolved) {
@@ -2927,8 +2927,21 @@ if (typeof localStorage === 'undefined') {
         }
       }, 10000);
 
+      let tokenInfo = null;
       try {
-        kickWebSocket = new WebSocket('wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false');
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const apiBase = window.CONFIG?.getBackendApiBase ? window.CONFIG.getBackendApiBase() : (isLocal ? 'http://localhost:3000' : window.location.origin);
+        const res = await fetch(`${apiBase}/api/kick/realtime-token`, { signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+          tokenInfo = await res.json();
+        }
+      } catch (_) {}
+
+      const realtimeWsUrl = tokenInfo?.ws_url || 'wss://realtime.us-east-1.platform.kick.com/connection/websocket';
+      const realtimeToken = tokenInfo?.token;
+
+      try {
+        kickWebSocket = new WebSocket(realtimeWsUrl);
       } catch (e) {
         clearTimeout(timeout);
         showToast('Greška pri kreiranju WebSocket konekcije.', 'error');
@@ -2942,10 +2955,14 @@ if (typeof localStorage === 'undefined') {
         if (resolved) return;
         resolved = true;
         clearTimeout(timeout);
-        kickWebSocket.send(JSON.stringify({ event: 'pusher:subscribe', data: { auth: '', channel: `chatrooms.${chatroomId}.v2` } }));
+
+        if (realtimeToken) {
+          kickWebSocket.send(JSON.stringify({ id: 1, connect: { token: realtimeToken } }));
+        }
+
         if (pingInterval) clearInterval(pingInterval);
         pingInterval = setInterval(() => {
-          if (kickWebSocket?.readyState === WebSocket.OPEN) kickWebSocket.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
+          if (kickWebSocket?.readyState === WebSocket.OPEN) kickWebSocket.send(JSON.stringify({}));
         }, 25000);
         showToast(`Povezan chat za kanal: ${channelName}`, 'success');
         resolve(true);
@@ -2989,9 +3006,21 @@ if (typeof localStorage === 'undefined') {
       const processedMessageIds = new Set();
       kickWebSocket.onmessage = (event) => {
         try {
+          if (!event.data || event.data === '{}') return;
           const d = JSON.parse(event.data);
-          if ((d.event || '').includes('ChatMessage')) {
-            const payload = typeof d.data === 'string' ? JSON.parse(d.data) : d.data;
+
+          if (d.id === 1 && d.connect) {
+            kickWebSocket.send(JSON.stringify({ id: 2, subscribe: { channel: `chatrooms.${chatroomId}.v2` } }));
+            return;
+          }
+
+          const pubData = d.push?.pub?.data || d.data;
+          if (!pubData) return;
+
+          const evName = pubData.event || d.event || '';
+          if (evName.includes('ChatMessage')) {
+            const rawPayload = pubData.data !== undefined ? pubData.data : pubData;
+            const payload = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload;
             const sender  = payload?.sender?.username || payload?.sender?.slug || payload?.username;
             const text    = payload?.content || payload?.message;
             if (sender && text) {

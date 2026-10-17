@@ -953,13 +953,24 @@
       return;
     }
 
-    const pusherUrl = 'wss://ws-us2.pusher.com/app/32cbd69e4b950bf97679?protocol=7&client=js&version=8.5.0&flash=false';
+    let tokenInfo = null;
+    try {
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const apiBase = window.CONFIG?.getBackendApiBase ? window.CONFIG.getBackendApiBase() : (isLocal ? 'http://localhost:3000' : window.location.origin);
+      const res = await fetch(`${apiBase}/api/kick/realtime-token`, { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        tokenInfo = await res.json();
+      }
+    } catch (_) {}
+
+    const realtimeWsUrl = tokenInfo?.ws_url || 'wss://realtime.us-east-1.platform.kick.com/connection/websocket';
+    const realtimeToken = tokenInfo?.token;
 
     // Reconnect state — reset pri svakom svesnom pozivu connectToRealKickChat
     if (!connectToRealKickChat._retryCount) connectToRealKickChat._retryCount = 0;
 
     try {
-      kickWebSocket = new WebSocket(pusherUrl);
+      kickWebSocket = new WebSocket(realtimeWsUrl);
     } catch (err) {
       console.warn('[Kickan] WebSocket init greška:', err);
       return;
@@ -969,20 +980,17 @@
       connectToRealKickChat._retryCount = 0; // Reset po uspešnom spajanju
       console.info(`[Kickan] Realtime Connected: chatroom ${chatroomId}`);
 
-      kickWebSocket.send(JSON.stringify({
-        event: 'pusher:subscribe',
-        data: { auth: '', channel: `chatrooms.${chatroomId}.v2` }
-      }));
-
-      kickWebSocket.send(JSON.stringify({
-        event: 'pusher:subscribe',
-        data: { auth: '', channel: `chatrooms.${chatroomId}` }
-      }));
+      if (realtimeToken) {
+        kickWebSocket.send(JSON.stringify({
+          id: 1,
+          connect: { token: realtimeToken }
+        }));
+      }
 
       if (pingInterval) clearInterval(pingInterval);
       pingInterval = setInterval(() => {
         if (kickWebSocket?.readyState === WebSocket.OPEN) {
-          kickWebSocket.send(JSON.stringify({ event: 'pusher:ping', data: {} }));
+          kickWebSocket.send(JSON.stringify({}));
         }
       }, WS_PING_INTERVAL_MS);
     };
@@ -1006,6 +1014,7 @@
 
     kickWebSocket.onmessage = (event) => {
       if (!isTrackingActive) return;
+      if (!event.data || event.data === '{}') return;
 
       let msgData;
       try {
@@ -1015,14 +1024,27 @@
         return;
       }
 
+      // Ako je odgovor na connect handshake, pretplaćujemo se na chatroom
+      if (msgData.id === 1 && msgData.connect) {
+        kickWebSocket.send(JSON.stringify({
+          id: 2,
+          subscribe: { channel: `chatrooms.${chatroomId}.v2` }
+        }));
+        return;
+      }
+
+      const pubData = msgData.push?.pub?.data || msgData.data;
+      if (!pubData) return;
+
       try {
-        const evName = msgData.event || '';
+        const evName = pubData.event || msgData.event || '';
+        const rawPayload = pubData.data !== undefined ? pubData.data : pubData;
 
         if (evName.includes('ChatMessageEvent') || evName.includes('ChatMessageSentEvent')) {
-          const payload = typeof msgData.data === 'string' ? JSON.parse(msgData.data) : msgData.data;
+          const payload = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload;
           processChatMessageEvent(payload);
         } else if (evName.includes('UserBannedEvent') || evName.includes('MessageDeletedEvent')) {
-          const payload = typeof msgData.data === 'string' ? JSON.parse(msgData.data) : msgData.data;
+          const payload = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload;
           processBanEvent(payload, evName.includes('MessageDeleted') ? 'Delete' : 'Ban');
         } else if (evName.includes('StreamHostEvent')) {
           liveStats.totalHosts++;
@@ -1035,7 +1057,7 @@
           addRecentEventMessage('Pretplata', 'Novi sub / poklonjena pretplata!');
           throttledUpdateUI();
         } else if (evName.includes('KicksGiftedEvent') || evName.includes('KicksGifted') || evName.includes('GiftedKicks') || evName.includes('KicksEvent')) {
-          const payload = typeof msgData.data === 'string' ? JSON.parse(msgData.data) : msgData.data;
+          const payload = typeof rawPayload === 'string' ? JSON.parse(rawPayload) : rawPayload;
           const amount = parseInt(payload?.amount || payload?.kicks || payload?.gift_amount || payload?.kicks_amount || 10, 10) || 10;
           liveStats.totalKicks += amount;
           playAlertSound('event');
@@ -1043,7 +1065,7 @@
           throttledUpdateUI();
         }
       } catch (err) {
-        console.warn('[Kickan] WS event obrada greška:', err);
+        console.warn('[Kickan] Greška pri obradi WS poruke:', err);
       }
     };
   }

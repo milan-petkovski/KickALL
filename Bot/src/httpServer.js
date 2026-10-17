@@ -200,6 +200,24 @@ async function handleHttpRequest(req, res) {
             return;
         }
 
+        // ─── Kick Realtime Token Endpoint (za Dashboard frontend) ───────────
+        if (parsedUrl.pathname === '/api/kick/realtime-token' && (req.method === 'GET' || req.method === 'POST')) {
+            try {
+                const connectionMod = require('./connection');
+                const configMod = require('./config');
+                const token = await connectionMod.getRealtimeToken();
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    token,
+                    ws_url: configMod.REALTIME_WS_URL || 'wss://realtime.us-east-1.platform.kick.com/connection/websocket'
+                }));
+            } catch (tokenErr) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Failed to retrieve realtime token', detail: tokenErr.message }));
+            }
+            return;
+        }
+
         // ─── Kick OAuth2 Token Exchange API (za Live Server / 5500) ──────────
         if (parsedUrl.pathname === '/api/kick/exchange' && req.method === 'POST') {
             let body = '';

@@ -265,11 +265,8 @@ async function pokreniKanal(chatroomId, channelUsername, dbConfig) {
         ]);
 
         // Ako je WebSocket već otvoren, odmah se pretplatimo na ovaj čet
-        if (state.isConnected && state.ws && state.ws.readyState === WebSocket.OPEN) {
-            state.ws.send(JSON.stringify({
-                event: 'pusher:subscribe',
-                data: { channel: `chatrooms.${channelState.realChatroomId || chatroomId}.v2` }
-            }));
+        if (state.isConnected && typeof state.pretplatiNaChatroom === 'function') {
+            state.pretplatiNaChatroom(chatroomId);
         }
 
         // Pokrećemo auto-announce vremenski tajmer za ovaj kanal
@@ -318,12 +315,8 @@ async function zaustaviKanal(chatroomId) {
         }
 
         // Otkazivanje pretplate sa četa
-        if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-            const subId = channelState.realChatroomId || chatroomId;
-            state.ws.send(JSON.stringify({
-                event: 'pusher:unsubscribe',
-                data: { channel: `chatrooms.${subId}.v2` }
-            }));
+        if (typeof state.otkaziPretplatu === 'function') {
+            state.otkaziPretplatu(chatroomId);
         }
 
         // Čišćenje tajmera
