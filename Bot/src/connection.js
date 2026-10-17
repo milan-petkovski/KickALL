@@ -51,6 +51,23 @@ function startHeartbeat() {
     }, config.HEARTBEAT_MS || 25000);
 }
 
+const TOKEN_ROTATION_MS = 25 * 60 * 1000; // 25 minuta (Kick JWT token ističe za 45 minuta)
+
+function stopTokenRotation() {
+    if (state.tokenRotationTimer) {
+        clearTimeout(state.tokenRotationTimer);
+        state.tokenRotationTimer = null;
+    }
+}
+
+function startTokenRotation() {
+    stopTokenRotation();
+    state.tokenRotationTimer = setTimeout(() => {
+        utils.log('INFO', 'Proaktivna rotacija Kick Realtime tokena (pre isteka sesije)...');
+        povezi();
+    }, TOKEN_ROTATION_MS);
+}
+
 function scheduleReconnect(immediate = false) {
     if (state.isShuttingDown) return;
 
@@ -61,7 +78,7 @@ function scheduleReconnect(immediate = false) {
 
     if (immediate) {
         state.reconnectAttempt = 0;
-        utils.log('INFO', 'Hitna rekonekcija na WebSocket (kod 4200/4201) za 0.5s...');
+        utils.log('INFO', 'Hitna rekonekcija na WebSocket za 0.5s...');
         state.reconnectTimer = setTimeout(() => {
             state.reconnectTimer = null;
             povezi();
@@ -436,6 +453,60 @@ async function getRealtimeToken() {
     }
 }
 
+function clearConnectingTimeout() {
+    if (state.connectingTimeout) {
+        clearTimeout(state.connectingTimeout);
+        state.connectingTimeout = null;
+    }
+}
+
+function startLivenessWatchdog() {
+    stopLivenessWatchdog();
+    state.livenessWatchdogTimer = setInterval(() => {
+        if (state.isShuttingDown || !state.isLeader) return;
+
+        // 1. Ako je bot diskonektovan, a nijedan tajmer za povezivanje/rekonekciju nije aktivan
+        if (!state.isConnected && !state.isConnecting && !state.reconnectTimer) {
+            utils.log('WARN', '[WATCHDOG] Realtime konekcija je prekinuta i nije zakazana rekonekcija. Pokrećem automatski oporavak...');
+            scheduleReconnect(true);
+            return;
+        }
+
+        // 2. Ako state vodi da smo povezani, proveravamo stvarno stanje klijenta
+        if (state.isConnected && state.centrifuge) {
+            if (state.centrifuge.state !== 'connected') {
+                utils.log('WARN', `[WATCHDOG] Otkriven nesklad stanja (centrifuge.state=${state.centrifuge.state}, isConnected=true). Resetujem konekciju...`);
+                state.isConnected = false;
+                state.isConnecting = false;
+                scheduleReconnect(true);
+                return;
+            }
+
+            // 3. Provera pretplata za sve aktivne kanale
+            for (const chatroomId of Object.keys(state.channels)) {
+                const channelState = state.channels[chatroomId];
+                if (channelState && channelState.botActive !== false) {
+                    const subId = channelState.realChatroomId || chatroomId;
+                    const channelName = `chatrooms.${subId}.v2`;
+                    const sub = state.centrifuge.getSubscription(channelName);
+                    if (!sub || sub.state === 'unsubscribed') {
+                        utils.log('WARN', `[WATCHDOG] Kanal ${channelName} nije aktivan u pretplatama. Ponovo pretplaćujem...`);
+                        pretplatiNaChatroom(chatroomId);
+                    }
+                }
+            }
+        }
+    }, 45000);
+    if (state.livenessWatchdogTimer.unref) state.livenessWatchdogTimer.unref();
+}
+
+function stopLivenessWatchdog() {
+    if (state.livenessWatchdogTimer) {
+        clearInterval(state.livenessWatchdogTimer);
+        state.livenessWatchdogTimer = null;
+    }
+}
+
 function pretplatiNaChatroom(chatroomId) {
     if (!state.centrifuge) return;
     const channelState = state.channels[chatroomId];
@@ -449,10 +520,27 @@ function pretplatiNaChatroom(chatroomId) {
             utils.log('INFO', `Uspešno pretplaćen na kanal četa: ${channelName}`);
         });
         sub.on('publication', (ctx) => {
-            obradiRealtimePoruku(channelName, ctx.data);
+            try {
+                const res = obradiRealtimePoruku(channelName, ctx.data);
+                if (res && typeof res.catch === 'function') {
+                    res.catch((err) => {
+                        utils.log('ERR', `Greška pri asinhronoj obradi poruke sa kanala ${channelName}: ${err.message}`);
+                    });
+                }
+            } catch (err) {
+                utils.log('ERR', `Greška pri prijemu poruke sa kanala ${channelName}: ${err.message}`);
+            }
         });
         sub.on('error', (ctx) => {
             utils.log('WARN', `Centrifugo greška na kanalu ${channelName}: ${ctx.error?.message || ctx.error}`);
+            // Ako je pretplata otkazana usled greške na serveru, ponovo je pokrećemo
+            if (sub.state === 'unsubscribed' && !state.isShuttingDown && state.isConnected) {
+                setTimeout(() => {
+                    if (state.centrifuge && state.isConnected) {
+                        pretplatiNaChatroom(chatroomId);
+                    }
+                }, 2000);
+            }
         });
         sub.subscribe();
     } else if (sub.state === 'unsubscribed') {
@@ -502,7 +590,7 @@ async function obradiRealtimePoruku(channelName, payload) {
 state.pretplatiNaChatroom = pretplatiNaChatroom;
 state.otkaziPretplatu = otkaziPretplatu;
 
-async function povezi() {
+async function povezi(force = false) {
     if (state.isShuttingDown) {
         utils.log('WARN', 'Gašenje u toku — preskačem ponovno povezivanje na WebSocket.');
         return;
@@ -513,11 +601,30 @@ async function povezi() {
         state.reconnectTimer = null;
     }
 
-    if (state.isConnecting) {
+    if (state.isConnecting && !force) {
         utils.log('INFO', 'Konekcija na Kick Realtime je već u toku — preskačem duplirani poziv.');
         return;
     }
     state.isConnecting = true;
+    stopTokenRotation();
+    clearConnectingTimeout();
+
+    // Watchdog za slučaj da povezivanje visi duže od 20s
+    state.connectingTimeout = setTimeout(() => {
+        if (state.isConnecting && !state.isConnected) {
+            utils.log('WARN', 'Kick Realtime povezivanje je prekoračilo vremenski limit (20s). Resetujem i zakazujem rekonekciju...');
+            state.isConnecting = false;
+            if (state.centrifuge) {
+                try {
+                    state.centrifuge.removeAllListeners();
+                    state.centrifuge.disconnect();
+                } catch (_) {}
+                state.centrifuge = null;
+            }
+            scheduleReconnect(true);
+        }
+    }, 20000);
+    if (state.connectingTimeout.unref) state.connectingTimeout.unref();
 
     if (state.centrifuge) {
         try {
@@ -540,11 +647,22 @@ async function povezi() {
             minReconnectDelay: 1000
         });
 
+        // Sprečavamo slanje in-place { refresh: { token } } RPC paketa koji Kick server odbija sa kodom 3500 (invalid token).
+        // Umesto toga, pri svakom zahtevu za osvežavanje pokrećemo čistu rekonekciju sa novim tokenom.
+        state.centrifuge._refresh = () => {
+            utils.log('INFO', 'Zahtev za osvežavanje tokena — pokrećem bezbednu rotaciju konekcije...');
+            povezi(true);
+        };
+
         state.centrifuge.on('connected', (ctx) => {
+            clearConnectingTimeout();
             state.isConnecting = false;
             state.isConnected = true;
             state.reconnectAttempt = 0;
             utils.log('INFO', 'Uspešno povezan na Kick Realtime WebSocket (Centrifugo)!');
+
+            startTokenRotation();
+            startLivenessWatchdog();
 
             for (const chatroomId of Object.keys(state.channels)) {
                 pretplatiNaChatroom(chatroomId);
@@ -552,20 +670,35 @@ async function povezi() {
         });
 
         state.centrifuge.on('disconnected', (ctx) => {
+            clearConnectingTimeout();
             state.isConnecting = false;
             state.isConnected = false;
+            stopTokenRotation();
             utils.log('WARN', `Kick Realtime konekcija zatvorena. Kod: ${ctx.code}, Razlog: ${ctx.reason || 'nema'}`);
+
+            if (state.isShuttingDown) return;
+
+            // Kodovi 3500-3999 (npr. 3500 invalid token) i 4200/4201 su terminalni za Centrifuge
+            // Centrifuge na njima gasi interni reconnect, pa uvek pokrećemo naš robustni reconnect mehanizam
+            const isTerminalError = ctx.code === 3500 || ctx.code === 3502 || ctx.code === 4200 || ctx.code === 4201;
+            scheduleReconnect(isTerminalError);
         });
 
         state.centrifuge.on('error', (ctx) => {
+            clearConnectingTimeout();
             state.isConnecting = false;
             utils.log('ERR', `Kick Realtime greška: ${ctx.error?.message || ctx.error}`);
+            if (!state.isConnected && !state.reconnectTimer && !state.isShuttingDown) {
+                scheduleReconnect();
+            }
         });
 
         state.centrifuge.connect();
     } catch (err) {
+        clearConnectingTimeout();
         state.isConnecting = false;
         state.isConnected = false;
+        stopTokenRotation();
         utils.log('ERR', `Neuspešno pokretanje Kick Realtime klijenta: ${err.message}`);
         scheduleReconnect();
     }
@@ -573,6 +706,9 @@ async function povezi() {
 
 function prekiniKonekciju() {
     stopHeartbeat();
+    stopTokenRotation();
+    stopLivenessWatchdog();
+    clearConnectingTimeout();
     if (state.reconnectTimer) {
         clearTimeout(state.reconnectTimer);
         state.reconnectTimer = null;
@@ -602,6 +738,11 @@ module.exports = {
     scheduleReconnect,
     startHeartbeat,
     stopHeartbeat,
+    startTokenRotation,
+    stopTokenRotation,
+    startLivenessWatchdog,
+    stopLivenessWatchdog,
+    clearConnectingTimeout,
     prekiniKonekciju,
     obradiPusherPoruku,
     obradiRealtimePoruku,

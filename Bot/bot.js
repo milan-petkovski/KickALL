@@ -431,31 +431,36 @@ async function start() {
     await acquireStartupLeadership();
 
     if (database.KORISTI_SUPABASE && database.supabase) {
-        // 1. Učitaj sve kanale koji imaju aktivnog bota
-        const aktivniKanali = await database.ucitajSveAktivneKanale();
-        utils.log('INFO', `Pronađeno ${aktivniKanali.length} aktivnih kanala u bazi.`);
+        try {
+            // 1. Učitaj sve kanale koji imaju aktivnog bota
+            const aktivniKanali = await database.ucitajSveAktivneKanale();
+            utils.log('INFO', `Pronađeno ${aktivniKanali.length} aktivnih kanala u bazi.`);
 
-        // 2. Pokreni i učitaj svaki od njih paralelno
-        for (const dbConfig of aktivniKanali) {
-            const chatroomId = String(dbConfig.channel_id);
-            const channelUsername = dbConfig.channel_name || 'Nepoznat';
-            try {
-                await channelManager.pokreniKanal(chatroomId, channelUsername, dbConfig);
-            } catch (err) {
-                utils.log('ERR', `Greška pri pokretanju kanala @${channelUsername}: ${err.message}`);
+            // 2. Pokreni i učitaj svaki od njih paralelno
+            for (const dbConfig of aktivniKanali) {
+                const chatroomId = String(dbConfig.channel_id);
+                const channelUsername = dbConfig.channel_name || 'Nepoznat';
+                try {
+                    await channelManager.pokreniKanal(chatroomId, channelUsername, dbConfig);
+                } catch (err) {
+                    utils.log('ERR', `Greška pri pokretanju kanala @${channelUsername}: ${err.message}`);
+                }
             }
+
+            // 3. Pokreni globalne watchtime tick cikluse
+            watchtime.pokreniWatchtimeTick();
+
+            // 3b. Sinhronizuj pending pretplate iz Supabase baze
+            await channelManager.syncPendingSubscriptions();
+            state.syncSubscriptionsTimer = setInterval(channelManager.syncPendingSubscriptions, 3 * 60 * 1000);
+            if (state.syncSubscriptionsTimer && state.syncSubscriptionsTimer.unref) state.syncSubscriptionsTimer.unref();
+        } catch (dbInitErr) {
+            utils.log('ERR', `Greška pri početnoj inicijalizaciji iz baze: ${dbInitErr.message}`);
         }
 
-        // 3. Pokreni globalne watchtime tick cikluse
-        watchtime.pokreniWatchtimeTick();
-
-        // 3b. Sinhronizuj pending pretplate iz Supabase baze
-        await channelManager.syncPendingSubscriptions();
-        state.syncSubscriptionsTimer = setInterval(channelManager.syncPendingSubscriptions, 3 * 60 * 1000);
-        if (state.syncSubscriptionsTimer && state.syncSubscriptionsTimer.unref) state.syncSubscriptionsTimer.unref();
-
-        // 4. Poveži WebSocket na Kick Pusher
+        // 4. Poveži WebSocket na Kick Realtime i pokreni nadzorni watchdog
         connection.povezi();
+        connection.startLivenessWatchdog();
 
         // 5. Pokreni periodičnu proaktivnu proveru live statusa
         state.checkLiveTimer = setInterval(channelManager.proveriDaLiSuLiveSvi, 2 * 60 * 1000);

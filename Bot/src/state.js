@@ -135,11 +135,13 @@ module.exports = {
     channels,
     getChannelState,
 
-    // Globalni WebSocket i statusi konekcije
+    // Globalni WebSocket / Centrifuge i statusi konekcije
     ws: null,
+    centrifuge: null,
     isConnected: false,
     reconnectAttempt: 0,
     heartbeatTimer: null,
+    tokenRotationTimer: null,
     watchtimeTickTimer: null,
 
     // Globalni status autentifikacije bota
@@ -157,6 +159,8 @@ module.exports = {
     // Reconnect i konekcioni guard-ovi
     isConnecting: false,
     reconnectTimer: null,
+    connectingTimeout: null,
+    livenessWatchdogTimer: null,
 
     // Globalni periodični tajmeri
     syncSubscriptionsTimer: null,
