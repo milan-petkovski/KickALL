@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://kickall.app">
-    <img src="https://kickall.app/assets/kickall.webp" alt="KickALL Ecosystem Banner" width="820" style="border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.4);" />
+    <img src="https://milanwebportal.com/images/Projects/kickall.webp" alt="KickALL Ecosystem Banner" width="820" style="border-radius: 12px; box-shadow: 0 12px 36px rgba(0,0,0,0.4);" />
   </a>
   <h1>KickALL Ecosystem</h1>
   <p><b>Comprehensive multi-channel streaming toolkit and ecosystem built exclusively for Kick.com creators and communities.</b></p>
@@ -264,3 +264,6 @@ This project is open-source software licensed under the [MIT License](LICENSE).
 - **Contact & Support**: `contact@milanwebportal.com`
 - **Parent Network**: [Milan Web Portal](https://milanwebportal.com)
 - **Support the Project**: [Support via PayPal](https://paypal.me/milanwebportal)
+
+---
+<p align="center">Made with ❤️ by <b>Milan Web Portal</b></p>
