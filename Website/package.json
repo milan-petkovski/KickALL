@@ -2,6 +2,10 @@
   "name": "kickall-website",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.22.1"
+  },
   "scripts": {
     "dev": "npx serve . -p 5500 -c serve.json",
     "start": "npx serve . -p 5500 -c serve.json",

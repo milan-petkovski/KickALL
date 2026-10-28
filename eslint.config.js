@@ -22,7 +22,7 @@ module.exports = [
       }
     },
     rules: {
-      "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrors": "none" }],
       "no-undef": "off",
       "no-console": "off"
     }
@@ -43,7 +43,7 @@ module.exports = [
       }
     },
     rules: {
-      "no-unused-vars": ["warn", { "vars": "local", "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+      "no-unused-vars": ["warn", { "vars": "local", "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrors": "none" }],
       "no-undef": "off",
       "no-console": "off"
     }
