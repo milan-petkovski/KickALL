@@ -96,10 +96,17 @@ state.memoryCleanupTimer = setInterval(() => {
             }
         }
 
-        // 6. Duplicate tracker
+        // 6. Duplicate tracker & Recent user messages
         if (channelState.duplicateTracker) {
             for (const [user, data] of channelState.duplicateTracker.entries()) {
                 if (data && data.timestamp && (sada - data.timestamp > 3600000)) channelState.duplicateTracker.delete(user);
+            }
+        }
+        if (channelState.recentUserMessages) {
+            for (const [user, msgs] of channelState.recentUserMessages.entries()) {
+                const fresh = Array.isArray(msgs) ? msgs.filter(m => sada - m.ts < 120000) : [];
+                if (fresh.length === 0) channelState.recentUserMessages.delete(user);
+                else channelState.recentUserMessages.set(user, fresh);
             }
         }
 
@@ -126,6 +133,22 @@ state.memoryCleanupTimer = setInterval(() => {
         const threshold = sada - 60000;
         for (const [msgId, ts] of connection.processedMessageCache.entries()) {
             if (ts < threshold) connection.processedMessageCache.delete(msgId);
+        }
+    }
+
+    // 10. Proaktivni RAM Watchdog za prevenciju OOM (Out Of Memory) rušenja na hostingu
+    const memUsage = process.memoryUsage();
+    const rssMb = memUsage.rss / 1024 / 1024;
+    if (rssMb > 420) {
+        utils.log('WARN', `[RAM-WATCHDOG] Potrošnja radne memorije povišena (${Math.round(rssMb)}MB). Pokrećem proaktivno rasterećenje bafera...`);
+        if (state.globalLogs && state.globalLogs.length > 10) {
+            state.globalLogs = state.globalLogs.slice(-10);
+        }
+        if (connection.processedMessageCache) {
+            connection.processedMessageCache.clear();
+        }
+        if (global.gc) {
+            try { global.gc(); } catch (_) {}
         }
     }
 }, 10 * 60 * 1000).unref();
@@ -586,6 +609,36 @@ async function start() {
                         if (row.enabled !== undefined) {
                             state.channels[chatroomId].gamble_enabled = !!row.enabled;
                         }
+                    }
+                }
+            })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'custom_commands'
+            }, async (payload) => {
+                const { new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (row && row.channel_id) {
+                    const chatroomId = String(row.channel_id);
+                    if (state.channels[chatroomId]) {
+                        logDebouncedUpdate(`custom_commands::${chatroomId}`, `[REALTIME] Custom komande sinhronizovane za @${state.channels[chatroomId].channelUsername || chatroomId}.`);
+                        await database.ucitajCustomKomande(chatroomId);
+                    }
+                }
+            })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'song_request'
+            }, async (payload) => {
+                const { new: newRow, old: oldRow } = payload;
+                const row = newRow || oldRow;
+                if (row && row.channel_id) {
+                    const chatroomId = String(row.channel_id);
+                    if (state.channels[chatroomId]) {
+                        logDebouncedUpdate(`song_request::${chatroomId}`, `[REALTIME] Muzička lista sinhronizovana za @${state.channels[chatroomId].channelUsername || chatroomId}.`);
+                        await database.ucitajSongQueue(chatroomId);
                     }
                 }
             })

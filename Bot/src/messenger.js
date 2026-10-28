@@ -32,14 +32,29 @@ function scheduleQueueDrain(chatroomId) {
     const now = Date.now();
     let delay = 0;
 
-    // 1. Provera aktivne Kick 429 Too Many Requests blokade
-    if (channelState.rateLimitUntil && now < channelState.rateLimitUntil) {
+    // 1. Provera aktivne Kick 403 Forbidden pauze ili 429 Too Many Requests blokade
+    if (channelState.forbiddenUntil && now < channelState.forbiddenUntil) {
+        if (channelState.messageQueue.length > 3) {
+            channelState.messageQueue = channelState.messageQueue.slice(-2);
+        }
+        delay = Math.max(0, channelState.forbiddenUntil - now);
+    } else if (channelState.rateLimitUntil && now < channelState.rateLimitUntil) {
         delay = Math.max(0, channelState.rateLimitUntil - now);
     } else {
-        // 2. Leaky bucket regulator: obezbeđuje razmak od najmanje MIN_SEND_INTERVAL_MS
+        // 2. Dinamički prilagodljiv Leaky bucket: osnovni interval je MIN_SEND_INTERVAL_MS (1000ms).
+        // Ako se red poruka puni brže nego što se prazni (nagli skok aktivnosti),
+        // interval se postepeno adaptira (do 1800ms) radi sprečavanja Kick 429 blokada.
+        const queueLength = channelState.messageQueue.length;
+        let effectiveSendInterval = MIN_SEND_INTERVAL_MS;
+        if (queueLength > 10) {
+            effectiveSendInterval = Math.min(1800, MIN_SEND_INTERVAL_MS + (queueLength * 35));
+        } else if (queueLength > 5) {
+            effectiveSendInterval = 1200;
+        }
+
         const elapsed = now - (channelState.lastSentTimestamp || 0);
-        if (elapsed < MIN_SEND_INTERVAL_MS) {
-            delay = MIN_SEND_INTERVAL_MS - elapsed;
+        if (elapsed < effectiveSendInterval) {
+            delay = effectiveSendInterval - elapsed;
         }
     }
 
@@ -94,6 +109,7 @@ function resetQueue(chatroomId) {
     channelState.messageQueue = [];
     channelState.isProcessingQueue = false;
     channelState.rateLimitUntil = 0;
+    channelState.forbiddenUntil = 0;
 }
 
 async function izvrsiSlanje(chatroomId, tekst) {
@@ -146,16 +162,25 @@ async function pinujPoruku(chatroomId, messageId) {
 
         if (res.statusCode >= 200 && res.statusCode < 300) {
             log('INFO', `[${channelUsername}] Poruka uspešno pinovana na lajvu!`);
+            channelState.lastPinWarningTs = 0;
         } else if (res.statusCode === 401 || res.statusCode === 403) {
             kickAuth.obrisiKeshSesije();
-            log('WARN', `[${channelUsername}] Neuspešan pin poruke (HTTP ${res.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao. Pinovanje poruka zahteva aktivan session_cookie.`);
+            const now = Date.now();
+            if (!channelState.lastPinWarningTs || (now - channelState.lastPinWarningTs > 60 * 60 * 1000)) {
+                channelState.lastPinWarningTs = now;
+                log('WARN', `[${channelUsername}] Neuspešan pin poruke (HTTP ${res.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao. Pinovanje poruka zahteva aktivan session_cookie.`);
+            }
         } else {
             log('ERR', `[${channelUsername}] Neuspešan pin poruke: HTTP ${res.statusCode} - ${JSON.stringify(res.body)}`);
         }
     } catch (err) {
         if (err.response && (err.response.statusCode === 401 || err.response.statusCode === 403)) {
             kickAuth.obrisiKeshSesije();
-            log('WARN', `[${channelUsername}] Neuspešan pin poruke (HTTP ${err.response.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao.`);
+            const now = Date.now();
+            if (!channelState.lastPinWarningTs || (now - channelState.lastPinWarningTs > 60 * 60 * 1000)) {
+                channelState.lastPinWarningTs = now;
+                log('WARN', `[${channelUsername}] Neuspešan pin poruke (HTTP ${err.response.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao.`);
+            }
         } else {
             log('ERR', `[${channelUsername}] Greška pri pinovanju poruke: ${err.message}`);
         }
@@ -178,16 +203,25 @@ async function odpinujPoruku(chatroomId) {
 
         if (res.statusCode >= 200 && res.statusCode < 300) {
             log('INFO', `[${channelUsername}] Poruka uspešno odpinovana sa lajva!`);
+            channelState.lastPinWarningTs = 0;
         } else if (res.statusCode === 401 || res.statusCode === 403) {
             kickAuth.obrisiKeshSesije();
-            log('WARN', `[${channelUsername}] Neuspešan unpin poruke (HTTP ${res.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao.`);
+            const now = Date.now();
+            if (!channelState.lastPinWarningTs || (now - channelState.lastPinWarningTs > 60 * 60 * 1000)) {
+                channelState.lastPinWarningTs = now;
+                log('WARN', `[${channelUsername}] Neuspešan unpin poruke (HTTP ${res.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao.`);
+            }
         } else {
             log('ERR', `[${channelUsername}] Neuspešan unpin poruke: HTTP ${res.statusCode} - ${JSON.stringify(res.body)}`);
         }
     } catch (err) {
         if (err.response && (err.response.statusCode === 401 || err.response.statusCode === 403)) {
             kickAuth.obrisiKeshSesije();
-            log('WARN', `[${channelUsername}] Neuspešan unpin poruke (HTTP ${err.response.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao.`);
+            const now = Date.now();
+            if (!channelState.lastPinWarningTs || (now - channelState.lastPinWarningTs > 60 * 60 * 1000)) {
+                channelState.lastPinWarningTs = now;
+                log('WARN', `[${channelUsername}] Neuspešan unpin poruke (HTTP ${err.response.statusCode}): Sesijski kolačić bota (session_cookie) je nevažeći ili je istekao.`);
+            }
         } else {
             log('ERR', `[${channelUsername}] Greška pri unpinovanju poruke: ${err.message}`);
         }

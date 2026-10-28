@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const state = require('../src/state');
 const config = require('../src/config');
-const { spamFilter, normalizujZaPoredjenje } = require('../src/spam');
+const { spamFilter, normalizujZaPoredjenje, daLiJeBotSpam } = require('../src/spam');
 
 // Mock fetch to prevent network calls from messenger
 global.fetch = async () => ({
@@ -131,4 +131,56 @@ test('Spam - Bot komande ne podležu proveri identičnih poruka', () => {
     assert.equal(spamFilter(chatroomId, username, cmd), false);
     assert.equal(spamFilter(chatroomId, username, cmd), false);
 });
+
+test('Spam - daLiJeBotSpam prepoznaje kivasmm u svim oblicima razmaka i interpunkcije', () => {
+    assert.equal(daLiJeBotSpam('kivasmm com'), true);
+    assert.equal(daLiJeBotSpam('"kivasmm com"'), true);
+    assert.equal(daLiJeBotSpam('k iv a smm com'), true);
+    assert.equal(daLiJeBotSpam('k.i.v.a.s.m.m.c.o.m'), true);
+    assert.equal(daLiJeBotSpam('posetite k-i-v-a-s-m-m com'), true);
+    assert.equal(daLiJeBotSpam('@tutz_live Make your stream fire with "kivasmm com" @d90075'), true);
+    assert.equal(daLiJeBotSpam('@tutz_live Take your broadcast to the next level with k iv a smm com @536cc3'), true);
+});
+
+test('Spam - Pravi gledaoci i uobičajene poruke na srpskom i engleskom ne okidaju daLiJeBotSpam', () => {
+    assert.equal(daLiJeBotSpam('Pozdrav brate kako si'), false);
+    assert.equal(daLiJeBotSpam('idemo jako veceras'), false);
+    assert.equal(daLiJeBotSpam('koji ti je ovo bot?'), false);
+    assert.equal(daLiJeBotSpam('sta ima u igrici'), false);
+    assert.equal(daLiJeBotSpam('GG WP'), false);
+    assert.equal(daLiJeBotSpam('kako se zoves u cs2'), false);
+});
+
+test('Spam - Ponovljeni spam šalje samo opomenu u chatu bez timeout-a', () => {
+    const chatroomId = 'test_spam_room_warning_only';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.SPAM_THRESHOLD = 3;
+    channelState.SPAM_WINDOW_MS = 15000;
+    channelState.channelUsername = 'TestStreamer';
+
+    const username = 'Elena_Repeat';
+    const msg = '[emote:37217:Bwop]';
+
+    // Za kratke reakcije (poput pojedinačnog emote-a), prag je 5 poruka
+    spamFilter(chatroomId, username, msg);
+    spamFilter(chatroomId, username, msg);
+    spamFilter(chatroomId, username, msg);
+    spamFilter(chatroomId, username, msg);
+    // 5. poruka dostiže limit (opomena)
+    const res1 = spamFilter(chatroomId, username, msg);
+    assert.equal(res1, true);
+
+    // Simuliramo sledeći talas nakon isteka warning cooldown-a (60s)
+    channelState.lastWarned[username.toLowerCase()] = Date.now() - 65000;
+    channelState.spamTracker = {};
+
+    spamFilter(chatroomId, username, msg);
+    spamFilter(chatroomId, username, msg);
+    spamFilter(chatroomId, username, msg);
+    spamFilter(chatroomId, username, msg);
+    // Ponovni talas šalje opomenu, ne timeout
+    const res2 = spamFilter(chatroomId, username, msg);
+    assert.equal(res2, true);
+});
+
 

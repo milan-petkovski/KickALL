@@ -248,4 +248,95 @@ test('Moderation - Svi stvarni formati viewbot spama iz današnjeg lajva se 100%
     assert.equal(channelState.bannedUsers.has('bot_3db7e1'), true);
 });
 
+test('Moderation - Svi kivasmm i AI-powered bot šabloni iz Tutz_live lajva se 100% prepoznaju i banuju', () => {
+    const chatroomId = 'test_mod_kivasmm_suite';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.botActive = true;
+    channelState.feature_moderation = true;
+    channelState.bannedUsers = new Set();
+    channelState.isProcessingQueue = true;
+
+    const botSender = { id: 888, identity: { badges: [] } };
+
+    const botMessages = [
+        // 1. Komercijalne ponude i spaced-out SMM domeni
+        '@tutz_live Make your stream fire with "kivasmm com" @d90075',
+        '@tutz_live Take your broadcast to the next level with kivasmm com @5362e8',
+        '@tutz_live Take your broadcast to the next level with k iv a smm com @536cc3',
+        '@tutz_live Make your stream fire with "k iv a smm com" @8132b6',
+        '@tutz_live Take your broadcast to the next level with k iv a smm com @22d583',
+
+        // 2. AI-powered i automatizovani bot tekstovi sa cenzurisanim rečima
+        'With AI-powered ******* and zero-cost perks for supporters, highlight traction, and daily drops, your stream stays buzzing 24/7.',
+        'With AI-powered ******** community growth, replay reach, and complimentary reward events, your chat stays alive around the clock.',
+        'With AI-powered ******** new supporters, highlight reach, and daily reward drops on the house, your channel stays active around the clock.',
+        'Automate your stream traffic with continuous viewer flow and dedicated active chat tools.',
+        'Boost your overall channel visibility and audience engagement with cutting-edge automation.'
+    ];
+
+    botMessages.forEach((msg, idx) => {
+        const fakeUsername = `bot_target_${idx}`;
+        const triggered = proveriModeraciju(chatroomId, fakeUsername, msg, `msg_id_${idx}`, botSender);
+        assert.equal(triggered, true, `Poruka mora biti detektovana kao bot spam: "${msg}"`);
+        assert.equal(channelState.bannedUsers.has(fakeUsername), true, `Bot ${fakeUsername} mora biti odmah banovan`);
+    });
+});
+
+test('Moderation - ZAŠTITA PRAVOG ČOVEKA: Prijateljski pozdravi, komplimenti i obične poruke NIKADA se ne banuju', () => {
+    const chatroomId = 'test_mod_human_safety';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.botActive = true;
+    channelState.feature_moderation = true;
+    channelState.bannedUsers = new Set();
+    channelState.isProcessingQueue = true;
+
+    const regularHuman = { id: 12345, identity: { badges: [] } };
+
+    const humanMessages = [
+        'Hey legend, hope the stream is going amazing today',
+        'have a great broadcast today man',
+        'keep grinding, you are killing it',
+        'wishing you all the best on your stream',
+        '@a1b2c3 dobar stream brate!',
+        'pozz svima u cetu',
+        'jesi gladan tutz',
+        'sta se igra veceras',
+        'kako si danas',
+        'GG dobar mec',
+        'rekao mi je "super stvar com" haha'
+    ];
+
+    humanMessages.forEach((msg, idx) => {
+        const humanUser = `human_viewer_${idx}`;
+        const triggered = proveriModeraciju(chatroomId, humanUser, msg, `msg_human_${idx}`, regularHuman);
+        assert.equal(triggered, false, `Čovek ne sme biti banovan za poruku: "${msg}"`);
+        assert.equal(channelState.bannedUsers.has(humanUser), false, `Čovek ${humanUser} ne sme biti u bannedUsers`);
+    });
+});
+
+test('Moderation - Retroaktivno brisanje prethodnih poruka bota iz recentUserMessages pri banovanju', () => {
+    const chatroomId = 'test_mod_retro_del';
+    const channelState = state.getChannelState(chatroomId);
+    channelState.botActive = true;
+    channelState.feature_moderation = true;
+    channelState.bannedUsers = new Set();
+    channelState.recentUserMessages = new Map();
+    channelState.isProcessingQueue = true;
+
+    const botUser = 'stealth_bot_1';
+    // Zabeleži raniju naizgled običnu poruku pre nego što je poslao promo link
+    channelState.recentUserMessages.set(botUser, [
+        { id: 'prev_msg_101', ts: Date.now() - 5000 }
+    ]);
+
+    const botSender = { id: 999, identity: { badges: [] } };
+    const promoMsg = '@tutz_live Make your stream fire with "kivasmm com" @d90075';
+
+    const triggered = proveriModeraciju(chatroomId, botUser, promoMsg, 'current_msg_102', botSender);
+    assert.equal(triggered, true);
+    assert.equal(channelState.bannedUsers.has(botUser), true);
+    // recentUserMessages za tog bota mora biti očišćen nakon brisanja
+    assert.equal(channelState.recentUserMessages.has(botUser), false);
+});
+
 

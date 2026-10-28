@@ -24,6 +24,15 @@ async function proveriDaLiJeLive(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState) return;
     const channelUsername = channelState.channelUsername;
+    if (!channelUsername) return;
+
+    // Preskoči proveru live statusa za samog bota (bot nalog nije strimer)
+    const botName = (getBotUsername() || '').toLowerCase();
+    const unameLower = channelUsername.toLowerCase();
+    if (unameLower === botName || unameLower === 'kickotbot' || unameLower === 'kickot' || unameLower === 'bot') {
+        return;
+    }
+
     const realId = channelState.realChatroomId || chatroomId;
 
     try {
@@ -371,6 +380,7 @@ async function azurirajKonfiguracijuKanala(channelState, dbConfig) {
     channelState.botActive = dbConfig.bot_active || false;
 
     await database.ucitajAutoAnnounces(dbConfig.channel_id);
+    await database.ucitajCustomKomande(dbConfig.channel_id);
 
     channelState.announce_interval_mins = dbConfig.announce_interval_mins ?? 15;
     channelState.announce_message_threshold = dbConfig.announce_message_threshold ?? 30;

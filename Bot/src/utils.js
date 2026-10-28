@@ -177,6 +177,9 @@ async function fetchKickAPI(url) {
             url: url,
             responseType: 'json',
             headers: await kickScrapingHeaders(),
+            timeout: {
+                request: 12000
+            },
             retry: { limit: 0 }
         });
         
@@ -187,7 +190,7 @@ async function fetchKickAPI(url) {
             text: async () => JSON.stringify(response.body)
         };
     } catch (error) {
-        log('ERR', `gotScraping greška za ${url}: ${error.message}`);
+        log('WARN', `gotScraping greška za ${url}: ${error.message}`);
         return {
             ok: false,
             status: error.response ? error.response.statusCode : 500,

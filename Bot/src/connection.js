@@ -14,6 +14,8 @@ const spam = require('./spam');
 const streamAnalytics = require('./streamAnalytics');
 const commandRouter = require('./commandRouter');
 const channelManager = require('./channelManager');
+const raidDefense = require('./raidDefense');
+const metrics = require('./metrics');
 
 // ─── WEBSOCKET KONEKCIJA & SPLIT-BRAIN DEDUPLICATION ─────────────────────────
 const processedMessageCache = new Map();
@@ -291,7 +293,7 @@ async function obradiPusherPoruku(data) {
         const botKey = (channelManager.getBotUsername() || '').toLowerCase();
 
         // Preskačemo poznate eksterne botove
-        if (userKey === 'kickotbot' || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs') {
+        if (userKey === 'kickotbot' || userKey === 'botrix' || userKey === 'nightbot' || userKey === 'streamelements' || userKey === 'streamlabs' || userKey === 'kickbot' || userKey === 'kicklet' || userKey === '@kicklet') {
             return;
         }
 
@@ -323,7 +325,44 @@ async function obradiPusherPoruku(data) {
             }
         }
 
-        // Stream Analytics za Kickan
+        // Provera zaštite od masovnih napada i racija (Raid Defense)
+        metrics.inc('chat_messages');
+        if (raidDefense.proveriRaidPoruku(chatroomId, username, chatData.sender, channelState.channelUsername)) {
+            metrics.inc('raid_blocked_messages');
+            const messageId = chatData.id || chatData.messageId || null;
+            if (messageId) messenger.obrisiPoruku(chatroomId, messageId);
+            return;
+        }
+
+        // Evidentiraj nedavni messageId korisnika (radi retroaktivnog brisanja ako je multi-message spam bot)
+        const messageId = chatData.id || chatData.messageId || null;
+        if (messageId && !isPrivilegedUser) {
+            if (!channelState.recentUserMessages) {
+                channelState.recentUserMessages = new Map();
+            }
+            const nowTs = Date.now();
+            const recentList = (channelState.recentUserMessages.get(userKey) || [])
+                .filter(m => nowTs - m.ts < 120000)
+                .slice(-4);
+            recentList.push({ id: messageId, ts: nowTs });
+            channelState.recentUserMessages.set(userKey, recentList);
+        }
+
+        // Logujemo chat poruku
+        utils.log('CHAT', `[@${channelState.channelUsername || chatroomId}] ${username}: ${poruka}`);
+
+        // Automatska moderacija četa
+        if (moderation.proveriModeraciju(chatroomId, username, poruka, messageId, chatData.sender)) {
+            return;
+        }
+
+        // Anti-spam filter (izuzimamo strimera i bot komande)
+        if (userKey !== channelState.channelUsername.toLowerCase() && !startsWithPrefix && spam.spamFilter(chatroomId, username, poruka, chatData.sender, messageId)) {
+            // Samo upozorenje bez brisanja poruka (osim ako je viewbot banovan unutar spamFilter-a)
+            return;
+        }
+
+        // Stream Analytics za Kickan (samo za poruke koje su prošle moderaciju i anti-spam)
         try {
             streamAnalytics.recordChatMessage(
                 chatroomId,
@@ -332,21 +371,6 @@ async function obradiPusherPoruku(data) {
                 chatData.sender?.identity?.badges || chatData.sender?.badges || []
             );
         } catch (_) {}
-
-        // Logujemo chat poruku
-        utils.log('CHAT', `[@${channelState.channelUsername || chatroomId}] ${username}: ${poruka}`);
-
-        // Automatska moderacija četa
-        const messageId = chatData.id || chatData.messageId || null;
-        if (moderation.proveriModeraciju(chatroomId, username, poruka, messageId, chatData.sender)) {
-            return;
-        }
-
-        // Anti-spam filter (izuzimamo strimera i bot komande)
-        if (userKey !== channelState.channelUsername.toLowerCase() && !startsWithPrefix && spam.spamFilter(chatroomId, username, poruka, chatData.sender)) {
-            // Samo upozorenje bez brisanja poruka
-            return;
-        }
 
         // Ako poruka počinje sa prefiksom i posle njega ima razmak (npr. "! komanda"), spoj ih
         let porukaSredjena = porukaTrimmed;

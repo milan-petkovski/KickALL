@@ -2,6 +2,10 @@ const { createClient } = require('@supabase/supabase-js');
 const config = require('./config');
 const { log } = require('./utils');
 
+const LruCache = require('./lruCache');
+const { withRetry } = require('./retry');
+const metrics = require('./metrics');
+
 const TABELA = 'bot_kick_tokens';
 const RED_ID = 1; // uvek čuvamo jedan red (bot ima jedan nalog)
 
@@ -12,7 +16,7 @@ const supabase = (config.SUPABASE_URL && config.SUPABASE_KEY)
 let keshTokeni = null;       // { access_token, refresh_token, expires_at }
 let keshSesija = null;       // session_cookie string (keš)
 let refreshTimer = null;
-let broadcasterIdCache = {}; // username -> user_id
+const broadcasterIdCache = new LruCache({ maxSize: 1000, defaultTtlMs: 2 * 60 * 60 * 1000 }); // username -> user_id (2h TTL)
 let _refreshInFlight = null; // Mutex: aktivan promise osvežavanja tokena (sprečava race condition)
 
 async function ucitajTokene() {
@@ -153,7 +157,8 @@ function zakaziAutoOsvezavanje() {
  */
 async function getBroadcasterUserId(username) {
     const key = username.toLowerCase();
-    if (broadcasterIdCache[key]) return broadcasterIdCache[key];
+    const cached = broadcasterIdCache.get(key);
+    if (cached) return cached;
 
     const accessToken = await getAccessToken();
     const res = await fetch(`https://api.kick.com/public/v1/channels?slug=${encodeURIComponent(username)}`, {
@@ -172,7 +177,7 @@ async function getBroadcasterUserId(username) {
         throw new Error(`API nije vratio broadcaster_user_id za ${username}`);
     }
 
-    broadcasterIdCache[key] = userId;
+    broadcasterIdCache.set(key, userId);
     return userId;
 }
 
@@ -186,22 +191,48 @@ async function posaljiPrekoZvanicnogApija(chatroomId, tekst, channelUsername, _c
         const broadcasterId = await getBroadcasterUserId(channelUsername);
         const accessToken = await getAccessToken();
 
-        const response = await fetch('https://api.kick.com/public/v1/chat', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                broadcaster_user_id: Number(broadcasterId) || broadcasterId,
-                content: tekst,
-                type: 'user'
-            })
-        });
+        let response;
+        try {
+            response = await withRetry(async () => {
+                const r = await fetch('https://api.kick.com/public/v1/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        broadcaster_user_id: Number(broadcasterId) || broadcasterId,
+                        content: tekst,
+                        type: 'user'
+                    })
+                });
+                // Privremene serverske greške (502/503/504) se ponavljaju sa backoff-om
+                if (r.status === 502 || r.status === 503 || r.status === 504) {
+                    const e = new Error(`HTTP ${r.status}`);
+                    e.response = r;
+                    throw e;
+                }
+                return r;
+            }, { retries: 2, baseDelayMs: 400, maxDelayMs: 2500 });
+        } catch (retryErr) {
+            if (retryErr && retryErr.response) {
+                response = retryErr.response;
+            } else {
+                throw retryErr;
+            }
+        }
 
         if (!response.ok) {
+            metrics.inc('kick_send_errors');
             const errText = await response.text();
+            if (response.status === 403) {
+                if (_channelState) {
+                    _channelState.forbiddenUntil = Date.now() + 5 * 60 * 1000;
+                }
+                log('WARN', `[${channelUsername || chatroomId}] Bot nema dozvolu za slanje poruka na Kick API (HTTP 403 Forbidden - proverite da li je bot moderator na kanalu ili je chat u follower/sub-only režimu). Pauziram slanje na 5 minuta.`);
+                return null;
+            }
             log('ERR', `[${channelUsername || chatroomId}] Greška slanja na Kick API: HTTP ${response.status} - ${errText}`);
             if (response.status === 429 && _channelState) {
                 const retryAfterHeader = response.headers ? response.headers.get('retry-after') : null;

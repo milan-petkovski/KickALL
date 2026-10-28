@@ -2,6 +2,9 @@ const config = require('../config');
 const state = require('../state');
 const { log, isValidUsername, sanitizeInput, proveraKulauna, prevediVreme, fetchKickAPI } = require('../utils');
 const { posaljiPoruku } = require('../messenger');
+const CircuitBreaker = require('../circuitBreaker');
+
+const weatherBreaker = new CircuitBreaker({ name: 'weather-wttr', failureThreshold: 3, resetTimeoutMs: 30000 });
 
 async function handleFollowage(chatroomId, sender, targetRaw) {
     const channelState = state.getChannelState(chatroomId);
@@ -204,44 +207,52 @@ async function handleVreme(chatroomId, grad) {
         return;
     }
 
+    if (weatherBreaker.isOpen()) {
+        posaljiPoruku(chatroomId, `Servis za vremensku prognozu je trenutno preopterećen. Pokušajte ponovo za 30 sekundi.`);
+        return;
+    }
+
     try {
-        const { gotScraping } = await import('got-scraping');
-        const url = `https://wttr.in/${encodeURIComponent(cleanGrad)}?format=j1`;
-        const response = await gotScraping({
-            url,
-            responseType: 'json',
-            headers: { 'Accept': 'application/json', 'User-Agent': 'curl/7.68.0' },
-            timeout: { request: 8000 },
-            retry: { limit: 1 }
+        await weatherBreaker.execute(async () => {
+            const { gotScraping } = await import('got-scraping');
+            const url = `https://wttr.in/${encodeURIComponent(cleanGrad)}?format=j1`;
+            const response = await gotScraping({
+                url,
+                responseType: 'json',
+                headers: { 'Accept': 'application/json', 'User-Agent': 'curl/7.68.0' },
+                timeout: { request: 4000 },
+                retry: { limit: 0 }
+            });
+
+            if (response.statusCode < 200 || response.statusCode >= 300) {
+                throw new Error(`HTTP ${response.statusCode}`);
+            }
+
+            const podaci = response.body;
+            if (!podaci || !podaci.current_condition || !podaci.current_condition[0]) {
+                posaljiPoruku(chatroomId, `Grad "${cleanGrad}" nije pronađen. Proverite naziv grada.`);
+                return;
+            }
+
+            const cc = podaci.current_condition[0];
+            const tempC = cc.temp_C;
+            const opis = cc.weatherDesc[0].value;
+            const vlaznost = cc.humidity;
+            const vetar = cc.windspeedKmph;
+            const osecaj = cc.FeelsLikeC;
+
+            const opisSrp = prevediVreme(opis);
+            const tekst = `Vreme u ${cleanGrad}: ${opisSrp} | ${tempC}°C (oseća se ${osecaj}°C) | Vlažnost: ${vlaznost}% | Vetar: ${vetar} km/h`;
+
+            channelState.weatherCache[gradKey] = { podaci: tekst, ts: sada };
+            posaljiPoruku(chatroomId, tekst);
         });
-
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-            throw new Error(`HTTP ${response.statusCode}`);
-        }
-
-        const podaci = response.body;
-        if (!podaci || !podaci.current_condition || !podaci.current_condition[0]) {
-            posaljiPoruku(chatroomId, `❌ Grad "${cleanGrad}" nije pronađen. Provjeri naziv grada.`);
-            return;
-        }
-
-        const cc = podaci.current_condition[0];
-        const tempC = cc.temp_C;
-        const opis = cc.weatherDesc[0].value;
-        const vlaznost = cc.humidity;
-        const vetar = cc.windspeedKmph;
-        const osecaj = cc.FeelsLikeC;
-
-        const opisSrp = prevediVreme(opis);
-
-        const tekst = `🌍 Vreme u ${cleanGrad}: ${opisSrp} | 🌡️ ${tempC}°C (oseća se ${osecaj}°C) | 💧 Vlažnost: ${vlaznost}% | 💨 Vetar: ${vetar} km/h`;
-
-        channelState.weatherCache[gradKey] = { podaci: tekst, ts: sada };
-        posaljiPoruku(chatroomId, tekst);
     } catch (err) {
         log('ERR', `handleVreme greška: ${err.message}`);
         if (err.message && (err.message.includes('404') || err.message.includes('Unknown location'))) {
-            posaljiPoruku(chatroomId, `❌ Grad "${cleanGrad}" nije pronađen. Provjeri naziv grada.`);
+            posaljiPoruku(chatroomId, `Grad "${cleanGrad}" nije pronađen. Proverite naziv grada.`);
+        } else if (weatherBreaker.isOpen()) {
+            posaljiPoruku(chatroomId, `Servis za vremensku prognozu je privremeno nedostupan.`);
         }
     }
 }

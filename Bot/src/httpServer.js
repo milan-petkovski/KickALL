@@ -138,14 +138,41 @@ async function handleHttpRequest(req, res) {
     try {
         const parsedUrl = new URL(req.url, 'http://localhost');
 
-        // ─── Health Check Endpoint (za Render i load balancer-e) ─────────────
-        if (parsedUrl.pathname === '/health' || parsedUrl.pathname === '/healthz') {
+        // ─── Health Check & Metrics Endpoint (za Render i load balancer-e) ───
+        if (parsedUrl.pathname === '/health' || parsedUrl.pathname === '/healthz' || parsedUrl.pathname === '/metrics') {
+            const mem = process.memoryUsage();
+            const raidDefense = require('./raidDefense');
+            const metrics = require('./metrics');
+            const activeRaidChannels = Object.keys(state.channels).filter(c => raidDefense.isRaidModeActive(c));
+
+            if (parsedUrl.pathname === '/metrics' && parsedUrl.searchParams.get('format') === 'prom') {
+                res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
+                res.end(metrics.toPrometheus({
+                    channels_active: Object.keys(state.channels).length,
+                    realtime_connected: state.isConnected ? 1 : 0,
+                    is_leader: state.isLeader ? 1 : 0,
+                    raid_defense_active_channels: activeRaidChannels.length,
+                    memory_rss_bytes: mem.rss,
+                    memory_heap_used_bytes: mem.heapUsed
+                }));
+                return;
+            }
+
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({
                 status: 'ok',
                 isLeader: state.isLeader,
                 instanceId: state.instanceId,
-                uptime: process.uptime()
+                uptimeSeconds: Math.round(process.uptime()),
+                channelsActive: Object.keys(state.channels).length,
+                realtimeConnected: !!state.isConnected,
+                raidDefenseActiveOn: activeRaidChannels,
+                counters: metrics.snapshot(),
+                memoryMb: {
+                    rss: Math.round(mem.rss / 1024 / 1024),
+                    heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+                    heapTotal: Math.round(mem.heapTotal / 1024 / 1024)
+                }
             }));
             return;
         }
@@ -582,6 +609,25 @@ async function handleHttpRequest(req, res) {
 
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify(filteredLogs));
+            return;
+        }
+
+        // ─── Audit log automatske moderacije ─────────────────────────────────
+        if (parsedUrl.pathname === '/api/kick/moderation-log' && req.method === 'GET') {
+            if (!verifyInternalToken(req)) {
+                res.writeHead(401, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Unauthorized access to moderation log' }));
+                return;
+            }
+            const chatroomId = parsedUrl.searchParams.get('chatroom_id') || parsedUrl.searchParams.get('channel_id');
+            if (!chatroomId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Nedostaje chatroom_id' }));
+                return;
+            }
+            const moderationAudit = require('./moderationAudit');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(moderationAudit.dohvati(chatroomId, parsedUrl.searchParams.get('limit'))));
             return;
         }
 

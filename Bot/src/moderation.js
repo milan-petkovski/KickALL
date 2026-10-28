@@ -1,28 +1,11 @@
 const { posaljiPoruku, obrisiPoruku, banujKorisnika, timeoutKorisnika } = require('./messenger');
 const { log } = require('./utils');
 const state = require('./state');
-const { normalizujZaPoredjenje, despaceText } = require('./spam');
+const { normalizujZaPoredjenje, despaceText, daLiJeBotSpam } = require('./spam');
+const moderationAudit = require('./moderationAudit');
 
-// 100% nepobitne fraze i servisi koje koriste isključivo spam botovi za promociju
-const HARD_BOT_PROMO_REGEX = /\b(typical\s*panels|save\s*99%|buy\s*(followers|viewers|chatters)|cheap\s*(viewers|chatters|followers|bots)|kickbotting|ownkick|kickview|pay\s*only\s*for\s*what\s*you\s*use|free\s*trial\s*available|chatters\s*with\s*custom|kick\s*viewbot|viewbot[,\s]+follower\s*bot)\b/i;
-
-// Generički termini za botove koji se kažnjavaju SAMO ako poruka sadrži komercijalne/reklamne reči ili link ka servisu
-const GENERIC_BOT_REGEX = /\b(viewbot|view-bot|viewer\s*bot|follower\s*bot|chat\s*bot)\b/i;
-const PROMO_INDICATOR_REGEX = /\b(cheap|reliable|automated|24\/7|order|discount|deal|packages?|instant|pricing|panel|trial|fast|best\s*service|usd|eur|fees?|billed|no\s*fees|minutes\s*you\s*use|\$|\%)\b|https?:\/\/|[a-z0-9-]+\.(com|net|org|io|gg|xyz|ru|live|store|club|app|dev)/i;
-
-function isViewBotSpam(content, despaced) {
-    if (HARD_BOT_PROMO_REGEX.test(content) || HARD_BOT_PROMO_REGEX.test(despaced)) {
-        return true;
-    }
-    // Ako spominje viewbot/follower bot/chat bot, banuj samo ako ima komercijalni/reklamni kontekst
-    const mentionsBot = GENERIC_BOT_REGEX.test(content) || GENERIC_BOT_REGEX.test(despaced);
-    if (mentionsBot) {
-        const hasPromo = PROMO_INDICATOR_REGEX.test(content) || PROMO_INDICATOR_REGEX.test(despaced);
-        if (hasPromo) {
-            return true;
-        }
-    }
-    return false;
+function isViewBotSpam(content) {
+    return daLiJeBotSpam(content);
 }
 const DOMAIN_URL_REGEX = /(https?:\/\/[^\s]+|([a-zA-Z0-9-]{2,}\.)+(com|net|org|io|gg|xyz|site|ru|tv|me|info|biz|live|top|online|store|club|app|dev)\b[^\s]*)/gi;
 
@@ -62,9 +45,19 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
     let triggerReason = null;
     let filterAction = null;
     let filterTimeout = null;
+
+    // ── 0. VIEWBOT & SCAM BOT PROTECTION (Prioritet pre ostalih filtera) ────
+    const despaced = despaceText(content);
+    // Poznati i poverljivi korisnici (mod, vip, sub, og) nikada ne mogu biti lažno banovani kao viewbot
+    const isTrustedUser = isMod || isVip || isSub || isOg;
+    if (!isTrustedUser && isViewBotSpam(content, despaced)) {
+        triggerReason = 'Viewbot / nedozvoljena reklama';
+        filterAction = 'ban';
+        filterTimeout = null;
+    }
     
     // ── 1. CAPS PROTECTION ──────────────────────────────────────────────────
-    if (settings.caps_enabled) {
+    if (!triggerReason && settings.caps_enabled) {
         const minLen = settings.caps_min_len || 5;
         const pct = settings.caps_pct || 70;
         
@@ -80,16 +73,7 @@ function proveriModeraciju(chatroomId, username, content, messageId, senderObj) 
         }
     }
     
-    // ── 2. LINK & VIEWBOT PROTECTION ───────────────────────────────────────
-    const despaced = despaceText(content);
-    // Poznati i poverljivi korisnici (mod, vip, sub, og) nikada ne mogu biti lažno banovani kao viewbot
-    const isTrustedUser = isMod || isVip || isSub || isOg;
-    if (!triggerReason && !isTrustedUser && isViewBotSpam(content, despaced)) {
-        triggerReason = 'Viewbot / nedozvoljena reklama';
-        filterAction = 'ban';
-        filterTimeout = null;
-    }
-
+    // ── 2. LINK PROTECTION ──────────────────────────────────────────────────
     if (!triggerReason && settings.links_enabled) {
         const matchesOriginal = content.match(DOMAIN_URL_REGEX) || [];
         const matchesDespaced = despaced.match(DOMAIN_URL_REGEX) || [];
@@ -266,6 +250,13 @@ function kazniKorisnika(chatroomId, username, messageId, reason, actionType, tim
     const userKey = username.toLowerCase();
     const userId = senderObj?.id || senderObj?.user_id || null;
 
+    // Audit log + dry-run: u dry-run režimu se akcija samo beleži, bez stvarne kazne
+    const dryRun = moderationAudit.jeDryRun(channelState);
+    moderationAudit.zabelezi(chatroomId, { action: act, username, reason, source: 'moderation', dryRun });
+    if (dryRun) {
+        log('MOD', `[${channelState.channelUsername || chatroomId}] [DRY-RUN] Bio bi primenjen '${act}' nad ${username}. Reason: ${reason}`);
+        return;
+    }
     // Beleži u streamAnalytics za Kickan
     try {
         const streamAnalytics = require('./streamAnalytics');
@@ -279,6 +270,14 @@ function kazniKorisnika(chatroomId, username, messageId, reason, actionType, tim
         channelState.bannedUsers.add(userKey);
 
         if (messageId) obrisiPoruku(chatroomId, messageId);
+        if (channelState.recentUserMessages && channelState.recentUserMessages.has(userKey)) {
+            for (const recentMsg of channelState.recentUserMessages.get(userKey)) {
+                if (recentMsg.id && recentMsg.id !== messageId) {
+                    obrisiPoruku(chatroomId, recentMsg.id);
+                }
+            }
+            channelState.recentUserMessages.delete(userKey);
+        }
         banujKorisnika(chatroomId, username, reason, userId);
         posaljiPoruku(chatroomId, `[MOD] @${username} je trajno banovan.`);
         log('MOD', `[${channelState.channelUsername || chatroomId}] Ban ${username}. Reason: ${reason}`);

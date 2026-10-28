@@ -100,99 +100,44 @@ async function sacuvajWatchtime(chatroomId) {
             }
 
             const { dobijTrenutniMesec, dobijTrenutniDan } = require('./utils');
+            const database = require('./database');
+            const limitFn = database.limitDbConcurrency || (fn => fn());
             const trenutniMesec = dobijTrenutniMesec();
             const trenutniDan = dobijTrenutniDan();
             const godinaStr = trenutniMesec.split('-')[1] || String(new Date().getFullYear());
 
-            // 1. Čuvanje mesečnog watchtime-a
-            if (dirtyKeys.length > 0) {
-                const { data, error: fetchError } = await supabase
-                    .from('leaderboard')
-                    .select('username, chat, watchtime_minutes')
-                    .eq('channel_id', chatroomId)
-                    .eq('month', trenutniMesec)
-                    .in('username', dirtyKeys);
+            await limitFn(async () => {
+                // 1. Čuvanje mesečnog watchtime-a
+                if (dirtyKeys.length > 0) {
+                    const { data, error: fetchError } = await supabase
+                        .from('leaderboard')
+                        .select('username, chat, watchtime_minutes')
+                        .eq('channel_id', chatroomId)
+                        .eq('month', trenutniMesec)
+                        .in('username', dirtyKeys);
 
-                if (fetchError) throw fetchError;
+                    if (fetchError) throw fetchError;
 
-                const dbMap = {};
-                if (data) {
-                    data.forEach(row => {
-                        dbMap[row.username.toLowerCase()] = row;
-                    });
-                }
-
-                const lbRows = dirtyKeys.map(key => {
-                    const existing = dbMap[key];
-                    const dbMinutes = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : 0;
-                    const dbChat = existing && existing.chat !== undefined ? existing.chat : ((channelState.leaderboard && channelState.leaderboard[key]) ? channelState.leaderboard[key].count : 0);
-                    const delta = channelState.watchtimeDeltas[key];
-                    const newMinutes = Math.max(0, dbMinutes + delta);
-
-                    return {
-                        channel_id: chatroomId,
-                        username: key,
-                        display_name: (channelState.watchtime[key] && channelState.watchtime[key].display_name) || key,
-                        chat: dbChat,
-                        watchtime_minutes: newMinutes,
-                        month: trenutniMesec,
-                        year: godinaStr,
-                        updated_at: new Date().toISOString(),
-                        _newMinutes: newMinutes
-                    };
-                });
-
-                const lbClean = lbRows.map(({ _newMinutes, ...r }) => r);
-                const { error: upsertError } = await supabase
-                    .from('leaderboard')
-                    .upsert(lbClean, { onConflict: 'channel_id,username,month' });
-
-                if (upsertError) throw upsertError;
-
-                lbRows.forEach(row => {
-                    const key = row.username;
-                    if (channelState.watchtime[key]) {
-                        channelState.watchtime[key].minutes = row._newMinutes;
-                    } else {
-                        channelState.watchtime[key] = {
-                            display_name: row.display_name,
-                            minutes: row._newMinutes
-                        };
-                    }
-                    delete channelState.watchtimeDeltas[key];
-                });
-            }
-
-            // 2. Čuvanje dnevnog watchtime-a
-            if (dailyDirtyKeys.length > 0) {
-                const danStr = channelState.tekuciDanLeaderboarda || trenutniDan;
-                const { data: dailyData, error: dailyFetchError } = await supabase
-                    .from('leaderboard_daily')
-                    .select('username, chat, watchtime_minutes')
-                    .eq('channel_id', chatroomId)
-                    .eq('day', danStr)
-                    .in('username', dailyDirtyKeys);
-
-                if (!dailyFetchError) {
-                    const dailyDbMap = {};
-                    if (dailyData) {
-                        dailyData.forEach(row => { dailyDbMap[row.username.toLowerCase()] = row; });
+                    const dbMap = {};
+                    if (data) {
+                        data.forEach(row => {
+                            dbMap[row.username.toLowerCase()] = row;
+                        });
                     }
 
-                    const dailyRows = dailyDirtyKeys.map(key => {
-                        const existing = dailyDbMap[key];
+                    const lbRows = dirtyKeys.map(key => {
+                        const existing = dbMap[key];
                         const dbMinutes = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : 0;
-                        const dbChat = existing && existing.chat !== undefined ? existing.chat : ((channelState.leaderboardDaily && channelState.leaderboardDaily[key]) ? channelState.leaderboardDaily[key].count : 0);
-                        const delta = channelState.watchtimeDailyDeltas[key];
+                        const dbChat = existing && existing.chat !== undefined ? existing.chat : ((channelState.leaderboard && channelState.leaderboard[key]) ? channelState.leaderboard[key].count : 0);
+                        const delta = channelState.watchtimeDeltas[key];
                         const newMinutes = Math.max(0, dbMinutes + delta);
 
                         return {
                             channel_id: chatroomId,
                             username: key,
-                            display_name: (channelState.watchtimeDaily[key] && channelState.watchtimeDaily[key].display_name) || (channelState.watchtime[key] && channelState.watchtime[key].display_name) || key,
+                            display_name: (channelState.watchtime[key] && channelState.watchtime[key].display_name) || key,
                             chat: dbChat,
                             watchtime_minutes: newMinutes,
-                            day: danStr,
                             month: trenutniMesec,
                             year: godinaStr,
                             updated_at: new Date().toISOString(),
@@ -200,25 +145,86 @@ async function sacuvajWatchtime(chatroomId) {
                         };
                     });
 
-                    const dailyClean = dailyRows.map(({ _newMinutes, ...r }) => r);
-                    const { error: dailyUpsertError } = await supabase
-                        .from('leaderboard_daily')
-                        .upsert(dailyClean, { onConflict: 'channel_id,username,day' });
+                    const lbClean = lbRows.map(({ _newMinutes, ...r }) => r);
+                    const { error: upsertError } = await supabase
+                        .from('leaderboard')
+                        .upsert(lbClean, { onConflict: 'channel_id,username,month' });
 
-                    if (!dailyUpsertError) {
-                        dailyRows.forEach(row => {
-                            const key = row.username;
-                            if (channelState.watchtimeDaily[key]) {
-                                channelState.watchtimeDaily[key].minutes = row._newMinutes;
-                            }
-                            delete channelState.watchtimeDailyDeltas[key];
+                    if (upsertError) throw upsertError;
+
+                    lbRows.forEach(row => {
+                        const key = row.username;
+                        if (channelState.watchtime[key]) {
+                            channelState.watchtime[key].minutes = row._newMinutes;
+                        } else {
+                            channelState.watchtime[key] = {
+                                display_name: row.display_name,
+                                minutes: row._newMinutes
+                            };
+                        }
+                        delete channelState.watchtimeDeltas[key];
+                    });
+                }
+
+                // 2. Čuvanje dnevnog watchtime-a
+                if (dailyDirtyKeys.length > 0) {
+                    const danStr = channelState.tekuciDanLeaderboarda || trenutniDan;
+                    const { data: dailyData, error: dailyFetchError } = await supabase
+                        .from('leaderboard_daily')
+                        .select('username, chat, watchtime_minutes')
+                        .eq('channel_id', chatroomId)
+                        .eq('day', danStr)
+                        .in('username', dailyDirtyKeys);
+
+                    if (!dailyFetchError) {
+                        const dailyDbMap = {};
+                        if (dailyData) {
+                            dailyData.forEach(row => { dailyDbMap[row.username.toLowerCase()] = row; });
+                        }
+
+                        const dailyRows = dailyDirtyKeys.map(key => {
+                            const existing = dailyDbMap[key];
+                            const dbMinutes = existing && existing.watchtime_minutes !== undefined ? existing.watchtime_minutes : 0;
+                            const dbChat = existing && existing.chat !== undefined ? existing.chat : ((channelState.leaderboardDaily && channelState.leaderboardDaily[key]) ? channelState.leaderboardDaily[key].count : 0);
+                            const delta = channelState.watchtimeDailyDeltas[key];
+                            const newMinutes = Math.max(0, dbMinutes + delta);
+
+                            return {
+                                channel_id: chatroomId,
+                                username: key,
+                                display_name: (channelState.watchtimeDaily[key] && channelState.watchtimeDaily[key].display_name) || (channelState.watchtime[key] && channelState.watchtime[key].display_name) || key,
+                                chat: dbChat,
+                                watchtime_minutes: newMinutes,
+                                day: danStr,
+                                month: trenutniMesec,
+                                year: godinaStr,
+                                updated_at: new Date().toISOString(),
+                                _newMinutes: newMinutes
+                            };
                         });
+
+                        const dailyClean = dailyRows.map(({ _newMinutes, ...r }) => r);
+                        const { error: dailyUpsertError } = await supabase
+                            .from('leaderboard_daily')
+                            .upsert(dailyClean, { onConflict: 'channel_id,username,day' });
+
+                        if (!dailyUpsertError) {
+                            dailyRows.forEach(row => {
+                                const key = row.username;
+                                if (channelState.watchtimeDaily[key]) {
+                                    channelState.watchtimeDaily[key].minutes = row._newMinutes;
+                                }
+                                delete channelState.watchtimeDailyDeltas[key];
+                            });
+                        }
                     }
                 }
-            }
+            });
 
             channelState.watchtimeDirty = false;
-            log('INFO', `[${channelState.channelUsername || chatroomId}] Watchtime sačuvan u bazu.`);
+            if (process.env.DEBUG_DATABASE === 'true') {
+                log('INFO', `[${channelState.channelUsername || chatroomId}] Watchtime sačuvan u bazu.`);
+            }
         } catch (err) {
             log('ERR', `Greška pri čuvanju watchtime-a za ${chatroomId}: ${err.message}`);
         }

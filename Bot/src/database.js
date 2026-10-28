@@ -1272,6 +1272,45 @@ async function ucitajEkonomiju(chatroomId) {
     }
 }
 
+// Ograničava maksimalan broj paralelnih Supabase I/O operacija (sprečava zagušenje PgBouncer pool-a)
+const MAX_CONCURRENT_DB_OPS = 3;
+let activeDbOps = 0;
+const dbOpsQueue = [];
+
+function limitDbConcurrency(task) {
+    return new Promise((resolve, reject) => {
+        const executeTask = async () => {
+            activeDbOps++;
+            try {
+                const result = await task();
+                resolve(result);
+            } catch (err) {
+                reject(err);
+            } finally {
+                activeDbOps--;
+                if (dbOpsQueue.length > 0) {
+                    const next = dbOpsQueue.shift();
+                    next();
+                }
+            }
+        };
+
+        if (activeDbOps < MAX_CONCURRENT_DB_OPS) {
+            executeTask();
+        } else {
+            dbOpsQueue.push(executeTask);
+        }
+    });
+}
+
+function chunkArray(array, size = 40) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += size) {
+        chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+}
+
 async function sacuvajEkonomiju(chatroomId) {
     const channelState = state.getChannelState(chatroomId);
     if (!channelState || !channelState.economyDirty) return;
@@ -1317,16 +1356,23 @@ async function sacuvajEkonomiju(chatroomId) {
             return;
         }
 
-        const { error } = await sbPanels
-            .from('leaderboard')
-            .upsert(rows, { onConflict: 'channel_id,username,month' });
+        await limitDbConcurrency(async () => {
+            const chunks = chunkArray(rows, 40);
+            for (const batch of chunks) {
+                const { error } = await sbPanels
+                    .from('leaderboard')
+                    .upsert(batch, { onConflict: 'channel_id,username,month' });
 
-        if (error) throw error;
+                if (error) throw error;
+            }
+        });
 
         channelState.economyDeltas.clear();
         channelState.economyDirty = false;
 
-        log('INFO', `[${channelState.channelUsername || chatroomId}] Ekonomija sačuvana u leaderboard tabelu za ${rows.length} korisnika.`);
+        if (process.env.DEBUG_DATABASE === 'true') {
+            log('INFO', `[${channelState.channelUsername || chatroomId}] Ekonomija sačuvana u leaderboard tabelu za ${rows.length} korisnika.`);
+        }
     } catch (err) {
         log('ERR', `Greška pri čuvanju ekonomije za ${chatroomId}: ${err.message}`);
     }
@@ -1345,6 +1391,9 @@ async function syncChatroomId(channelName, realChatroomId) {
 }
 
 let realtimeChannel = null;
+let realtimeDisconnectTimer = null;
+let realtimeWasSubscribed = false;
+let realtimeWarnedDisconnected = false;
 
 /**
  * Pokreće Supabase Realtime CDC (Change Data Capture) pretplatu na `bot_config` tabelu.
@@ -1371,6 +1420,10 @@ function ocistiRealtimeDebounceTajmere() {
 
 function zaustaviRealtimeSlusalac() {
     ocistiRealtimeDebounceTajmere();
+    if (realtimeDisconnectTimer) {
+        clearTimeout(realtimeDisconnectTimer);
+        realtimeDisconnectTimer = null;
+    }
     if (realtimeChannel && supabase) {
         try {
             supabase.removeChannel(realtimeChannel);
@@ -1448,11 +1501,28 @@ function postaviRealtimeSlusalac() {
             )
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
-                    log('INFO', '[REALTIME] Supabase Realtime CDC sinhronizacija aktivna za izmene bota u realnom vremenu.');
-                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                    log('WARN', `[REALTIME] Supabase Realtime CDC konekcija prekinuta (status: ${status}). Supabase će automatski pokušati reko-nekciju.`);
-                } else if (status === 'CLOSED') {
-                    log('WARN', '[REALTIME] Supabase Realtime CDC kanal zatvoren.');
+                    if (realtimeDisconnectTimer) {
+                        clearTimeout(realtimeDisconnectTimer);
+                        realtimeDisconnectTimer = null;
+                    }
+                    if (!realtimeWasSubscribed) {
+                        realtimeWasSubscribed = true;
+                        log('INFO', '[REALTIME] Supabase Realtime CDC sinhronizacija aktivna za izmene bota u realnom vremenu.');
+                    } else if (realtimeWarnedDisconnected) {
+                        realtimeWarnedDisconnected = false;
+                        log('INFO', '[REALTIME] Supabase Realtime CDC konekcija uspešno obnovljena.');
+                    }
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    if (!realtimeDisconnectTimer) {
+                        realtimeDisconnectTimer = setTimeout(() => {
+                            realtimeDisconnectTimer = null;
+                            realtimeWarnedDisconnected = true;
+                            log('WARN', `[REALTIME] Supabase Realtime CDC konekcija prekinuta (status: ${status}). Supabase će automatski pokušati reko-nekciju.`);
+                        }, 15000);
+                        if (realtimeDisconnectTimer && typeof realtimeDisconnectTimer.unref === 'function') {
+                            realtimeDisconnectTimer.unref();
+                        }
+                    }
                 }
             });
     } catch (err) {
@@ -1491,7 +1561,8 @@ module.exports = {
     postaviRealtimeSlusalac,
     zaustaviRealtimeSlusalac,
     ocistiRealtimeDebounceTajmere,
-    normalizujLjubavKaNuli
+    normalizujLjubavKaNuli,
+    limitDbConcurrency
 };
 
 
