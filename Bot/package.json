@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
-    "axios": "^1.20.0",
+    "axios": "^1.21.0",
     "centrifuge": "^5.7.4",
     "dotenv": "^17.4.2",
     "got-scraping": "^4.2.1",
