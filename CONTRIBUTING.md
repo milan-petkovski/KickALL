@@ -67,3 +67,19 @@ npm run verify
 3. **Icons & UI Design**: Never use emoji symbols for UI components. Always use clean custom SVG icons.
 4. **Unit Tests**: Every new feature, command in `Bot/src/`, or endpoint in `Website/` must include automated tests using Node's native test runner (`node:test` and `node:assert/strict`) located in the respective `tests/` directory.
 5. **Clean Pull Requests**: Ensure all linting, security audits, and tests pass before submitting your Pull Request. Keep commits atomic and descriptive.
+
+---
+
+## ☕ The Story & Support
+
+If KickALL helps you grow your channel or streamlines your broadcast workflow, and you want to support my late-night coding sessions, you can buy me a coffee!
+
+💖 [Support my work via PayPal](https://paypal.me/milanwebportal)
+
+---
+
+_Thank you for maintaining and elevating the KickALL ecosystem!_
+
+---
+
+<p align="center">Made with ❤️ by <b>Milan Web Portal</b></p>
